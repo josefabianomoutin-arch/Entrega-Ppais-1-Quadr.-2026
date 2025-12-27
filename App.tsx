@@ -85,6 +85,24 @@ const App: React.FC = () => {
     }
   };
 
+  const cancelDeliveries = (producerId: string, deliveryIds: string[]) => {
+    const updatedProducers = producers.map(p => {
+        if (p.id === producerId) {
+            return {
+                ...p,
+                deliveries: p.deliveries.filter(d => !deliveryIds.includes(d.id))
+            };
+        }
+        return p;
+    });
+
+    setProducers(updatedProducers);
+    const updatedUser = updatedProducers.find(p => p.id === producerId);
+    if (updatedUser) {
+        setCurrentUser(updatedUser);
+    }
+  };
+
   const markInvoicesAsUploaded = (producerId: string, deliveryIds: string[], invoiceNumber: string) => {
       const producerToUpdate = producers.find(p => p.id === producerId);
       if (!producerToUpdate) return;
@@ -140,6 +158,7 @@ const App: React.FC = () => {
       onLogout={handleLogout} 
       onAddDeliveries={addDeliveries}
       onInvoiceUpload={markInvoicesAsUploaded}
+      onCancelDeliveries={cancelDeliveries}
     />
   );
 };

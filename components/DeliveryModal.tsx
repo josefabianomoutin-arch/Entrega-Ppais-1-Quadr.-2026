@@ -4,12 +4,13 @@ import type { ContractItem } from '../types';
 interface DeliveryModalProps {
   date: Date;
   onClose: () => void;
-  onSave: (deliveryData: { time: string; item: string; kg: number; value: number }[]) => void;
+  onSave: (deliveryData: { time: string; item: string; kg: number; value: number }[], invoiceNumber: string) => void;
   contractItems: ContractItem[];
 }
 
 const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, contractItems }) => {
   const [time, setTime] = useState('08:00');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
   const [itemInputs, setItemInputs] = useState(
     contractItems.map(() => ({ kg: '', value: '' }))
   );
@@ -22,6 +23,12 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, co
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!invoiceNumber.trim()) {
+        alert('Por favor, insira o número da nota fiscal.');
+        return;
+    }
+
     const deliveriesToSave: { time: string; item: string; kg: number; value: number }[] = [];
     
     itemInputs.forEach((input, index) => {
@@ -39,7 +46,7 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, co
     });
 
     if (deliveriesToSave.length > 0) {
-      onSave(deliveriesToSave);
+      onSave(deliveriesToSave, invoiceNumber);
     } else {
       alert('Por favor, preencha os campos de quilograma e valor para pelo menos um item.');
     }
@@ -57,6 +64,11 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, co
         <p className="mb-6 text-gray-600">Data selecionada: <span className="font-semibold text-green-700">{formattedDate}</span></p>
         
         <form onSubmit={handleSubmit} className="space-y-4">
+           <div>
+            <label htmlFor="invoice-number" className="block text-sm font-medium text-gray-700">Número da Nota Fiscal (para todos os itens)</label>
+            <input type="text" id="invoice-number" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} required placeholder="Ex: 001234" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"/>
+          </div>
+
           <div>
             <label htmlFor="time" className="block text-sm font-medium text-gray-700">Horário da Entrega (para todos os itens)</label>
             <input type="time" id="time" value={time} onChange={e => setTime(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"/>

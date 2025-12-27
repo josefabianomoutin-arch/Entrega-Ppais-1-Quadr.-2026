@@ -11,9 +11,10 @@ interface DashboardProps {
   onLogout: () => void;
   onAddDeliveries: (producerId: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => void;
   onInvoiceUpload: (producerId: string, deliveryIds: string[], invoiceNumber: string) => void;
+  onCancelDeliveries: (producerId: string, deliveryIds: string[]) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveries, onInvoiceUpload }) => {
+const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveries, onInvoiceUpload, onCancelDeliveries }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [deliveriesToShow, setDeliveriesToShow] = useState<Delivery[]>([]);
@@ -55,13 +56,24 @@ const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveri
     setIsModalOpen(true);
   }
 
-  const handleSaveDelivery = (deliveryItems: { time: string; item: string; kg: number; value: number }[]) => {
+  const handleSaveDelivery = (deliveryItems: { time: string; item: string; kg: number; value: number }[], invoiceNumber: string) => {
     if (selectedDate) {
       const dateString = selectedDate.toISOString().split('T')[0];
-      const deliveriesToAdd = deliveryItems.map(item => ({ ...item, date: dateString }));
+      const deliveriesToAdd = deliveryItems.map(item => ({ 
+          ...item, 
+          date: dateString,
+          invoiceNumber,
+      }));
       onAddDeliveries(producer.id, deliveriesToAdd);
     }
     handleCloseModal();
+  };
+
+  const handleCancelDeliveries = (deliveryIds: string[]) => {
+    if(window.confirm('Tem certeza que deseja cancelar estes agendamentos? Esta ação não pode ser desfeita.')) {
+      onCancelDeliveries(producer.id, deliveryIds);
+      handleCloseViewModal();
+    }
   };
 
   const pendingInvoices = useMemo(() => {
@@ -148,6 +160,8 @@ const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveri
           deliveries={deliveriesToShow}
           onClose={handleCloseViewModal}
           onAddNew={handleAddNewFromView}
+          onCancel={handleCancelDeliveries}
+          simulatedToday={SIMULATED_TODAY}
         />
       )}
     </div>
