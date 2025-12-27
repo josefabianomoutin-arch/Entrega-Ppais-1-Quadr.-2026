@@ -6,9 +6,18 @@ interface CalendarProps {
   onDayClick: (date: Date) => void;
   deliveries: Delivery[];
   simulatedToday: Date;
+  allowedWeeks: number[];
 }
 
-const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedToday }) => {
+const getWeekNumber = (d: Date): number => {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return weekNo;
+};
+
+const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedToday, allowedWeeks }) => {
 
   const deliveriesByDate = useMemo(() => {
     const map = new Map<string, Delivery[]>();
@@ -34,29 +43,37 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
       const dateString = currentDate.toISOString().split('T')[0];
       const deliveriesOnThisDate = deliveriesByDate.get(dateString);
       
-      let dayClasses = "p-2 text-center border-r border-b border-gray-200 cursor-pointer transition-colors h-20 flex flex-col justify-center items-center relative";
+      const weekNumber = getWeekNumber(currentDate);
+      const isWeekAllowed = !allowedWeeks || allowedWeeks.length === 0 || allowedWeeks.includes(weekNumber);
       
-      const isPast = currentDate < simulatedToday;
-      const hasDeliveries = deliveriesOnThisDate && deliveriesOnThisDate.length > 0;
-      const needsInvoice = hasDeliveries && isPast && deliveriesOnThisDate.some(d => !d.invoiceUploaded);
+      let dayClasses = "p-2 text-center border-r border-b border-gray-200 h-20 flex flex-col justify-center items-center relative";
 
-      if (needsInvoice) {
-        dayClasses += " bg-red-500 hover:bg-red-600 text-white font-bold";
-      } else if (hasDeliveries) {
-        dayClasses += " bg-green-200 hover:bg-green-300 text-green-900 font-bold";
+      if (!isWeekAllowed) {
+        dayClasses += " bg-gray-100 text-gray-400 cursor-not-allowed";
       } else {
-        dayClasses += " hover:bg-blue-100";
+        dayClasses += " cursor-pointer transition-colors";
+        const isPast = currentDate < simulatedToday;
+        const hasDeliveries = deliveriesOnThisDate && deliveriesOnThisDate.length > 0;
+        const needsInvoice = hasDeliveries && isPast && deliveriesOnThisDate.some(d => !d.invoiceUploaded);
+
+        if (needsInvoice) {
+          dayClasses += " bg-red-500 hover:bg-red-600 text-white font-bold";
+        } else if (hasDeliveries) {
+          dayClasses += " bg-green-200 hover:bg-green-300 text-green-900 font-bold";
+        } else {
+          dayClasses += " hover:bg-blue-100";
+        }
       }
 
       grid.push(
-        <div key={day} className={dayClasses} onClick={() => onDayClick(currentDate)}>
+        <div key={day} className={dayClasses} onClick={() => isWeekAllowed && onDayClick(currentDate)}>
           <span className="text-sm md:text-base">{day}</span>
-          {hasDeliveries && (
+          {isWeekAllowed && deliveriesOnThisDate && deliveriesOnThisDate.length > 0 && (
             <span className="text-xs mt-1 px-1 rounded bg-black bg-opacity-10 truncate">
               Entrega
             </span>
           )}
-          {needsInvoice && (
+          {isWeekAllowed && deliveriesOnThisDate && deliveriesOnThisDate.length > 0 && deliveriesOnThisDate.some(d => !d.invoiceUploaded) && currentDate < simulatedToday && (
             <span className="absolute bottom-1 right-1 text-xs text-white font-semibold">NF!</span>
           )}
         </div>

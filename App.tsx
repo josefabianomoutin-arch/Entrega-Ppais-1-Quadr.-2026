@@ -3,22 +3,37 @@ import { initialProducers } from './constants';
 import type { Producer, Delivery, ContractItem } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
+import AdminDashboard from './components/AdminDashboard';
 
 const App: React.FC = () => {
   const [producers, setProducers] = useState<Producer[]>(initialProducers);
   const [currentUser, setCurrentUser] = useState<Producer | null>(null);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
   const handleLogin = (name: string, cpf: string): boolean => {
-    const user = producers.find(p => p.name.toLowerCase() === name.toLowerCase() && p.cpf === cpf);
+    // Admin login check (name is case-insensitive, password is exact)
+    if (name.toLowerCase() === 'administrador' && cpf === '15210361870') {
+      setIsAdminLoggedIn(true);
+      setCurrentUser(null);
+      return true;
+    }
+
+    // Producer login check (name is uppercase, cpf is sanitized)
+    const upperCaseName = name.toUpperCase();
+    const sanitizedCpf = cpf.replace(/[^\d]/g, '');
+    const user = producers.find(p => p.name === upperCaseName && p.cpf === sanitizedCpf);
+
     if (user) {
       setCurrentUser(user);
+      setIsAdminLoggedIn(false);
       return true;
     }
     return false;
   };
   
-  const handleRegister = (name: string, cpf: string, contractItems: ContractItem[]): boolean => {
-    const nameExists = producers.some(p => p.name.toLowerCase() === name.toLowerCase());
+  const handleRegister = (name: string, cpf: string, contractItems: ContractItem[], allowedWeeks: number[]): boolean => {
+    // Assumes name is already UPPERCASE and cpf is already sanitized from AdminDashboard
+    const nameExists = producers.some(p => p.name === name);
     const cpfExists = producers.some(p => p.cpf === cpf);
 
     if (nameExists || cpfExists) {
@@ -29,11 +44,12 @@ const App: React.FC = () => {
 
     const newProducer: Producer = {
       id: `produtor-${Date.now()}`,
-      name,
-      cpf,
+      name, // Stored in uppercase
+      cpf,  // Stored as numbers only
       initialValue,
       contractItems,
       deliveries: [],
+      allowedWeeks,
     };
 
     setProducers(prevProducers => [...prevProducers, newProducer]);
@@ -42,6 +58,7 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setIsAdminLoggedIn(false);
   };
 
   const addDeliveries = (producerId: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => {
@@ -69,29 +86,52 @@ const App: React.FC = () => {
   };
 
   const markInvoicesAsUploaded = (producerId: string, deliveryIds: string[], invoiceNumber: string) => {
-      const updatedProducers = producers.map(p => {
-          if (p.id === producerId) {
-              const updatedDeliveries = p.deliveries.map(d => 
-                  deliveryIds.includes(d.id) 
-                      ? { ...d, invoiceUploaded: true, invoiceNumber: invoiceNumber } 
-                      : d
-              );
-              return {
-                  ...p,
-                  deliveries: updatedDeliveries
-              };
-          }
-          return p;
-      });
-      setProducers(updatedProducers);
-      const updatedUser = updatedProducers.find(p => p.id === producerId);
-      if (updatedUser) {
-          setCurrentUser(updatedUser);
+      const producerToUpdate = producers.find(p => p.id === producerId);
+      if (!producerToUpdate) return;
+
+      // Cria um objeto de produtor atualizado em memória para realizar as verificações
+      const updatedProducer = {
+          ...producerToUpdate,
+          deliveries: producerToUpdate.deliveries.map(d => 
+              deliveryIds.includes(d.id) 
+                  ? { ...d, invoiceUploaded: true, invoiceNumber: invoiceNumber } 
+                  : d
+          )
+      };
+
+      // Define a data de simulação para a verificação
+      const SIMULATED_TODAY = new Date('2026-04-30T00:00:00');
+
+      // Condição 1: Verifica se o valor do contrato foi totalmente entregue
+      const totalDeliveredValue = updatedProducer.deliveries.reduce((sum, delivery) => sum + delivery.value, 0);
+      const isContractComplete = totalDeliveredValue >= updatedProducer.initialValue;
+
+      // Condição 2: Verifica se não há mais notas fiscais pendentes para entregas passadas
+      const hasNoPendingInvoices = updatedProducer.deliveries
+          .filter(d => new Date(d.date + 'T00:00:00') < SIMULATED_TODAY)
+          .every(d => d.invoiceUploaded);
+      
+      // Se ambas as condições forem atendidas, remove o produtor
+      if (isContractComplete && hasNoPendingInvoices) {
+          setProducers(prevProducers => prevProducers.filter(p => p.id !== producerId));
+          // Desloga o usuário, pois seus dados foram limpos
+          setCurrentUser(null); 
+      } else {
+          // Se as condições não forem atendidas, apenas atualiza os dados do produtor
+          const updatedProducers = producers.map(p => 
+              p.id === producerId ? updatedProducer : p
+          );
+          setProducers(updatedProducers);
+          setCurrentUser(updatedProducer);
       }
   };
 
+  if (isAdminLoggedIn) {
+    return <AdminDashboard onRegister={handleRegister} onLogout={handleLogout} producers={producers} />;
+  }
+
   if (!currentUser) {
-    return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} producers={producers} />;
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   return (

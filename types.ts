@@ -23,4 +23,5 @@ export interface Producer {
   initialValue: number;
   contractItems: ContractItem[];
   deliveries: Delivery[];
+  allowedWeeks: number[];
 }

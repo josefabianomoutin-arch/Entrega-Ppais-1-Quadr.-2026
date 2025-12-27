@@ -110,7 +110,12 @@ const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveri
             <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
                 <h2 className="text-2xl font-semibold mb-4 text-center text-gray-700">Agenda de Entregas - 2026</h2>
                 <p className="text-center text-gray-500 mb-6">Clique em um dia para agendar ou visualizar uma entrega.</p>
-                <Calendar onDayClick={handleDayClick} deliveries={producer.deliveries} simulatedToday={SIMULATED_TODAY} />
+                <Calendar 
+                  onDayClick={handleDayClick} 
+                  deliveries={producer.deliveries} 
+                  simulatedToday={SIMULATED_TODAY} 
+                  allowedWeeks={producer.allowedWeeks}
+                />
             </div>
           </div>
           <div className="space-y-8">
