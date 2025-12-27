@@ -68,7 +68,7 @@ const App: React.FC = () => {
       return false; // Indicate failure due to duplicate
     }
     
-    const initialValue = contractItems.reduce((acc, item) => acc + item.value, 0);
+    const initialValue = contractItems.reduce((acc, item) => acc + (item.totalKg * item.valuePerKg), 0);
 
     const newProducer: Producer = {
       id: `produtor-${Date.now()}`,

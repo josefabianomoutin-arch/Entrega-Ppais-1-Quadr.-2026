@@ -1,4 +1,9 @@
 
+export interface Supplier {
+  name: string;
+  cpf: string;
+}
+
 export interface Delivery {
   id: string;
   date: string; // ISO string format: 'YYYY-MM-DD'
@@ -12,8 +17,9 @@ export interface Delivery {
 
 export interface ContractItem {
   name: string;
-  kg: number;
-  value: number;
+  totalKg: number;
+  valuePerKg: number;
+  suppliers: Supplier[];
 }
 
 export interface Producer {

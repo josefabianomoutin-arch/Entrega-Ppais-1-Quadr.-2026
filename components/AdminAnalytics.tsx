@@ -279,14 +279,15 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                     <div className="space-y-3">
                                                         <h4 className="font-semibold text-gray-700">Detalhes do Contrato de {p.name}</h4>
                                                         {p.contractItems.map(item => {
+                                                            const itemTotalValue = item.totalKg * item.valuePerKg;
                                                             const itemDelivered = deliveredValueByItem.get(item.name) || 0;
-                                                            const itemProgress = item.value > 0 ? (itemDelivered / item.value) * 100 : 0;
+                                                            const itemProgress = itemTotalValue > 0 ? (itemDelivered / itemTotalValue) * 100 : 0;
                                                             return (
                                                                 <div key={item.name} className="p-2 bg-white rounded-lg border">
                                                                     <div className="flex justify-between items-center mb-1">
                                                                         <span className="font-medium">{item.name}</span>
                                                                         <span className="text-xs text-gray-500">
-                                                                            {formatCurrency(itemDelivered)} / {formatCurrency(item.value)}
+                                                                            {formatCurrency(itemDelivered)} / {formatCurrency(itemTotalValue)}
                                                                         </span>
                                                                     </div>
                                                                     <div className="w-full bg-gray-200 rounded-full h-3">

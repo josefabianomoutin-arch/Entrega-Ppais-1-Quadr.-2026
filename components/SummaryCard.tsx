@@ -43,14 +43,15 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
                 <h3 className="font-semibold text-gray-600">Detalhes por Produto</h3>
                 <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
                     {producer.contractItems.map(item => {
+                        const itemTotalValue = item.totalKg * item.valuePerKg;
                         const delivered = deliveredValueByItem.get(item.name) || 0;
-                        const remaining = item.value - delivered;
+                        const remaining = itemTotalValue - delivered;
                         return (
                             <div key={item.name} className="p-3 bg-gray-50 rounded-lg text-sm">
                                 <p className="font-bold text-gray-800">{item.name}</p>
                                 <div className="flex justify-between mt-1">
                                     <span className="text-gray-500">Contratado:</span>
-                                    <span>{formatCurrency(item.value)}</span>
+                                    <span>{formatCurrency(itemTotalValue)}</span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Entregue:</span>
