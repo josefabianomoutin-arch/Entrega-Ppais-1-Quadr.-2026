@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { Producer } from '../types';
+import type { Producer, Delivery } from '../types';
 
 interface AdminAnalyticsProps {
   producers: Producer[];
@@ -63,16 +63,16 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
     const [sortKey, setSortKey] = useState<SortKey>('progress');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
     const [expandedProducerId, setExpandedProducerId] = useState<string | null>(null);
+    const SIMULATED_TODAY = new Date('2026-04-30T00:00:00');
 
     const analyticsData = useMemo(() => {
         const totalContracted = producers.reduce((sum, p) => sum + p.initialValue, 0);
         const totalDelivered = producers.reduce((sum, p) => sum + p.deliveries.reduce((dSum, d) => dSum + d.value, 0), 0);
         
         const productsDelivered = new Map<string, number>();
-        producers.forEach(p => {
-            p.deliveries.forEach(d => {
-                productsDelivered.set(d.item, (productsDelivered.get(d.item) || 0) + d.value);
-            });
+        const allDeliveries = producers.flatMap(p => p.deliveries);
+        allDeliveries.forEach(d => {
+            productsDelivered.set(d.item, (productsDelivered.get(d.item) || 0) + d.value);
         });
 
         const topProducts = Array.from(productsDelivered.entries())
@@ -80,14 +80,44 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
             .slice(0, 5)
             .map(([label, value]) => ({ label, value }));
 
+        const deliveriesByInvoice = new Map<string, Delivery[]>();
+        allDeliveries.forEach(d => {
+            const key = d.invoiceNumber || 'N/A';
+            const group = deliveriesByInvoice.get(key) || [];
+            group.push(d);
+            deliveriesByInvoice.set(key, group);
+        });
+
+        let uniquePendingInvoices = 0;
+        let uniqueSentInvoices = 0;
+
+        for (const [invoiceNumber, deliveries] of deliveriesByInvoice.entries()) {
+            if (invoiceNumber === 'N/A') continue;
+
+            const isFullyUploaded = deliveries.every(d => d.invoiceUploaded);
+            
+            if (isFullyUploaded) {
+                uniqueSentInvoices++;
+            } else {
+                const hasPastDatePending = deliveries.some(d => 
+                    !d.invoiceUploaded && new Date(d.date + 'T00:00:00') < SIMULATED_TODAY
+                );
+                if (hasPastDatePending) {
+                    uniquePendingInvoices++;
+                }
+            }
+        }
+
         return {
             totalContracted,
             totalDelivered,
             progress: totalContracted > 0 ? (totalDelivered / totalContracted) * 100 : 0,
             producerCount: producers.length,
-            topProducts
+            topProducts,
+            uniquePendingInvoices,
+            uniqueSentInvoices
         };
-    }, [producers]);
+    }, [producers, SIMULATED_TODAY]);
     
     const sortedProducers = useMemo(() => {
       return [...producers].sort((a, b) => {
@@ -128,7 +158,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
     return (
         <div className="space-y-8 animate-fade-in">
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-lg flex items-center space-x-4">
                     <div className="bg-blue-100 p-3 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 8h6m-5 4h4m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div>
                     <div>
@@ -155,6 +185,24 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                     <div>
                         <p className="text-sm text-gray-500">Produtores Ativos</p>
                         <p className="text-2xl font-bold">{analyticsData.producerCount}</p>
+                    </div>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-lg lg:col-span-2">
+                    <div className="flex items-center space-x-4">
+                        <div className="bg-orange-100 p-3 rounded-full">
+                           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                        </div>
+                        <p className="text-lg font-semibold text-gray-700">Status das Notas Fiscais</p>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                        <div className="flex justify-between items-baseline">
+                            <p className="text-sm text-gray-500">Pendentes</p>
+                            <p className="text-2xl font-bold text-red-600">{analyticsData.uniquePendingInvoices}</p>
+                        </div>
+                        <div className="flex justify-between items-baseline">
+                            <p className="text-sm text-gray-500">Enviadas</p>
+                            <p className="text-2xl font-bold text-green-600">{analyticsData.uniqueSentInvoices}</p>
+                        </div>
                     </div>
                 </div>
             </div>

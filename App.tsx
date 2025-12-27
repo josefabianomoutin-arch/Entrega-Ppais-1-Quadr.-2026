@@ -1,14 +1,42 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { initialProducers } from './constants';
 import type { Producer, Delivery, ContractItem } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 
+const getInitialProducers = (): Producer[] => {
+  try {
+    const savedData = window.localStorage.getItem('producersData');
+    if (savedData) {
+      const parsedData = JSON.parse(savedData);
+      // Garante que os dados carregados sejam um array para evitar erros em toda a aplicação.
+      if (Array.isArray(parsedData)) {
+        return parsedData;
+      }
+    }
+    // Retorna o estado inicial (vazio) se não houver dados ou se os dados estiverem corrompidos.
+    return initialProducers;
+  } catch (error) {
+    console.error("Falha ao carregar ou analisar produtores do localStorage, começando do zero.", error);
+    // Retorna o estado inicial em caso de qualquer erro.
+    return initialProducers;
+  }
+};
+
 const App: React.FC = () => {
-  const [producers, setProducers] = useState<Producer[]>(initialProducers);
+  const [producers, setProducers] = useState<Producer[]>(getInitialProducers);
+
   const [currentUser, setCurrentUser] = useState<Producer | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('producersData', JSON.stringify(producers));
+    } catch (error) {
+      console.error('Erro ao salvar dados no localStorage:', error);
+    }
+  }, [producers]);
 
   const handleLogin = (name: string, cpf: string): boolean => {
     // Admin login check (name is case-insensitive, password is exact)
