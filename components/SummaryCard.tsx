@@ -6,6 +6,7 @@ interface SummaryCardProps {
 }
 
 const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
+    // Value calculations
     const totalDeliveredValue = producer.deliveries.reduce((sum, delivery) => sum + delivery.value, 0);
     const remainingValue = producer.initialValue - totalDeliveredValue;
 
@@ -18,8 +19,27 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
         return valueMap;
     }, [producer.deliveries]);
 
+    // Weight (Kg) calculations
+    const totalContractedKg = producer.contractItems.reduce((sum, item) => sum + item.totalKg, 0);
+    const totalDeliveredKg = producer.deliveries.reduce((sum, delivery) => sum + delivery.kg, 0);
+    const remainingKg = totalContractedKg - totalDeliveredKg;
+
+    const deliveredKgByItem = useMemo(() => {
+        const kgMap = new Map<string, number>();
+        producer.deliveries.forEach(delivery => {
+            const currentKg = kgMap.get(delivery.item) || 0;
+            kgMap.set(delivery.item, currentKg + delivery.kg);
+        });
+        return kgMap;
+    }, [producer.deliveries]);
+
+    // Formatting helpers
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    };
+
+    const formatKg = (value: number) => {
+        return `${value.toFixed(2).replace('.', ',')} Kg`;
     };
 
     return (
@@ -27,15 +47,18 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
             <h2 className="text-xl font-semibold mb-4 text-gray-700">Resumo Financeiro</h2>
             
             {/* General Summary */}
-            <div className="space-y-3 pb-4 border-b">
-                 <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Valor Total do Contrato:</span>
-                    <span className="font-bold text-gray-800">{formatCurrency(producer.initialValue)}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Valor Total Entregue:</span>
-                    <span className="font-bold text-green-600">{formatCurrency(totalDeliveredValue)}</span>
-                </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 pb-4 border-b text-sm">
+                <span className="text-gray-500">Valor Total do Contrato:</span>
+                <span className="font-bold text-gray-800 text-right">{formatCurrency(producer.initialValue)}</span>
+                
+                <span className="text-gray-500">Peso Total do Contrato:</span>
+                <span className="font-bold text-gray-800 text-right">{formatKg(totalContractedKg)}</span>
+
+                <span className="text-gray-500">Valor Total Entregue:</span>
+                <span className="font-bold text-green-600 text-right">{formatCurrency(totalDeliveredValue)}</span>
+
+                <span className="text-gray-500">Peso Total Entregue:</span>
+                <span className="font-bold text-green-600 text-right">{formatKg(totalDeliveredKg)}</span>
             </div>
 
             {/* Item Breakdown */}
@@ -44,22 +67,36 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
                 <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
                     {producer.contractItems.map(item => {
                         const itemTotalValue = item.totalKg * item.valuePerKg;
-                        const delivered = deliveredValueByItem.get(item.name) || 0;
-                        const remaining = itemTotalValue - delivered;
+                        const deliveredValue = deliveredValueByItem.get(item.name) || 0;
+                        const remainingItemValue = itemTotalValue - deliveredValue;
+
+                        const itemTotalKg = item.totalKg;
+                        const deliveredItemKg = deliveredKgByItem.get(item.name) || 0;
+                        const remainingItemKg = itemTotalKg - deliveredItemKg;
+
                         return (
                             <div key={item.name} className="p-3 bg-gray-50 rounded-lg text-sm">
-                                <p className="font-bold text-gray-800">{item.name}</p>
-                                <div className="flex justify-between mt-1">
-                                    <span className="text-gray-500">Contratado:</span>
-                                    <span>{formatCurrency(itemTotalValue)}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Entregue:</span>
-                                    <span className="text-green-600">{formatCurrency(delivered)}</span>
-                                </div>
-                                <div className="flex justify-between font-semibold">
-                                    <span className="text-gray-500">Restante:</span>
-                                    <span className="text-blue-600">{formatCurrency(remaining)}</span>
+                                <p className="font-bold text-gray-800 mb-2">{item.name}</p>
+                                <div className="grid grid-cols-3 gap-x-2 text-xs">
+                                    {/* Headers */}
+                                    <span className="font-semibold text-gray-500"></span>
+                                    <span className="font-semibold text-gray-600 text-right">Valor</span>
+                                    <span className="font-semibold text-gray-600 text-right">Peso</span>
+                                    
+                                    {/* Contracted */}
+                                    <span className="text-gray-500">Contratado</span>
+                                    <span className="text-right">{formatCurrency(itemTotalValue)}</span>
+                                    <span className="text-right">{formatKg(itemTotalKg)}</span>
+
+                                    {/* Delivered */}
+                                    <span className="text-gray-500">Entregue</span>
+                                    <span className="text-green-600 text-right">{formatCurrency(deliveredValue)}</span>
+                                    <span className="text-green-600 text-right">{formatKg(deliveredItemKg)}</span>
+
+                                    {/* Remaining */}
+                                    <span className="text-gray-500 font-semibold">Restante</span>
+                                    <span className="text-blue-600 font-semibold text-right">{formatCurrency(remainingItemValue)}</span>
+                                    <span className="text-blue-600 font-semibold text-right">{formatKg(remainingItemKg)}</span>
                                 </div>
                             </div>
                         );
@@ -69,9 +106,11 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
             
             {/* Total Remaining */}
             <hr className="my-2"/>
-            <div className="flex justify-between items-center pt-2">
+            <div className="grid grid-cols-2 gap-x-4 pt-2">
                 <span className="text-gray-500 font-semibold">Valor Total Restante:</span>
-                <span className="font-bold text-2xl text-blue-600">{formatCurrency(remainingValue)}</span>
+                <span className="font-bold text-xl text-blue-600 text-right">{formatCurrency(remainingValue)}</span>
+                <span className="text-gray-500 font-semibold">Peso Total Restante:</span>
+                <span className="font-bold text-xl text-blue-600 text-right">{formatKg(remainingKg)}</span>
             </div>
         </div>
     );

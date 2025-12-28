@@ -114,6 +114,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
         for (const producerId of assignedProducerIds) {
             const producer = producerMap.get(producerId);
             if (producer) {
+                // FIX: Property 'contractItems' does not exist on type 'unknown'.
+                // The producer variable was being inferred as 'unknown'. By explicitly typing `updatedProducers`
+                // in the line above, we ensure correct type inference for the map and this variable.
                 producer.contractItems.push({
                     name: uiItem.name, totalKg: kgPerProducer, valuePerKg, suppliers: allAssignedProducersInfo,
                 });
