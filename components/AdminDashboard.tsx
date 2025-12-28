@@ -16,17 +16,21 @@ const formatCurrency = (value: number) => {
 };
 
 // Tipos para o estado da UI de Gestão por Item
+interface SupplierInput { name: string; cpf: string; }
 interface ProducerSlot { producerId: string; }
 interface ItemCentricInput {
   name: string;
   totalKg: string;
   valuePerKg: string;
   producers: ProducerSlot[];
+  suppliers: SupplierInput[];
 }
+const initialSupplierInput = (): SupplierInput => ({ name: '', cpf: '' });
 const initialProducerSlot = (): ProducerSlot => ({ producerId: '' });
 const initialItemCentricInput = (): ItemCentricInput => ({
   name: '', totalKg: '', valuePerKg: '',
-  producers: Array(15).fill(null).map(initialProducerSlot)
+  producers: Array(15).fill(null).map(initialProducerSlot),
+  suppliers: Array(15).fill(null).map(initialSupplierInput),
 });
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdateProducers, onLogout, producers }) => {
@@ -42,19 +46,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
   // Estados para aba de GESTÃO POR ITEM
   const [itemCentricContracts, setItemCentricContracts] = useState<ItemCentricInput[]>([initialItemCentricInput()]);
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(0);
+  const [expandedSection, setExpandedSection] = useState<'producers' | 'suppliers' | null>('producers');
   const [contractError, setContractError] = useState('');
   const [contractSuccess, setContractSuccess] = useState('');
 
   useEffect(() => {
     if (activeTab === 'contracts') {
-        const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; producerIds: string[] }>();
+        const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; producerIds: string[]; suppliers: Supplier[] }>();
 
         // Agrega dados de todos os produtores para criar uma visão centrada no item
         producers.forEach(producer => {
             producer.contractItems.forEach(item => {
-                const mapEntry = itemsMap.get(item.name) || { totalKg: 0, valuePerKg: item.valuePerKg, producerIds: [] };
+                const mapEntry = itemsMap.get(item.name) || { totalKg: 0, valuePerKg: item.valuePerKg, producerIds: [], suppliers: item.suppliers };
                 mapEntry.totalKg += item.totalKg;
-                mapEntry.producerIds.push(producer.id);
+                if (!mapEntry.producerIds.includes(producer.id)) {
+                    mapEntry.producerIds.push(producer.id);
+                }
                 itemsMap.set(item.name, mapEntry);
             });
         });
@@ -67,8 +74,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
                 ...data.producerIds.map(id => ({ producerId: id })),
                 ...Array(15 - data.producerIds.length).fill(null).map(initialProducerSlot)
             ],
+            suppliers: [
+                ...data.suppliers.map(s => ({ name: s.name, cpf: s.cpf })),
+                ...Array(15 - data.suppliers.length).fill(null).map(initialSupplierInput)
+            ]
         }));
 
+        // FIX: Corrected typo from ui_state to uiState
         setItemCentricContracts(uiState.length > 0 ? uiState : [initialItemCentricInput()]);
         setExpandedItemIndex(0);
     }
@@ -88,9 +100,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
   const handleSaveContracts = (e: React.FormEvent) => {
     e.preventDefault(); setContractError(''); setContractSuccess('');
 
-    // FIX: Explicitly type the empty array for contractItems to avoid incorrect type inference (never[]).
-    // This was causing the `producer` variable later on to be inferred as `unknown`.
-    const updatedProducers = producers.map(p => ({ ...p, contractItems: [] as ContractItem[], initialValue: 0 }));
+    // FIX: Explicitly type `updatedProducers` to prevent type inference issues with `producerMap` below.
+    const updatedProducers: Producer[] = producers.map(p => ({ ...p, contractItems: [], initialValue: 0 }));
     const producerMap = new Map(updatedProducers.map(p => [p.id, p]));
 
     for (const uiItem of itemCentricContracts) {
@@ -105,20 +116,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
 
         const assignedProducerIds = uiItem.producers.map(p => p.producerId).filter(id => id);
         if (assignedProducerIds.length === 0) continue;
+        
+        const validSuppliers: Supplier[] = uiItem.suppliers
+            .map(s => ({ name: s.name.trim(), cpf: s.cpf.replace(/[^\d]/g, '') }))
+            .filter(s => s.name !== '' && s.cpf !== '');
 
         const kgPerProducer = totalKg / assignedProducerIds.length;
-        const allAssignedProducersInfo = assignedProducerIds
-            .map(id => producers.find(p => p.id === id)).filter((p): p is Producer => !!p)
-            .map(p => ({ name: p.name, cpf: p.cpf }));
 
         for (const producerId of assignedProducerIds) {
             const producer = producerMap.get(producerId);
             if (producer) {
-                // FIX: Property 'contractItems' does not exist on type 'unknown'.
-                // The producer variable was being inferred as 'unknown'. By explicitly typing `updatedProducers`
-                // in the line above, we ensure correct type inference for the map and this variable.
                 producer.contractItems.push({
-                    name: uiItem.name, totalKg: kgPerProducer, valuePerKg, suppliers: allAssignedProducersInfo,
+                    name: uiItem.name, totalKg: kgPerProducer, valuePerKg, suppliers: validSuppliers,
                 });
             }
         }
@@ -143,6 +152,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
     const newProducers = [...newItems[itemIndex].producers];
     newProducers[slotIndex] = { producerId };
     newItems[itemIndex] = { ...newItems[itemIndex], producers: newProducers };
+    setItemCentricContracts(newItems);
+  };
+  
+  const handleSupplierChange = (itemIndex: number, supplierIndex: number, field: 'name' | 'cpf', value: string) => {
+    const newItems = [...itemCentricContracts];
+    const newSuppliers = [...newItems[itemIndex].suppliers];
+    const updatedValue = field === 'cpf' ? value.replace(/[^\d]/g, '') : value;
+    newSuppliers[supplierIndex] = { ...newSuppliers[supplierIndex], [field]: updatedValue };
+    newItems[itemIndex] = { ...newItems[itemIndex], suppliers: newSuppliers };
     setItemCentricContracts(newItems);
   };
 
@@ -213,11 +231,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
                         <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
                             {itemCentricContracts.map((item, index) => {
                                 const assignedProducersCount = item.producers.filter(p => p.producerId).length;
+                                const activeSuppliersCount = item.suppliers.filter(s => s.name.trim() !== '' && s.cpf.trim() !== '').length;
                                 const kgNum = parseFloat(item.totalKg) || 0;
                                 const valKgNum = parseFloat(item.valuePerKg) || 0;
                                 const kgPerProducer = assignedProducersCount > 0 ? kgNum / assignedProducersCount : 0;
                                 const valPerProducer = assignedProducersCount > 0 ? kgPerProducer * valKgNum : 0;
-                                const isExpanded = expandedItemIndex === index;
+                                
+                                const isProducersExpanded = expandedItemIndex === index && expandedSection === 'producers';
+                                const isSuppliersExpanded = expandedItemIndex === index && expandedSection === 'suppliers';
+                                
                                 return (
                                 <div key={index} className="p-4 border rounded-lg relative bg-gray-50 shadow-sm">
                                     <div className="flex justify-between items-center">
@@ -232,10 +254,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
                                         </div>
                                     </div>
                                     {assignedProducersCount > 0 && <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md text-sm text-center"><p><span className="font-semibold">{kgPerProducer.toFixed(2)} Kg</span> | <span className="font-semibold">{formatCurrency(valPerProducer)}</span> por produtor</p></div>}
-                                    <button type="button" onClick={() => setExpandedItemIndex(isExpanded ? null : index)} className="w-full text-left mt-4 text-sm font-semibold text-blue-600">
-                                        {isExpanded ? 'Ocultar' : 'Mostrar'} Produtores ({assignedProducersCount}/15) {isExpanded ? '▲' : '▼'}
-                                    </button>
-                                    {isExpanded && <div className="mt-3 pt-3 border-t space-y-3">{item.producers.map((slot, slotIndex) => <div key={slotIndex} className="flex space-x-2 items-center"><span className="text-xs text-gray-500 w-6 text-right">#{slotIndex + 1}</span><select value={slot.producerId} onChange={e => handleProducerSelectionChange(index, slotIndex, e.target.value)} className="input-field"><option value="">-- Selecione um Produtor --</option>{producers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>)}</div>}
+                                    
+                                    <div className="mt-4 grid grid-cols-2 gap-2">
+                                      <button type="button" onClick={() => { setExpandedItemIndex(isProducersExpanded ? null : index); setExpandedSection(isProducersExpanded ? null : 'producers'); }} className={`w-full text-left text-sm font-semibold p-2 rounded text-center transition-colors ${isProducersExpanded ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'}`}>
+                                          Produtores ({assignedProducersCount}/15) {isProducersExpanded ? '▲' : '▼'}
+                                      </button>
+                                      <button type="button" onClick={() => { setExpandedItemIndex(isSuppliersExpanded ? null : index); setExpandedSection(isSuppliersExpanded ? null : 'suppliers'); }} className={`w-full text-left text-sm font-semibold p-2 rounded text-center transition-colors ${isSuppliersExpanded ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'}`}>
+                                          Fornecedores ({activeSuppliersCount}/15) {isSuppliersExpanded ? '▲' : '▼'}
+                                      </button>
+                                    </div>
+
+                                    {isProducersExpanded && <div className="mt-3 pt-3 border-t space-y-3">{item.producers.map((slot, slotIndex) => <div key={slotIndex} className="flex space-x-2 items-center"><span className="text-xs text-gray-500 w-6 text-right">#{slotIndex + 1}</span><select value={slot.producerId} onChange={e => handleProducerSelectionChange(index, slotIndex, e.target.value)} className="input-field"><option value="">-- Selecione um Produtor --</option>{producers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>)}</div>}
+                                    {isSuppliersExpanded && <div className="mt-3 pt-3 border-t space-y-3">{item.suppliers.map((supplier, supIndex) => <div key={supIndex} className="flex space-x-2 items-center"><span className="text-xs text-gray-500 w-6 text-right">#{supIndex + 1}</span><input value={supplier.name} onChange={e => handleSupplierChange(index, supIndex, 'name', e.target.value)} placeholder="Nome do Fornecedor" className="input-field w-1/2"/><input value={supplier.cpf} onChange={e => handleSupplierChange(index, supIndex, 'cpf', e.target.value)} maxLength={11} placeholder="CPF do Fornecedor" className="input-field w-1/2"/></div>)}</div>}
+
                                 </div>
                             )})}
                         </div>
