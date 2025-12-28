@@ -44,11 +44,14 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
       const deliveriesOnThisDate = deliveriesByDate.get(dateString);
       
       const weekNumber = getWeekNumber(currentDate);
+      const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
       const isWeekAllowed = !allowedWeeks || allowedWeeks.length === 0 || allowedWeeks.includes(weekNumber);
+      const isClickable = isWeekAllowed && !isWeekend;
       
       let dayClasses = "p-2 text-center border-r border-b border-gray-200 h-20 flex flex-col justify-center items-center relative";
 
-      if (!isWeekAllowed) {
+      if (!isClickable) {
         dayClasses += " bg-gray-100 text-gray-400 cursor-not-allowed";
       } else {
         dayClasses += " cursor-pointer transition-colors";
@@ -66,14 +69,14 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
       }
 
       grid.push(
-        <div key={day} className={dayClasses} onClick={() => isWeekAllowed && onDayClick(currentDate)}>
+        <div key={day} className={dayClasses} onClick={() => isClickable && onDayClick(currentDate)}>
           <span className="text-sm md:text-base">{day}</span>
-          {isWeekAllowed && deliveriesOnThisDate && deliveriesOnThisDate.length > 0 && (
+          {isClickable && deliveriesOnThisDate && deliveriesOnThisDate.length > 0 && (
             <span className="text-xs mt-1 px-1 rounded bg-black bg-opacity-10 truncate">
               Entrega
             </span>
           )}
-          {isWeekAllowed && deliveriesOnThisDate && deliveriesOnThisDate.length > 0 && deliveriesOnThisDate.some(d => !d.invoiceUploaded) && currentDate < simulatedToday && (
+          {isClickable && deliveriesOnThisDate && deliveriesOnThisDate.length > 0 && deliveriesOnThisDate.some(d => !d.invoiceUploaded) && currentDate < simulatedToday && (
             <span className="absolute bottom-1 right-1 text-xs text-white font-semibold">NF!</span>
           )}
         </div>
