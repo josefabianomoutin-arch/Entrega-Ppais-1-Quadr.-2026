@@ -59,8 +59,7 @@ const App: React.FC = () => {
     return false;
   };
   
-  const handleRegister = (name: string, cpf: string, contractItems: ContractItem[], allowedWeeks: number[]): boolean => {
-    // Assumes name is already UPPERCASE and cpf is already sanitized from AdminDashboard
+  const handleRegister = (name: string, cpf: string, allowedWeeks: number[]): boolean => {
     const nameExists = producers.some(p => p.name === name);
     const cpfExists = producers.some(p => p.cpf === cpf);
 
@@ -68,14 +67,12 @@ const App: React.FC = () => {
       return false; // Indicate failure due to duplicate
     }
     
-    const initialValue = contractItems.reduce((acc, item) => acc + (item.totalKg * item.valuePerKg), 0);
-
     const newProducer: Producer = {
       id: `produtor-${Date.now()}`,
       name, // Stored in uppercase
       cpf,  // Stored as numbers only
-      initialValue,
-      contractItems,
+      initialValue: 0, // Starts at 0, will be calculated when contract is added
+      contractItems: [], // Starts empty
       deliveries: [],
       allowedWeeks,
     };
@@ -83,6 +80,23 @@ const App: React.FC = () => {
     setProducers(prevProducers => [...prevProducers, newProducer]);
     return true; // Indicate success
   };
+
+  const updateProducerContract = (producerId: string, newContractItems: ContractItem[]) => {
+    const newInitialValue = newContractItems.reduce((acc, item) => acc + (item.totalKg * item.valuePerKg), 0);
+    
+    const updatedProducers = producers.map(p => {
+        if (p.id === producerId) {
+            return {
+                ...p,
+                contractItems: newContractItems,
+                initialValue: newInitialValue
+            };
+        }
+        return p;
+    });
+
+    setProducers(updatedProducers);
+};
 
   const handleLogout = () => {
     setCurrentUser(null);
@@ -173,7 +187,12 @@ const App: React.FC = () => {
   };
 
   if (isAdminLoggedIn) {
-    return <AdminDashboard onRegister={handleRegister} onLogout={handleLogout} producers={producers} />;
+    return <AdminDashboard 
+        onRegister={handleRegister} 
+        onUpdateContract={updateProducerContract}
+        onLogout={handleLogout} 
+        producers={producers} 
+    />;
   }
 
   if (!currentUser) {
