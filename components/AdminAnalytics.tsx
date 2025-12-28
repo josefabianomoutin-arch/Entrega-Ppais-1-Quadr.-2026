@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { Producer, Delivery } from '../types';
+import type { Producer, Delivery, Supplier } from '../types';
 
 interface AdminAnalyticsProps {
   producers: Producer[];
@@ -63,14 +63,63 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
     const [sortKey, setSortKey] = useState<SortKey>('progress');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
     const [expandedProducerId, setExpandedProducerId] = useState<string | null>(null);
+    const [selectedSupplier, setSelectedSupplier] = useState<string>(''); // CPF of the supplier
     const SIMULATED_TODAY = new Date('2026-04-30T00:00:00');
 
+    const uniqueSuppliers = useMemo(() => {
+        const suppliersMap = new Map<string, string>(); // CPF -> Name
+        producers.forEach(p => {
+            p.contractItems.forEach(item => {
+                item.suppliers.forEach(supplier => {
+                    if (supplier.cpf && !suppliersMap.has(supplier.cpf)) {
+                        suppliersMap.set(supplier.cpf, supplier.name);
+                    }
+                });
+            });
+        });
+        return Array.from(suppliersMap.entries()).map(([cpf, name]) => ({ cpf, name }));
+    }, [producers]);
+
+    const filteredProducersData = useMemo(() => {
+        if (!selectedSupplier) {
+            return producers;
+        }
+
+        const supplierItemNames = new Set<string>();
+        producers.forEach(p => {
+            p.contractItems.forEach(item => {
+                if (item.suppliers.some(s => s.cpf === selectedSupplier)) {
+                    supplierItemNames.add(item.name);
+                }
+            });
+        });
+
+        return producers.map(p => {
+            const filteredContractItems = p.contractItems.filter(item =>
+                item.suppliers.some(s => s.cpf === selectedSupplier)
+            );
+
+            const filteredDeliveries = p.deliveries.filter(delivery =>
+                supplierItemNames.has(delivery.item)
+            );
+
+            const filteredInitialValue = filteredContractItems.reduce((sum, item) => sum + (item.totalKg * item.valuePerKg), 0);
+
+            return {
+                ...p,
+                contractItems: filteredContractItems,
+                deliveries: filteredDeliveries,
+                initialValue: filteredInitialValue,
+            };
+        }).filter(p => p.contractItems.length > 0);
+    }, [producers, selectedSupplier]);
+
     const analyticsData = useMemo(() => {
-        const totalContracted = producers.reduce((sum, p) => sum + p.initialValue, 0);
-        const totalDelivered = producers.reduce((sum, p) => sum + p.deliveries.reduce((dSum, d) => dSum + d.value, 0), 0);
+        const totalContracted = filteredProducersData.reduce((sum, p) => sum + p.initialValue, 0);
+        const totalDelivered = filteredProducersData.reduce((sum, p) => sum + p.deliveries.reduce((dSum, d) => dSum + d.value, 0), 0);
         
         const productsDelivered = new Map<string, number>();
-        const allDeliveries = producers.flatMap(p => p.deliveries);
+        const allDeliveries = filteredProducersData.flatMap(p => p.deliveries);
         allDeliveries.forEach(d => {
             productsDelivered.set(d.item, (productsDelivered.get(d.item) || 0) + d.value);
         });
@@ -112,15 +161,41 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
             totalContracted,
             totalDelivered,
             progress: totalContracted > 0 ? (totalDelivered / totalContracted) * 100 : 0,
-            producerCount: producers.length,
+            producerCount: filteredProducersData.length,
             topProducts,
             uniquePendingInvoices,
             uniqueSentInvoices
         };
-    }, [producers, SIMULATED_TODAY]);
+    }, [filteredProducersData, SIMULATED_TODAY]);
+
+    const itemProgressData = useMemo(() => {
+        const itemsMap = new Map<string, { contracted: number; delivered: number }>();
+        const allContractItems = filteredProducersData.flatMap(p => p.contractItems);
+        const allDeliveries = filteredProducersData.flatMap(p => p.deliveries);
+        
+        allContractItems.forEach(item => {
+            const entry = itemsMap.get(item.name) || { contracted: 0, delivered: 0 };
+            entry.contracted += item.totalKg * item.valuePerKg;
+            itemsMap.set(item.name, entry);
+        });
+
+        allDeliveries.forEach(delivery => {
+            const entry = itemsMap.get(delivery.item) || { contracted: 0, delivered: 0 };
+            entry.delivered += delivery.value;
+            itemsMap.set(delivery.item, entry);
+        });
+
+        const result = Array.from(itemsMap.entries()).map(([name, data]) => ({
+            name,
+            ...data,
+            progress: data.contracted > 0 ? (data.delivered / data.contracted) * 100 : 0,
+        }));
+
+        return result.sort((a, b) => a.name.localeCompare(b.name));
+    }, [filteredProducersData]);
     
     const sortedProducers = useMemo(() => {
-      return [...producers].sort((a, b) => {
+      return [...filteredProducersData].sort((a, b) => {
         const aDelivered = a.deliveries.reduce((sum, d) => sum + d.value, 0);
         const bDelivered = b.deliveries.reduce((sum, d) => sum + d.value, 0);
         const aProgress = a.initialValue > 0 ? (aDelivered / a.initialValue) : 0;
@@ -134,7 +209,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
 
         return sortDirection === 'asc' ? comparison : -comparison;
       });
-    }, [producers, sortKey, sortDirection]);
+    }, [filteredProducersData, sortKey, sortDirection]);
 
     const handleSort = (key: SortKey) => {
       if (key === sortKey) {
@@ -157,6 +232,21 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
 
     return (
         <div className="space-y-8 animate-fade-in">
+             <div className="bg-white p-4 rounded-xl shadow-lg">
+                <label htmlFor="supplier-filter" className="block text-sm font-medium text-gray-700">Filtrar por Fornecedor</label>
+                <select
+                    id="supplier-filter"
+                    value={selectedSupplier}
+                    onChange={(e) => setSelectedSupplier(e.target.value)}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                >
+                    <option value="">-- Todos os Fornecedores --</option>
+                    {uniqueSuppliers.map(s => (
+                    <option key={s.cpf} value={s.cpf}>{s.name} - {s.cpf}</option>
+                    ))}
+                </select>
+            </div>
+
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-lg flex items-center space-x-4">
@@ -207,6 +297,33 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                 </div>
             </div>
 
+            {/* Item Progress Section */}
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+                <h3 className="text-lg font-semibold mb-4">Progresso por Item</h3>
+                <div className="space-y-4 max-h-72 overflow-y-auto pr-2">
+                    {itemProgressData.length > 0 ? itemProgressData.map(item => (
+                        <div key={item.name}>
+                            <div className="flex justify-between items-baseline mb-1 text-sm">
+                                <span className="font-medium text-gray-700">{item.name}</span>
+                                <span className="text-xs text-gray-500">
+                                    {formatCurrency(item.delivered)} / {formatCurrency(item.contracted)}
+                                </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-4">
+                                <div 
+                                    className="bg-purple-600 h-4 rounded-full text-white text-xs flex items-center justify-center" 
+                                    style={{ width: `${item.progress}%` }}
+                                >
+                                    {item.progress > 20 && `${item.progress.toFixed(0)}%`}
+                                </div>
+                            </div>
+                        </div>
+                    )) : (
+                        <p className="text-center text-gray-500 italic pt-8">Nenhum item de contrato para exibir.</p>
+                    )}
+                </div>
+            </div>
+
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
                  <div className="lg:col-span-3 bg-white p-6 rounded-xl shadow-lg">
@@ -224,7 +341,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                               <div className="text-sm mt-1">Entregue</div>
                           </div>
                       </div>
-                    ) : <p className="text-center text-gray-500 pt-16">Nenhum contrato cadastrado.</p>}
+                    ) : <p className="text-center text-gray-500 pt-16">Nenhum contrato para este fornecedor.</p>}
                 </div>
                  <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
                     <h3 className="text-lg font-semibold mb-4 text-center">Top 5 Produtos (Valor Entregue)</h3>
