@@ -33,7 +33,8 @@ const App: React.FC = () => {
   useEffect(() => {
     try {
       window.localStorage.setItem('producersData', JSON.stringify(producers));
-    } catch (error) {
+    } catch (error)
+{
       console.error('Erro ao salvar dados no localStorage:', error);
     }
   }, [producers]);
@@ -81,22 +82,9 @@ const App: React.FC = () => {
     return true; // Indicate success
   };
 
-  const updateProducerContract = (producerId: string, newContractItems: ContractItem[]) => {
-    const newInitialValue = newContractItems.reduce((acc, item) => acc + (item.totalKg * item.valuePerKg), 0);
-    
-    const updatedProducers = producers.map(p => {
-        if (p.id === producerId) {
-            return {
-                ...p,
-                contractItems: newContractItems,
-                initialValue: newInitialValue
-            };
-        }
-        return p;
-    });
-
+  const handleUpdateProducers = (updatedProducers: Producer[]) => {
     setProducers(updatedProducers);
-};
+  };
 
   const handleLogout = () => {
     setCurrentUser(null);
@@ -189,7 +177,7 @@ const App: React.FC = () => {
   if (isAdminLoggedIn) {
     return <AdminDashboard 
         onRegister={handleRegister} 
-        onUpdateContract={updateProducerContract}
+        onUpdateProducers={handleUpdateProducers}
         onLogout={handleLogout} 
         producers={producers} 
     />;
