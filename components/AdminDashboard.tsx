@@ -8,6 +8,7 @@ interface AdminDashboardProps {
   onUpdateProducers: (updatedProducers: Producer[]) => void;
   onLogout: () => void;
   producers: Producer[];
+  onResetData: () => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -33,7 +34,7 @@ const initialItemCentricInput = (): ItemCentricInput => ({
   suppliers: Array(15).fill(null).map(initialSupplierInput),
 });
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdateProducers, onLogout, producers }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdateProducers, onLogout, producers, onResetData }) => {
   const [activeTab, setActiveTab] = useState<'register' | 'contracts' | 'analytics'>('register');
   
   // Estados para aba de REGISTRO
@@ -176,6 +177,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
     setItemCentricContracts(newItems);
   };
 
+  const handleResetClick = () => {
+    if (window.confirm('Você tem certeza que deseja apagar TODOS os dados de produtores, contratos e entregas? Esta ação é irreversível.')) {
+        onResetData();
+    }
+  };
+
   const TabButton: React.FC<{tab: 'register' | 'contracts' | 'analytics', label: string}> = ({ tab, label }) => (
       <button onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${ activeTab === tab ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-blue-100' }`}>{label}</button>
   );
@@ -199,22 +206,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
 
         {activeTab === 'register' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
-              <h2 className="text-2xl font-semibold mb-6 text-center text-gray-700">Cadastrar Novo Produtor</h2>
-              <form className="space-y-6" onSubmit={handleRegisterSubmit}>
-                <div className="rounded-md shadow-sm space-y-3">
-                    <input value={regName} onChange={(e) => setRegName(e.target.value.toUpperCase())} required placeholder="Nome completo (MAIÚSCULA)" className="input-field"/>
-                    <input value={regCpf} onChange={(e) => setRegCpf(e.target.value.replace(/[^\d]/g, ''))} maxLength={11} required placeholder="CPF (será a senha) - apenas números" className="input-field"/>
+            <div className="space-y-8">
+                <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
+                    <h2 className="text-2xl font-semibold mb-6 text-center text-gray-700">Cadastrar Novo Produtor</h2>
+                    <form className="space-y-6" onSubmit={handleRegisterSubmit}>
+                        <div className="rounded-md shadow-sm space-y-3">
+                            <input value={regName} onChange={(e) => setRegName(e.target.value.toUpperCase())} required placeholder="Nome completo (MAIÚSCULA)" className="input-field"/>
+                            <input value={regCpf} onChange={(e) => setRegCpf(e.target.value.replace(/[^\d]/g, ''))} maxLength={11} required placeholder="CPF (será a senha) - apenas números" className="input-field"/>
+                        </div>
+                        <div className="space-y-4 pt-2">
+                        <h3 className="text-lg font-medium text-gray-800 text-center border-b pb-2">Semanas de Entrega Permitidas</h3>
+                        <p className="text-center text-xs text-gray-500">Selecione as semanas em que este produtor pode entregar.</p>
+                        <WeekSelector selectedWeeks={selectedWeeks} onWeekToggle={(week) => setSelectedWeeks(p => p.includes(week) ? p.filter(w=>w!==week) : [...p,week])} />
+                        </div>
+                        {regError && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded">{regError}</p>}
+                        {regSuccess && <p className="text-green-600 text-sm text-center bg-green-50 p-2 rounded">{regSuccess}</p>}
+                        <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">Cadastrar Produtor</button>
+                    </form>
                 </div>
-                <div className="space-y-4 pt-2">
-                  <h3 className="text-lg font-medium text-gray-800 text-center border-b pb-2">Semanas de Entrega Permitidas</h3>
-                  <p className="text-center text-xs text-gray-500">Selecione as semanas em que este produtor pode entregar.</p>
-                  <WeekSelector selectedWeeks={selectedWeeks} onWeekToggle={(week) => setSelectedWeeks(p => p.includes(week) ? p.filter(w=>w!==week) : [...p,week])} />
+
+                <div className="bg-red-50/90 backdrop-blur-sm p-6 rounded-xl shadow-lg border-2 border-dashed border-red-400">
+                    <h3 className="text-xl font-bold mb-4 text-center text-red-800">Zona de Perigo</h3>
+                    <p className="text-center text-sm text-red-700 mb-4">A ação abaixo é permanente e não pode ser desfeita. Tenha certeza absoluta antes de continuar.</p>
+                    <button 
+                        type="button" 
+                        onClick={handleResetClick}
+                        className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                        Resetar Todos os Dados
+                    </button>
                 </div>
-                {regError && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded">{regError}</p>}
-                {regSuccess && <p className="text-green-600 text-sm text-center bg-green-50 p-2 rounded">{regSuccess}</p>}
-                <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">Cadastrar Produtor</button>
-              </form>
             </div>
             <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
               <h2 className="text-2xl font-semibold mb-6 text-center text-gray-700">Produtores Cadastrados</h2>

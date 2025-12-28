@@ -91,6 +91,21 @@ const App: React.FC = () => {
     setIsAdminLoggedIn(false);
   };
 
+  const handleResetData = () => {
+    if (window.confirm('Você tem certeza que deseja apagar TODOS os dados de produtores, contratos e entregas? Esta ação é irreversível.')) {
+      // Clear state
+      setProducers(initialProducers);
+      // Clear localStorage
+      try {
+        window.localStorage.removeItem('producersData');
+      } catch (error) {
+        console.error('Erro ao limpar dados do localStorage:', error);
+      }
+      // Logout admin
+      handleLogout();
+    }
+  };
+
   const addDeliveries = (producerId: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => {
     const newDeliveries: Delivery[] = deliveries.map(delivery => ({
         ...delivery,
@@ -180,6 +195,7 @@ const App: React.FC = () => {
         onUpdateProducers={handleUpdateProducers}
         onLogout={handleLogout} 
         producers={producers} 
+        onResetData={handleResetData}
     />;
   }
 
