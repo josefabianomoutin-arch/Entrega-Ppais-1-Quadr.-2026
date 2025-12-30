@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import type { Producer, ContractItem, Supplier } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import type { Producer, ContractItem } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 
@@ -17,21 +17,22 @@ const formatCurrency = (value: number) => {
 };
 
 // Tipos para o estado da UI de Gestão por Item
-interface SupplierInput { name: string; cpf: string; }
 interface ProducerSlot { producerId: string; }
 interface ItemCentricInput {
   name: string;
   totalKg: string;
   valuePerKg: string;
   producers: ProducerSlot[];
-  suppliers: SupplierInput[];
+  id: string; // Adicionado para rastrear a ordem de criação
 }
-const initialSupplierInput = (): SupplierInput => ({ name: '', cpf: '' });
+
 const initialProducerSlot = (): ProducerSlot => ({ producerId: '' });
 const initialItemCentricInput = (): ItemCentricInput => ({
-  name: '', totalKg: '', valuePerKg: '',
+  name: '', 
+  totalKg: '', 
+  valuePerKg: '',
   producers: Array(15).fill(null).map(initialProducerSlot),
-  suppliers: Array(15).fill(null).map(initialSupplierInput),
+  id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 });
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdateProducers, onLogout, producers, onResetData }) => {
@@ -47,44 +48,60 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
   // Estados para aba de GESTÃO POR ITEM
   const [itemCentricContracts, setItemCentricContracts] = useState<ItemCentricInput[]>([initialItemCentricInput()]);
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(0);
-  const [expandedSection, setExpandedSection] = useState<'producers' | 'suppliers' | null>('producers');
   const [contractError, setContractError] = useState('');
   const [contractSuccess, setContractSuccess] = useState('');
+  const contractsInitialized = useRef(false);
 
+
+  // Sincroniza o estado da UI com os dados dos produtores ao abrir a aba, mantendo a ordem
   useEffect(() => {
-    if (activeTab === 'contracts') {
-        const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; producerIds: string[]; suppliers: Supplier[] }>();
+    if (activeTab !== 'contracts') {
+        contractsInitialized.current = false;
+        return;
+    }
 
-        // Agrega dados de todos os produtores para criar uma visão centrada no item
-        producers.forEach(producer => {
-            producer.contractItems.forEach(item => {
-                const mapEntry = itemsMap.get(item.name) || { totalKg: 0, valuePerKg: item.valuePerKg, producerIds: [], suppliers: item.suppliers };
-                mapEntry.totalKg += item.totalKg;
-                if (!mapEntry.producerIds.includes(producer.id)) {
-                    mapEntry.producerIds.push(producer.id);
-                }
-                itemsMap.set(item.name, mapEntry);
-            });
+    if (contractsInitialized.current) {
+        // Após o carregamento inicial, o estado local é a fonte da verdade para preservar a ordem e os itens não atribuídos.
+        return;
+    }
+      
+    // Usamos um Map para agrupar, mas mantendo a ordem de primeira aparição
+    const itemsOrder: string[] = [];
+    const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; producerIds: string[] }>();
+
+    producers.forEach(producer => {
+        producer.contractItems.forEach(item => {
+            if (!itemsMap.has(item.name)) {
+                itemsOrder.push(item.name);
+                itemsMap.set(item.name, { totalKg: 0, valuePerKg: item.valuePerKg, producerIds: [] });
+            }
+            const entry = itemsMap.get(item.name)!;
+            entry.totalKg += item.totalKg;
+            if (!entry.producerIds.includes(producer.id)) {
+                entry.producerIds.push(producer.id);
+            }
         });
+    });
 
-        const uiState: ItemCentricInput[] = Array.from(itemsMap.entries()).map(([name, data]) => ({
+    // Reconstrói a lista baseada na ordem de detecção
+    const uiState: ItemCentricInput[] = itemsOrder.map((name, index) => {
+        const data = itemsMap.get(name)!;
+        return {
+            id: `item-loaded-${index}`,
             name,
             totalKg: String(data.totalKg),
             valuePerKg: String(data.valuePerKg),
             producers: [
                 ...data.producerIds.map(id => ({ producerId: id })),
-                ...Array(15 - data.producerIds.length).fill(null).map(initialProducerSlot)
-            ],
-            suppliers: [
-                ...data.suppliers.map(s => ({ name: s.name, cpf: s.cpf })),
-                ...Array(15 - data.suppliers.length).fill(null).map(initialSupplierInput)
+                ...Array(Math.max(0, 15 - data.producerIds.length)).fill(null).map(initialProducerSlot)
             ]
-        }));
+        };
+    });
 
-        // FIX: Corrected typo from ui_state to uiState
-        setItemCentricContracts(uiState.length > 0 ? uiState : [initialItemCentricInput()]);
-        setExpandedItemIndex(0);
+    if (uiState.length > 0) {
+        setItemCentricContracts(uiState);
     }
+    contractsInitialized.current = true;
   }, [producers, activeTab]);
 
 
@@ -101,45 +118,48 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
   const handleSaveContracts = (e: React.FormEvent) => {
     e.preventDefault(); setContractError(''); setContractSuccess('');
 
-    // FIX: Explicitly type `updatedProducers` to prevent type inference issues with `producerMap` below.
     const updatedProducers: Producer[] = producers.map(p => ({ ...p, contractItems: [], initialValue: 0 }));
     const producerMap = new Map(updatedProducers.map(p => [p.id, p]));
 
     for (const uiItem of itemCentricContracts) {
-        if (!uiItem.name.trim()) continue;
+        const name = uiItem.name.trim().toUpperCase();
+        if (!name) continue;
 
-        const totalKg = parseFloat(uiItem.totalKg);
-        const valuePerKg = parseFloat(uiItem.valuePerKg);
-        if (!uiItem.name.trim() || isNaN(totalKg) || totalKg <= 0 || isNaN(valuePerKg) || valuePerKg <= 0) {
-            setContractError(`Item "${uiItem.name || 'em branco'}" tem dados inválidos. Preencha nome, Kg total e valor/Kg com números positivos.`);
-            return;
-        }
-
-        const assignedProducerIds = uiItem.producers.map(p => p.producerId).filter(id => id);
-        if (assignedProducerIds.length === 0) continue;
+        const assignedProducerIds = uiItem.producers.map(p => p.producerId).filter(id => id !== '');
         
-        const validSuppliers: Supplier[] = uiItem.suppliers
-            .map(s => ({ name: s.name.trim(), cpf: s.cpf.replace(/[^\d]/g, '') }))
-            .filter(s => s.name !== '' && s.cpf !== '');
+        // Apenas processa e valida itens que estão de fato atribuídos a produtores
+        if (assignedProducerIds.length > 0) {
+            const totalKg = parseFloat(uiItem.totalKg);
+            const valuePerKg = parseFloat(uiItem.valuePerKg);
+            
+            if (isNaN(totalKg) || totalKg <= 0 || isNaN(valuePerKg) || valuePerKg <= 0) {
+                setContractError(`O item "${name}" (atribuído a produtores) possui valores inválidos.`);
+                return;
+            }
 
-        const kgPerProducer = totalKg / assignedProducerIds.length;
+            const kgPerProducer = totalKg / assignedProducerIds.length;
 
-        for (const producerId of assignedProducerIds) {
-            const producer = producerMap.get(producerId);
-            if (producer) {
-                producer.contractItems.push({
-                    name: uiItem.name, totalKg: kgPerProducer, valuePerKg, suppliers: validSuppliers,
-                });
+            for (const producerId of assignedProducerIds) {
+                const producer = producerMap.get(producerId);
+                if (producer) {
+                    producer.contractItems.push({
+                        name, totalKg: kgPerProducer, valuePerKg
+                    });
+                }
             }
         }
+        // Se um item não tiver produtores, ele é simplesmente ignorado na lógica de salvamento,
+        // mas permanecerá no estado da UI por causa da alteração no useEffect.
     }
 
+    // Recalcula o valor inicial total de cada produtor
     updatedProducers.forEach(p => {
         p.initialValue = p.contractItems.reduce((sum, item) => sum + (item.totalKg * item.valuePerKg), 0);
     });
 
     onUpdateProducers(updatedProducers);
     setContractSuccess('Contratos salvos com sucesso!');
+    setTimeout(() => setContractSuccess(''), 3000);
   };
   
   const handleItemChange = (index: number, field: 'name' | 'totalKg' | 'valuePerKg', value: string) => {
@@ -156,29 +176,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
     setItemCentricContracts(newItems);
   };
   
-  const handleSupplierChange = (itemIndex: number, supplierIndex: number, field: 'name' | 'cpf', value: string) => {
-    const newItems = [...itemCentricContracts];
-    const newSuppliers = [...newItems[itemIndex].suppliers];
-    const updatedValue = field === 'cpf' ? value.replace(/[^\d]/g, '') : value;
-    newSuppliers[supplierIndex] = { ...newSuppliers[supplierIndex], [field]: updatedValue };
-    newItems[itemIndex] = { ...newItems[itemIndex], suppliers: newSuppliers };
-    setItemCentricContracts(newItems);
-  };
-
   const handleAddItem = () => {
-    if (itemCentricContracts.length < 15) {
+    if (itemCentricContracts.length < 50) {
         setItemCentricContracts([...itemCentricContracts, initialItemCentricInput()]);
         setExpandedItemIndex(itemCentricContracts.length);
     }
   };
 
   const handleRemoveItem = (index: number) => {
-    const newItems = itemCentricContracts.filter((_, i) => i !== index);
-    setItemCentricContracts(newItems);
+    if (window.confirm('Excluir definitivamente este item de contrato?')) {
+        const newItems = itemCentricContracts.filter((_, i) => i !== index);
+        setItemCentricContracts(newItems);
+    }
   };
 
   const handleResetClick = () => {
-    if (window.confirm('Você tem certeza que deseja apagar TODOS os dados de produtores, contratos e entregas? Esta ação é irreversível.')) {
+    if (window.confirm('Deseja realmente limpar tudo?')) {
         onResetData();
     }
   };
@@ -189,120 +202,211 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
 
   return (
     <div className="min-h-screen text-gray-800">
-       <header className="bg-white/80 backdrop-blur-sm shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
+       <header className="bg-white/90 backdrop-blur-md shadow-sm p-4 flex justify-between items-center sticky top-0 z-20">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-blue-800">Painel do Administrador</h1>
-          <p className="text-sm text-gray-500">Gestão de Produtores e Contratos</p>
+          <h1 className="text-xl md:text-2xl font-bold text-blue-900">Painel do Administrador</h1>
+          <p className="text-xs text-gray-400 font-medium">Controle de Safra 2026</p>
         </div>
-        <button onClick={onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Sair</button>
+        <button onClick={onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-xl transition-all shadow-sm text-sm">Sair</button>
       </header>
       
       <main className="p-4 md:p-8">
-        <div className="mb-8 flex justify-center border-b"><div className="flex space-x-2 p-1 bg-gray-100 rounded-lg">
-                <TabButton tab="register" label="Cadastro de Produtor"/>
+        <div className="mb-8 flex justify-center border-b"><div className="flex space-x-2 p-1 bg-gray-100/50 rounded-xl">
+                <TabButton tab="register" label="Cadastro"/>
                 <TabButton tab="contracts" label="Gestão por Item"/>
-                <TabButton tab="analytics" label="Análise Gráfica"/>
+                <TabButton tab="analytics" label="Análise"/>
         </div></div>
 
         {activeTab === 'register' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
             <div className="space-y-8">
-                <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
-                    <h2 className="text-2xl font-semibold mb-6 text-center text-gray-700">Cadastrar Novo Produtor</h2>
+                <div className="bg-white p-6 rounded-2xl shadow-xl border-t-8 border-green-500">
+                    <h2 className="text-2xl font-black mb-6 text-gray-700 uppercase tracking-tight">Novo Produtor</h2>
                     <form className="space-y-6" onSubmit={handleRegisterSubmit}>
-                        <div className="rounded-md shadow-sm space-y-3">
-                            <input value={regName} onChange={(e) => setRegName(e.target.value.toUpperCase())} required placeholder="Nome completo (MAIÚSCULA)" className="input-field"/>
-                            <input value={regCpf} onChange={(e) => setRegCpf(e.target.value.replace(/[^\d]/g, ''))} maxLength={11} required placeholder="CPF (será a senha) - apenas números" className="input-field"/>
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Dados de Acesso</label>
+                            <input value={regName} onChange={(e) => setRegName(e.target.value.toUpperCase())} required placeholder="NOME DO PRODUTOR" className="input-field font-bold"/>
+                            <input value={regCpf} onChange={(e) => setRegCpf(e.target.value.replace(/[^\d]/g, ''))} maxLength={11} required placeholder="CPF (SENHA)" className="input-field font-mono"/>
                         </div>
                         <div className="space-y-4 pt-2">
-                        <h3 className="text-lg font-medium text-gray-800 text-center border-b pb-2">Semanas de Entrega Permitidas</h3>
-                        <p className="text-center text-xs text-gray-500">Selecione as semanas em que este produtor pode entregar.</p>
-                        <WeekSelector selectedWeeks={selectedWeeks} onWeekToggle={(week) => setSelectedWeeks(p => p.includes(week) ? p.filter(w=>w!==week) : [...p,week])} />
+                            <h3 className="text-sm font-black text-gray-600 border-b pb-2 uppercase tracking-widest">Semanas Disponíveis</h3>
+                            <WeekSelector selectedWeeks={selectedWeeks} onWeekToggle={(week) => setSelectedWeeks(p => p.includes(week) ? p.filter(w=>w!==week) : [...p,week])} />
                         </div>
-                        {regError && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded">{regError}</p>}
-                        {regSuccess && <p className="text-green-600 text-sm text-center bg-green-50 p-2 rounded">{regSuccess}</p>}
-                        <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">Cadastrar Produtor</button>
+                        {regError && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg font-bold">{regError}</p>}
+                        {regSuccess && <p className="text-green-600 text-sm text-center bg-green-50 p-2 rounded-lg font-bold">{regSuccess}</p>}
+                        <button type="submit" className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-black rounded-xl transition-all shadow-lg active:scale-95 uppercase">Finalizar Cadastro</button>
                     </form>
                 </div>
-
-                <div className="bg-red-50/90 backdrop-blur-sm p-6 rounded-xl shadow-lg border-2 border-dashed border-red-400">
-                    <h3 className="text-xl font-bold mb-4 text-center text-red-800">Zona de Perigo</h3>
-                    <p className="text-center text-sm text-red-700 mb-4">A ação abaixo é permanente e não pode ser desfeita. Tenha certeza absoluta antes de continuar.</p>
-                    <button 
-                        type="button" 
-                        onClick={handleResetClick}
-                        className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                    >
-                        Resetar Todos os Dados
-                    </button>
+                <div className="bg-red-50 p-6 rounded-2xl shadow-md border-2 border-dashed border-red-300">
+                    <h3 className="text-lg font-bold mb-4 text-center text-red-800 uppercase tracking-tighter">Zona Crítica</h3>
+                    <button onClick={handleResetClick} className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors text-sm uppercase">Resetar Tudo</button>
                 </div>
             </div>
-            <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
-              <h2 className="text-2xl font-semibold mb-6 text-center text-gray-700">Produtores Cadastrados</h2>
-              <div className="space-y-3 max-h-[70vh] overflow-y-auto">{producers.length > 0 ? producers.map(p => (<div key={p.id} className="p-3 bg-gray-50 rounded-lg flex justify-between items-center text-sm shadow-sm"><div><p className="font-bold text-gray-800">{p.name}</p><p className="text-xs text-gray-500">CPF: {p.cpf}</p></div><span className="font-mono text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">{p.contractItems.length} {p.contractItems.length === 1 ? 'item' : 'itens'}</span></div>)) : <p className="text-center text-gray-500 italic mt-8">Nenhum produtor cadastrado.</p>}</div>
+            <div className="bg-white p-6 rounded-2xl shadow-xl border-t-8 border-blue-600 overflow-hidden">
+              <h2 className="text-2xl font-black mb-6 text-gray-700 uppercase tracking-tight">Produtores Cadastrados ({producers.length})</h2>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                {producers.length > 0 ? producers.map(p => (
+                  <div key={p.id} className="p-4 bg-gray-50 rounded-xl flex justify-between items-center text-sm border border-gray-100 hover:bg-white transition-colors group">
+                    <div>
+                        <p className="font-black text-gray-800 group-hover:text-blue-600 transition-colors">{p.name}</p>
+                        <p className="text-[10px] text-gray-400 font-mono">ID: {p.id.split('-')[1]}</p>
+                    </div>
+                    <span className="font-bold text-[10px] text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">{p.contractItems.length} itens</span>
+                  </div>
+                )) : <div className="text-center py-20"><p className="text-gray-300 italic">Nenhum registro.</p></div>}
+              </div>
             </div>
           </div>
         )}
 
         {activeTab === 'contracts' && (
-            <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg max-w-4xl mx-auto">
-                <h2 className="text-2xl font-semibold mb-6 text-center text-gray-700">Gestão de Contratos por Item</h2>
-                <form className="space-y-6" onSubmit={handleSaveContracts}>
-                    <div className="space-y-4 pt-2">
-                        <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
-                            {itemCentricContracts.map((item, index) => {
-                                const assignedProducersCount = item.producers.filter(p => p.producerId).length;
-                                const activeSuppliersCount = item.suppliers.filter(s => s.name.trim() !== '' && s.cpf.trim() !== '').length;
-                                const kgNum = parseFloat(item.totalKg) || 0;
-                                const valKgNum = parseFloat(item.valuePerKg) || 0;
-                                const kgPerProducer = assignedProducersCount > 0 ? kgNum / assignedProducersCount : 0;
-                                const valPerProducer = assignedProducersCount > 0 ? kgPerProducer * valKgNum : 0;
-                                
-                                const isProducersExpanded = expandedItemIndex === index && expandedSection === 'producers';
-                                const isSuppliersExpanded = expandedItemIndex === index && expandedSection === 'suppliers';
-                                
-                                return (
-                                <div key={index} className="p-4 border rounded-lg relative bg-gray-50 shadow-sm">
-                                    <div className="flex justify-between items-center">
-                                        <p className="font-semibold text-gray-600">Item de Contrato {index + 1}</p>
-                                        {itemCentricContracts.length > 1 && <button type="button" onClick={() => handleRemoveItem(index)} className="text-red-500 hover:text-red-700 text-2xl font-bold leading-none">&times;</button>}
+            <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-5xl mx-auto border-t-8 border-blue-600 animate-fade-in">
+                <div className="text-center mb-10">
+                  <h2 className="text-3xl font-black text-blue-900 uppercase tracking-tighter">Gestão de Contratos por Item</h2>
+                  <p className="text-gray-400 font-medium">Os itens abaixo permanecem na ordem exata de adição.</p>
+                </div>
+                
+                <form className="space-y-10" onSubmit={handleSaveContracts}>
+                    <div className="space-y-6 max-h-[65vh] overflow-y-auto pr-3 custom-scrollbar p-2">
+                        {itemCentricContracts.map((item, index) => {
+                            const activeProducers = item.producers.filter(p => p.producerId !== '');
+                            const assignedCount = activeProducers.length;
+                            const isExpanded = expandedItemIndex === index;
+                            
+                            const totalKg = parseFloat(item.totalKg) || 0;
+                            const valKg = parseFloat(item.valuePerKg) || 0;
+                            const totalItemValue = totalKg * valKg;
+                            
+                            const kgPerProd = assignedCount > 0 ? totalKg / assignedCount : 0;
+                            const valPerProd = assignedCount > 0 ? totalItemValue / assignedCount : 0;
+                            
+                            return (
+                            <div key={item.id} className="p-6 border-2 rounded-2xl relative bg-white shadow-lg border-l-[12px] border-l-blue-600 transition-all hover:scale-[1.01]">
+                                <div className="flex justify-between items-center mb-6 pb-3 border-b-2 border-gray-100">
+                                    <div className="flex items-center gap-4">
+                                        <span className="bg-blue-600 text-white w-10 h-10 flex items-center justify-center rounded-xl font-black text-lg shadow-blue-200 shadow-lg">{index + 1}</span>
+                                        <h3 className="font-black text-2xl text-blue-950 uppercase tracking-tighter">{item.name || 'ITEM PENDENTE'}</h3>
                                     </div>
-                                    <div className="space-y-3 mt-2">
-                                        <input value={item.name} onChange={(e) => handleItemChange(index, 'name', e.target.value)} placeholder="Nome do Item (Ex: Soja)" className="input-field"/>
-                                        <div className="flex space-x-2">
-                                            <input type="number" value={item.totalKg} onChange={(e) => handleItemChange(index, 'totalKg', e.target.value)} min="0.01" step="0.01" placeholder="Quantidade Total (Kg)" className="input-field w-1/2"/>
-                                            <input type="number" value={item.valuePerKg} onChange={(e) => handleItemChange(index, 'valuePerKg', e.target.value)} min="0.01" step="0.01" placeholder="Valor por Kg (R$)" className="input-field w-1/2"/>
+                                    <button type="button" onClick={() => handleRemoveItem(index)} className="text-red-300 hover:text-red-600 transition-colors p-2 rounded-full hover:bg-red-50">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome do Produto</label>
+                                        <input value={item.name} onChange={(e) => handleItemChange(index, 'name', e.target.value.toUpperCase())} placeholder="EX: ARROZ AGULHINHA" className="input-field font-black text-blue-900 uppercase"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Peso Total Contratado (Kg)</label>
+                                        <input type="number" step="0.01" value={item.totalKg} onChange={(e) => handleItemChange(index, 'totalKg', e.target.value)} placeholder="0,00" className="input-field font-mono text-lg"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Preço por Quilograma (R$)</label>
+                                        <input type="number" step="0.01" value={item.valuePerKg} onChange={(e) => handleItemChange(index, 'valuePerKg', e.target.value)} placeholder="0,00" className="input-field font-mono text-lg text-green-700"/>
+                                    </div>
+                                </div>
+
+                                {/* PAINEL DE RESUMO EXCLUSIVO */}
+                                <div className="mt-8 bg-blue-50/50 border-2 border-blue-100 rounded-2xl overflow-hidden shadow-inner">
+                                    <div className="bg-blue-100/50 px-4 py-2 border-b-2 border-blue-100 flex justify-between items-center">
+                                        <span className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">Resumo de Cálculos do Contrato</span>
+                                        <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full shadow-sm">{assignedCount} PRODUTORES</span>
+                                    </div>
+                                    <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-6">
+                                        <div className="text-center md:border-r-2 border-blue-100/50">
+                                            <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter mb-1">Valor Total</p>
+                                            <p className="text-lg font-black text-gray-900">{formatCurrency(totalItemValue)}</p>
+                                        </div>
+                                        <div className="text-center md:border-r-2 border-blue-100/50">
+                                            <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter mb-1">Peso Total</p>
+                                            <p className="text-lg font-black text-gray-900">{totalKg.toLocaleString('pt-BR')} <span className="text-xs">Kg</span></p>
+                                        </div>
+                                        <div className="text-center md:border-r-2 border-blue-100/50">
+                                            <p className="text-[10px] text-blue-500 uppercase font-black tracking-tighter mb-1">Cota Valor / Prod</p>
+                                            <p className="text-lg font-black text-blue-700">{formatCurrency(valPerProd)}</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-[10px] text-blue-500 uppercase font-black tracking-tighter mb-1">Cota Peso / Prod</p>
+                                            <p className="text-lg font-black text-blue-700">{kgPerProd.toLocaleString('pt-BR')} <span className="text-xs">Kg</span></p>
                                         </div>
                                     </div>
-                                    {assignedProducersCount > 0 && <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md text-sm text-center"><p><span className="font-semibold">{kgPerProducer.toFixed(2)} Kg</span> | <span className="font-semibold">{formatCurrency(valPerProducer)}</span> por produtor</p></div>}
-                                    
-                                    <div className="mt-4 grid grid-cols-2 gap-2">
-                                      <button type="button" onClick={() => { setExpandedItemIndex(isProducersExpanded ? null : index); setExpandedSection(isProducersExpanded ? null : 'producers'); }} className={`w-full text-left text-sm font-semibold p-2 rounded text-center transition-colors ${isProducersExpanded ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'}`}>
-                                          Produtores ({assignedProducersCount}/15) {isProducersExpanded ? '▲' : '▼'}
-                                      </button>
-                                      <button type="button" onClick={() => { setExpandedItemIndex(isSuppliersExpanded ? null : index); setExpandedSection(isSuppliersExpanded ? null : 'suppliers'); }} className={`w-full text-left text-sm font-semibold p-2 rounded text-center transition-colors ${isSuppliersExpanded ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'}`}>
-                                          Fornecedores ({activeSuppliersCount}/15) {isSuppliersExpanded ? '▲' : '▼'}
-                                      </button>
-                                    </div>
-
-                                    {isProducersExpanded && <div className="mt-3 pt-3 border-t space-y-3">{item.producers.map((slot, slotIndex) => <div key={slotIndex} className="flex space-x-2 items-center"><span className="text-xs text-gray-500 w-6 text-right">#{slotIndex + 1}</span><select value={slot.producerId} onChange={e => handleProducerSelectionChange(index, slotIndex, e.target.value)} className="input-field"><option value="">-- Selecione um Produtor --</option>{producers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>)}</div>}
-                                    {isSuppliersExpanded && <div className="mt-3 pt-3 border-t space-y-3">{item.suppliers.map((supplier, supIndex) => <div key={supIndex} className="flex space-x-2 items-center"><span className="text-xs text-gray-500 w-6 text-right">#{supIndex + 1}</span><input value={supplier.name} onChange={e => handleSupplierChange(index, supIndex, 'name', e.target.value)} placeholder="Nome do Fornecedor" className="input-field w-1/2"/><input value={supplier.cpf} onChange={e => handleSupplierChange(index, supIndex, 'cpf', e.target.value)} maxLength={11} placeholder="CPF do Fornecedor" className="input-field w-1/2"/></div>)}</div>}
-
                                 </div>
-                            )})}
-                        </div>
-                        {itemCentricContracts.length < 15 && <button type="button" onClick={handleAddItem} className="w-full text-sm font-medium text-green-600 hover:bg-green-50 py-2 px-4 rounded-md border-2 border-dashed border-green-300 transition-colors">+ Adicionar Item de Contrato</button>}
+                                
+                                <button type="button" onClick={() => setExpandedItemIndex(isExpanded ? null : index)} className={`w-full text-xs font-black p-4 mt-6 rounded-xl transition-all flex items-center justify-center gap-3 uppercase tracking-widest ${isExpanded ? 'bg-blue-600 text-white shadow-xl translate-y-[-2px]' : 'bg-white text-blue-600 border-2 border-blue-200 hover:bg-blue-50'}`}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
+                                    {isExpanded ? 'Fechar Lista de Vinculados' : `Configurar Produtores (${assignedCount})`}
+                                </button>
+
+                                {isExpanded && (
+                                    <div className="mt-4 pt-6 border-t-2 border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-slide-down">
+                                        {item.producers.map((slot, slotIndex) => (
+                                            <div key={slotIndex} className="flex space-x-2 items-center group">
+                                                <span className="text-[10px] font-black text-gray-300 w-5 group-hover:text-blue-500 transition-colors">{slotIndex + 1}</span>
+                                                <select 
+                                                    value={slot.producerId} 
+                                                    onChange={e => handleProducerSelectionChange(index, slotIndex, e.target.value)} 
+                                                    className="input-field py-2 text-xs font-bold border-gray-100 bg-gray-50/50 hover:border-blue-300 transition-all cursor-pointer"
+                                                >
+                                                    <option value="">-- SELECIONAR --</option>
+                                                    {producers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                                </select>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )})}
                     </div>
-                    {contractError && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded mt-4">{contractError}</p>}
-                    {contractSuccess && <p className="text-green-600 text-sm text-center bg-green-50 p-2 rounded mt-4">{contractSuccess}</p>}
-                    <div className="mt-6"><button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Salvar Alterações nos Contratos</button></div>
+                    
+                    {itemCentricContracts.length < 50 && (
+                        <button type="button" onClick={handleAddItem} className="w-full text-lg font-black text-blue-600 hover:bg-blue-50 py-5 rounded-2xl border-4 border-dashed border-blue-200 flex items-center justify-center space-x-3 transition-all hover:border-blue-400 group shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 group-hover:rotate-90 transition-transform duration-300" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                            <span className="uppercase tracking-widest">Adicionar Próximo Item</span>
+                        </button>
+                    )}
+                    
+                    <div className="space-y-4">
+                        {contractError && (
+                            <div className="bg-red-50 border-l-8 border-red-500 p-4 rounded-xl text-red-700 flex items-center gap-4 animate-shake">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
+                                <span className="font-black uppercase text-sm">{contractError}</span>
+                            </div>
+                        )}
+                        {contractSuccess && (
+                            <div className="bg-green-50 border-l-8 border-green-500 p-4 rounded-xl text-green-700 flex items-center gap-4 animate-fade-in">
+                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                 <span className="font-black uppercase text-sm">{contractSuccess}</span>
+                            </div>
+                        )}
+
+                        <div className="flex justify-center pt-6">
+                            <button type="submit" className="w-full max-w-2xl py-5 text-white bg-blue-700 hover:bg-blue-800 font-black text-xl rounded-2xl shadow-2xl transition-all transform hover:scale-105 active:scale-95 uppercase tracking-widest flex items-center justify-center gap-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                                Salvar Tudo e Preservar Ordem
+                            </button>
+                        </div>
+                    </div>
                 </form>
             </div>
         )}
 
         {activeTab === 'analytics' && <AdminAnalytics producers={producers} />}
       </main>
-      <style>{`.input-field { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 0.75rem; border: 1px solid #D1D5DB; border-radius: 0.375rem; background-color: #fff; } .input-field:focus { outline: 2px solid transparent; outline-offset: 2px; border-color: #10B981; box-shadow: 0 0 0 2px #10B981; }`}</style>
+      <style>{`
+        .input-field { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 1rem; border: 2px solid #F3F4F6; border-radius: 1rem; background-color: #fff; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); } 
+        .input-field:focus { border-color: #3B82F6; background-color: #fff; box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.15); }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; } 
+        .custom-scrollbar::-webkit-scrollbar-track { background: #F9FAFB; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; border: 2px solid #F9FAFB; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3B82F6; }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slide-down { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
+        .animate-slide-down { animation: slide-down 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-shake { animation: shake 0.2s ease-in-out 3; }
+      `}</style>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { Producer, Delivery, Supplier } from '../types';
+import type { Producer, Delivery } from '../types';
 
 interface AdminAnalyticsProps {
   producers: Producer[];
@@ -8,14 +8,12 @@ interface AdminAnalyticsProps {
 type SortKey = 'name' | 'progress' | 'delivered' | 'contracted';
 type SortDirection = 'asc' | 'desc';
 
-// Helper function to format currency
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-// SVG Donut Chart Component
 const DonutChart: React.FC<{ data: { label: string; value: number }[] }> = ({ data }) => {
-    if (!data || data.length === 0) return <p className="text-center text-gray-500">Dados insuficientes para o gráfico.</p>;
+    if (!data || data.length === 0) return <p className="text-center text-gray-500">Dados insuficientes.</p>;
 
     const colors = ['#34D399', '#60A5FA', '#FBBF24', '#F87171', '#A78BFA'];
     const total = data.reduce((sum, item) => sum + item.value, 0);
@@ -26,32 +24,24 @@ const DonutChart: React.FC<{ data: { label: string; value: number }[] }> = ({ da
         const startAngle = (cumulative / total) * 360;
         const endAngle = ((cumulative + item.value) / total) * 360;
         cumulative += item.value;
-
         const largeArcFlag = percentage > 0.5 ? 1 : 0;
         const x1 = 50 + 40 * Math.cos(Math.PI * (startAngle - 90) / 180);
         const y1 = 50 + 40 * Math.sin(Math.PI * (startAngle - 90) / 180);
         const x2 = 50 + 40 * Math.cos(Math.PI * (endAngle - 90) / 180);
         const y2 = 50 + 40 * Math.sin(Math.PI * (endAngle - 90) / 180);
-
         return (
-            <path
-                key={index}
-                d={`M ${x1},${y1} A 40,40 0 ${largeArcFlag},1 ${x2},${y2}`}
-                fill="none"
-                stroke={colors[index % colors.length]}
-                strokeWidth="15"
-            />
+            <path key={index} d={`M ${x1},${y1} A 40,40 0 ${largeArcFlag},1 ${x2},${y2}`} fill="none" stroke={colors[index % colors.length]} strokeWidth="15" />
         );
     });
 
     return (
-        <div className="flex flex-col md:flex-row items-center justify-center">
+        <div className="flex flex-col items-center">
             <svg viewBox="0 0 100 100" className="w-40 h-40 transform -rotate-90">{paths}</svg>
-            <div className="ml-0 md:ml-6 mt-4 md:mt-0 text-sm">
+            <div className="mt-4 text-xs space-y-1">
                 {data.map((item, index) => (
-                    <div key={index} className="flex items-center mb-2">
-                        <div className="w-4 h-4 rounded-full mr-2" style={{ backgroundColor: colors[index % colors.length] }}></div>
-                        <span>{item.label}: <span className="font-semibold">{formatCurrency(item.value)}</span></span>
+                    <div key={index} className="flex items-center">
+                        <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: colors[index % colors.length] }}></div>
+                        <span className="truncate max-w-[150px]">{item.label}: <b>{formatCurrency(item.value)}</b></span>
                     </div>
                 ))}
             </div>
@@ -63,63 +53,18 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
     const [sortKey, setSortKey] = useState<SortKey>('progress');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
     const [expandedProducerId, setExpandedProducerId] = useState<string | null>(null);
-    const [selectedSupplier, setSelectedSupplier] = useState<string>(''); // CPF of the supplier
+    const [expandedItemName, setExpandedItemName] = useState<string | null>(null);
+    const [itemSearchTerm, setItemSearchTerm] = useState('');
+    const [producerSearchTerm, setProducerSearchTerm] = useState('');
+    
     const SIMULATED_TODAY = new Date('2026-04-30T00:00:00');
 
-    const uniqueSuppliers = useMemo(() => {
-        const suppliersMap = new Map<string, string>(); // CPF -> Name
-        producers.forEach(p => {
-            p.contractItems.forEach(item => {
-                item.suppliers.forEach(supplier => {
-                    if (supplier.cpf && !suppliersMap.has(supplier.cpf)) {
-                        suppliersMap.set(supplier.cpf, supplier.name);
-                    }
-                });
-            });
-        });
-        return Array.from(suppliersMap.entries()).map(([cpf, name]) => ({ cpf, name }));
-    }, [producers]);
-
-    const filteredProducersData = useMemo(() => {
-        if (!selectedSupplier) {
-            return producers;
-        }
-
-        const supplierItemNames = new Set<string>();
-        producers.forEach(p => {
-            p.contractItems.forEach(item => {
-                if (item.suppliers.some(s => s.cpf === selectedSupplier)) {
-                    supplierItemNames.add(item.name);
-                }
-            });
-        });
-
-        return producers.map(p => {
-            const filteredContractItems = p.contractItems.filter(item =>
-                item.suppliers.some(s => s.cpf === selectedSupplier)
-            );
-
-            const filteredDeliveries = p.deliveries.filter(delivery =>
-                supplierItemNames.has(delivery.item)
-            );
-
-            const filteredInitialValue = filteredContractItems.reduce((sum, item) => sum + (item.totalKg * item.valuePerKg), 0);
-
-            return {
-                ...p,
-                contractItems: filteredContractItems,
-                deliveries: filteredDeliveries,
-                initialValue: filteredInitialValue,
-            };
-        }).filter(p => p.contractItems.length > 0);
-    }, [producers, selectedSupplier]);
-
     const analyticsData = useMemo(() => {
-        const totalContracted = filteredProducersData.reduce((sum, p) => sum + p.initialValue, 0);
-        const totalDelivered = filteredProducersData.reduce((sum, p) => sum + p.deliveries.reduce((dSum, d) => dSum + d.value, 0), 0);
+        const totalContracted = producers.reduce((sum, p) => sum + p.initialValue, 0);
+        const totalDelivered = producers.reduce((sum, p) => sum + p.deliveries.reduce((dSum, d) => dSum + d.value, 0), 0);
         
         const productsDelivered = new Map<string, number>();
-        const allDeliveries = filteredProducersData.flatMap(p => p.deliveries);
+        const allDeliveries = producers.flatMap(p => p.deliveries);
         allDeliveries.forEach(d => {
             productsDelivered.set(d.item, (productsDelivered.get(d.item) || 0) + d.value);
         });
@@ -129,312 +74,164 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
             .slice(0, 5)
             .map(([label, value]) => ({ label, value }));
 
-        const deliveriesByInvoice = new Map<string, Delivery[]>();
-        allDeliveries.forEach(d => {
-            const key = d.invoiceNumber || 'N/A';
-            const group = deliveriesByInvoice.get(key) || [];
-            group.push(d);
-            deliveriesByInvoice.set(key, group);
-        });
-
         let uniquePendingInvoices = 0;
         let uniqueSentInvoices = 0;
+        const invoiceGroups = new Map<string, Delivery[]>();
+        allDeliveries.forEach(d => {
+            if (!d.invoiceNumber) return;
+            const group = invoiceGroups.get(d.invoiceNumber) || [];
+            group.push(d);
+            invoiceGroups.set(d.invoiceNumber, group);
+        });
 
-        for (const [invoiceNumber, deliveries] of deliveriesByInvoice.entries()) {
-            if (invoiceNumber === 'N/A') continue;
-
-            const isFullyUploaded = deliveries.every(d => d.invoiceUploaded);
-            
-            if (isFullyUploaded) {
-                uniqueSentInvoices++;
-            } else {
-                const hasPastDatePending = deliveries.some(d => 
-                    !d.invoiceUploaded && new Date(d.date + 'T00:00:00') < SIMULATED_TODAY
-                );
-                if (hasPastDatePending) {
-                    uniquePendingInvoices++;
-                }
-            }
-        }
+        invoiceGroups.forEach((deliveries) => {
+            if (deliveries.every(d => d.invoiceUploaded)) uniqueSentInvoices++;
+            else if (deliveries.some(d => new Date(d.date + 'T00:00:00') < SIMULATED_TODAY)) uniquePendingInvoices++;
+        });
 
         return {
-            totalContracted,
-            totalDelivered,
+            totalContracted, totalDelivered,
             progress: totalContracted > 0 ? (totalDelivered / totalContracted) * 100 : 0,
-            producerCount: filteredProducersData.length,
-            topProducts,
-            uniquePendingInvoices,
-            uniqueSentInvoices
+            producerCount: producers.length,
+            topProducts, uniquePendingInvoices, uniqueSentInvoices
         };
-    }, [filteredProducersData, SIMULATED_TODAY]);
+    }, [producers, SIMULATED_TODAY]);
 
     const itemProgressData = useMemo(() => {
-        const itemsMap = new Map<string, { contracted: number; delivered: number }>();
-        const allContractItems = filteredProducersData.flatMap(p => p.contractItems);
-        const allDeliveries = filteredProducersData.flatMap(p => p.deliveries);
+        const itemsMap = new Map<string, { contracted: number; delivered: number; contributors: {producerName: string, contracted: number, delivered: number}[] }>();
         
-        allContractItems.forEach(item => {
-            const entry = itemsMap.get(item.name) || { contracted: 0, delivered: 0 };
-            entry.contracted += item.totalKg * item.valuePerKg;
-            itemsMap.set(item.name, entry);
+        producers.forEach(p => {
+            p.contractItems.forEach(item => {
+                const entry = itemsMap.get(item.name) || { contracted: 0, delivered: 0, contributors: [] };
+                const itemContractValue = item.totalKg * item.valuePerKg;
+                const itemDeliveredValue = p.deliveries.filter(d => d.item === item.name).reduce((sum, d) => sum + d.value, 0);
+                entry.contracted += itemContractValue;
+                entry.delivered += itemDeliveredValue;
+                entry.contributors.push({ producerName: p.name, contracted: itemContractValue, delivered: itemDeliveredValue });
+                itemsMap.set(item.name, entry);
+            });
         });
 
-        allDeliveries.forEach(delivery => {
-            const entry = itemsMap.get(delivery.item) || { contracted: 0, delivered: 0 };
-            entry.delivered += delivery.value;
-            itemsMap.set(delivery.item, entry);
-        });
-
-        const result = Array.from(itemsMap.entries()).map(([name, data]) => ({
-            name,
-            ...data,
-            progress: data.contracted > 0 ? (data.delivered / data.contracted) * 100 : 0,
-        }));
-
-        return result.sort((a, b) => a.name.localeCompare(b.name));
-    }, [filteredProducersData]);
+        return Array.from(itemsMap.entries())
+            .map(([name, data]) => ({ name, ...data, progress: data.contracted > 0 ? (data.delivered / data.contracted) * 100 : 0 }))
+            .filter(item => item.name.toLowerCase().includes(itemSearchTerm.toLowerCase()))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [producers, itemSearchTerm]);
     
     const sortedProducers = useMemo(() => {
-      return [...filteredProducersData].sort((a, b) => {
-        const aDelivered = a.deliveries.reduce((sum, d) => sum + d.value, 0);
-        const bDelivered = b.deliveries.reduce((sum, d) => sum + d.value, 0);
-        const aProgress = a.initialValue > 0 ? (aDelivered / a.initialValue) : 0;
-        const bProgress = b.initialValue > 0 ? (bDelivered / b.initialValue) : 0;
-
-        let comparison = 0;
-        if (sortKey === 'name') comparison = a.name.localeCompare(b.name);
-        if (sortKey === 'progress') comparison = bProgress - aProgress;
-        if (sortKey === 'delivered') comparison = bDelivered - aDelivered;
-        if (sortKey === 'contracted') comparison = b.initialValue - a.initialValue;
-
-        return sortDirection === 'asc' ? comparison : -comparison;
-      });
-    }, [filteredProducersData, sortKey, sortDirection]);
+      return [...producers]
+        .filter(p => p.name.toLowerCase().includes(producerSearchTerm.toLowerCase()))
+        .sort((a, b) => {
+            const aDelivered = a.deliveries.reduce((sum, d) => sum + d.value, 0);
+            const bDelivered = b.deliveries.reduce((sum, d) => sum + d.value, 0);
+            const aProgress = a.initialValue > 0 ? aDelivered / a.initialValue : 0;
+            const bProgress = b.initialValue > 0 ? bDelivered / b.initialValue : 0;
+            let comp = 0;
+            if (sortKey === 'name') comp = a.name.localeCompare(b.name);
+            else if (sortKey === 'progress') comp = bProgress - aProgress;
+            else if (sortKey === 'delivered') comp = bDelivered - aDelivered;
+            else comp = b.initialValue - a.initialValue;
+            return sortDirection === 'asc' ? comp : -comp;
+        });
+    }, [producers, sortKey, sortDirection, producerSearchTerm]);
 
     const handleSort = (key: SortKey) => {
-      if (key === sortKey) {
-        setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-      } else {
-        setSortKey(key);
-        setSortDirection('desc');
-      }
+      if (key === sortKey) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+      else { setSortKey(key); setSortDirection('desc'); }
     };
-
-    const toggleProducerDetails = (producerId: string) => {
-      setExpandedProducerId(currentId => currentId === producerId ? null : producerId);
-    };
-
-    const SortableHeader: React.FC<{ headerKey: SortKey, label: string }> = ({ headerKey, label }) => (
-        <th className="p-3 text-left cursor-pointer" onClick={() => handleSort(headerKey)}>
-            {label} {sortKey === headerKey && (sortDirection === 'desc' ? '▼' : '▲')}
-        </th>
-    );
 
     return (
-        <div className="space-y-8 animate-fade-in">
-             <div className="bg-white p-4 rounded-xl shadow-lg">
-                <label htmlFor="supplier-filter" className="block text-sm font-medium text-gray-700">Filtrar por Fornecedor</label>
-                <select
-                    id="supplier-filter"
-                    value={selectedSupplier}
-                    onChange={(e) => setSelectedSupplier(e.target.value)}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                >
-                    <option value="">-- Todos os Fornecedores --</option>
-                    {uniqueSuppliers.map(s => (
-                    <option key={s.cpf} value={s.cpf}>{s.name} - {s.cpf}</option>
-                    ))}
-                </select>
-            </div>
-
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-xl shadow-lg flex items-center space-x-4">
-                    <div className="bg-blue-100 p-3 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 8h6m-5 4h4m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div>
-                    <div>
-                        <p className="text-sm text-gray-500">Total Contratado</p>
-                        <p className="text-2xl font-bold">{formatCurrency(analyticsData.totalContracted)}</p>
-                    </div>
+        <div className="space-y-8 animate-fade-in pb-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-blue-500">
+                    <p className="text-xs text-gray-400 font-bold uppercase">Contratado</p>
+                    <p className="text-xl font-black">{formatCurrency(analyticsData.totalContracted)}</p>
                 </div>
-                <div className="bg-white p-6 rounded-xl shadow-lg flex items-center space-x-4">
-                     <div className="bg-green-100 p-3 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
-                    <div>
-                        <p className="text-sm text-gray-500">Total Entregue</p>
-                        <p className="text-2xl font-bold">{formatCurrency(analyticsData.totalDelivered)}</p>
-                    </div>
+                <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-green-500">
+                    <p className="text-xs text-gray-400 font-bold uppercase">Entregue</p>
+                    <p className="text-xl font-black text-green-600">{formatCurrency(analyticsData.totalDelivered)}</p>
                 </div>
-                 <div className="bg-white p-6 rounded-xl shadow-lg flex items-center space-x-4">
-                    <div className="bg-yellow-100 p-3 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg></div>
-                    <div>
-                        <p className="text-sm text-gray-500">Progresso Geral</p>
-                        <p className="text-2xl font-bold">{analyticsData.progress.toFixed(1)}%</p>
-                    </div>
+                <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-yellow-500">
+                    <p className="text-xs text-gray-400 font-bold uppercase">Progresso</p>
+                    <p className="text-xl font-black text-yellow-600">{analyticsData.progress.toFixed(1)}%</p>
                 </div>
-                <div className="bg-white p-6 rounded-xl shadow-lg flex items-center space-x-4">
-                     <div className="bg-indigo-100 p-3 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg></div>
-                    <div>
-                        <p className="text-sm text-gray-500">Produtores Ativos</p>
-                        <p className="text-2xl font-bold">{analyticsData.producerCount}</p>
-                    </div>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-lg lg:col-span-2">
-                    <div className="flex items-center space-x-4">
-                        <div className="bg-orange-100 p-3 rounded-full">
-                           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                        </div>
-                        <p className="text-lg font-semibold text-gray-700">Status das Notas Fiscais</p>
-                    </div>
-                    <div className="mt-4 space-y-2">
-                        <div className="flex justify-between items-baseline">
-                            <p className="text-sm text-gray-500">Pendentes</p>
-                            <p className="text-2xl font-bold text-red-600">{analyticsData.uniquePendingInvoices}</p>
-                        </div>
-                        <div className="flex justify-between items-baseline">
-                            <p className="text-sm text-gray-500">Enviadas</p>
-                            <p className="text-2xl font-bold text-green-600">{analyticsData.uniqueSentInvoices}</p>
-                        </div>
-                    </div>
+                <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-indigo-500">
+                    <p className="text-xs text-gray-400 font-bold uppercase">Produtores</p>
+                    <p className="text-xl font-black text-indigo-800">{analyticsData.producerCount}</p>
                 </div>
             </div>
 
-            {/* Item Progress Section */}
             <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-lg font-semibold mb-4">Progresso por Item</h3>
-                <div className="space-y-4 max-h-72 overflow-y-auto pr-2">
-                    {itemProgressData.length > 0 ? itemProgressData.map(item => (
-                        <div key={item.name}>
-                            <div className="flex justify-between items-baseline mb-1 text-sm">
-                                <span className="font-medium text-gray-700">{item.name}</span>
-                                <span className="text-xs text-gray-500">
-                                    {formatCurrency(item.delivered)} / {formatCurrency(item.contracted)}
-                                </span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-4">
-                                <div 
-                                    className="bg-purple-600 h-4 rounded-full text-white text-xs flex items-center justify-center" 
-                                    style={{ width: `${item.progress}%` }}
-                                >
-                                    {item.progress > 20 && `${item.progress.toFixed(0)}%`}
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-gray-800">Progresso por Produto</h3>
+                    <input type="text" placeholder="Pesquisar..." value={itemSearchTerm} onChange={(e) => setItemSearchTerm(e.target.value)} className="border rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-400"/>
+                </div>
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {itemProgressData.map(item => {
+                        const isExpanded = expandedItemName === item.name;
+                        return (
+                            <div key={item.name} className={`border rounded-xl ${isExpanded ? 'ring-2 ring-blue-500' : ''}`}>
+                                <div className="p-4 cursor-pointer" onClick={() => setExpandedItemName(isExpanded ? null : item.name)}>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="font-bold text-gray-700">{item.name}</span>
+                                        <span className="text-xs text-gray-400">{formatCurrency(item.delivered)} / {formatCurrency(item.contracted)}</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                        <div className="bg-blue-600 h-3" style={{ width: `${Math.min(100, item.progress)}%` }}></div>
+                                    </div>
                                 </div>
+                                {isExpanded && (
+                                    <div className="p-4 bg-gray-50 border-t rounded-b-xl space-y-2">
+                                        {item.contributors.map((c, i) => (
+                                            <div key={i} className="flex justify-between text-xs bg-white p-2 rounded border">
+                                                <span>{c.producerName}</span>
+                                                <span className="font-bold text-blue-600">{((c.delivered/c.contracted)*100).toFixed(0)}%</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    )) : (
-                        <p className="text-center text-gray-500 italic pt-8">Nenhum item de contrato para exibir.</p>
-                    )}
+                        )
+                    })}
                 </div>
             </div>
 
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-                 <div className="lg:col-span-3 bg-white p-6 rounded-xl shadow-lg">
-                    <h3 className="text-lg font-semibold mb-4 text-center">Contrato vs. Entregas</h3>
-                    {analyticsData.totalContracted > 0 ? (
-                      <div className="w-full h-64 flex items-end space-x-8 px-4">
-                          <div className="flex-1 flex flex-col items-center">
-                              <div className="font-bold text-blue-600">{formatCurrency(analyticsData.totalContracted)}</div>
-                              <div className="w-full bg-blue-500 rounded-t-lg" style={{ height: `100%` }}></div>
-                              <div className="text-sm mt-1">Contratado</div>
-                          </div>
-                          <div className="flex-1 flex flex-col items-center">
-                              <div className="font-bold text-green-600">{formatCurrency(analyticsData.totalDelivered)}</div>
-                              <div className="w-full bg-green-500 rounded-t-lg" style={{ height: `${analyticsData.progress}%` }}></div>
-                              <div className="text-sm mt-1">Entregue</div>
-                          </div>
-                      </div>
-                    ) : <p className="text-center text-gray-500 pt-16">Nenhum contrato para este fornecedor.</p>}
-                </div>
-                 <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
-                    <h3 className="text-lg font-semibold mb-4 text-center">Top 5 Produtos (Valor Entregue)</h3>
-                     <DonutChart data={analyticsData.topProducts} />
-                </div>
-            </div>
-
-            {/* Producer Performance Table */}
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-lg font-semibold mb-4">Desempenho dos Produtores</h3>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <SortableHeader headerKey="name" label="Produtor" />
-                                <SortableHeader headerKey="contracted" label="Contratado" />
-                                <SortableHeader headerKey="delivered" label="Entregue" />
-                                <SortableHeader headerKey="progress" label="Progresso" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sortedProducers.map(p => {
-                                const delivered = p.deliveries.reduce((sum, d) => sum + d.value, 0);
-                                const progress = p.initialValue > 0 ? (delivered / p.initialValue) * 100 : 0;
-                                const isExpanded = expandedProducerId === p.id;
-
-                                const deliveredValueByItem = new Map<string, number>();
-                                p.deliveries.forEach(delivery => {
-                                    const currentVal = deliveredValueByItem.get(delivery.item) || 0;
-                                    deliveredValueByItem.set(delivery.item, currentVal + delivery.value);
-                                });
-
-                                return (
-                                    <React.Fragment key={p.id}>
-                                        <tr className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => toggleProducerDetails(p.id)}>
-                                            <td className="p-3 font-medium">
-                                                <span className="mr-2">{isExpanded ? '▼' : '►'}</span>{p.name}
-                                            </td>
-                                            <td className="p-3">{formatCurrency(p.initialValue)}</td>
-                                            <td className="p-3 text-green-600 font-semibold">{formatCurrency(delivered)}</td>
-                                            <td className="p-3">
-                                                <div className="w-full bg-gray-200 rounded-full h-4">
-                                                    <div className="bg-green-500 h-4 rounded-full text-white text-xs flex items-center justify-center" style={{ width: `${progress}%` }}>
-                                                        {progress > 20 && `${progress.toFixed(0)}%`}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        {isExpanded && (
-                                            <tr className="bg-blue-50">
-                                                <td colSpan={4} className="p-4">
-                                                    <div className="space-y-3">
-                                                        <h4 className="font-semibold text-gray-700">Detalhes do Contrato de {p.name}</h4>
-                                                        {p.contractItems.map(item => {
-                                                            const itemTotalValue = item.totalKg * item.valuePerKg;
-                                                            const itemDelivered = deliveredValueByItem.get(item.name) || 0;
-                                                            const itemProgress = itemTotalValue > 0 ? (itemDelivered / itemTotalValue) * 100 : 0;
-                                                            return (
-                                                                <div key={item.name} className="p-2 bg-white rounded-lg border">
-                                                                    <div className="flex justify-between items-center mb-1">
-                                                                        <span className="font-medium">{item.name}</span>
-                                                                        <span className="text-xs text-gray-500">
-                                                                            {formatCurrency(itemDelivered)} / {formatCurrency(itemTotalValue)}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="w-full bg-gray-200 rounded-full h-3">
-                                                                        <div className="bg-blue-500 h-3 rounded-full text-white text-[10px] flex items-center justify-center" style={{ width: `${itemProgress}%` }}>
-                                                                            {itemProgress > 25 && `${itemProgress.toFixed(0)}%`}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </React.Fragment>
-                                )
-                            })}
-                        </tbody>
-                    </table>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white p-6 rounded-xl shadow-lg"><DonutChart data={analyticsData.topProducts} /></div>
+                <div className="bg-white p-6 rounded-xl shadow-lg">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold">Ranking de Produtores</h3>
+                        <input 
+                            type="text" 
+                            placeholder="Filtrar por produtor..." 
+                            value={producerSearchTerm} 
+                            onChange={(e) => setProducerSearchTerm(e.target.value)}
+                            className="border rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="p-2 text-left cursor-pointer" onClick={() => handleSort('name')}>Nome</th>
+                                    <th className="p-2 text-left cursor-pointer" onClick={() => handleSort('progress')}>%</th>
+                                    <th className="p-2 text-right">Entregue</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {sortedProducers.map(p => (
+                                    <tr key={p.id} className="border-b hover:bg-gray-50">
+                                        <td className="p-2 font-bold">{p.name}</td>
+                                        <td className="p-2">{( (p.deliveries.reduce((s,d)=>s+d.value,0) / p.initialValue || 0) * 100 ).toFixed(0)}%</td>
+                                        <td className="p-2 text-right text-green-600 font-bold">{formatCurrency(p.deliveries.reduce((s,d)=>s+d.value,0))}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-             <style>{`
-                @keyframes fade-in {
-                  from { opacity: 0; transform: translateY(10px); }
-                  to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-in {
-                  animation: fade-in 0.5s ease-out forwards;
-                }
-              `}</style>
+            <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }`}</style>
         </div>
     );
 };
