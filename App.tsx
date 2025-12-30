@@ -119,6 +119,34 @@ const App: React.FC = () => {
     }
   };
 
+  const handleRestoreData = async (backupProducers: Producer[]): Promise<boolean> => {
+     try {
+        setLoading(true);
+        // 1. Apagar todos os documentos existentes
+        const producersCollectionRef = collection(db, 'producers');
+        const querySnapshot = await getDocs(producersCollectionRef);
+        const deleteBatch = writeBatch(db);
+        querySnapshot.forEach(doc => {
+          deleteBatch.delete(doc.ref);
+        });
+        await deleteBatch.commit();
+
+        // 2. Adicionar os novos documentos do backup
+        const restoreBatch = writeBatch(db);
+        backupProducers.forEach(producer => {
+            const docRef = doc(db, "producers", producer.id);
+            restoreBatch.set(docRef, producer);
+        });
+        await restoreBatch.commit();
+        setLoading(false);
+        return true;
+     } catch (error) {
+        console.error('Erro ao restaurar dados:', error);
+        setLoading(false);
+        return false;
+     }
+  };
+
   const addDeliveries = async (producerId: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => {
     const producerRef = doc(db, "producers", producerId);
     const producer = producers.find(p => p.id === producerId);
@@ -212,6 +240,7 @@ const App: React.FC = () => {
         onLogout={handleLogout} 
         producers={producers} 
         onResetData={handleResetData}
+        onRestoreData={handleRestoreData}
     />;
   }
 

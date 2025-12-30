@@ -9,6 +9,7 @@ interface AdminDashboardProps {
   onLogout: () => void;
   producers: Producer[];
   onResetData: () => void;
+  onRestoreData: (backupProducers: Producer[]) => Promise<boolean>;
 }
 
 const formatCurrency = (value: number) => {
@@ -35,7 +36,7 @@ const initialItemCentricInput = (): ItemCentricInput => ({
   id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 });
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdateProducers, onLogout, producers, onResetData }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdateProducers, onLogout, producers, onResetData, onRestoreData }) => {
   const [activeTab, setActiveTab] = useState<'register' | 'contracts' | 'analytics'>('register');
   
   // Estados para aba de REGISTRO
@@ -51,6 +52,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
   const [contractError, setContractError] = useState('');
   const [contractSuccess, setContractSuccess] = useState('');
   const contractsInitialized = useRef(false);
+
+  // Estados para ZONA CRÍTICA (Backup/Restore)
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreMessage, setRestoreMessage] = useState({ type: '', text: '' });
 
 
   // Sincroniza o estado da UI com os dados dos produtores ao abrir a aba, mantendo a ordem
@@ -191,9 +196,60 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
   };
 
   const handleResetClick = () => {
-    if (window.confirm('Deseja realmente limpar tudo?')) {
-        onResetData();
+      onResetData();
+  };
+  
+  const handleBackupData = () => {
+      const jsonData = JSON.stringify(producers, null, 2);
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `backup-ppais-2026-${date}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+  };
+
+  const handleRestoreClick = () => {
+    if (!restoreFile) {
+      setRestoreMessage({ type: 'error', text: 'Nenhum arquivo selecionado.' });
+      return;
     }
+    
+    if (!window.confirm('ATENÇÃO: A restauração irá APAGAR TODOS os dados atuais e substituí-los pelo conteúdo do arquivo de backup. Esta ação é irreversível. Deseja continuar?')) {
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const backupProducers: Producer[] = JSON.parse(content);
+        
+        // Validação simples do arquivo
+        if (!Array.isArray(backupProducers) || (backupProducers.length > 0 && !backupProducers[0].cpf)) {
+           throw new Error('Arquivo de backup inválido ou corrompido.');
+        }
+
+        const success = await onRestoreData(backupProducers);
+        if (success) {
+          setRestoreMessage({ type: 'success', text: 'Dados restaurados com sucesso!' });
+          setRestoreFile(null);
+        } else {
+           throw new Error('Falha na operação de restauração no servidor.');
+        }
+
+      } catch (error: any) {
+        setRestoreMessage({ type: 'error', text: `Erro: ${error.message}` });
+      }
+    };
+    reader.onerror = () => {
+      setRestoreMessage({ type: 'error', text: 'Erro ao ler o arquivo.' });
+    };
+    reader.readAsText(restoreFile);
   };
 
   const TabButton: React.FC<{tab: 'register' | 'contracts' | 'analytics', label: string}> = ({ tab, label }) => (
@@ -239,7 +295,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
                 </div>
                 <div className="bg-red-50 p-6 rounded-2xl shadow-md border-2 border-dashed border-red-300">
                     <h3 className="text-lg font-bold mb-4 text-center text-red-800 uppercase tracking-tighter">Zona Crítica</h3>
-                    <button onClick={handleResetClick} className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors text-sm uppercase">Resetar Tudo</button>
+                    <div className="space-y-4">
+                        <button onClick={handleBackupData} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors text-sm uppercase">Fazer Backup (JSON)</button>
+                        
+                        <div className="pt-2 border-t-2 border-red-200">
+                           <div className="flex items-center space-x-2">
+                                <label htmlFor="restore-input" className="w-full cursor-pointer text-center py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl transition-colors text-sm uppercase">Selecionar Arquivo</label>
+                                <input id="restore-input" type="file" accept=".json" onChange={e => setRestoreFile(e.target.files ? e.target.files[0] : null)} className="hidden" />
+                           </div>
+                            {restoreFile && (
+                                <div className="text-center mt-2 space-y-2">
+                                    <p className="text-xs text-gray-600 truncate">Arquivo: <span className="font-mono">{restoreFile.name}</span></p>
+                                    <button onClick={handleRestoreClick} className="w-full py-2 bg-red-600 text-white rounded-md text-xs font-bold uppercase">Restaurar Dados</button>
+                                </div>
+                            )}
+                            {restoreMessage.text && <p className={`text-xs text-center mt-2 font-bold ${restoreMessage.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>{restoreMessage.text}</p>}
+                        </div>
+                        
+                        <button onClick={handleResetClick} className="w-full py-3 bg-red-800 hover:bg-red-900 text-white font-bold rounded-xl transition-colors text-sm uppercase mt-4">Resetar Tudo</button>
+                    </div>
                 </div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-xl border-t-8 border-blue-600 overflow-hidden">
