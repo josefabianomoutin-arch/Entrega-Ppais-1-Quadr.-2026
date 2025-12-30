@@ -1,127 +1,39 @@
 import React, { useMemo, useState } from 'react';
-import type { Producer, Delivery } from '../types';
+import type { Producer } from '../types';
 
 interface AdminAnalyticsProps {
   producers: Producer[];
 }
 
-type SortKey = 'name' | 'progress' | 'delivered' | 'contracted';
-type SortDirection = 'asc' | 'desc';
-
 const formatCurrency = (value: number) => {
+    if (isNaN(value)) return 'R$ 0,00';
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-const DonutChart: React.FC<{ data: { label: string; value: number }[] }> = ({ data }) => {
-    if (!data || data.length === 0) return <p className="text-center text-gray-500">Dados insuficientes.</p>;
-
-    const colors = ['#34D399', '#60A5FA', '#FBBF24', '#F87171', '#A78BFA'];
-    const total = data.reduce((sum, item) => sum + item.value, 0);
-    let cumulative = 0;
-
-    const paths = data.map((item, index) => {
-        const percentage = item.value / total;
-        const startAngle = (cumulative / total) * 360;
-        const endAngle = ((cumulative + item.value) / total) * 360;
-        cumulative += item.value;
-        const largeArcFlag = percentage > 0.5 ? 1 : 0;
-        const x1 = 50 + 40 * Math.cos(Math.PI * (startAngle - 90) / 180);
-        const y1 = 50 + 40 * Math.sin(Math.PI * (startAngle - 90) / 180);
-        const x2 = 50 + 40 * Math.cos(Math.PI * (endAngle - 90) / 180);
-        const y2 = 50 + 40 * Math.sin(Math.PI * (endAngle - 90) / 180);
-        return (
-            <path key={index} d={`M ${x1},${y1} A 40,40 0 ${largeArcFlag},1 ${x2},${y2}`} fill="none" stroke={colors[index % colors.length]} strokeWidth="15" />
-        );
-    });
-
-    return (
-        <div className="flex flex-col items-center">
-            <svg viewBox="0 0 100 100" className="w-40 h-40 transform -rotate-90">{paths}</svg>
-            <div className="mt-4 text-xs space-y-1">
-                {data.map((item, index) => (
-                    <div key={index} className="flex items-center">
-                        <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: colors[index % colors.length] }}></div>
-                        <span className="truncate max-w-[150px]">{item.label}: <b>{formatCurrency(item.value)}</b></span>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
-
 const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
-    const [sortKey, setSortKey] = useState<SortKey>('progress');
-    const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-    const [expandedProducerId, setExpandedProducerId] = useState<string | null>(null);
-    const [expandedItemName, setExpandedItemName] = useState<string | null>(null);
-    const [itemSearchTerm, setItemSearchTerm] = useState('');
+    const [sortKey, setSortKey] = useState<'name' | 'progress' | 'delivered' | 'contracted'>('progress');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [producerSearchTerm, setProducerSearchTerm] = useState('');
-    
-    const SIMULATED_TODAY = new Date('2026-04-30T00:00:00');
+    const [expandedProducerId, setExpandedProducerId] = useState<string | null>(null);
 
     const analyticsData = useMemo(() => {
         const totalContracted = producers.reduce((sum, p) => sum + p.initialValue, 0);
         const totalDelivered = producers.reduce((sum, p) => sum + p.deliveries.reduce((dSum, d) => dSum + d.value, 0), 0);
         
-        const productsDelivered = new Map<string, number>();
-        const allDeliveries = producers.flatMap(p => p.deliveries);
-        allDeliveries.forEach(d => {
-            productsDelivered.set(d.item, (productsDelivered.get(d.item) || 0) + d.value);
-        });
-
-        const topProducts = Array.from(productsDelivered.entries())
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([label, value]) => ({ label, value }));
-
-        let uniquePendingInvoices = 0;
-        let uniqueSentInvoices = 0;
-        const invoiceGroups = new Map<string, Delivery[]>();
-        allDeliveries.forEach(d => {
-            if (!d.invoiceNumber) return;
-            const group = invoiceGroups.get(d.invoiceNumber) || [];
-            group.push(d);
-            invoiceGroups.set(d.invoiceNumber, group);
-        });
-
-        invoiceGroups.forEach((deliveries) => {
-            if (deliveries.every(d => d.invoiceUploaded)) uniqueSentInvoices++;
-            else if (deliveries.some(d => new Date(d.date + 'T00:00:00') < SIMULATED_TODAY)) uniquePendingInvoices++;
-        });
-
         return {
-            totalContracted, totalDelivered,
+            totalContracted,
+            totalDelivered,
             progress: totalContracted > 0 ? (totalDelivered / totalContracted) * 100 : 0,
             producerCount: producers.length,
-            topProducts, uniquePendingInvoices, uniqueSentInvoices
         };
-    }, [producers, SIMULATED_TODAY]);
-
-    const itemProgressData = useMemo(() => {
-        const itemsMap = new Map<string, { contracted: number; delivered: number; contributors: {producerName: string, contracted: number, delivered: number}[] }>();
-        
-        producers.forEach(p => {
-            p.contractItems.forEach(item => {
-                const entry = itemsMap.get(item.name) || { contracted: 0, delivered: 0, contributors: [] };
-                const itemContractValue = item.totalKg * item.valuePerKg;
-                const itemDeliveredValue = p.deliveries.filter(d => d.item === item.name).reduce((sum, d) => sum + d.value, 0);
-                entry.contracted += itemContractValue;
-                entry.delivered += itemDeliveredValue;
-                entry.contributors.push({ producerName: p.name, contracted: itemContractValue, delivered: itemDeliveredValue });
-                itemsMap.set(item.name, entry);
-            });
-        });
-
-        return Array.from(itemsMap.entries())
-            .map(([name, data]) => ({ name, ...data, progress: data.contracted > 0 ? (data.delivered / data.contracted) * 100 : 0 }))
-            .filter(item => item.name.toLowerCase().includes(itemSearchTerm.toLowerCase()))
-            .sort((a, b) => a.name.localeCompare(b.name));
-    }, [producers, itemSearchTerm]);
+    }, [producers]);
     
+    const filteredProducers = useMemo(() => {
+      return producers.filter(p => p.name.toLowerCase().includes(producerSearchTerm.toLowerCase()));
+    }, [producers, producerSearchTerm]);
+
     const sortedProducers = useMemo(() => {
-      return [...producers]
-        .filter(p => p.name.toLowerCase().includes(producerSearchTerm.toLowerCase()))
-        .sort((a, b) => {
+      return [...filteredProducers].sort((a, b) => {
             const aDelivered = a.deliveries.reduce((sum, d) => sum + d.value, 0);
             const bDelivered = b.deliveries.reduce((sum, d) => sum + d.value, 0);
             const aProgress = a.initialValue > 0 ? aDelivered / a.initialValue : 0;
@@ -133,9 +45,9 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
             else comp = b.initialValue - a.initialValue;
             return sortDirection === 'asc' ? comp : -comp;
         });
-    }, [producers, sortKey, sortDirection, producerSearchTerm]);
+    }, [filteredProducers, sortKey, sortDirection]);
 
-    const handleSort = (key: SortKey) => {
+    const handleSort = (key: 'name' | 'progress' | 'delivered' | 'contracted') => {
       if (key === sortKey) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
       else { setSortKey(key); setSortDirection('desc'); }
     };
@@ -163,75 +75,113 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
 
             <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-gray-800">Progresso por Produto</h3>
-                    <input type="text" placeholder="Pesquisar..." value={itemSearchTerm} onChange={(e) => setItemSearchTerm(e.target.value)} className="border rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-400"/>
+                    <h3 className="text-lg font-bold text-gray-800">Detalhes do Contrato por Produtor</h3>
+                     <input 
+                        type="text" 
+                        placeholder="Pesquisar produtor..." 
+                        value={producerSearchTerm} 
+                        onChange={(e) => setProducerSearchTerm(e.target.value)}
+                        className="border rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                    />
                 </div>
-                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {itemProgressData.map(item => {
-                        const isExpanded = expandedItemName === item.name;
-                        return (
-                            <div key={item.name} className={`border rounded-xl ${isExpanded ? 'ring-2 ring-blue-500' : ''}`}>
-                                <div className="p-4 cursor-pointer" onClick={() => setExpandedItemName(isExpanded ? null : item.name)}>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="font-bold text-gray-700">{item.name}</span>
-                                        <span className="text-xs text-gray-400">{formatCurrency(item.delivered)} / {formatCurrency(item.contracted)}</span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                                        <div className="bg-blue-600 h-3" style={{ width: `${Math.min(100, item.progress)}%` }}></div>
-                                    </div>
-                                </div>
-                                {isExpanded && (
-                                    <div className="p-4 bg-gray-50 border-t rounded-b-xl space-y-2">
-                                        {item.contributors.map((c, i) => (
-                                            <div key={i} className="flex justify-between text-xs bg-white p-2 rounded border">
-                                                <span>{c.producerName}</span>
-                                                <span className="font-bold text-blue-600">{((c.delivered/c.contracted)*100).toFixed(0)}%</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )
-                    })}
+                <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                   {filteredProducers.length > 0 ? filteredProducers.map(producer => {
+                       const isExpanded = expandedProducerId === producer.id;
+                       return (
+                           <div key={producer.id} className={`border rounded-xl transition-all ${isExpanded ? 'ring-2 ring-blue-500 bg-white' : 'bg-gray-50/50 hover:bg-white'}`}>
+                               <div className="p-4 cursor-pointer flex justify-between items-center" onClick={() => setExpandedProducerId(isExpanded ? null : producer.id)}>
+                                   <span className="font-bold text-gray-700">{producer.name}</span>
+                                   <div className="flex items-center gap-4">
+                                       <span className="text-sm font-bold text-blue-600">{formatCurrency(producer.initialValue)}</span>
+                                       <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                   </div>
+                               </div>
+                               {isExpanded && (
+                                   <div className="p-4 bg-gray-50 border-t animate-slide-down">
+                                       <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Itens Contratados</h4>
+                                       <div className="overflow-x-auto">
+                                            <table className="w-full text-xs">
+                                                <thead className="bg-gray-200">
+                                                    <tr>
+                                                        <th className="p-2 text-left font-semibold">Item</th>
+                                                        <th className="p-2 text-right font-semibold">Peso (Kg)</th>
+                                                        <th className="p-2 text-right font-semibold">Valor (R$)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {producer.contractItems.length > 0 ? producer.contractItems.map(item => (
+                                                        <tr key={item.name} className="border-b last:border-b-0 bg-white">
+                                                            <td className="p-2">{item.name}</td>
+                                                            <td className="p-2 text-right font-mono">{item.totalKg.toFixed(2).replace('.',',')}</td>
+                                                            <td className="p-2 text-right font-mono">{formatCurrency(item.totalKg * item.valuePerKg)}</td>
+                                                        </tr>
+                                                    )) : (
+                                                        <tr><td colSpan={3} className="p-4 text-center text-gray-500 italic">Nenhum item neste contrato.</td></tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                       </div>
+                                   </div>
+                               )}
+                           </div>
+                       );
+                   }) : (
+                        <div className="text-center py-10"><p className="text-gray-400 italic">Nenhum produtor encontrado.</p></div>
+                   )}
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white p-6 rounded-xl shadow-lg"><DonutChart data={analyticsData.topProducts} /></div>
-                <div className="bg-white p-6 rounded-xl shadow-lg">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold">Ranking de Produtores</h3>
-                        <input 
-                            type="text" 
-                            placeholder="Filtrar por produtor..." 
-                            value={producerSearchTerm} 
-                            onChange={(e) => setProducerSearchTerm(e.target.value)}
-                            className="border rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                        />
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="p-2 text-left cursor-pointer" onClick={() => handleSort('name')}>Nome</th>
-                                    <th className="p-2 text-left cursor-pointer" onClick={() => handleSort('progress')}>%</th>
-                                    <th className="p-2 text-right">Entregue</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sortedProducers.map(p => (
-                                    <tr key={p.id} className="border-b hover:bg-gray-50">
-                                        <td className="p-2 font-bold">{p.name}</td>
-                                        <td className="p-2">{( (p.deliveries.reduce((s,d)=>s+d.value,0) / p.initialValue || 0) * 100 ).toFixed(0)}%</td>
-                                        <td className="p-2 text-right text-green-600 font-bold">{formatCurrency(p.deliveries.reduce((s,d)=>s+d.value,0))}</td>
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+                <h3 className="text-lg font-bold mb-4">Desempenho Geral dos Produtores</h3>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                            <tr>
+                                <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('name')}>Produtor</th>
+                                <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('progress')}>Progresso da Entrega</th>
+                                <th className="p-3 text-right cursor-pointer" onClick={() => handleSort('delivered')}>Entregue / Contratado (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sortedProducers.length > 0 ? sortedProducers.map(p => {
+                                const deliveredValue = p.deliveries.reduce((s, d) => s + d.value, 0);
+                                const contractedValue = p.initialValue;
+                                const progress = contractedValue > 0 ? (deliveredValue / contractedValue) * 100 : 0;
+                                return (
+                                    <tr key={p.id} className="border-b hover:bg-gray-50 transition-colors">
+                                        <td className="p-3 font-bold text-gray-800">{p.name}</td>
+                                        <td className="p-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-full bg-gray-200 rounded-full h-5 relative overflow-hidden shadow-inner">
+                                                    <div
+                                                        className="bg-green-500 h-5 rounded-full transition-all duration-500"
+                                                        style={{ width: `${Math.min(100, progress)}%` }}
+                                                    />
+                                                    <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white mix-blend-lighten">{progress.toFixed(0)}%</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-3 text-right font-mono text-xs">
+                                            <span className="font-bold text-green-600">{formatCurrency(deliveredValue)}</span>
+                                            <span className="text-gray-400"> / {formatCurrency(contractedValue)}</span>
+                                        </td>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                );
+                            }) : (
+                                <tr><td colSpan={3} className="p-8 text-center text-gray-400 italic">Nenhum dado de produtor para exibir.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }`}</style>
+            <style>{`
+              .custom-scrollbar::-webkit-scrollbar { width: 6px; } 
+              .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+              .custom-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
+              .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
+              @keyframes slide-down { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+              .animate-slide-down { animation: slide-down 0.3s ease-out forwards; }
+            `}</style>
         </div>
     );
 };
