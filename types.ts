@@ -8,6 +8,7 @@ export interface Delivery {
   value: number;
   invoiceUploaded: boolean;
   invoiceNumber?: string;
+  invoiceDownloadURL?: string;
 }
 
 export interface ContractItem {

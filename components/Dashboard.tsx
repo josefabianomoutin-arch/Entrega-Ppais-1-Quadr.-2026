@@ -10,7 +10,7 @@ interface DashboardProps {
   producer: Producer;
   onLogout: () => void;
   onAddDeliveries: (producerId: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => void;
-  onInvoiceUpload: (producerId: string, deliveryIds: string[], invoiceNumber: string) => void;
+  onInvoiceUpload: (producerId: string, deliveryIds: string[], invoiceNumber: string, file: File) => void;
   onCancelDeliveries: (producerId: string, deliveryIds: string[]) => void;
 }
 
@@ -137,7 +137,7 @@ const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveri
                     <InvoiceUploader 
                         producerName={producer.name}
                         pendingInvoices={pendingInvoices} 
-                        onUpload={(deliveryIds, invoiceNumber) => onInvoiceUpload(producer.id, deliveryIds, invoiceNumber)} 
+                        onUpload={(deliveryIds, invoiceNumber, file) => onInvoiceUpload(producer.id, deliveryIds, invoiceNumber, file)} 
                     />
                 </div>
             )}
@@ -151,6 +151,7 @@ const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveri
           onClose={handleCloseModal}
           onSave={handleSaveDelivery}
           contractItems={producer.contractItems}
+          deliveries={producer.deliveries}
         />
       )}
 

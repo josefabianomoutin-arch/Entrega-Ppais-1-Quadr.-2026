@@ -10,6 +10,12 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+const formatDate = (dateString: string) => {
+    const date = new Date(dateString + 'T00:00:00');
+    return date.toLocaleDateString('pt-BR');
+};
+
+
 const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
     const [sortKey, setSortKey] = useState<'name' | 'progress' | 'delivered' | 'contracted'>('progress');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -97,29 +103,66 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                    </div>
                                </div>
                                {isExpanded && (
-                                   <div className="p-4 bg-gray-50 border-t animate-slide-down">
-                                       <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Itens Contratados</h4>
-                                       <div className="overflow-x-auto">
-                                            <table className="w-full text-xs">
-                                                <thead className="bg-gray-200">
-                                                    <tr>
-                                                        <th className="p-2 text-left font-semibold">Item</th>
-                                                        <th className="p-2 text-right font-semibold">Peso (Kg)</th>
-                                                        <th className="p-2 text-right font-semibold">Valor (R$)</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {producer.contractItems.length > 0 ? producer.contractItems.map(item => (
-                                                        <tr key={item.name} className="border-b last:border-b-0 bg-white">
-                                                            <td className="p-2">{item.name}</td>
-                                                            <td className="p-2 text-right font-mono">{item.totalKg.toFixed(2).replace('.',',')}</td>
-                                                            <td className="p-2 text-right font-mono">{formatCurrency(item.totalKg * item.valuePerKg)}</td>
-                                                        </tr>
-                                                    )) : (
-                                                        <tr><td colSpan={3} className="p-4 text-center text-gray-500 italic">Nenhum item neste contrato.</td></tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
+                                   <div className="p-4 bg-gray-50 border-t animate-slide-down space-y-6">
+                                       <div>
+                                            <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Itens Contratados</h4>
+                                            <div className="overflow-x-auto">
+                                                    <table className="w-full text-xs">
+                                                        <thead className="bg-gray-200">
+                                                            <tr>
+                                                                <th className="p-2 text-left font-semibold">Item</th>
+                                                                <th className="p-2 text-right font-semibold">Peso (Kg)</th>
+                                                                <th className="p-2 text-right font-semibold">Valor (R$)</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {producer.contractItems.length > 0 ? producer.contractItems.map(item => (
+                                                                <tr key={item.name} className="border-b last:border-b-0 bg-white">
+                                                                    <td className="p-2">{item.name}</td>
+                                                                    <td className="p-2 text-right font-mono">{item.totalKg.toFixed(2).replace('.',',')}</td>
+                                                                    <td className="p-2 text-right font-mono">{formatCurrency(item.totalKg * item.valuePerKg)}</td>
+                                                                </tr>
+                                                            )) : (
+                                                                <tr><td colSpan={3} className="p-4 text-center text-gray-500 italic">Nenhum item neste contrato.</td></tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                            </div>
+                                       </div>
+                                       <div>
+                                            <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Entregas Realizadas</h4>
+                                            <div className="overflow-x-auto">
+                                                    <table className="w-full text-xs">
+                                                        <thead className="bg-gray-200">
+                                                            <tr>
+                                                                <th className="p-2 text-left font-semibold">Data</th>
+                                                                <th className="p-2 text-left font-semibold">Item</th>
+                                                                <th className="p-2 text-left font-semibold">NF</th>
+                                                                <th className="p-2 text-right font-semibold">Valor (R$)</th>
+                                                                <th className="p-2 text-center font-semibold">Fatura</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {producer.deliveries.length > 0 ? producer.deliveries.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(delivery => (
+                                                                <tr key={delivery.id} className="border-b last:border-b-0 bg-white">
+                                                                    <td className="p-2 font-mono">{formatDate(delivery.date)}</td>
+                                                                    <td className="p-2">{delivery.item}</td>
+                                                                    <td className="p-2 font-mono">{delivery.invoiceNumber || '-'}</td>
+                                                                    <td className="p-2 text-right font-mono">{formatCurrency(delivery.value)}</td>
+                                                                    <td className="p-2 text-center">
+                                                                        {delivery.invoiceDownloadURL ? (
+                                                                            <a href={delivery.invoiceDownloadURL} target="_blank" rel="noopener noreferrer" className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-green-200 transition-colors">Baixar NF</a>
+                                                                        ) : (
+                                                                            <span className="text-red-500 font-semibold">Pendente</span>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            )) : (
+                                                                <tr><td colSpan={5} className="p-4 text-center text-gray-500 italic">Nenhuma entrega registrada.</td></tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                            </div>
                                        </div>
                                    </div>
                                )}

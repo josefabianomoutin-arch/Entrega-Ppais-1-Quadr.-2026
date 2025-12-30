@@ -15,6 +15,7 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
   const formattedDate = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   const canCancel = new Date(date) >= simulatedToday;
   const invoiceNumber = deliveries[0]?.invoiceNumber;
+  const invoiceDownloadURL = deliveries[0]?.invoiceDownloadURL;
 
 
   const formatCurrency = (value: number) => {
@@ -31,7 +32,13 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
         </div>
         <p className="text-gray-600">Data: <span className="font-semibold text-green-700">{formattedDate}</span></p>
-        {invoiceNumber && <p className="mb-6 text-gray-600">Nota Fiscal: <span className="font-semibold font-mono text-blue-700">{invoiceNumber}</span></p>}
+        
+        <div className="flex justify-between items-baseline mb-6">
+            {invoiceNumber && <p className="text-gray-600">Nota Fiscal: <span className="font-semibold font-mono text-blue-700">{invoiceNumber}</span></p>}
+            {invoiceDownloadURL && (
+                <a href={invoiceDownloadURL} target="_blank" rel="noopener noreferrer" className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-green-200 transition-colors">Baixar NF</a>
+            )}
+        </div>
         
         <div className="space-y-3 max-h-64 overflow-y-auto mb-4 border-t border-b py-2">
             {deliveries.length > 0 ? (
@@ -40,9 +47,6 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
                         <div>
                             <p className="font-bold text-gray-800">{delivery.item}</p>
                             <p className="text-xs text-gray-500">{delivery.kg} Kg</p>
-                            {delivery.invoiceNumber && (
-                                <p className="text-xs text-gray-500 mt-1">NF: <span className="font-mono bg-gray-200 px-1 rounded">{delivery.invoiceNumber}</span></p>
-                            )}
                         </div>
                         <span className="font-semibold text-green-600 whitespace-nowrap pl-4">{formatCurrency(delivery.value)}</span>
                     </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { db } from './firebaseConfig';
+import { db, storage } from './firebaseConfig';
 import { collection, onSnapshot, doc, setDoc, updateDoc, writeBatch, getDocs, deleteDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import type { Producer, Delivery } from './types';
 import LoginScreen from './components/LoginScreen';
@@ -181,18 +182,25 @@ const App: React.FC = () => {
     }
   };
 
-  const markInvoicesAsUploaded = async (producerId: string, deliveryIds: string[], invoiceNumber: string) => {
+  const markInvoicesAsUploaded = async (producerId: string, deliveryIds: string[], invoiceNumber: string, file: File) => {
       const producerToUpdate = producers.find(p => p.id === producerId);
       if (!producerToUpdate) return;
+      
+      // 1. Fazer upload do arquivo para o Firebase Storage
+      const storageRef = ref(storage, `invoices/${producerId}/${invoiceNumber}-${file.name}`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
 
+      // 2. Atualizar os documentos no Firestore
       const updatedDeliveries = producerToUpdate.deliveries.map(d => 
           deliveryIds.includes(d.id) 
-              ? { ...d, invoiceUploaded: true, invoiceNumber: invoiceNumber } 
+              ? { ...d, invoiceUploaded: true, invoiceNumber: invoiceNumber, invoiceDownloadURL: downloadURL } 
               : d
       );
 
       const updatedProducer = { ...producerToUpdate, deliveries: updatedDeliveries };
       
+      // Lógica de finalização de contrato
       const SIMULATED_TODAY = new Date('2026-04-30T00:00:00');
       const totalDeliveredValue = updatedProducer.deliveries.reduce((sum, delivery) => sum + delivery.value, 0);
       const isContractComplete = totalDeliveredValue >= updatedProducer.initialValue;

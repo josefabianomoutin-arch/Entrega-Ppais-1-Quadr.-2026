@@ -4,12 +4,13 @@ import type { Delivery } from '../types';
 interface InvoiceUploaderProps {
   producerName: string;
   pendingInvoices: Delivery[];
-  onUpload: (deliveryIds: string[], invoiceNumber: string) => void;
+  onUpload: (deliveryIds: string[], invoiceNumber: string, file: File) => void;
 }
 
 const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ producerName, pendingInvoices, onUpload }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [currentUploadData, setCurrentUploadData] = useState<{ invoiceNumber: string; deliveryIds: string[] } | null>(null);
+  const [isUploading, setIsUploading] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState('');
 
   const groupedByInvoice = useMemo(() => {
     const groups = new Map<string, Delivery[]>();
@@ -22,53 +23,30 @@ const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ producerName, pending
     return groups;
   }, [pendingInvoices]);
 
-  const handleSelectFileClick = (invoiceNumber: string, deliveriesForInvoice: Delivery[]) => {
-    if (invoiceNumber === 'N/A') {
-        alert('Não é possível enviar uma nota fiscal para entregas sem um número de nota fiscal definido.');
-        return;
-    }
-    setCurrentUploadData({
-      invoiceNumber,
-      deliveryIds: deliveriesForInvoice.map(d => d.id)
-    });
-    fileInputRef.current?.click();
+  const handleAttachClick = (invoiceNumber: string) => {
+    if (invoiceNumber === 'N/A' || !fileInputRef.current) return;
+    fileInputRef.current.setAttribute('data-invoice-number', invoiceNumber);
+    fileInputRef.current.click();
   };
   
-  const formatDate = (dateString: string) => {
-      const date = new Date(dateString + 'T00:00:00');
-      return date.toLocaleDateString('pt-BR');
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    const invoiceNumber = event.target.getAttribute('data-invoice-number');
 
-    if (file && currentUploadData) {
-        const { invoiceNumber, deliveryIds } = currentUploadData;
-        
-        const deliveriesForEmail = pendingInvoices.filter(d => deliveryIds.includes(d.id));
-        const pendingListText = deliveriesForEmail
-            .map(d => `- Item: ${d.item} (Data: ${formatDate(d.date)})`)
-            .join('\n');
-        
-        const subject = `Notas Fiscais Pendentes - ${producerName} (NF: ${invoiceNumber})`;
-        const body = `Prezado(a),
-
-Segue em anexo o arquivo PDF com as notas fiscais (Número: ${invoiceNumber}) referentes a todas as entregas pendentes listadas abaixo:
-
-${pendingListText}
-
-Por favor, anexe o arquivo "${file.name}" a este e-mail antes de enviar.
-
-Atenciosamente,
-${producerName}`;
-
-        const mailtoLink = `mailto:destinatario@exemplo.com.br?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-
-        window.open(mailtoLink, '_blank');
-
-        onUpload(deliveryIds, invoiceNumber);
-        
-        setCurrentUploadData(null);
+    if (file && invoiceNumber && invoiceNumber !== 'N/A') {
+      setIsUploading(invoiceNumber);
+      setUploadError('');
+      try {
+        const deliveriesForInvoice = groupedByInvoice.get(invoiceNumber)?.map(d => d.id) || [];
+        if (deliveriesForInvoice.length > 0) {
+          await onUpload(deliveriesForInvoice, invoiceNumber, file);
+        }
+      } catch (error) {
+        setUploadError(`Falha no envio da NF ${invoiceNumber}. Tente novamente.`);
+        console.error("Upload failed: ", error);
+      } finally {
+        setIsUploading(null);
+      }
     }
     
     if (fileInputRef.current) {
@@ -88,16 +66,23 @@ ${producerName}`;
                     <p className="font-bold text-gray-800 text-sm">Nota Fiscal: <span className="font-mono">{invoiceNumber}</span></p>
                     <p className="text-xs text-gray-500">{deliveries.length} item(s) nesta NF</p>
                 </div>
-                <button
-                    onClick={() => handleSelectFileClick(invoiceNumber, deliveries)}
-                    className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-3 rounded-lg transition-colors text-xs"
-                >
-                    Enviar PDF
-                </button>
+                 {isUploading === invoiceNumber ? (
+                    <span className="text-xs font-bold text-gray-500 animate-pulse">Enviando...</span>
+                ) : (
+                    <button
+                        onClick={() => handleAttachClick(invoiceNumber)}
+                        disabled={invoiceNumber === 'N/A'}
+                        className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-3 rounded-lg transition-colors text-xs disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                        Anexar PDF
+                    </button>
+                )}
             </div>
           </div>
         ))}
       </div>
+
+      {uploadError && <p className="text-red-500 text-xs text-center font-semibold">{uploadError}</p>}
 
       <input 
         type="file" 

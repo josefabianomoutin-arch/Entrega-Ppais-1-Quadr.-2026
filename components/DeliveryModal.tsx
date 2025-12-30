@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import type { ContractItem } from '../types';
+import type { ContractItem, Delivery } from '../types';
 
 interface DeliveryModalProps {
   date: Date;
   onClose: () => void;
   onSave: (deliveryData: { time: string; item: string; kg: number; value: number }[], invoiceNumber: string) => void;
   contractItems: ContractItem[];
+  deliveries: Delivery[];
 }
 
-const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, contractItems }) => {
+const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, contractItems, deliveries }) => {
   const [time, setTime] = useState('08:00');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [itemInputs, setItemInputs] = useState(
@@ -61,11 +62,41 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, co
       }
     });
 
-    if (deliveriesToSave.length > 0) {
-      onSave(deliveriesToSave, invoiceNumber);
-    } else {
+    if (deliveriesToSave.length === 0) {
       alert('Por favor, preencha o campo de quilograma para pelo menos um item.');
+      return;
     }
+
+    // Validação de excesso de entrega
+    const deliveredKgByItem = new Map<string, number>();
+    deliveries.forEach(delivery => {
+        const currentKg = deliveredKgByItem.get(delivery.item) || 0;
+        deliveredKgByItem.set(delivery.item, currentKg + delivery.kg);
+    });
+
+    for (const deliveryToSave of deliveriesToSave) {
+        const itemName = deliveryToSave.item;
+        const newKg = deliveryToSave.kg;
+
+        const contractItem = contractItems.find(ci => ci.name === itemName);
+        if (!contractItem) continue;
+
+        const contractedKg = contractItem.totalKg;
+        const alreadyDeliveredKg = deliveredKgByItem.get(itemName) || 0;
+        const totalKgWithNewDelivery = alreadyDeliveredKg + newKg;
+
+        if (totalKgWithNewDelivery > contractedKg) {
+            alert(
+                `ALERTA: A quantidade para o item "${itemName}" excede o total contratado.\n\n` +
+                `Contratado: ${contractedKg.toFixed(2).replace('.', ',')} Kg\n` +
+                `Já entregue: ${alreadyDeliveredKg.toFixed(2).replace('.', ',')} Kg\n` +
+                `Total com esta entrega: ${totalKgWithNewDelivery.toFixed(2).replace('.', ',')} Kg`
+            );
+            return; // Impede o salvamento
+        }
+    }
+
+    onSave(deliveriesToSave, invoiceNumber);
   };
   
   const formattedDate = date.toLocaleString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
