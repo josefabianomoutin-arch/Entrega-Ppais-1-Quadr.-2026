@@ -9,6 +9,8 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
     // Value calculations
     const totalDeliveredValue = producer.deliveries.reduce((sum, delivery) => sum + delivery.value, 0);
     const remainingValue = producer.initialValue - totalDeliveredValue;
+    const valueProgress = producer.initialValue > 0 ? (totalDeliveredValue / producer.initialValue) * 100 : 0;
+
 
     const deliveredValueByItem = useMemo(() => {
         const valueMap = new Map<string, number>();
@@ -23,6 +25,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
     const totalContractedKg = producer.contractItems.reduce((sum, item) => sum + item.totalKg, 0);
     const totalDeliveredKg = producer.deliveries.reduce((sum, delivery) => sum + delivery.kg, 0);
     const remainingKg = totalContractedKg - totalDeliveredKg;
+    const kgProgress = totalContractedKg > 0 ? (totalDeliveredKg / totalContractedKg) * 100 : 0;
 
     const deliveredKgByItem = useMemo(() => {
         const kgMap = new Map<string, number>();
@@ -64,7 +67,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
             {/* Item Breakdown */}
             <div className="py-4 space-y-4">
                 <h3 className="font-semibold text-gray-600">Detalhes por Produto</h3>
-                <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                     {producer.contractItems.map(item => {
                         const itemTotalValue = item.totalKg * item.valuePerKg;
                         const deliveredValue = deliveredValueByItem.get(item.name) || 0;
@@ -104,6 +107,42 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
                 </div>
             </div>
             
+             {/* NEW CHART SECTION */}
+            <div className="py-4 space-y-4 border-t">
+                <h3 className="font-semibold text-gray-600">Progresso Geral</h3>
+                <div className="space-y-4">
+                    {/* Value Chart */}
+                    <div>
+                        <div className="flex justify-between items-baseline text-sm mb-1">
+                            <span className="font-bold text-gray-700">Progresso Financeiro (R$)</span>
+                            <span className="text-xs font-mono text-gray-500">{valueProgress.toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-5 relative overflow-hidden shadow-inner">
+                           <div 
+                                className="bg-green-500 h-5 rounded-full transition-all duration-500" 
+                                style={{ width: `${valueProgress}%` }}
+                            />
+                             <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white mix-blend-lighten">{formatCurrency(totalDeliveredValue)}</span>
+                        </div>
+                    </div>
+
+                    {/* KG Chart */}
+                    <div>
+                        <div className="flex justify-between items-baseline text-sm mb-1">
+                            <span className="font-bold text-gray-700">Progresso de Entrega (Kg)</span>
+                            <span className="text-xs font-mono text-gray-500">{kgProgress.toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-5 relative overflow-hidden shadow-inner">
+                            <div 
+                                className="bg-blue-500 h-5 rounded-full transition-all duration-500" 
+                                style={{ width: `${kgProgress}%` }}
+                            />
+                             <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white mix-blend-lighten">{formatKg(totalDeliveredKg)}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Total Remaining */}
             <hr className="my-2"/>
             <div className="grid grid-cols-2 gap-x-4 pt-2">
@@ -112,6 +151,10 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
                 <span className="text-gray-500 font-semibold">Peso Total Restante:</span>
                 <span className="font-bold text-xl text-blue-600 text-right">{formatKg(remainingKg)}</span>
             </div>
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
+            `}</style>
         </div>
     );
 };
