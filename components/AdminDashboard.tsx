@@ -4,7 +4,7 @@ import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 
 interface AdminDashboardProps {
-  onRegister: (name: string, cpf: string, allowedWeeks: number[]) => boolean;
+  onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<boolean>;
   onUpdateProducers: (updatedProducers: Producer[]) => void;
   onLogout: () => void;
   producers: Producer[];
@@ -66,33 +66,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
     }
 
     if (contractsInitialized.current) {
-        // Após o carregamento inicial, o estado local é a fonte da verdade para preservar a ordem e os itens não atribuídos.
         return;
     }
       
-    // Usamos um Map para agrupar, mas mantendo a ordem de primeira aparição
-    const itemsOrder: string[] = [];
-    const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; producerIds: string[] }>();
+    const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; producerIds: string[]; order: number }>();
 
     producers.forEach(producer => {
-        producer.contractItems.forEach(item => {
+        (producer.contractItems || []).forEach(item => {
+            const order = item.order ?? Infinity; // Default para itens antigos sem ordem
+            
             if (!itemsMap.has(item.name)) {
-                itemsOrder.push(item.name);
-                itemsMap.set(item.name, { totalKg: 0, valuePerKg: item.valuePerKg, producerIds: [] });
+                itemsMap.set(item.name, { totalKg: 0, valuePerKg: item.valuePerKg, producerIds: [], order: order });
             }
+
             const entry = itemsMap.get(item.name)!;
             entry.totalKg += item.totalKg;
+
+            // Mantém o menor número de 'order' encontrado para um item, que representa sua criação original
+            if (order < entry.order) {
+                entry.order = order;
+            }
+
             if (!entry.producerIds.includes(producer.id)) {
                 entry.producerIds.push(producer.id);
             }
         });
     });
 
-    // Reconstrói a lista baseada na ordem de detecção
-    const uiState: ItemCentricInput[] = itemsOrder.map((name, index) => {
-        const data = itemsMap.get(name)!;
+    // Converte o Map para um array e ordena pela propriedade 'order'
+    const sortedItems = Array.from(itemsMap.entries()).sort(([, a], [, b]) => a.order - b.order);
+
+    // Reconstrói o estado da UI a partir dos itens ordenados
+    const uiState: ItemCentricInput[] = sortedItems.map(([name, data], index) => {
         return {
-            id: `item-loaded-${index}`,
+            id: `item-loaded-${index}-${name}`,
             name,
             totalKg: String(data.totalKg),
             valuePerKg: String(data.valuePerKg),
@@ -105,14 +112,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
 
     if (uiState.length > 0) {
         setItemCentricContracts(uiState);
+    } else {
+        setItemCentricContracts([initialItemCentricInput()]);
     }
+    
     contractsInitialized.current = true;
   }, [producers, activeTab]);
 
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setRegError(''); setRegSuccess('');
-    if (onRegister(regName, regCpf, selectedWeeks)) {
+    if (await onRegister(regName, regCpf, selectedWeeks)) {
         setRegSuccess(`Produtor "${regName}" cadastrado com sucesso!`);
         setRegName(''); setRegCpf(''); setSelectedWeeks([]);
     } else {
@@ -126,13 +136,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
     const updatedProducers: Producer[] = producers.map(p => ({ ...p, contractItems: [], initialValue: 0 }));
     const producerMap = new Map(updatedProducers.map(p => [p.id, p]));
 
-    for (const uiItem of itemCentricContracts) {
+    for (let index = 0; index < itemCentricContracts.length; index++) {
+        const uiItem = itemCentricContracts[index];
         const name = uiItem.name.trim().toUpperCase();
         if (!name) continue;
 
         const assignedProducerIds = uiItem.producers.map(p => p.producerId).filter(id => id !== '');
         
-        // Apenas processa e valida itens que estão de fato atribuídos a produtores
         if (assignedProducerIds.length > 0) {
             const totalKg = parseFloat(uiItem.totalKg);
             const valuePerKg = parseFloat(uiItem.valuePerKg);
@@ -148,13 +158,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
                 const producer = producerMap.get(producerId);
                 if (producer) {
                     producer.contractItems.push({
-                        name, totalKg: kgPerProducer, valuePerKg
+                        name,
+                        totalKg: kgPerProducer,
+                        valuePerKg,
+                        order: index // Salva a posição do item na lista como 'order'
                     });
                 }
             }
         }
-        // Se um item não tiver produtores, ele é simplesmente ignorado na lógica de salvamento,
-        // mas permanecerá no estado da UI por causa da alteração no useEffect.
     }
 
     // Recalcula o valor inicial total de cada produtor

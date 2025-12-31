@@ -15,6 +15,7 @@ export interface ContractItem {
   name: string;
   totalKg: number;
   valuePerKg: number;
+  order?: number;
 }
 
 export interface Producer {

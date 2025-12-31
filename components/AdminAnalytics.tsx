@@ -58,6 +58,48 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
       else { setSortKey(key); setSortDirection('desc'); }
     };
 
+    const handleExportCSV = () => {
+        const headers = [
+            "Produtor",
+            "Valor Contratado (R$)",
+            "Valor Entregue (R$)",
+            "Progresso (%)",
+            "Peso Contratado (Kg)",
+            "Peso Entregue (Kg)"
+        ];
+
+        const csvRows = [headers.join(';')]; // Usa ponto e vírgula para compatibilidade com Excel em PT-BR
+
+        producers.forEach(p => {
+            const contractedValue = p.initialValue;
+            const deliveredValue = p.deliveries.reduce((s, d) => s + d.value, 0);
+            const progress = contractedValue > 0 ? (deliveredValue / contractedValue) * 100 : 0;
+            const contractedKg = p.contractItems.reduce((s, item) => s + item.totalKg, 0);
+            const deliveredKg = p.deliveries.reduce((s, d) => s + d.kg, 0);
+
+            const row = [
+                `"${p.name}"`,
+                String(contractedValue.toFixed(2)).replace('.', ','),
+                String(deliveredValue.toFixed(2)).replace('.', ','),
+                String(progress.toFixed(2)).replace('.', ','),
+                String(contractedKg.toFixed(2)).replace('.', ','),
+                String(deliveredKg.toFixed(2)).replace('.', ','),
+            ];
+            csvRows.push(row.join(';'));
+        });
+
+        const csvString = csvRows.join('\n');
+        const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' }); // BOM for UTF-8
+        
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'relatorio_produtores_ppais_2026.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="space-y-8 animate-fade-in pb-12">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -80,15 +122,21 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow-lg">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                     <h3 className="text-lg font-bold text-gray-800">Detalhes do Contrato por Produtor</h3>
-                     <input 
-                        type="text" 
-                        placeholder="Pesquisar produtor..." 
-                        value={producerSearchTerm} 
-                        onChange={(e) => setProducerSearchTerm(e.target.value)}
-                        className="border rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                    />
+                    <div className="flex items-center gap-2">
+                         <input 
+                            type="text" 
+                            placeholder="Pesquisar produtor..." 
+                            value={producerSearchTerm} 
+                            onChange={(e) => setProducerSearchTerm(e.target.value)}
+                            className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+                        />
+                         <button onClick={handleExportCSV} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            Exportar CSV
+                        </button>
+                    </div>
                 </div>
                 <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                    {filteredProducers.length > 0 ? filteredProducers.map(producer => {

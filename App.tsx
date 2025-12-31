@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { db, storage } from './firebaseConfig';
-import { collection, onSnapshot, doc, setDoc, updateDoc, writeBatch, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, writeBatch, deleteDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from './firebaseConfig';
 
 import type { Producer, Delivery } from './types';
 import LoginScreen from './components/LoginScreen';
@@ -14,27 +14,22 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Producer | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
-  // Efeito para carregar e ouvir dados do Firestore em tempo real
+  // Carrega os dados do Firebase na inicialização
   useEffect(() => {
-    setLoading(true);
-    const producersCollectionRef = collection(db, 'producers');
-    
-    // onSnapshot cria um listener em tempo real
-    const unsubscribe = onSnapshot(producersCollectionRef, (querySnapshot) => {
-      const producersData: Producer[] = [];
-      querySnapshot.forEach((doc) => {
-        // Combina o ID do documento com os dados do documento
-        producersData.push({ ...doc.data(), id: doc.id } as Producer);
-      });
-      setProducers(producersData);
+    const fetchProducers = async () => {
+      setLoading(true);
+      try {
+        const querySnapshot = await getDocs(collection(db, 'producers'));
+        const producersData = querySnapshot.docs.map(doc => doc.data() as Producer);
+        setProducers(producersData);
+      } catch (error) {
+        console.error("Falha ao carregar dados do Firebase:", error);
+        alert("Erro de conexão com o banco de dados. Verifique a configuração do Firebase e sua conexão com a internet.");
+        setProducers([]);
+      }
       setLoading(false);
-    }, (error) => {
-      console.error("Erro ao buscar dados do Firestore: ", error);
-      setLoading(false);
-    });
-
-    // Função de limpeza para remover o listener quando o componente for desmontado
-    return () => unsubscribe();
+    };
+    fetchProducers();
   }, []);
 
   const handleLogin = (name: string, cpf: string): boolean => {
@@ -74,27 +69,26 @@ const App: React.FC = () => {
     };
     
     try {
-      // Cria um novo documento no Firestore com o ID gerado
-      await setDoc(doc(db, "producers", newProducerId), newProducer);
+      await setDoc(doc(db, 'producers', newProducerId), newProducer);
+      setProducers(prevProducers => [...prevProducers, newProducer]);
       return true;
     } catch (error) {
-      console.error("Erro ao registrar novo produtor: ", error);
+      console.error("Erro ao registrar produtor:", error);
       return false;
     }
   };
 
   const handleUpdateProducers = async (updatedProducers: Producer[]) => {
-    // Usa um batch write para atualizar múltiplos documentos de uma vez
-    const batch = writeBatch(db);
-    updatedProducers.forEach(producer => {
-      const producerRef = doc(db, "producers", producer.id);
-      batch.set(producerRef, producer); // set substitui o documento inteiro
-    });
-
     try {
+      const batch = writeBatch(db);
+      updatedProducers.forEach(producer => {
+        const producerRef = doc(db, 'producers', producer.id);
+        batch.set(producerRef, producer); // Usar `set` para garantir que novos produtores sejam criados se não existirem
+      });
       await batch.commit();
-    } catch (error) {
-      console.error("Erro ao atualizar produtores: ", error);
+      setProducers(updatedProducers);
+    } catch(error) {
+      console.error("Erro ao atualizar produtores:", error);
     }
   };
 
@@ -104,52 +98,47 @@ const App: React.FC = () => {
   };
 
   const handleResetData = async () => {
-    if (window.confirm('Você tem certeza que deseja apagar TODOS os dados do banco de dados? Esta ação é irreversível.')) {
+    if (window.confirm('Você tem certeza que deseja apagar TODOS os dados do banco de dados na nuvem? Esta ação é irreversível.')) {
       try {
-        const producersCollectionRef = collection(db, 'producers');
-        const querySnapshot = await getDocs(producersCollectionRef);
+        const querySnapshot = await getDocs(collection(db, 'producers'));
         const batch = writeBatch(db);
-        querySnapshot.forEach(doc => {
+        querySnapshot.docs.forEach(doc => {
           batch.delete(doc.ref);
         });
         await batch.commit();
+        setProducers([]);
         handleLogout();
       } catch (error) {
-        console.error('Erro ao limpar dados do Firestore:', error);
+        console.error("Erro ao resetar dados:", error);
       }
     }
   };
 
   const handleRestoreData = async (backupProducers: Producer[]): Promise<boolean> => {
      try {
-        setLoading(true);
-        // 1. Apagar todos os documentos existentes
-        const producersCollectionRef = collection(db, 'producers');
-        const querySnapshot = await getDocs(producersCollectionRef);
+        // Limpa a coleção atual antes de restaurar
+        const querySnapshot = await getDocs(collection(db, 'producers'));
         const deleteBatch = writeBatch(db);
-        querySnapshot.forEach(doc => {
-          deleteBatch.delete(doc.ref);
-        });
+        querySnapshot.docs.forEach(d => deleteBatch.delete(d.ref));
         await deleteBatch.commit();
-
-        // 2. Adicionar os novos documentos do backup
+        
+        // Adiciona os novos dados
         const restoreBatch = writeBatch(db);
         backupProducers.forEach(producer => {
             const docRef = doc(db, "producers", producer.id);
             restoreBatch.set(docRef, producer);
         });
         await restoreBatch.commit();
-        setLoading(false);
+        
+        setProducers(backupProducers);
         return true;
      } catch (error) {
         console.error('Erro ao restaurar dados:', error);
-        setLoading(false);
         return false;
      }
   };
 
   const addDeliveries = async (producerId: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => {
-    const producerRef = doc(db, "producers", producerId);
     const producer = producers.find(p => p.id === producerId);
     if (!producer) return;
 
@@ -158,68 +147,59 @@ const App: React.FC = () => {
         id: `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         invoiceUploaded: false,
     }));
-
+    
     const updatedDeliveries = [...producer.deliveries, ...newDeliveries];
-
+    
     try {
-      await updateDoc(producerRef, { deliveries: updatedDeliveries });
-    } catch (error) {
-      console.error("Erro ao adicionar entregas: ", error);
+        const producerRef = doc(db, 'producers', producerId);
+        await updateDoc(producerRef, { deliveries: updatedDeliveries });
+        setProducers(prev => prev.map(p => p.id === producerId ? {...p, deliveries: updatedDeliveries} : p));
+    } catch(error) {
+        console.error("Erro ao adicionar entrega:", error);
     }
   };
 
   const cancelDeliveries = async (producerId: string, deliveryIds: string[]) => {
-    const producerRef = doc(db, "producers", producerId);
     const producer = producers.find(p => p.id === producerId);
     if (!producer) return;
 
     const updatedDeliveries = producer.deliveries.filter(d => !deliveryIds.includes(d.id));
-
+    
     try {
-      await updateDoc(producerRef, { deliveries: updatedDeliveries });
+        const producerRef = doc(db, 'producers', producerId);
+        await updateDoc(producerRef, { deliveries: updatedDeliveries });
+        setProducers(prev => prev.map(p => p.id === producerId ? {...p, deliveries: updatedDeliveries} : p));
     } catch (error) {
-      console.error("Erro ao cancelar entregas: ", error);
+        console.error("Erro ao cancelar entrega:", error);
     }
   };
 
   const markInvoicesAsUploaded = async (producerId: string, deliveryIds: string[], invoiceNumber: string, file: File) => {
-      const producerToUpdate = producers.find(p => p.id === producerId);
-      if (!producerToUpdate) return;
-      
-      // 1. Fazer upload do arquivo para o Firebase Storage
-      const storageRef = ref(storage, `invoices/${producerId}/${invoiceNumber}-${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      const producer = producers.find(p => p.id === producerId);
+      if (!producer) return;
 
-      // 2. Atualizar os documentos no Firestore
-      const updatedDeliveries = producerToUpdate.deliveries.map(d => 
-          deliveryIds.includes(d.id) 
-              ? { ...d, invoiceUploaded: true, invoiceNumber: invoiceNumber, invoiceDownloadURL: downloadURL } 
-              : d
-      );
-
-      const updatedProducer = { ...producerToUpdate, deliveries: updatedDeliveries };
-      
-      // Lógica de finalização de contrato
-      const SIMULATED_TODAY = new Date('2026-04-30T00:00:00');
-      const totalDeliveredValue = updatedProducer.deliveries.reduce((sum, delivery) => sum + delivery.value, 0);
-      const isContractComplete = totalDeliveredValue >= updatedProducer.initialValue;
-      const hasNoPendingInvoices = updatedProducer.deliveries
-          .filter(d => new Date(d.date + 'T00:00:00') < SIMULATED_TODAY)
-          .every(d => d.invoiceUploaded);
+      const filePath = `invoices/${producerId}/${invoiceNumber}_${Date.now()}.pdf`;
+      const storageRef = ref(storage, filePath);
       
       try {
-        if (isContractComplete && hasNoPendingInvoices) {
-            await deleteDoc(doc(db, "producers", producerId));
-            setCurrentUser(null); 
-        } else {
-            const producerRef = doc(db, "producers", producerId);
-            await updateDoc(producerRef, { deliveries: updatedDeliveries });
-        }
+        await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(storageRef);
+
+        const updatedDeliveries = producer.deliveries.map(d => 
+            deliveryIds.includes(d.id) 
+                ? { ...d, invoiceUploaded: true, invoiceNumber: invoiceNumber, invoiceDownloadURL: downloadURL } 
+                : d
+        );
+
+        const producerRef = doc(db, 'producers', producerId);
+        await updateDoc(producerRef, { deliveries: updatedDeliveries });
+
+        setProducers(prev => prev.map(p => p.id === producerId ? {...p, deliveries: updatedDeliveries} : p));
       } catch (error) {
-          console.error("Erro ao marcar notas fiscais como enviadas:", error);
+        console.error("Erro ao fazer upload da nota fiscal:", error);
       }
   };
+
 
   // Atualiza o currentUser quando a lista de produtores mudar
   useEffect(() => {
@@ -234,8 +214,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100/50">
         <div className="text-center">
-          <p className="text-xl font-semibold text-gray-700">Carregando dados...</p>
-          <p className="text-gray-500">Conectando ao banco de dados.</p>
+          <p className="text-xl font-semibold text-gray-700">Conectando ao banco de dados...</p>
         </div>
       </div>
     );
