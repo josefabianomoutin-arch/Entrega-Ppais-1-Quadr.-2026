@@ -15,7 +15,6 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
   const formattedDate = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   const canCancel = new Date(date) >= simulatedToday;
   const invoiceNumber = deliveries[0]?.invoiceNumber;
-  const invoiceDownloadURL = deliveries[0]?.invoiceDownloadURL;
 
 
   const formatCurrency = (value: number) => {
@@ -35,9 +34,6 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
         
         <div className="flex justify-between items-baseline mb-6">
             {invoiceNumber && <p className="text-gray-600">Nota Fiscal: <span className="font-semibold font-mono text-blue-700">{invoiceNumber}</span></p>}
-            {invoiceDownloadURL && (
-                <a href={invoiceDownloadURL} target="_blank" rel="noopener noreferrer" className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-green-200 transition-colors">Baixar NF</a>
-            )}
         </div>
         
         <div className="space-y-3 max-h-64 overflow-y-auto mb-4 border-t border-b py-2">

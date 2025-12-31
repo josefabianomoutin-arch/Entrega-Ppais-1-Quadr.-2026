@@ -4,13 +4,13 @@ import type { Delivery } from '../types';
 interface InvoiceUploaderProps {
   producerName: string;
   pendingInvoices: Delivery[];
-  onUpload: (deliveryIds: string[], invoiceNumber: string, file: File) => void;
+  onUpload: (deliveryIds: string[], invoiceNumber: string) => void;
 }
 
 const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ producerName, pendingInvoices, onUpload }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState('');
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [uploadMessage, setUploadMessage] = useState('');
 
   const groupedByInvoice = useMemo(() => {
     const groups = new Map<string, Delivery[]>();
@@ -29,23 +29,24 @@ const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ producerName, pending
     fileInputRef.current.click();
   };
   
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     const invoiceNumber = event.target.getAttribute('data-invoice-number');
 
     if (file && invoiceNumber && invoiceNumber !== 'N/A') {
-      setIsUploading(invoiceNumber);
-      setUploadError('');
+      setIsProcessing(invoiceNumber);
+      setUploadMessage('');
       try {
         const deliveriesForInvoice = groupedByInvoice.get(invoiceNumber)?.map(d => d.id) || [];
         if (deliveriesForInvoice.length > 0) {
-          await onUpload(deliveriesForInvoice, invoiceNumber, file);
+          onUpload(deliveriesForInvoice, invoiceNumber);
+          setUploadMessage(`Verifique seu app de e-mail para concluir o envio da NF ${invoiceNumber}.`);
         }
       } catch (error) {
-        setUploadError(`Falha no envio da NF ${invoiceNumber}. Tente novamente.`);
-        console.error("Upload failed: ", error);
+        setUploadMessage(`Ocorreu um erro ao preparar o e-mail da NF ${invoiceNumber}.`);
+        console.error("Mailto link generation failed: ", error);
       } finally {
-        setIsUploading(null);
+        setIsProcessing(null);
       }
     }
     
@@ -66,15 +67,15 @@ const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ producerName, pending
                     <p className="font-bold text-gray-800 text-sm">Nota Fiscal: <span className="font-mono">{invoiceNumber}</span></p>
                     <p className="text-xs text-gray-500">{deliveries.length} item(s) nesta NF</p>
                 </div>
-                 {isUploading === invoiceNumber ? (
-                    <span className="text-xs font-bold text-gray-500 animate-pulse">Enviando...</span>
+                 {isProcessing === invoiceNumber ? (
+                    <span className="text-xs font-bold text-gray-500 animate-pulse">Aguarde...</span>
                 ) : (
                     <button
                         onClick={() => handleAttachClick(invoiceNumber)}
                         disabled={invoiceNumber === 'N/A'}
                         className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-3 rounded-lg transition-colors text-xs disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >
-                        Anexar PDF
+                        Enviar por E-mail
                     </button>
                 )}
             </div>
@@ -82,7 +83,7 @@ const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ producerName, pending
         ))}
       </div>
 
-      {uploadError && <p className="text-red-500 text-xs text-center font-semibold">{uploadError}</p>}
+      {uploadMessage && <p className="text-blue-600 text-xs text-center font-semibold bg-blue-50 p-2 rounded-md">{uploadMessage}</p>}
 
       <input 
         type="file" 

@@ -187,7 +187,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                 <th className="p-2 text-left font-semibold">Item</th>
                                                                 <th className="p-2 text-left font-semibold">NF</th>
                                                                 <th className="p-2 text-right font-semibold">Valor (R$)</th>
-                                                                <th className="p-2 text-center font-semibold">Fatura</th>
+                                                                <th className="p-2 text-center font-semibold">Status NF</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -198,10 +198,10 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                     <td className="p-2 font-mono">{delivery.invoiceNumber || '-'}</td>
                                                                     <td className="p-2 text-right font-mono">{formatCurrency(delivery.value)}</td>
                                                                     <td className="p-2 text-center">
-                                                                        {delivery.invoiceDownloadURL ? (
-                                                                            <a href={delivery.invoiceDownloadURL} target="_blank" rel="noopener noreferrer" className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-green-200 transition-colors">Baixar NF</a>
+                                                                        {delivery.invoiceUploaded ? (
+                                                                            <span className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full">Enviada</span>
                                                                         ) : (
-                                                                            <span className="text-red-500 font-semibold">Pendente</span>
+                                                                            <span className="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">Pendente</span>
                                                                         )}
                                                                     </td>
                                                                 </tr>

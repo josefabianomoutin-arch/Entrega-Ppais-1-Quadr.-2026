@@ -37,7 +37,7 @@ const initialItemCentricInput = (): ItemCentricInput => ({
 });
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdateProducers, onLogout, producers, onResetData, onRestoreData }) => {
-  const [activeTab, setActiveTab] = useState<'register' | 'contracts' | 'analytics'>('register');
+  const [activeTab, setActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics'>('info');
   
   // Estados para aba de REGISTRO
   const [regName, setRegName] = useState('');
@@ -230,7 +230,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
       return;
     }
     
-    if (!window.confirm('ATENÇÃO: A restauração irá APAGAR TODOS os dados atuais e substituí-los pelo conteúdo do arquivo de backup. Esta ação é irreversível. Deseja continuar?')) {
+    if (!window.confirm('ATENÇÃO: A restauração irá APAGAR TODOS os dados da nuvem e substituí-los pelo conteúdo do arquivo de backup. Esta ação é irreversível e afetará todos os usuários. Deseja continuar?')) {
         return;
     }
 
@@ -247,10 +247,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
 
         const success = await onRestoreData(backupProducers);
         if (success) {
-          setRestoreMessage({ type: 'success', text: 'Dados restaurados com sucesso!' });
+          setRestoreMessage({ type: 'success', text: 'Dados restaurados com sucesso na nuvem!' });
           setRestoreFile(null);
         } else {
-           throw new Error('Falha na operação de restauração no servidor.');
+           throw new Error('Falha na operação de restauração.');
         }
 
       } catch (error: any) {
@@ -263,7 +263,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
     reader.readAsText(restoreFile);
   };
 
-  const TabButton: React.FC<{tab: 'register' | 'contracts' | 'analytics', label: string}> = ({ tab, label }) => (
+  const TabButton: React.FC<{tab: 'info' | 'register' | 'contracts' | 'analytics', label: string}> = ({ tab, label }) => (
       <button onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${ activeTab === tab ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-blue-100' }`}>{label}</button>
   );
 
@@ -279,10 +279,55 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
       
       <main className="p-4 md:p-8">
         <div className="mb-8 flex justify-center border-b"><div className="flex space-x-2 p-1 bg-gray-100/50 rounded-xl">
+                <TabButton tab="info" label="Backup e Segurança"/>
                 <TabButton tab="register" label="Cadastro"/>
                 <TabButton tab="contracts" label="Gestão por Item"/>
                 <TabButton tab="analytics" label="Análise"/>
         </div></div>
+
+        {activeTab === 'info' && (
+            <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
+                <div className="bg-white p-6 rounded-2xl shadow-xl border-t-8 border-blue-500">
+                    <h2 className="text-2xl font-black mb-2 text-gray-700 uppercase tracking-tight">Como os Dados Funcionam?</h2>
+                    <p className="text-gray-500 mb-6">Todos os dados agora são salvos em um <strong>banco de dados central na nuvem</strong>. A sincronização entre todos os computadores é <strong>automática e em tempo real</strong>.</p>
+                    <p className="text-sm text-gray-500 mb-6">As ferramentas abaixo são para <strong>segurança e recuperação de desastres</strong>, não para o uso diário.</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-gray-50 p-4 rounded-xl border-l-4 border-blue-400">
+                            <h3 className="font-bold text-gray-800 mb-2">1. Backup (Cópia de Segurança)</h3>
+                            <p className="text-sm text-gray-600">Use o botão <strong>"Fazer Backup"</strong> para baixar uma cópia de todos os dados da nuvem para o seu computador. Guarde este arquivo em um local seguro.</p>
+                        </div>
+                         <div className="bg-gray-50 p-4 rounded-xl border-l-4 border-green-400">
+                            <h3 className="font-bold text-gray-800 mb-2">2. Restaurar (Recuperação)</h3>
+                            <p className="text-sm text-gray-600">Em caso de emergência (ex: dados corrompidos), use o botão <strong>"Restaurar Dados"</strong> para substituir os dados da nuvem por um arquivo de backup que você salvou anteriormente.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-red-50 p-6 rounded-2xl shadow-md border-2 border-dashed border-red-300">
+                    <h3 className="text-lg font-bold mb-4 text-center text-red-800 uppercase tracking-tighter">Ferramentas de Gerenciamento</h3>
+                    <div className="space-y-4">
+                        <button onClick={handleBackupData} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors text-sm uppercase">Fazer Backup (Salvar cópia local)</button>
+                        
+                        <div className="pt-2 border-t-2 border-red-200">
+                           <div className="flex items-center space-x-2">
+                                <label htmlFor="restore-input" className="w-full cursor-pointer text-center py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl transition-colors text-sm uppercase">Selecionar Arquivo de Backup</label>
+                                <input id="restore-input" type="file" accept=".json" onChange={e => setRestoreFile(e.target.files ? e.target.files[0] : null)} className="hidden" />
+                           </div>
+                            {restoreFile && (
+                                <div className="text-center mt-2 space-y-2">
+                                    <p className="text-xs text-gray-600 truncate">Arquivo: <span className="font-mono">{restoreFile.name}</span></p>
+                                    <button onClick={handleRestoreClick} className="w-full py-2 bg-red-600 text-white rounded-md text-xs font-bold uppercase">Restaurar Dados na Nuvem</button>
+                                </div>
+                            )}
+                            {restoreMessage.text && <p className={`text-xs text-center mt-2 font-bold ${restoreMessage.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>{restoreMessage.text}</p>}
+                        </div>
+                        
+                        <button onClick={handleResetClick} className="w-full py-3 bg-red-800 hover:bg-red-900 text-white font-bold rounded-xl transition-colors text-sm uppercase mt-4">Resetar Tudo (Apaga dados da nuvem)</button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {activeTab === 'register' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
@@ -303,28 +348,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
                         {regSuccess && <p className="text-green-600 text-sm text-center bg-green-50 p-2 rounded-lg font-bold">{regSuccess}</p>}
                         <button type="submit" className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-black rounded-xl transition-all shadow-lg active:scale-95 uppercase">Finalizar Cadastro</button>
                     </form>
-                </div>
-                <div className="bg-red-50 p-6 rounded-2xl shadow-md border-2 border-dashed border-red-300">
-                    <h3 className="text-lg font-bold mb-4 text-center text-red-800 uppercase tracking-tighter">Zona Crítica</h3>
-                    <div className="space-y-4">
-                        <button onClick={handleBackupData} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors text-sm uppercase">Fazer Backup (JSON)</button>
-                        
-                        <div className="pt-2 border-t-2 border-red-200">
-                           <div className="flex items-center space-x-2">
-                                <label htmlFor="restore-input" className="w-full cursor-pointer text-center py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl transition-colors text-sm uppercase">Selecionar Arquivo</label>
-                                <input id="restore-input" type="file" accept=".json" onChange={e => setRestoreFile(e.target.files ? e.target.files[0] : null)} className="hidden" />
-                           </div>
-                            {restoreFile && (
-                                <div className="text-center mt-2 space-y-2">
-                                    <p className="text-xs text-gray-600 truncate">Arquivo: <span className="font-mono">{restoreFile.name}</span></p>
-                                    <button onClick={handleRestoreClick} className="w-full py-2 bg-red-600 text-white rounded-md text-xs font-bold uppercase">Restaurar Dados</button>
-                                </div>
-                            )}
-                            {restoreMessage.text && <p className={`text-xs text-center mt-2 font-bold ${restoreMessage.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>{restoreMessage.text}</p>}
-                        </div>
-                        
-                        <button onClick={handleResetClick} className="w-full py-3 bg-red-800 hover:bg-red-900 text-white font-bold rounded-xl transition-colors text-sm uppercase mt-4">Resetar Tudo</button>
-                    </div>
                 </div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-xl border-t-8 border-blue-600 overflow-hidden">
