@@ -27,7 +27,13 @@ const App: React.FC = () => {
     // iniciais e, depois, toda vez que os dados mudam na nuvem.
     const unsubscribe = onValue(producersRef, (snapshot) => {
       const data = snapshot.val();
-      setProducers(data || []); // Se o banco de dados estiver vazio, começa com um array vazio
+      
+      // CORREÇÃO: Garante que os dados sejam sempre um array.
+      // O Firebase pode retornar um objeto se os índices da lista não forem sequenciais.
+      // Object.values() converte o objeto de volta para um array, tornando o app mais robusto.
+      const producersArray = data ? Object.values(data) : [];
+
+      setProducers(producersArray as Producer[]);
       setLoading(false);
     }, (error) => {
       console.error("Falha ao ler dados do Firebase: ", error);
@@ -121,7 +127,7 @@ const App: React.FC = () => {
 
     const updatedProducers = producers.map(p => 
         p.id === producerId 
-            ? { ...p, deliveries: [...p.deliveries, ...newDeliveries] } 
+            ? { ...p, deliveries: [...(p.deliveries || []), ...newDeliveries] } 
             : p
     );
     updateDatabase(updatedProducers);
@@ -235,4 +241,4 @@ ATENÇÃO: Por favor, anexe o arquivo PDF da nota fiscal a este e-mail antes de 
   );
 };
 
-export default App
+export default App;
