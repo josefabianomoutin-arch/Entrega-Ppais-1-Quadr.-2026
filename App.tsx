@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics'>('register');
+  const [adminDashboardVersion, setAdminDashboardVersion] = useState(0);
 
 
   // Efeito para ouvir mudanças no banco de dados em tempo real
@@ -114,14 +115,14 @@ const App: React.FC = () => {
       allowedWeeks,
     };
     
-    // Cria a lista atualizada, já ordenada, para garantir consistência
-    const updatedProducers = [...producers, newProducer].sort((a, b) => a.name.localeCompare(b.name));
+    // Cria a lista atualizada que será enviada ao Firebase
+    const updatedProducers = [...producers, newProducer];
   
     try {
-      // 1. Escreve no DB
+      // 1. Escreve no DB. O listener onValue será o único responsável por atualizar o estado 'producers'.
       await writeToDatabase(updatedProducers);
-      // 2. Força a atualização do estado local imediatamente após o sucesso
-      setProducers(updatedProducers);
+      // 2. Incrementa a versão para forçar a remontagem do AdminDashboard, garantindo que ele leia os novos dados.
+      setAdminDashboardVersion(v => v + 1);
       return true;
     } catch (error) {
       console.error("Falha ao registrar produtor:", error);
@@ -254,6 +255,7 @@ const App: React.FC = () => {
 
         {isAdminLoggedIn ? (
           <AdminDashboard 
+              key={adminDashboardVersion}
               onRegister={handleRegister} 
               onUpdateProducers={handleUpdateProducers}
               onLogout={handleLogout} 
