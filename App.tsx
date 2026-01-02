@@ -136,20 +136,29 @@ const App: React.FC = () => {
     try {
       // Usa uma transação para garantir uma operação de escrita atômica e segura.
       const transactionResult = await runTransaction(producersRef, (currentData) => {
-        // Garante que estamos trabalhando com um objeto. Se os dados da nuvem estiverem corrompidos, nulos ou
-        // em um formato inesperado (ex: array), começamos com um objeto vazio para evitar erros.
-        const currentProducers = (currentData && typeof currentData === 'object' && !Array.isArray(currentData))
-            ? currentData
-            : {};
+        let producersObject: { [key: string]: Producer } = {};
+
+        if (Array.isArray(currentData)) {
+          // Se os dados forem um array, converte para um objeto mapeado por CPF para corrigir a estrutura.
+          currentData.forEach(producer => {
+            if (producer && producer.cpf) {
+              producersObject[producer.cpf] = producer;
+            }
+          });
+        } else if (currentData && typeof currentData === 'object') {
+          // Se já for um objeto, usa diretamente.
+          producersObject = currentData;
+        }
+        // Se for nulo ou outro tipo, producersObject permanecerá como um objeto vazio, começando do zero.
 
         // Verificação final no servidor: se o CPF já existir, aborta a transação.
-        if (currentProducers[finalCpf]) {
+        if (producersObject[finalCpf]) {
           return; // Retornar undefined aborta a transação.
         }
         
         // Adiciona o novo produtor ao objeto de produtores.
-        currentProducers[finalCpf] = newProducer;
-        return currentProducers; // Retorna os dados atualizados para serem salvos.
+        producersObject[finalCpf] = newProducer;
+        return producersObject; // Retorna os dados atualizados para serem salvos.
       });
 
       if (transactionResult.committed) {
@@ -297,25 +306,4 @@ const App: React.FC = () => {
             </div>
         </div>
 
-        {isAdminLoggedIn ? (
-          <AdminDashboard 
-              onRegister={handleRegister} 
-              onUpdateProducers={handleUpdateProducers}
-              onLogout={handleLogout} 
-              producers={producers} 
-              onResetData={handleResetData}
-              onRestoreData={handleRestoreData}
-              activeTab={adminActiveTab}
-              onTabChange={setAdminActiveTab}
-              registrationStatus={registrationStatus}
-              onClearRegistrationStatus={handleClearRegistrationStatus}
-          />
-        ) : !currentUser ? (
-          <LoginScreen onLogin={handleLogin} />
-        ) : (
-          <Dashboard 
-            producer={currentUser} 
-            onLogout={handleLogout} 
-            onAddDeliveries={addDeliveries}
-            onInvoiceUpload={markInvoicesAsUploaded}
-            onCancelDeliveries={cancelDeliveries}
+        {isAdmin
