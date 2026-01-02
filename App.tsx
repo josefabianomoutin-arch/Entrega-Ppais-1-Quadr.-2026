@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Producer, Delivery } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
@@ -99,7 +99,6 @@ const App: React.FC = () => {
       return false;
     }
   
-    // Verifica a existência contra o estado atual para evitar escritas desnecessárias no DB
     if (producers.some(p => p.name === finalName || p.cpf === finalCpf)) {
       return false;
     }
@@ -113,15 +112,20 @@ const App: React.FC = () => {
       allowedWeeks,
     };
     
-    // Cria a lista atualizada que será enviada ao Firebase
-    const updatedProducers = [...producers, newProducer];
+    const originalProducers = [...producers];
+    const updatedProducers = [...producers, newProducer].sort((a, b) => a.name.localeCompare(b.name));
+    
+    // 1. Atualiza a UI imediatamente (Atualização Otimista)
+    setProducers(updatedProducers);
   
     try {
-      // Escreve no DB. O listener onValue será o único responsável por atualizar a UI.
+      // 2. Envia os dados para a nuvem em segundo plano
       await writeToDatabase(updatedProducers);
       return true;
     } catch (error) {
       console.error("Falha ao registrar produtor:", error);
+      // 3. Em caso de erro, reverte a mudança na UI
+      setProducers(originalProducers);
       return false;
     }
   };
@@ -228,9 +232,6 @@ const App: React.FC = () => {
     }
   }, [producers, currentUser?.cpf]);
 
-  // Cria uma chave única e robusta baseada no conteúdo da lista de produtores.
-  // Isso força a remontagem do AdminDashboard quando a lista muda, resolvendo o bug de renderização.
-  const producerKey = useMemo(() => producers.map(p => p.cpf).join(','), [producers]);
 
   if (loading) {
     return (
@@ -254,7 +255,6 @@ const App: React.FC = () => {
 
         {isAdminLoggedIn ? (
           <AdminDashboard 
-              key={producerKey}
               onRegister={handleRegister} 
               onUpdateProducers={handleUpdateProducers}
               onLogout={handleLogout} 
