@@ -3,6 +3,8 @@ import type { Producer } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 
+type AdminTab = 'info' | 'register' | 'contracts' | 'analytics';
+
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<boolean>;
   onUpdateProducers: (updatedProducers: Producer[]) => void;
@@ -10,6 +12,8 @@ interface AdminDashboardProps {
   producers: Producer[];
   onResetData: () => void;
   onRestoreData: (backupProducers: Producer[]) => Promise<boolean>;
+  activeTab: AdminTab;
+  onTabChange: (tab: AdminTab) => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -36,9 +40,16 @@ const initialItemCentricInput = (): ItemCentricInput => ({
   id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 });
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdateProducers, onLogout, producers, onResetData, onRestoreData }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics'>('info');
-  
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
+    onRegister, 
+    onUpdateProducers, 
+    onLogout, 
+    producers, 
+    onResetData, 
+    onRestoreData,
+    activeTab,
+    onTabChange
+}) => {
   // Estados para aba de REGISTRO
   const [regName, setRegName] = useState('');
   const [regCpf, setRegCpf] = useState('');
@@ -257,8 +268,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
     reader.readAsText(restoreFile);
   };
 
-  const TabButton: React.FC<{tab: 'info' | 'register' | 'contracts' | 'analytics', label: string}> = ({ tab, label }) => (
-      <button onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${ activeTab === tab ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-blue-100' }`}>{label}</button>
+  const TabButton: React.FC<{tab: AdminTab, label: string}> = ({ tab, label }) => (
+      <button onClick={() => onTabChange(tab)} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${ activeTab === tab ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-blue-100' }`}>{label}</button>
   );
 
   return (

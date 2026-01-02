@@ -19,6 +19,8 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Producer | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics'>('register');
+
 
   // Efeito para ouvir mudanças no banco de dados em tempo real
   useEffect(() => {
@@ -71,6 +73,7 @@ const App: React.FC = () => {
     if (name.toLowerCase() === 'administrador' && cpf === '15210361870') {
       setIsAdminLoggedIn(true);
       setCurrentUser(null);
+      setAdminActiveTab('register'); // Direciona para a aba de cadastro
       return true;
     }
     const upperCaseName = name.toUpperCase();
@@ -258,6 +261,8 @@ const App: React.FC = () => {
               producers={producers} 
               onResetData={handleResetData}
               onRestoreData={handleRestoreData}
+              activeTab={adminActiveTab}
+              onTabChange={setAdminActiveTab}
           />
         ) : !currentUser ? (
           <LoginScreen onLogin={handleLogin} />
