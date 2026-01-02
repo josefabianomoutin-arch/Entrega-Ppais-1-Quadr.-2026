@@ -18,9 +18,8 @@ export interface ContractItem {
 }
 
 export interface Producer {
-  id:string;
   name: string;
-  cpf: string; // Acts as password
+  cpf: string; // Atua como senha e identificador único
   initialValue: number;
   contractItems: ContractItem[];
   deliveries: Delivery[];

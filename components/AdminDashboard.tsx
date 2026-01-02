@@ -18,7 +18,7 @@ const formatCurrency = (value: number) => {
 };
 
 // Tipos para o estado da UI de Gestão por Item
-interface ProducerSlot { producerId: string; }
+interface ProducerSlot { producerCpf: string; }
 interface ItemCentricInput {
   name: string;
   totalKg: string;
@@ -27,7 +27,7 @@ interface ItemCentricInput {
   id: string; // Adicionado para rastrear a ordem de criação
 }
 
-const initialProducerSlot = (): ProducerSlot => ({ producerId: '' });
+const initialProducerSlot = (): ProducerSlot => ({ producerCpf: '' });
 const initialItemCentricInput = (): ItemCentricInput => ({
   name: '', 
   totalKg: '', 
@@ -69,14 +69,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
         return;
     }
       
-    const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; producerIds: string[]; order: number }>();
+    const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; producerCpfs: string[]; order: number }>();
 
     producers.forEach(producer => {
         (producer.contractItems || []).forEach(item => {
             const order = item.order ?? Infinity; // Default para itens antigos sem ordem
             
             if (!itemsMap.has(item.name)) {
-                itemsMap.set(item.name, { totalKg: 0, valuePerKg: item.valuePerKg, producerIds: [], order: order });
+                itemsMap.set(item.name, { totalKg: 0, valuePerKg: item.valuePerKg, producerCpfs: [], order: order });
             }
 
             const entry = itemsMap.get(item.name)!;
@@ -87,8 +87,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
                 entry.order = order;
             }
 
-            if (!entry.producerIds.includes(producer.id)) {
-                entry.producerIds.push(producer.id);
+            if (!entry.producerCpfs.includes(producer.cpf)) {
+                entry.producerCpfs.push(producer.cpf);
             }
         });
     });
@@ -104,8 +104,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
             totalKg: String(data.totalKg),
             valuePerKg: String(data.valuePerKg),
             producers: [
-                ...data.producerIds.map(id => ({ producerId: id })),
-                ...Array(Math.max(0, 15 - data.producerIds.length)).fill(null).map(initialProducerSlot)
+                ...data.producerCpfs.map(cpf => ({ producerCpf: cpf })),
+                ...Array(Math.max(0, 15 - data.producerCpfs.length)).fill(null).map(initialProducerSlot)
             ]
         };
     });
@@ -134,16 +134,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
     e.preventDefault(); setContractError(''); setContractSuccess('');
 
     const updatedProducers: Producer[] = producers.map(p => ({ ...p, contractItems: [], initialValue: 0 }));
-    const producerMap = new Map(updatedProducers.map(p => [p.id, p]));
+    const producerMap = new Map(updatedProducers.map(p => [p.cpf, p]));
 
     for (let index = 0; index < itemCentricContracts.length; index++) {
         const uiItem = itemCentricContracts[index];
         const name = uiItem.name.trim().toUpperCase();
         if (!name) continue;
 
-        const assignedProducerIds = uiItem.producers.map(p => p.producerId).filter(id => id !== '');
+        const assignedProducerCpfs = uiItem.producers.map(p => p.producerCpf).filter(cpf => cpf !== '');
         
-        if (assignedProducerIds.length > 0) {
+        if (assignedProducerCpfs.length > 0) {
             const totalKg = parseFloat(uiItem.totalKg);
             const valuePerKg = parseFloat(uiItem.valuePerKg);
             
@@ -152,10 +152,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
                 return;
             }
 
-            const kgPerProducer = totalKg / assignedProducerIds.length;
+            const kgPerProducer = totalKg / assignedProducerCpfs.length;
 
-            for (const producerId of assignedProducerIds) {
-                const producer = producerMap.get(producerId);
+            for (const producerCpf of assignedProducerCpfs) {
+                const producer = producerMap.get(producerCpf);
                 if (producer) {
                     producer.contractItems.push({
                         name,
@@ -184,10 +184,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
     setItemCentricContracts(newItems);
   };
 
-  const handleProducerSelectionChange = (itemIndex: number, slotIndex: number, producerId: string) => {
+  const handleProducerSelectionChange = (itemIndex: number, slotIndex: number, producerCpf: string) => {
     const newItems = [...itemCentricContracts];
     const newProducers = [...newItems[itemIndex].producers];
-    newProducers[slotIndex] = { producerId };
+    newProducers[slotIndex] = { producerCpf };
     newItems[itemIndex] = { ...newItems[itemIndex], producers: newProducers };
     setItemCentricContracts(newItems);
   };
@@ -354,10 +354,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
               <h2 className="text-2xl font-black mb-6 text-gray-700 uppercase tracking-tight">Produtores Cadastrados ({producers.length})</h2>
               <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                 {producers.length > 0 ? producers.map(p => (
-                  <div key={p.id} className="p-4 bg-gray-50 rounded-xl flex justify-between items-center text-sm border border-gray-100 hover:bg-white transition-colors group">
+                  <div key={p.cpf} className="p-4 bg-gray-50 rounded-xl flex justify-between items-center text-sm border border-gray-100 hover:bg-white transition-colors group">
                     <div>
                         <p className="font-black text-gray-800 group-hover:text-blue-600 transition-colors">{p.name}</p>
-                        <p className="text-[10px] text-gray-400 font-mono">ID: {p.id.split('-')[1]}</p>
+                        <p className="text-[10px] text-gray-400 font-mono">CPF: ...{p.cpf.slice(-4)}</p>
                     </div>
                     <span className="font-bold text-[10px] text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">{p.contractItems.length} itens</span>
                   </div>
@@ -377,7 +377,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
                 <form className="space-y-10" onSubmit={handleSaveContracts}>
                     <div className="space-y-6 max-h-[65vh] overflow-y-auto pr-3 custom-scrollbar p-2">
                         {itemCentricContracts.map((item, index) => {
-                            const activeProducers = item.producers.filter(p => p.producerId !== '');
+                            const activeProducers = item.producers.filter(p => p.producerCpf !== '');
                             const assignedCount = activeProducers.length;
                             const isExpanded = expandedItemIndex === index;
                             
@@ -452,12 +452,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
                                             <div key={slotIndex} className="flex space-x-2 items-center group">
                                                 <span className="text-[10px] font-black text-gray-300 w-5 group-hover:text-blue-500 transition-colors">{slotIndex + 1}</span>
                                                 <select 
-                                                    value={slot.producerId} 
+                                                    value={slot.producerCpf} 
                                                     onChange={e => handleProducerSelectionChange(index, slotIndex, e.target.value)} 
                                                     className="input-field py-2 text-xs font-bold border-gray-100 bg-gray-50/50 hover:border-blue-300 transition-all cursor-pointer"
                                                 >
                                                     <option value="">-- SELECIONAR --</option>
-                                                    {producers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                                    {producers.map(p => <option key={p.cpf} value={p.cpf}>{p.name}</option>)}
                                                 </select>
                                             </div>
                                         ))}

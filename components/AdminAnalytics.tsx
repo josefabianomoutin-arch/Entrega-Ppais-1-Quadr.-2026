@@ -20,7 +20,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
     const [sortKey, setSortKey] = useState<'name' | 'progress' | 'delivered' | 'contracted'>('progress');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [producerSearchTerm, setProducerSearchTerm] = useState('');
-    const [expandedProducerId, setExpandedProducerId] = useState<string | null>(null);
+    const [expandedProducerCpf, setExpandedProducerCpf] = useState<string | null>(null);
 
     const analyticsData = useMemo(() => {
         const totalContracted = producers.reduce((sum, p) => sum + p.initialValue, 0);
@@ -140,10 +140,10 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                 </div>
                 <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                    {filteredProducers.length > 0 ? filteredProducers.map(producer => {
-                       const isExpanded = expandedProducerId === producer.id;
+                       const isExpanded = expandedProducerCpf === producer.cpf;
                        return (
-                           <div key={producer.id} className={`border rounded-xl transition-all ${isExpanded ? 'ring-2 ring-blue-500 bg-white' : 'bg-gray-50/50 hover:bg-white'}`}>
-                               <div className="p-4 cursor-pointer flex justify-between items-center" onClick={() => setExpandedProducerId(isExpanded ? null : producer.id)}>
+                           <div key={producer.cpf} className={`border rounded-xl transition-all ${isExpanded ? 'ring-2 ring-blue-500 bg-white' : 'bg-gray-50/50 hover:bg-white'}`}>
+                               <div className="p-4 cursor-pointer flex justify-between items-center" onClick={() => setExpandedProducerCpf(isExpanded ? null : producer.cpf)}>
                                    <span className="font-bold text-gray-700">{producer.name}</span>
                                    <div className="flex items-center gap-4">
                                        <span className="text-sm font-bold text-blue-600">{formatCurrency(producer.initialValue)}</span>
@@ -239,7 +239,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                 const contractedValue = p.initialValue;
                                 const progress = contractedValue > 0 ? (deliveredValue / contractedValue) * 100 : 0;
                                 return (
-                                    <tr key={p.id} className="border-b hover:bg-gray-50 transition-colors">
+                                    <tr key={p.cpf} className="border-b hover:bg-gray-50 transition-colors">
                                         <td className="p-3 font-bold text-gray-800">{p.name}</td>
                                         <td className="p-3">
                                             <div className="flex items-center gap-2">

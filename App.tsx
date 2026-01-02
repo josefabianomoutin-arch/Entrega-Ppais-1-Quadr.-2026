@@ -36,10 +36,19 @@ const App: React.FC = () => {
   }, []);
 
   // Helper central para escrever no banco de dados com feedback visual
-  const writeToDatabase = async (updatedProducers: Producer[]) => {
+  const writeToDatabase = async (producersArray: Producer[]) => {
     setIsSaving(true);
     try {
-      await set(producersRef, updatedProducers);
+      // TRANSFORMA O ARRAY EM UM OBJETO ANTES DE SALVAR
+      // Usando o CPF do produtor como a chave única.
+      const producersObject = producersArray.reduce((acc, producer) => {
+        if (producer && producer.cpf) { // Garante que o produtor e seu CPF existam
+          acc[producer.cpf] = producer;
+        }
+        return acc;
+      }, {} as { [key: string]: Producer });
+
+      await set(producersRef, producersObject);
     } catch (error) {
       console.error("Falha ao salvar dados no Firebase", error);
       throw error; // Permite que a função que chamou trate o erro
@@ -78,7 +87,6 @@ const App: React.FC = () => {
       if (nameExists || cpfExists) return false;
       
       const newProducer: Producer = {
-        id: `produtor-${Date.now()}`,
         name,
         cpf,
         initialValue: 0,
@@ -121,7 +129,7 @@ const App: React.FC = () => {
      }
   };
 
-  const addDeliveries = async (producerId: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => {
+  const addDeliveries = async (producerCpf: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => {
     try {
       const snapshot = await get(producersRef);
       const currentProducers: Producer[] = snapshot.exists() ? Object.values(snapshot.val()) as Producer[] : [];
@@ -133,7 +141,7 @@ const App: React.FC = () => {
       }));
 
       const updatedProducers = currentProducers.map(p => 
-          p.id === producerId 
+          p.cpf === producerCpf 
               ? { ...p, deliveries: [...(p.deliveries || []), ...newDeliveries] } 
               : p
       );
@@ -143,13 +151,13 @@ const App: React.FC = () => {
     }
   };
 
-  const cancelDeliveries = async (producerId: string, deliveryIds: string[]) => {
+  const cancelDeliveries = async (producerCpf: string, deliveryIds: string[]) => {
     try {
       const snapshot = await get(producersRef);
       const currentProducers: Producer[] = snapshot.exists() ? Object.values(snapshot.val()) as Producer[] : [];
 
       const updatedProducers = currentProducers.map(p => {
-          if (p.id === producerId) {
+          if (p.cpf === producerCpf) {
               const updatedDeliveries = (p.deliveries || []).filter(d => !deliveryIds.includes(d.id));
               return { ...p, deliveries: updatedDeliveries };
           }
@@ -161,17 +169,17 @@ const App: React.FC = () => {
     }
   };
 
-  const markInvoicesAsUploaded = async (producerId: string, deliveryIds: string[], invoiceNumber: string) => {
+  const markInvoicesAsUploaded = async (producerCpf: string, deliveryIds: string[], invoiceNumber: string) => {
     let producerForEmail: Producer | undefined;
     try {
       const snapshot = await get(producersRef);
       const currentProducers: Producer[] = snapshot.exists() ? Object.values(snapshot.val()) as Producer[] : [];
       
-      producerForEmail = currentProducers.find(p => p.id === producerId);
+      producerForEmail = currentProducers.find(p => p.cpf === producerCpf);
       if (!producerForEmail) return;
 
       const updatedProducers = currentProducers.map(p => {
-        if (p.id === producerId) {
+        if (p.cpf === producerCpf) {
           const updatedDeliveries = (p.deliveries || []).map(d => 
             deliveryIds.includes(d.id) 
               ? { ...d, invoiceUploaded: true, invoiceNumber: invoiceNumber } 
@@ -202,10 +210,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (currentUser) {
-      const updatedUser = producers.find(p => p.id === currentUser.id);
+      const updatedUser = producers.find(p => p.cpf === currentUser.cpf);
       setCurrentUser(updatedUser || null);
     }
-  }, [producers, currentUser?.id]);
+  }, [producers, currentUser?.cpf]);
 
   if (loading) {
     return (

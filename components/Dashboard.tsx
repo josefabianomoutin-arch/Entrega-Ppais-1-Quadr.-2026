@@ -9,9 +9,9 @@ import InvoiceUploader from './InvoiceUploader';
 interface DashboardProps {
   producer: Producer;
   onLogout: () => void;
-  onAddDeliveries: (producerId: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => void;
-  onInvoiceUpload: (producerId: string, deliveryIds: string[], invoiceNumber: string) => void;
-  onCancelDeliveries: (producerId: string, deliveryIds: string[]) => void;
+  onAddDeliveries: (producerCpf: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => void;
+  onInvoiceUpload: (producerCpf: string, deliveryIds: string[], invoiceNumber: string) => void;
+  onCancelDeliveries: (producerCpf: string, deliveryIds: string[]) => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveries, onInvoiceUpload, onCancelDeliveries }) => {
@@ -64,14 +64,14 @@ const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveri
           date: dateString,
           invoiceNumber,
       }));
-      onAddDeliveries(producer.id, deliveriesToAdd);
+      onAddDeliveries(producer.cpf, deliveriesToAdd);
     }
     handleCloseModal();
   };
 
   const handleCancelDeliveries = (deliveryIds: string[]) => {
     if(window.confirm('Tem certeza que deseja cancelar estes agendamentos? Esta ação não pode ser desfeita.')) {
-      onCancelDeliveries(producer.id, deliveryIds);
+      onCancelDeliveries(producer.cpf, deliveryIds);
       handleCloseViewModal();
     }
   };
@@ -137,7 +137,7 @@ const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveri
                     <InvoiceUploader 
                         producerName={producer.name}
                         pendingInvoices={pendingInvoices} 
-                        onUpload={(deliveryIds, invoiceNumber) => onInvoiceUpload(producer.id, deliveryIds, invoiceNumber)} 
+                        onUpload={(deliveryIds, invoiceNumber) => onInvoiceUpload(producer.cpf, deliveryIds, invoiceNumber)} 
                     />
                 </div>
             )}
