@@ -244,6 +244,7 @@ const App: React.FC = () => {
 
         {isAdminLoggedIn ? (
           <AdminDashboard 
+              key={producers.length}
               onRegister={handleRegister} 
               onUpdateProducers={handleUpdateProducers}
               onLogout={handleLogout} 
