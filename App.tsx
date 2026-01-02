@@ -97,11 +97,8 @@ const App: React.FC = () => {
       return false;
     }
   
-    const currentStateOfProducers = producers;
-    const nameExists = currentStateOfProducers.some(p => p.name === finalName);
-    const cpfExists = currentStateOfProducers.some(p => p.cpf === finalCpf);
-    
-    if (nameExists || cpfExists) {
+    // Verifica a existência contra o estado atual para evitar escritas desnecessárias no DB
+    if (producers.some(p => p.name === finalName || p.cpf === finalCpf)) {
       return false;
     }
     
@@ -114,18 +111,15 @@ const App: React.FC = () => {
       allowedWeeks,
     };
     
-    // Atualização Otimista: atualiza a UI imediatamente.
-    const updatedProducers = [...currentStateOfProducers, newProducer];
-    setProducers(updatedProducers);
+    // Cria a lista atualizada que será enviada ao Firebase
+    const updatedProducers = [...producers, newProducer];
   
     try {
-      // Tenta salvar o estado atualizado no Firebase em segundo plano.
+      // Escreve no DB. O listener onValue será o único responsável por atualizar a UI.
       await writeToDatabase(updatedProducers);
       return true;
     } catch (error) {
       console.error("Falha ao registrar produtor:", error);
-      // Em caso de falha, reverte o estado da UI para o anterior.
-      setProducers(currentStateOfProducers);
       return false;
     }
   };
@@ -254,7 +248,6 @@ const App: React.FC = () => {
 
         {isAdminLoggedIn ? (
           <AdminDashboard 
-              key={producers.length}
               onRegister={handleRegister} 
               onUpdateProducers={handleUpdateProducers}
               onLogout={handleLogout} 
