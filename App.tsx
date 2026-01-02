@@ -135,17 +135,21 @@ const App: React.FC = () => {
   
     try {
       // Usa uma transação para garantir uma operação de escrita atômica e segura.
-      const transactionResult = await runTransaction(producersRef, (currentProducers) => {
-        // currentProducers é o objeto atual do banco de dados (ex: { cpf1: prod1, ... })
-        if (currentProducers && currentProducers[finalCpf]) {
-          // Aborta a transação se o CPF já existir no servidor (verificação final)
-          return; 
+      const transactionResult = await runTransaction(producersRef, (currentData) => {
+        // Garante que estamos trabalhando com um objeto. Se os dados da nuvem estiverem corrompidos, nulos ou
+        // em um formato inesperado (ex: array), começamos com um objeto vazio para evitar erros.
+        const currentProducers = (currentData && typeof currentData === 'object' && !Array.isArray(currentData))
+            ? currentData
+            : {};
+
+        // Verificação final no servidor: se o CPF já existir, aborta a transação.
+        if (currentProducers[finalCpf]) {
+          return; // Retornar undefined aborta a transação.
         }
         
-        // Se a lista for nula ou não contiver o CPF, adiciona o novo produtor.
-        const updatedProducers = currentProducers || {};
-        updatedProducers[finalCpf] = newProducer;
-        return updatedProducers;
+        // Adiciona o novo produtor ao objeto de produtores.
+        currentProducers[finalCpf] = newProducer;
+        return currentProducers; // Retorna os dados atualizados para serem salvos.
       });
 
       if (transactionResult.committed) {
@@ -315,10 +319,3 @@ const App: React.FC = () => {
             onAddDeliveries={addDeliveries}
             onInvoiceUpload={markInvoicesAsUploaded}
             onCancelDeliveries={cancelDeliveries}
-          />
-        )}
-      </>
-  );
-};
-
-export default App;
