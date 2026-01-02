@@ -26,8 +26,14 @@ const App: React.FC = () => {
     const unsubscribe = onValue(producersRef, (snapshot) => {
       try {
         const data = snapshot.val();
-        const producersArray = data && typeof data === 'object' ? Object.values(data) : [];
-        setProducers(producersArray as Producer[]);
+        let producersArray: Producer[] = [];
+        // Adiciona uma verificação robusta para garantir que os dados sejam válidos
+        if (data && typeof data === 'object') {
+          producersArray = Object.values(data).filter(
+            (p): p is Producer => p && typeof p === 'object' && 'cpf' in p && 'name' in p
+          );
+        }
+        setProducers(producersArray);
       } catch (error) {
         console.error("Erro ao processar dados do Firebase:", error);
         setProducers([]); // Reseta para um estado seguro em caso de erro
