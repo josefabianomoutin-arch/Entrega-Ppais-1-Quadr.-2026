@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { Producer, Delivery } from './types';
 import LoginScreen from './components/LoginScreen';
@@ -34,7 +35,13 @@ const App: React.FC = () => {
         if (data && typeof data === 'object') {
           producersArray = Object.values(data)
             .filter(
-              (p): p is Producer => p && typeof p === 'object' && 'cpf' in p && 'name' in p
+              (p): p is Producer => 
+                p && 
+                typeof p === 'object' && 
+                // FIX: Cast `p` to `any` to safely access properties for type validation.
+                // The `p` variable is of type `unknown` here, so direct property access is not allowed.
+                typeof (p as any).cpf === 'string' && (p as any).cpf.trim() !== '' &&
+                typeof (p as any).name === 'string' && (p as any).name.trim() !== ''
             )
             .sort((a, b) => a.name.localeCompare(b.name)); // Garante ordem consistente
         }
