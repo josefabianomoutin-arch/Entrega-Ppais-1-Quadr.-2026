@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Producer, Delivery } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
@@ -228,6 +228,10 @@ const App: React.FC = () => {
     }
   }, [producers, currentUser?.cpf]);
 
+  // Cria uma chave única e robusta baseada no conteúdo da lista de produtores.
+  // Isso força a remontagem do AdminDashboard quando a lista muda, resolvendo o bug de renderização.
+  const producerKey = useMemo(() => producers.map(p => p.cpf).join(','), [producers]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100/50">
@@ -250,6 +254,7 @@ const App: React.FC = () => {
 
         {isAdminLoggedIn ? (
           <AdminDashboard 
+              key={producerKey}
               onRegister={handleRegister} 
               onUpdateProducers={handleUpdateProducers}
               onLogout={handleLogout} 
