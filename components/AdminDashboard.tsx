@@ -6,7 +6,7 @@ import WeekSelector from './WeekSelector';
 type AdminTab = 'info' | 'register' | 'contracts' | 'analytics';
 
 interface AdminDashboardProps {
-  onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<boolean>;
+  onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
   onUpdateProducers: (updatedProducers: Producer[]) => void;
   onLogout: () => void;
   producers: Producer[];
@@ -14,6 +14,8 @@ interface AdminDashboardProps {
   onRestoreData: (backupProducers: Producer[]) => Promise<boolean>;
   activeTab: AdminTab;
   onTabChange: (tab: AdminTab) => void;
+  registrationStatus: { success: boolean; message: string } | null;
+  onClearRegistrationStatus: () => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -48,14 +50,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     onResetData, 
     onRestoreData,
     activeTab,
-    onTabChange
+    onTabChange,
+    registrationStatus,
+    onClearRegistrationStatus
 }) => {
   // Estados para aba de REGISTRO
   const [regName, setRegName] = useState('');
   const [regCpf, setRegCpf] = useState('');
   const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
-  const [regError, setRegError] = useState('');
-  const [regSuccess, setRegSuccess] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
 
   // Estados para aba de GESTÃO POR ITEM
@@ -67,6 +69,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Estados para ZONA CRÍTICA (Backup/Restore)
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoreMessage, setRestoreMessage] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    if (registrationStatus) {
+      if (registrationStatus.success) {
+        setRegName('');
+        setRegCpf('');
+        setSelectedWeeks([]);
+      }
+      const timer = setTimeout(() => {
+        onClearRegistrationStatus();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [registrationStatus, onClearRegistrationStatus]);
 
 
   // Sincroniza o estado da UI de contratos com os dados mais recentes dos produtores
@@ -127,26 +143,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRegError('');
-    setRegSuccess('');
     setIsRegistering(true);
-
-    try {
-        const success = await onRegister(regName, regCpf, selectedWeeks);
-        if (success) {
-            setRegSuccess(`Produtor "${regName}" cadastrado com sucesso! A lista será atualizada em instantes.`);
-            setRegName('');
-            setRegCpf('');
-            setSelectedWeeks([]);
-            setTimeout(() => setRegSuccess(''), 5000);
-        } else {
-            setRegError('Nome de produtor ou CPF já cadastrado.');
-        }
-    } catch (error) {
-        setRegError('Ocorreu um erro inesperado durante o cadastro.');
-    } finally {
-        setIsRegistering(false);
-    }
+    await onRegister(regName, regCpf, selectedWeeks);
+    setIsRegistering(false);
   };
   
   const handleSaveContracts = (e: React.FormEvent) => {
@@ -363,8 +362,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <h3 className="text-sm font-black text-gray-600 border-b pb-2 uppercase tracking-widest">Semanas Disponíveis</h3>
                             <WeekSelector selectedWeeks={selectedWeeks} onWeekToggle={(week) => setSelectedWeeks(p => p.includes(week) ? p.filter(w=>w!==week) : [...p,week])} />
                         </div>
-                        {regError && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg font-bold">{regError}</p>}
-                        {regSuccess && <p className="text-green-600 text-sm text-center bg-green-50 p-2 rounded-lg font-bold">{regSuccess}</p>}
+                        {registrationStatus && (
+                            <p className={`text-sm text-center p-2 rounded-lg font-bold ${registrationStatus.success ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50'}`}>
+                                {registrationStatus.message}
+                            </p>
+                        )}
                         <button type="submit" disabled={isRegistering} className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-black rounded-xl transition-all shadow-lg active:scale-95 uppercase disabled:bg-gray-400 disabled:cursor-wait">
                            {isRegistering ? 'Cadastrando...' : 'Finalizar Cadastro'}
                         </button>

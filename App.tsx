@@ -20,7 +20,7 @@ const App: React.FC = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics'>('register');
-  const [adminDashboardVersion, setAdminDashboardVersion] = useState(0);
+  const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
 
 
   // Efeito para ouvir mudanças no banco de dados em tempo real
@@ -92,18 +92,20 @@ const App: React.FC = () => {
     return false;
   };
   
-  const handleRegister = async (name: string, cpf: string, allowedWeeks: number[]): Promise<boolean> => {
+  const handleRegister = async (name: string, cpf: string, allowedWeeks: number[]) => {
+    setRegistrationStatus(null);
     const finalName = name.trim().toUpperCase();
     const finalCpf = cpf.trim().replace(/[^\d]/g, '');
   
     if (!finalName || !finalCpf) {
-      console.error("Nome ou CPF em branco não é permitido.");
-      return false;
+      setRegistrationStatus({ success: false, message: 'Nome e CPF são obrigatórios.' });
+      return;
     }
   
     // Verifica a existência contra o estado atual para evitar escritas desnecessárias no DB
     if (producers.some(p => p.name === finalName || p.cpf === finalCpf)) {
-      return false;
+      setRegistrationStatus({ success: false, message: 'Nome de produtor ou CPF já cadastrado.' });
+      return;
     }
     
     const newProducer: Producer = {
@@ -119,15 +121,18 @@ const App: React.FC = () => {
     const updatedProducers = [...producers, newProducer];
   
     try {
-      // 1. Escreve no DB. O listener onValue será o único responsável por atualizar o estado 'producers'.
       await writeToDatabase(updatedProducers);
-      // 2. Incrementa a versão para forçar a remontagem do AdminDashboard, garantindo que ele leia os novos dados.
-      setAdminDashboardVersion(v => v + 1);
-      return true;
+      // O listener onValue irá atualizar a lista de produtores na UI.
+      // Apenas informamos o sucesso da operação.
+      setRegistrationStatus({ success: true, message: `Produtor "${finalName}" cadastrado com sucesso!` });
     } catch (error) {
       console.error("Falha ao registrar produtor:", error);
-      return false;
+      setRegistrationStatus({ success: false, message: 'Ocorreu um erro inesperado durante o cadastro.' });
     }
+  };
+
+  const handleClearRegistrationStatus = () => {
+    setRegistrationStatus(null);
   };
 
   const handleUpdateProducers = (updatedProducers: Producer[]) => {
@@ -255,7 +260,6 @@ const App: React.FC = () => {
 
         {isAdminLoggedIn ? (
           <AdminDashboard 
-              key={adminDashboardVersion}
               onRegister={handleRegister} 
               onUpdateProducers={handleUpdateProducers}
               onLogout={handleLogout} 
@@ -264,6 +268,8 @@ const App: React.FC = () => {
               onRestoreData={handleRestoreData}
               activeTab={adminActiveTab}
               onTabChange={setAdminActiveTab}
+              registrationStatus={registrationStatus}
+              onClearRegistrationStatus={handleClearRegistrationStatus}
           />
         ) : !currentUser ? (
           <LoginScreen onLogin={handleLogin} />
