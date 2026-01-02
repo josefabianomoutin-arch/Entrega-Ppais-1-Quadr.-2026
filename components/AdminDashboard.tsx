@@ -56,6 +56,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
   const [regError, setRegError] = useState('');
   const [regSuccess, setRegSuccess] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   // Estados para aba de GESTÃO POR ITEM
   const [itemCentricContracts, setItemCentricContracts] = useState<ItemCentricInput[]>([initialItemCentricInput()]);
@@ -125,13 +126,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); setRegError(''); setRegSuccess('');
-    if (await onRegister(regName, regCpf, selectedWeeks)) {
-        setRegSuccess(`Produtor "${regName}" cadastrado com sucesso!`);
-        setRegName(''); setRegCpf(''); setSelectedWeeks([]);
-        setTimeout(() => setRegSuccess(''), 4000);
-    } else {
-        setRegError('Nome de produtor ou CPF já cadastrado.');
+    e.preventDefault();
+    setRegError('');
+    setRegSuccess('');
+    setIsRegistering(true);
+
+    try {
+        const success = await onRegister(regName, regCpf, selectedWeeks);
+        if (success) {
+            setRegSuccess(`Produtor "${regName}" cadastrado com sucesso! A lista será atualizada em instantes.`);
+            setRegName('');
+            setRegCpf('');
+            setSelectedWeeks([]);
+            setTimeout(() => setRegSuccess(''), 5000);
+        } else {
+            setRegError('Nome de produtor ou CPF já cadastrado.');
+        }
+    } catch (error) {
+        setRegError('Ocorreu um erro inesperado durante o cadastro.');
+    } finally {
+        setIsRegistering(false);
     }
   };
   
@@ -351,7 +365,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                         {regError && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg font-bold">{regError}</p>}
                         {regSuccess && <p className="text-green-600 text-sm text-center bg-green-50 p-2 rounded-lg font-bold">{regSuccess}</p>}
-                        <button type="submit" className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-black rounded-xl transition-all shadow-lg active:scale-95 uppercase">Finalizar Cadastro</button>
+                        <button type="submit" disabled={isRegistering} className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-black rounded-xl transition-all shadow-lg active:scale-95 uppercase disabled:bg-gray-400 disabled:cursor-wait">
+                           {isRegistering ? 'Cadastrando...' : 'Finalizar Cadastro'}
+                        </button>
                     </form>
                 </div>
             </div>
@@ -513,16 +529,4 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         .custom-scrollbar::-webkit-scrollbar { width: 8px; } 
         .custom-scrollbar::-webkit-scrollbar-track { background: #F9FAFB; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; border: 2px solid #F9FAFB; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3B82F6; }
-        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slide-down { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
-        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
-        .animate-slide-down { animation: slide-down 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        .animate-shake { animation: shake 0.2s ease-in-out 3; }
-      `}</style>
-    </div>
-  );
-};
-
-export default AdminDashboard;
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3B82

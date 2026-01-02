@@ -37,10 +37,11 @@ const App: React.FC = () => {
             )
             .sort((a, b) => a.name.localeCompare(b.name)); // Garante ordem consistente
         }
-        setProducers(producersArray);
+        // Usa a forma funcional para garantir que a atualização de estado seja processada
+        setProducers(() => producersArray);
       } catch (error) {
         console.error("Erro ao processar dados do Firebase:", error);
-        setProducers([]); // Reseta para um estado seguro em caso de erro
+        setProducers(() => []); // Reseta para um estado seguro em caso de erro
       } finally {
         setLoading(false);
       }
@@ -99,6 +100,7 @@ const App: React.FC = () => {
       return false;
     }
   
+    // Verifica a existência contra o estado atual para evitar escritas desnecessárias no DB
     if (producers.some(p => p.name === finalName || p.cpf === finalCpf)) {
       return false;
     }
@@ -112,20 +114,15 @@ const App: React.FC = () => {
       allowedWeeks,
     };
     
-    const originalProducers = [...producers];
-    const updatedProducers = [...producers, newProducer].sort((a, b) => a.name.localeCompare(b.name));
-    
-    // 1. Atualiza a UI imediatamente (Atualização Otimista)
-    setProducers(updatedProducers);
+    // Cria a lista atualizada que será enviada ao Firebase
+    const updatedProducers = [...producers, newProducer];
   
     try {
-      // 2. Envia os dados para a nuvem em segundo plano
+      // Escreve no DB. O listener onValue será o único responsável por atualizar a UI.
       await writeToDatabase(updatedProducers);
       return true;
     } catch (error) {
       console.error("Falha ao registrar produtor:", error);
-      // 3. Em caso de erro, reverte a mudança na UI
-      setProducers(originalProducers);
       return false;
     }
   };
@@ -248,7 +245,7 @@ const App: React.FC = () => {
       <>
         <div className={`fixed bottom-4 right-4 z-50 transition-opacity duration-300 ${isSaving ? 'opacity-100' : 'opacity-0'}`}>
             <div className="flex items-center gap-2 bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-full shadow-lg">
-                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 Salvando na nuvem...
             </div>
         </div>
