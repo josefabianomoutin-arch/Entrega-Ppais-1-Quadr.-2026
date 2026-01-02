@@ -31,9 +31,11 @@ const App: React.FC = () => {
         let producersArray: Producer[] = [];
         // Adiciona uma verificação robusta para garantir que os dados sejam válidos
         if (data && typeof data === 'object') {
-          producersArray = Object.values(data).filter(
-            (p): p is Producer => p && typeof p === 'object' && 'cpf' in p && 'name' in p
-          );
+          producersArray = Object.values(data)
+            .filter(
+              (p): p is Producer => p && typeof p === 'object' && 'cpf' in p && 'name' in p
+            )
+            .sort((a, b) => a.name.localeCompare(b.name)); // Garante ordem consistente
         }
         setProducers(producersArray);
       } catch (error) {
