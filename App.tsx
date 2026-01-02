@@ -5,7 +5,7 @@ import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set } from 'firebase/database';
+import { getDatabase, ref, onValue, set, child } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
 
 // Inicializa o Firebase e obtém uma referência ao banco de dados
@@ -61,6 +61,7 @@ const App: React.FC = () => {
   }, []);
 
   // Helper central para escrever no banco de dados com feedback visual
+  // Usado para operações em massa, como salvar contratos.
   const writeToDatabase = async (producersArray: Producer[]) => {
     setIsSaving(true);
     try {
@@ -108,9 +109,14 @@ const App: React.FC = () => {
       setRegistrationStatus({ success: false, message: 'Nome e CPF são obrigatórios.' });
       return;
     }
-  
-    if (producers.some(p => p.name === finalName || p.cpf === finalCpf)) {
-      setRegistrationStatus({ success: false, message: 'Nome de produtor ou CPF já cadastrado.' });
+    
+    // Validações contra o estado local atual para feedback rápido
+    if (producers.some(p => p.cpf === finalCpf)) {
+      setRegistrationStatus({ success: false, message: 'Este CPF já está cadastrado.' });
+      return;
+    }
+    if (producers.some(p => p.name === finalName)) {
+      setRegistrationStatus({ success: false, message: 'Este nome de produtor já está em uso.' });
       return;
     }
     
@@ -122,23 +128,21 @@ const App: React.FC = () => {
       deliveries: [],
       allowedWeeks,
     };
-    
-    const updatedProducers = [...producers, newProducer].sort((a, b) => a.name.localeCompare(b.name));
   
     try {
-      // Tenta escrever a nova lista completa no Firebase.
-      await writeToDatabase(updatedProducers);
+      // Cria uma referência para o caminho específico do novo produtor (ex: /producers/12345678900)
+      const newProducerRef = child(producersRef, finalCpf);
       
-      // Se for bem-sucedido, o listener onValue será acionado e atualizará a UI.
-      // Apenas exibimos a mensagem de sucesso.
+      // Escreve os dados do NOVO produtor de forma atômica, sem afetar os outros.
+      await set(newProducerRef, newProducer);
+      
+      // O listener `onValue` irá detectar a mudança e atualizar a UI de forma reativa.
+      // Apenas precisamos mostrar a mensagem de sucesso.
       setRegistrationStatus({ success: true, message: `Produtor "${finalName}" cadastrado com sucesso!` });
 
     } catch (error) {
       console.error("Falha ao registrar produtor:", error);
-      
-      // Se a escrita falhar, a UI não é alterada. Apenas exibimos uma mensagem de erro clara.
-      // O listener onValue não será acionado, então a lista de produtores permanece a mesma.
-      setRegistrationStatus({ success: false, message: 'Falha na comunicação com a nuvem. O cadastro não foi salvo.' });
+      setRegistrationStatus({ success: false, message: 'Ocorreu um erro inesperado ao salvar na nuvem. Tente novamente.' });
     }
   };
 
@@ -264,7 +268,8 @@ const App: React.FC = () => {
       <>
         <div className={`fixed bottom-4 right-4 z-50 transition-opacity duration-300 ${isSaving ? 'opacity-100' : 'opacity-0'}`}>
             <div className="flex items-center gap-2 bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-full shadow-lg">
-                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8
+ 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 Salvando na nuvem...
             </div>
         </div>
