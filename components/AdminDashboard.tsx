@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import type { Producer, ContractItem } from '../types';
+import React, { useState, useEffect } from 'react';
+import type { Producer } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 
@@ -51,24 +51,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(0);
   const [contractError, setContractError] = useState('');
   const [contractSuccess, setContractSuccess] = useState('');
-  const contractsInitialized = useRef(false);
 
   // Estados para ZONA CRÍTICA (Backup/Restore)
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoreMessage, setRestoreMessage] = useState({ type: '', text: '' });
 
 
-  // Sincroniza o estado da UI com os dados dos produtores ao abrir a aba, mantendo a ordem
+  // Sincroniza o estado da UI de contratos com os dados mais recentes dos produtores
   useEffect(() => {
+    // Roda a sincronização apenas quando a aba de contratos estiver ativa.
     if (activeTab !== 'contracts') {
-        contractsInitialized.current = false;
-        return;
+      return;
     }
 
-    if (contractsInitialized.current) {
-        return;
-    }
-      
     const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; producerCpfs: string[]; order: number }>();
 
     producers.forEach(producer => {
@@ -115,8 +110,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
     } else {
         setItemCentricContracts([initialItemCentricInput()]);
     }
-    
-    contractsInitialized.current = true;
   }, [producers, activeTab]);
 
 
@@ -125,6 +118,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
     if (await onRegister(regName, regCpf, selectedWeeks)) {
         setRegSuccess(`Produtor "${regName}" cadastrado com sucesso!`);
         setRegName(''); setRegCpf(''); setSelectedWeeks([]);
+        setTimeout(() => setRegSuccess(''), 4000);
     } else {
         setRegError('Nome de produtor ou CPF já cadastrado.');
     }
@@ -396,7 +390,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onRegister, onUpdatePro
                                         <h3 className="font-black text-2xl text-blue-950 uppercase tracking-tighter">{item.name || 'ITEM PENDENTE'}</h3>
                                     </div>
                                     <button type="button" onClick={() => handleRemoveItem(index)} className="text-red-300 hover:text-red-600 transition-colors p-2 rounded-full hover:bg-red-50">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2
+ 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                     </button>
                                 </div>
                                 
