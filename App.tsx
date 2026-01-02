@@ -5,7 +5,7 @@ import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set, child } from 'firebase/database';
+import { getDatabase, ref, onValue, set, runTransaction } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
 
 // Inicializa o Firebase e obtém uma referência ao banco de dados
@@ -102,21 +102,25 @@ const App: React.FC = () => {
   
   const handleRegister = async (name: string, cpf: string, allowedWeeks: number[]) => {
     setRegistrationStatus(null);
+    setIsSaving(true);
     const finalName = name.trim().toUpperCase();
     const finalCpf = cpf.trim().replace(/[^\d]/g, '');
   
     if (!finalName || !finalCpf) {
       setRegistrationStatus({ success: false, message: 'Nome e CPF são obrigatórios.' });
+      setIsSaving(false);
       return;
     }
     
-    // Validações contra o estado local atual para feedback rápido
+    // Validações rápidas no lado do cliente
     if (producers.some(p => p.cpf === finalCpf)) {
       setRegistrationStatus({ success: false, message: 'Este CPF já está cadastrado.' });
+      setIsSaving(false);
       return;
     }
     if (producers.some(p => p.name === finalName)) {
       setRegistrationStatus({ success: false, message: 'Este nome de produtor já está em uso.' });
+      setIsSaving(false);
       return;
     }
     
@@ -130,19 +134,34 @@ const App: React.FC = () => {
     };
   
     try {
-      // Cria uma referência para o caminho específico do novo produtor (ex: /producers/12345678900)
-      const newProducerRef = child(producersRef, finalCpf);
-      
-      // Escreve os dados do NOVO produtor de forma atômica, sem afetar os outros.
-      await set(newProducerRef, newProducer);
-      
-      // O listener `onValue` irá detectar a mudança e atualizar a UI de forma reativa.
-      // Apenas precisamos mostrar a mensagem de sucesso.
-      setRegistrationStatus({ success: true, message: `Produtor "${finalName}" cadastrado com sucesso!` });
+      // Usa uma transação para garantir uma operação de escrita atômica e segura.
+      const transactionResult = await runTransaction(producersRef, (currentProducers) => {
+        // currentProducers é o objeto atual do banco de dados (ex: { cpf1: prod1, ... })
+        if (currentProducers && currentProducers[finalCpf]) {
+          // Aborta a transação se o CPF já existir no servidor (verificação final)
+          return; 
+        }
+        
+        // Se a lista for nula ou não contiver o CPF, adiciona o novo produtor.
+        const updatedProducers = currentProducers || {};
+        updatedProducers[finalCpf] = newProducer;
+        return updatedProducers;
+      });
+
+      if (transactionResult.committed) {
+        // Sucesso! O listener onValue cuidará da atualização da UI.
+        setRegistrationStatus({ success: true, message: `Produtor "${finalName}" cadastrado com sucesso!` });
+      } else {
+        // A transação foi abortada por nós porque o produtor já existe.
+        setRegistrationStatus({ success: false, message: 'Cadastro cancelado. O CPF já existe no servidor.' });
+      }
 
     } catch (error) {
-      console.error("Falha ao registrar produtor:", error);
+      console.error("Falha na transação de registro:", error);
+      // Erro real de permissão, rede, etc.
       setRegistrationStatus({ success: false, message: 'Ocorreu um erro inesperado ao salvar na nuvem. Tente novamente.' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
