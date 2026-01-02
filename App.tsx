@@ -109,7 +109,6 @@ const App: React.FC = () => {
       return;
     }
   
-    // Verifica a existência contra o estado atual para evitar escritas desnecessárias no DB
     if (producers.some(p => p.name === finalName || p.cpf === finalCpf)) {
       setRegistrationStatus({ success: false, message: 'Nome de produtor ou CPF já cadastrado.' });
       return;
@@ -124,24 +123,26 @@ const App: React.FC = () => {
       allowedWeeks,
     };
     
-    // Cria o próximo estado da lista de produtores, já ordenado.
-    const updatedProducers = [...producers, newProducer].sort((a, b) => a.name.localeCompare(b.name));
+    // Padrão de Atualização Otimista
+    const originalProducers = producers;
+    const optimisticProducers = [...originalProducers, newProducer].sort((a, b) => a.name.localeCompare(b.name));
+    
+    // 1. Atualiza a UI imediatamente para uma experiência mais rápida.
+    setProducers(optimisticProducers);
   
     try {
-      // 1. Escreve a nova lista completa no banco de dados.
-      await writeToDatabase(updatedProducers);
+      // 2. Tenta salvar os dados na nuvem.
+      await writeToDatabase(optimisticProducers);
       
-      // 2. ATUALIZAÇÃO OTIMISTA: Atualiza manualmente o estado local de forma imediata.
-      // Isso força o React a renderizar novamente com o novo produtor na lista,
-      // sem esperar pelo listener do Firebase.
-      setProducers(updatedProducers);
-
-      // 3. Sinaliza o sucesso para o AdminDashboard limpar os campos do formulário.
+      // 3. Se for bem-sucedido, apenas mostra a mensagem de sucesso. A UI já está correta.
       setRegistrationStatus({ success: true, message: `Produtor "${finalName}" cadastrado com sucesso!` });
 
     } catch (error) {
       console.error("Falha ao registrar produtor:", error);
-      setRegistrationStatus({ success: false, message: 'Ocorreu um erro inesperado durante o cadastro.' });
+      
+      // 4. Se falhar, reverte a UI para o estado anterior e mostra um erro claro.
+      setProducers(originalProducers);
+      setRegistrationStatus({ success: false, message: 'Ocorreu um erro ao salvar. A operação foi desfeita.' });
     }
   };
 
