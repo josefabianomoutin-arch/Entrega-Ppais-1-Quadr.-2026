@@ -88,15 +88,15 @@ const App: React.FC = () => {
   const handleRegister = async (name: string, cpf: string, allowedWeeks: number[]): Promise<boolean> => {
     const finalName = name.trim().toUpperCase();
     const finalCpf = cpf.trim().replace(/[^\d]/g, '');
-
+  
     if (!finalName || !finalCpf) {
       console.error("Nome ou CPF em branco não é permitido.");
       return false;
     }
-
-    // Usa o estado local `producers` como fonte da verdade
-    const nameExists = producers.some(p => p.name === finalName);
-    const cpfExists = producers.some(p => p.cpf === finalCpf);
+  
+    const currentStateOfProducers = producers;
+    const nameExists = currentStateOfProducers.some(p => p.name === finalName);
+    const cpfExists = currentStateOfProducers.some(p => p.cpf === finalCpf);
     
     if (nameExists || cpfExists) {
       return false;
@@ -111,11 +111,18 @@ const App: React.FC = () => {
       allowedWeeks,
     };
     
+    // Atualização Otimista: atualiza a UI imediatamente.
+    const updatedProducers = [...currentStateOfProducers, newProducer];
+    setProducers(updatedProducers);
+  
     try {
-      await writeToDatabase([...producers, newProducer]);
+      // Tenta salvar o estado atualizado no Firebase em segundo plano.
+      await writeToDatabase(updatedProducers);
       return true;
     } catch (error) {
       console.error("Falha ao registrar produtor:", error);
+      // Em caso de falha, reverte o estado da UI para o anterior.
+      setProducers(currentStateOfProducers);
       return false;
     }
   };
