@@ -529,4 +529,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         .custom-scrollbar::-webkit-scrollbar { width: 8px; } 
         .custom-scrollbar::-webkit-scrollbar-track { background: #F9FAFB; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; border: 2px solid #F9FAFB; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3B82
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3B82F6; }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slide-down { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
+        .animate-slide-down { animation: slide-down 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-shake { animation: shake 0.2s ease-in-out 3; }
+      `}</style>
+    </div>
+  );
+};
+
+export default AdminDashboard;
