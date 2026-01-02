@@ -117,14 +117,21 @@ const App: React.FC = () => {
       allowedWeeks,
     };
     
-    // Cria a lista atualizada que será enviada ao Firebase
-    const updatedProducers = [...producers, newProducer];
+    // Cria o próximo estado da lista de produtores, já ordenado.
+    const updatedProducers = [...producers, newProducer].sort((a, b) => a.name.localeCompare(b.name));
   
     try {
+      // 1. Escreve a nova lista completa no banco de dados.
       await writeToDatabase(updatedProducers);
-      // O listener onValue irá atualizar a lista de produtores na UI.
-      // Apenas informamos o sucesso da operação.
+      
+      // 2. ATUALIZAÇÃO OTIMISTA: Atualiza manualmente o estado local de forma imediata.
+      // Isso força o React a renderizar novamente com o novo produtor na lista,
+      // sem esperar pelo listener do Firebase.
+      setProducers(updatedProducers);
+
+      // 3. Sinaliza o sucesso para o AdminDashboard limpar os campos do formulário.
       setRegistrationStatus({ success: true, message: `Produtor "${finalName}" cadastrado com sucesso!` });
+
     } catch (error) {
       console.error("Falha ao registrar produtor:", error);
       setRegistrationStatus({ success: false, message: 'Ocorreu um erro inesperado durante o cadastro.' });
