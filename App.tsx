@@ -123,26 +123,22 @@ const App: React.FC = () => {
       allowedWeeks,
     };
     
-    // Padrão de Atualização Otimista
-    const originalProducers = producers;
-    const optimisticProducers = [...originalProducers, newProducer].sort((a, b) => a.name.localeCompare(b.name));
-    
-    // 1. Atualiza a UI imediatamente para uma experiência mais rápida.
-    setProducers(optimisticProducers);
+    const updatedProducers = [...producers, newProducer].sort((a, b) => a.name.localeCompare(b.name));
   
     try {
-      // 2. Tenta salvar os dados na nuvem.
-      await writeToDatabase(optimisticProducers);
+      // Tenta escrever a nova lista completa no Firebase.
+      await writeToDatabase(updatedProducers);
       
-      // 3. Se for bem-sucedido, apenas mostra a mensagem de sucesso. A UI já está correta.
+      // Se for bem-sucedido, o listener onValue será acionado e atualizará a UI.
+      // Apenas exibimos a mensagem de sucesso.
       setRegistrationStatus({ success: true, message: `Produtor "${finalName}" cadastrado com sucesso!` });
 
     } catch (error) {
       console.error("Falha ao registrar produtor:", error);
       
-      // 4. Se falhar, reverte a UI para o estado anterior e mostra um erro claro.
-      setProducers(originalProducers);
-      setRegistrationStatus({ success: false, message: 'Ocorreu um erro ao salvar. A operação foi desfeita.' });
+      // Se a escrita falhar, a UI não é alterada. Apenas exibimos uma mensagem de erro clara.
+      // O listener onValue não será acionado, então a lista de produtores permanece a mesma.
+      setRegistrationStatus({ success: false, message: 'Falha na comunicação com a nuvem. O cadastro não foi salvo.' });
     }
   };
 
