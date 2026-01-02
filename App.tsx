@@ -4,7 +4,7 @@ import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set, get } from 'firebase/database';
+import { getDatabase, ref, onValue, set } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
 
 // Inicializa o Firebase e obtém uma referência ao banco de dados
@@ -24,10 +24,16 @@ const App: React.FC = () => {
   useEffect(() => {
     setLoading(true);
     const unsubscribe = onValue(producersRef, (snapshot) => {
-      const data = snapshot.val();
-      const producersArray = data ? Object.values(data) : [];
-      setProducers(producersArray as Producer[]);
-      setLoading(false);
+      try {
+        const data = snapshot.val();
+        const producersArray = data && typeof data === 'object' ? Object.values(data) : [];
+        setProducers(producersArray as Producer[]);
+      } catch (error) {
+        console.error("Erro ao processar dados do Firebase:", error);
+        setProducers([]); // Reseta para um estado seguro em caso de erro
+      } finally {
+        setLoading(false);
+      }
     }, (error) => {
       console.error("Falha ao ler dados do Firebase: ", error);
       setLoading(false);
@@ -39,10 +45,8 @@ const App: React.FC = () => {
   const writeToDatabase = async (producersArray: Producer[]) => {
     setIsSaving(true);
     try {
-      // TRANSFORMA O ARRAY EM UM OBJETO ANTES DE SALVAR
-      // Usando o CPF do produtor como a chave única.
       const producersObject = producersArray.reduce((acc, producer) => {
-        if (producer && producer.cpf) { // Garante que o produtor e seu CPF existam
+        if (producer && producer.cpf) {
           acc[producer.cpf] = producer;
         }
         return acc;
@@ -51,7 +55,7 @@ const App: React.FC = () => {
       await set(producersRef, producersObject);
     } catch (error) {
       console.error("Falha ao salvar dados no Firebase", error);
-      throw error; // Permite que a função que chamou trate o erro
+      throw error;
     } finally {
       setTimeout(() => setIsSaving(false), 500);
     }
@@ -76,27 +80,33 @@ const App: React.FC = () => {
   };
   
   const handleRegister = async (name: string, cpf: string, allowedWeeks: number[]): Promise<boolean> => {
-    try {
-      // 1. LÊ o estado mais recente do banco de dados antes de modificar.
-      const snapshot = await get(producersRef);
-      const currentProducers: Producer[] = snapshot.exists() ? Object.values(snapshot.val()) as Producer[] : [];
+    const finalName = name.trim().toUpperCase();
+    const finalCpf = cpf.trim().replace(/[^\d]/g, '');
 
-      // 2. Executa a lógica de negócio nos dados mais recentes.
-      const nameExists = currentProducers.some(p => p.name === name);
-      const cpfExists = currentProducers.some(p => p.cpf === cpf);
-      if (nameExists || cpfExists) return false;
-      
-      const newProducer: Producer = {
-        name,
-        cpf,
-        initialValue: 0,
-        contractItems: [],
-        deliveries: [],
-        allowedWeeks,
-      };
-      
-      // 3. ESCREVE a lista atualizada de volta.
-      await writeToDatabase([...currentProducers, newProducer]);
+    if (!finalName || !finalCpf) {
+      console.error("Nome ou CPF em branco não é permitido.");
+      return false;
+    }
+
+    // Usa o estado local `producers` como fonte da verdade
+    const nameExists = producers.some(p => p.name === finalName);
+    const cpfExists = producers.some(p => p.cpf === finalCpf);
+    
+    if (nameExists || cpfExists) {
+      return false;
+    }
+    
+    const newProducer: Producer = {
+      name: finalName,
+      cpf: finalCpf,
+      initialValue: 0,
+      contractItems: [],
+      deliveries: [],
+      allowedWeeks,
+    };
+    
+    try {
+      await writeToDatabase([...producers, newProducer]);
       return true;
     } catch (error) {
       console.error("Falha ao registrar produtor:", error);
@@ -130,21 +140,19 @@ const App: React.FC = () => {
   };
 
   const addDeliveries = async (producerCpf: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => {
+    const newDeliveries: Delivery[] = deliveries.map(delivery => ({
+        ...delivery,
+        id: `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        invoiceUploaded: false,
+    }));
+
+    const updatedProducers = producers.map(p => 
+        p.cpf === producerCpf 
+            ? { ...p, deliveries: [...(p.deliveries || []), ...newDeliveries] } 
+            : p
+    );
+    
     try {
-      const snapshot = await get(producersRef);
-      const currentProducers: Producer[] = snapshot.exists() ? Object.values(snapshot.val()) as Producer[] : [];
-
-      const newDeliveries: Delivery[] = deliveries.map(delivery => ({
-          ...delivery,
-          id: `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          invoiceUploaded: false,
-      }));
-
-      const updatedProducers = currentProducers.map(p => 
-          p.cpf === producerCpf 
-              ? { ...p, deliveries: [...(p.deliveries || []), ...newDeliveries] } 
-              : p
-      );
       await writeToDatabase(updatedProducers);
     } catch(error) {
       console.error("Falha ao adicionar entregas:", error);
@@ -152,17 +160,15 @@ const App: React.FC = () => {
   };
 
   const cancelDeliveries = async (producerCpf: string, deliveryIds: string[]) => {
-    try {
-      const snapshot = await get(producersRef);
-      const currentProducers: Producer[] = snapshot.exists() ? Object.values(snapshot.val()) as Producer[] : [];
+    const updatedProducers = producers.map(p => {
+        if (p.cpf === producerCpf) {
+            const updatedDeliveries = (p.deliveries || []).filter(d => !deliveryIds.includes(d.id));
+            return { ...p, deliveries: updatedDeliveries };
+        }
+        return p;
+    });
 
-      const updatedProducers = currentProducers.map(p => {
-          if (p.cpf === producerCpf) {
-              const updatedDeliveries = (p.deliveries || []).filter(d => !deliveryIds.includes(d.id));
-              return { ...p, deliveries: updatedDeliveries };
-          }
-          return p;
-      });
+    try {
       await writeToDatabase(updatedProducers);
     } catch(error) {
       console.error("Falha ao cancelar entregas:", error);
@@ -170,42 +176,37 @@ const App: React.FC = () => {
   };
 
   const markInvoicesAsUploaded = async (producerCpf: string, deliveryIds: string[], invoiceNumber: string) => {
-    let producerForEmail: Producer | undefined;
-    try {
-      const snapshot = await get(producersRef);
-      const currentProducers: Producer[] = snapshot.exists() ? Object.values(snapshot.val()) as Producer[] : [];
-      
-      producerForEmail = currentProducers.find(p => p.cpf === producerCpf);
-      if (!producerForEmail) return;
+    const producerForEmail = producers.find(p => p.cpf === producerCpf);
+    if (!producerForEmail) return;
 
-      const updatedProducers = currentProducers.map(p => {
-        if (p.cpf === producerCpf) {
-          const updatedDeliveries = (p.deliveries || []).map(d => 
-            deliveryIds.includes(d.id) 
-              ? { ...d, invoiceUploaded: true, invoiceNumber: invoiceNumber } 
-              : d
-          );
-          return { ...p, deliveries: updatedDeliveries };
-        }
-        return p;
-      });
+    const updatedProducers = producers.map(p => {
+      if (p.cpf === producerCpf) {
+        const updatedDeliveries = (p.deliveries || []).map(d => 
+          deliveryIds.includes(d.id) 
+            ? { ...d, invoiceUploaded: true, invoiceNumber: invoiceNumber } 
+            : d
+        );
+        return { ...p, deliveries: updatedDeliveries };
+      }
+      return p;
+    });
+
+    try {
       await writeToDatabase(updatedProducers);
     } catch (error) {
       console.error("Falha ao marcar fatura:", error);
       return;
     }
     
-    if (producerForEmail) {
-        const recipientEmail = 'seu-email-aqui@exemplo.com';
-        const subject = `Envio de Nota Fiscal - Produtor: ${producerForEmail.name} (NF: ${invoiceNumber})`;
-        const deliveriesForInvoice = (producerForEmail.deliveries || []).filter(d => deliveryIds.includes(d.id));
-        const itemsSummary = deliveriesForInvoice
-            .map(d => `- ${d.item} (${d.kg.toFixed(2).replace('.',',')} Kg) - Data: ${new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}`)
-            .join('\n');
-        const body = `Olá,\n\nEsta é uma submissão de nota fiscal através do aplicativo de gestão PPAIS.\n\n**Detalhes:**\nProdutor: ${producerForEmail.name}\nCPF: ${producerForEmail.cpf}\nNúmero da NF: ${invoiceNumber}\n\n**Entregas associadas a esta NF:**\n${itemsSummary}\n\n----------------------------------------------------\nATENÇÃO: Por favor, anexe o arquivo PDF da nota fiscal a este e-mail antes de enviar.`.trim();
-        const mailtoLink = `mailto:${recipientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.open(mailtoLink, '_blank');
-    }
+    const recipientEmail = 'seu-email-aqui@exemplo.com';
+    const subject = `Envio de Nota Fiscal - Produtor: ${producerForEmail.name} (NF: ${invoiceNumber})`;
+    const deliveriesForInvoice = (producerForEmail.deliveries || []).filter(d => deliveryIds.includes(d.id));
+    const itemsSummary = deliveriesForInvoice
+        .map(d => `- ${d.item} (${d.kg.toFixed(2).replace('.',',')} Kg) - Data: ${new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}`)
+        .join('\n');
+    const body = `Olá,\n\nEsta é uma submissão de nota fiscal através do aplicativo de gestão PPAIS.\n\n**Detalhes:**\nProdutor: ${producerForEmail.name}\nCPF: ${producerForEmail.cpf}\nNúmero da NF: ${invoiceNumber}\n\n**Entregas associadas a esta NF:**\n${itemsSummary}\n\n----------------------------------------------------\nATENÇÃO: Por favor, anexe o arquivo PDF da nota fiscal a este e-mail antes de enviar.`.trim();
+    const mailtoLink = `mailto:${recipientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoLink, '_blank');
   };
 
   useEffect(() => {
