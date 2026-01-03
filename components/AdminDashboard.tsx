@@ -3,8 +3,9 @@ import type { Producer } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 import EditProducerModal from './EditProducerModal';
+import AdminGraphs from './AdminGraphs';
 
-type AdminTab = 'info' | 'register' | 'contracts' | 'analytics';
+type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs';
 
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
@@ -323,11 +324,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </header>
       
       <main className="p-4 md:p-8">
-        <div className="mb-8 flex justify-center border-b"><div className="flex space-x-2 p-1 bg-gray-100/50 rounded-xl">
+        <div className="mb-8 flex justify-center border-b"><div className="flex flex-wrap justify-center space-x-2 p-1 bg-gray-100/50 rounded-xl">
                 <TabButton tab="info" label="Backup e Segurança"/>
                 <TabButton tab="register" label="Cadastro"/>
                 <TabButton tab="contracts" label="Gestão por Item"/>
                 <TabButton tab="analytics" label="Análise"/>
+                <TabButton tab="graphs" label="Gráficos"/>
         </div></div>
 
         {activeTab === 'info' && (
@@ -565,6 +567,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         )}
 
         {activeTab === 'analytics' && <AdminAnalytics producers={producers} />}
+        
+        {activeTab === 'graphs' && <AdminGraphs producers={producers} />}
 
         {editingProducer && (
             <EditProducerModal
