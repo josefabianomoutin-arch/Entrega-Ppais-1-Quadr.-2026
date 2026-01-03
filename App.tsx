@@ -162,10 +162,16 @@ const App: React.FC = () => {
         setRegistrationStatus({ success: false, message: 'Cadastro cancelado. O CPF já existe no servidor.' });
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Falha na transação de registro:", error);
-      // Erro real de permissão, rede, etc.
-      setRegistrationStatus({ success: false, message: 'Ocorreu um erro inesperado ao salvar na nuvem. Verifique sua conexão e tente novamente.' });
+      let errorMessage = 'Ocorreu um erro inesperado ao salvar na nuvem. Verifique sua conexão e tente novamente.';
+      
+      // Verifica códigos de erro específicos do Firebase
+      if (error && error.code === 'PERMISSION_DENIED') {
+        errorMessage = 'Erro de permissão ao salvar. Verifique as Regras de Segurança do seu banco de dados Firebase. Elas podem estar impedindo a gravação de dados.';
+      }
+
+      setRegistrationStatus({ success: false, message: errorMessage });
     } finally {
       setIsSaving(false);
     }

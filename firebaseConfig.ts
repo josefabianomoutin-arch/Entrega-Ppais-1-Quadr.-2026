@@ -9,7 +9,7 @@ export const firebaseConfig = {
   authDomain: "gestao-ppais.firebaseapp.com",
   databaseURL: "https://gestao-ppais-default-rtdb.firebaseio.com",
   projectId: "gestao-ppais",
-  storageBucket: "gestao-ppais.firebasestorage.app",
+  storageBucket: "gestao-ppais.appspot.com",
   messagingSenderId: "87829401992",
   appId: "1:87829401992:web:76d699089eb42b86c9aa3d", 
   measurementId: "G-FM306DHMNC"
