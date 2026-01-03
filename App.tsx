@@ -30,33 +30,37 @@ const App: React.FC = () => {
     const unsubscribe = onValue(producersRef, (snapshot) => {
       try {
         const data = snapshot.val();
-        let producersArray: Producer[] = [];
-        // Adiciona uma verificação robusta para garantir que os dados sejam válidos
-        if (data && typeof data === 'object') {
-          producersArray = Object.values(data)
-            .filter(
-              (p): p is Producer => 
-                p && 
-                typeof p === 'object' && 
-                // FIX: Cast `p` to `any` to safely access properties for type validation.
-                // The `p` variable is of type `unknown` here, so direct property access is not allowed.
-                typeof (p as any).cpf === 'string' && (p as any).cpf.trim() !== '' &&
-                typeof (p as any).name === 'string' && (p as any).name.trim() !== ''
-            )
-            .sort((a, b) => a.name.localeCompare(b.name)); // Garante ordem consistente
+        
+        // Se não houver dados ou não for um objeto, significa que não há produtores.
+        if (!data || typeof data !== 'object') {
+          setProducers([]);
+          return;
         }
-        // Usa a forma funcional para garantir que a atualização de estado seja processada
-        setProducers(() => producersArray);
+
+        // Converte o objeto de produtores (chaveado por CPF) em um array.
+        const producersArray: Producer[] = Object.values(data)
+          .filter(
+            (p): p is Producer => 
+              p && 
+              typeof p === 'object' && 
+              typeof (p as any).cpf === 'string' && (p as any).cpf.trim() !== '' &&
+              typeof (p as any).name === 'string' && (p as any).name.trim() !== ''
+          )
+          .sort((a, b) => a.name.localeCompare(b.name)); // Garante ordem consistente
+        
+        setProducers(producersArray);
       } catch (error) {
         console.error("Erro ao processar dados do Firebase:", error);
-        setProducers(() => []); // Reseta para um estado seguro em caso de erro
+        setProducers([]); // Reseta para um estado seguro em caso de erro
       } finally {
         setLoading(false);
       }
     }, (error) => {
       console.error("Falha ao ler dados do Firebase: ", error);
       setLoading(false);
+      setProducers([]);
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -112,7 +116,7 @@ const App: React.FC = () => {
       return;
     }
     
-    // Validações rápidas no lado do cliente
+    // Validação rápida no lado do cliente para feedback imediato
     if (producers.some(p => p.cpf === finalCpf)) {
       setRegistrationStatus({ success: false, message: 'Este CPF já está cadastrado.' });
       setIsSaving(false);
@@ -135,21 +139,10 @@ const App: React.FC = () => {
   
     try {
       // Usa uma transação para garantir uma operação de escrita atômica e segura.
+      // Esta é a verificação definitiva no servidor.
       const transactionResult = await runTransaction(producersRef, (currentData) => {
-        let producersObject: { [key: string]: Producer } = {};
-
-        if (Array.isArray(currentData)) {
-          // Se os dados forem um array, converte para um objeto mapeado por CPF para corrigir a estrutura.
-          currentData.forEach(producer => {
-            if (producer && producer.cpf) {
-              producersObject[producer.cpf] = producer;
-            }
-          });
-        } else if (currentData && typeof currentData === 'object') {
-          // Se já for um objeto, usa diretamente.
-          producersObject = currentData;
-        }
-        // Se for nulo ou outro tipo, producersObject permanecerá como um objeto vazio, começando do zero.
+        // currentData será null se o nó 'producers' não existir, ou um objeto.
+        const producersObject = currentData || {};
 
         // Verificação final no servidor: se o CPF já existir, aborta a transação.
         if (producersObject[finalCpf]) {
@@ -172,7 +165,7 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Falha na transação de registro:", error);
       // Erro real de permissão, rede, etc.
-      setRegistrationStatus({ success: false, message: 'Ocorreu um erro inesperado ao salvar na nuvem. Tente novamente.' });
+      setRegistrationStatus({ success: false, message: 'Ocorreu um erro inesperado ao salvar na nuvem. Verifique sua conexão e tente novamente.' });
     } finally {
       setIsSaving(false);
     }
@@ -306,4 +299,32 @@ const App: React.FC = () => {
             </div>
         </div>
 
-        {isAdmin
+        {isAdminLoggedIn ? (
+          <AdminDashboard 
+            producers={producers}
+            onRegister={handleRegister} 
+            onUpdateProducers={handleUpdateProducers} 
+            onLogout={handleLogout}
+            onResetData={handleResetData}
+            onRestoreData={handleRestoreData}
+            activeTab={adminActiveTab}
+            onTabChange={setAdminActiveTab}
+            registrationStatus={registrationStatus}
+            onClearRegistrationStatus={handleClearRegistrationStatus}
+          />
+        ) : currentUser ? (
+          <Dashboard 
+            producer={currentUser} 
+            onLogout={handleLogout} 
+            onAddDeliveries={addDeliveries}
+            onCancelDeliveries={cancelDeliveries}
+            onInvoiceUpload={markInvoicesAsUploaded}
+          />
+        ) : (
+          <LoginScreen onLogin={handleLogin} />
+        )}
+      </>
+  );
+};
+
+export default App;
