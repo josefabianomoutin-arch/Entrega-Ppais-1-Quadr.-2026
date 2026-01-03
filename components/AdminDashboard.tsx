@@ -326,10 +326,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <main className="p-4 md:p-8">
         <div className="mb-8 flex justify-center border-b"><div className="flex flex-wrap justify-center space-x-2 p-1 bg-gray-100/50 rounded-xl">
                 <TabButton tab="info" label="Backup e Segurança"/>
-                <TabButton tab="register" label="Cadastro"/>
-                <TabButton tab="contracts" label="Gestão por Item"/>
-                <TabButton tab="analytics" label="Análise"/>
-                <TabButton tab="graphs" label="Gráficos"/>
+                <TabButton tab="register" label="Cadastro de Fornecedores"/>
+                <TabButton tab="contracts" label="Cadastro de Itens"/>
+                <TabButton tab="analytics" label="Gestão dos Produtores"/>
+                <TabButton tab="graphs" label="Gestão dos Itens"/>
         </div></div>
 
         {activeTab === 'info' && (
@@ -423,7 +423,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 className="text-gray-400 hover:text-blue-600 p-2 rounded-full transition-colors"
                                 aria-label={`Editar ${p.name}`}
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z" /></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="http://www.w3.org/2000/svg" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z" /></svg>
                             </button>
                         </div>
                     </div>
@@ -436,7 +436,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {activeTab === 'contracts' && (
             <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-5xl mx-auto border-t-8 border-blue-600 animate-fade-in">
                 <div className="text-center mb-10">
-                  <h2 className="text-3xl font-black text-blue-900 uppercase tracking-tighter">Gestão de Contratos por Item</h2>
+                  <h2 className="text-3xl font-black text-blue-900 uppercase tracking-tighter">Cadastro de Itens Contratados</h2>
                   <p className="text-gray-400 font-medium">Os itens abaixo permanecem na ordem exata de adição.</p>
                 </div>
                 
