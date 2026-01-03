@@ -186,6 +186,62 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateProducerData = async (oldCpf: string, newName: string, newCpf: string): Promise<string | null> => {
+    setIsSaving(true);
+    const finalName = newName.trim().toUpperCase();
+    const finalCpf = newCpf.trim().replace(/[^\d]/g, '');
+
+    if (!finalName || !finalCpf) {
+      return 'Nome e CPF são obrigatórios.';
+    }
+
+    // Validação prévia para fornecer feedback rápido
+    if (producers.some(p => p.cpf === finalCpf && p.cpf !== oldCpf)) {
+      setIsSaving(false);
+      return 'Este CPF já está cadastrado para outro produtor.';
+    }
+    if (producers.some(p => p.name === finalName && p.cpf !== oldCpf)) {
+      setIsSaving(false);
+      return 'Este nome de produtor já está em uso.';
+    }
+
+    try {
+      const transactionResult = await runTransaction(producersRef, (currentData) => {
+        if (!currentData || !currentData[oldCpf]) {
+          return; // Aborta se o produtor original não existir mais
+        }
+        
+        // Validação final no servidor para evitar condições de corrida
+        if (oldCpf !== finalCpf && currentData[finalCpf]) {
+            return; // Aborta se o novo CPF já foi pego
+        }
+
+        const producerData = { ...currentData[oldCpf] };
+        producerData.name = finalName;
+        producerData.cpf = finalCpf;
+
+        // Move os dados se o CPF (a chave) mudou
+        if (oldCpf !== finalCpf) {
+          delete currentData[oldCpf];
+        }
+        currentData[finalCpf] = producerData;
+        
+        return currentData;
+      });
+
+      if (transactionResult.committed) {
+        return null; // Sucesso
+      } else {
+        return 'A atualização falhou. Os dados podem ter sido alterados simultaneamente por outro usuário.';
+      }
+    } catch (error: any) {
+      console.error("Falha na transação de atualização:", error);
+      return 'Ocorreu um erro inesperado ao salvar na nuvem.';
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleClearRegistrationStatus = () => {
     setRegistrationStatus(null);
   };
@@ -319,6 +375,7 @@ const App: React.FC = () => {
             producers={producers}
             onRegister={handleRegister} 
             onUpdateProducers={handleUpdateProducers} 
+            onUpdateProducer={handleUpdateProducerData}
             onLogout={handleLogout}
             onResetData={handleResetData}
             onRestoreData={handleRestoreData}

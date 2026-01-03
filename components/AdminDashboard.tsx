@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import type { Producer } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
+import EditProducerModal from './EditProducerModal';
 
 type AdminTab = 'info' | 'register' | 'contracts' | 'analytics';
 
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
   onUpdateProducers: (updatedProducers: Producer[]) => void;
+  onUpdateProducer: (oldCpf: string, newName: string, newCpf: string) => Promise<string | null>;
   onLogout: () => void;
   producers: Producer[];
   onResetData: () => void;
@@ -44,7 +46,8 @@ const initialItemCentricInput = (): ItemCentricInput => ({
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
     onRegister, 
-    onUpdateProducers, 
+    onUpdateProducers,
+    onUpdateProducer,
     onLogout, 
     producers, 
     onResetData, 
@@ -59,6 +62,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [regCpf, setRegCpf] = useState('');
   const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [editingProducer, setEditingProducer] = useState<Producer | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<{ success: boolean; message: string } | null>(null);
+
 
   // Estados para aba de GESTÃO POR ITEM
   const [itemCentricContracts, setItemCentricContracts] = useState<ItemCentricInput[]>([initialItemCentricInput()]);
@@ -83,6 +89,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return () => clearTimeout(timer);
     }
   }, [registrationStatus, onClearRegistrationStatus]);
+  
+  useEffect(() => {
+    if (updateStatus) {
+      const timer = setTimeout(() => {
+        setUpdateStatus(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [updateStatus]);
 
 
   // Sincroniza o estado da UI de contratos com os dados mais recentes dos produtores
@@ -148,6 +163,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsRegistering(false);
   };
   
+  const handleSaveProducerUpdate = async (oldCpf: string, newName: string, newCpf: string): Promise<string | null> => {
+    const errorMessage = await onUpdateProducer(oldCpf, newName, newCpf);
+    if (errorMessage) {
+        setUpdateStatus({ success: false, message: errorMessage });
+        return errorMessage; // Retorna o erro para o modal
+    } else {
+        setUpdateStatus({ success: true, message: 'Produtor atualizado com sucesso!' });
+        setEditingProducer(null); // Fecha o modal em caso de sucesso
+        return null;
+    }
+  };
+
   const handleSaveContracts = (e: React.FormEvent) => {
     e.preventDefault(); setContractError(''); setContractSuccess('');
 
@@ -374,18 +401,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-xl border-t-8 border-blue-600 overflow-hidden">
-              <h2 className="text-2xl font-black mb-6 text-gray-700 uppercase tracking-tight">Produtores Cadastrados ({producers.length})</h2>
-              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                {producers.length > 0 ? producers.map(p => (
-                  <div key={p.cpf} className="p-4 bg-gray-50 rounded-xl flex justify-between items-center text-sm border border-gray-100 hover:bg-white transition-colors group">
-                    <div>
-                        <p className="font-black text-gray-800 group-hover:text-blue-600 transition-colors">{p.name}</p>
-                        <p className="text-[10px] text-gray-400 font-mono">CPF: ...{p.cpf.slice(-4)}</p>
+                <h2 className="text-2xl font-black mb-2 text-gray-700 uppercase tracking-tight">Produtores Cadastrados ({producers.length})</h2>
+                {updateStatus && (
+                    <p className={`text-xs text-center p-2 my-2 rounded-lg font-bold ${updateStatus.success ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50'}`}>
+                        {updateStatus.message}
+                    </p>
+                )}
+                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                    {producers.length > 0 ? producers.map(p => (
+                    <div key={p.cpf} className="p-4 bg-gray-50 rounded-xl flex justify-between items-center text-sm border border-gray-100 hover:bg-white transition-colors group">
+                        <div>
+                            <p className="font-black text-gray-800 group-hover:text-blue-600 transition-colors">{p.name}</p>
+                            <p className="text-[10px] text-gray-400 font-mono">CPF: ...{p.cpf.slice(-4)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-[10px] text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">{p.contractItems.length} itens</span>
+                            <button 
+                                onClick={() => setEditingProducer(p)}
+                                className="text-gray-400 hover:text-blue-600 p-2 rounded-full transition-colors"
+                                aria-label={`Editar ${p.name}`}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z" /></svg>
+                            </button>
+                        </div>
                     </div>
-                    <span className="font-bold text-[10px] text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">{p.contractItems.length} itens</span>
-                  </div>
-                )) : <div className="text-center py-20"><p className="text-gray-300 italic">Nenhum registro.</p></div>}
-              </div>
+                    )) : <div className="text-center py-20"><p className="text-gray-300 italic">Nenhum registro.</p></div>}
+                </div>
             </div>
           </div>
         )}
@@ -524,6 +565,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         )}
 
         {activeTab === 'analytics' && <AdminAnalytics producers={producers} />}
+
+        {editingProducer && (
+            <EditProducerModal
+                producer={editingProducer}
+                producers={producers}
+                onClose={() => setEditingProducer(null)}
+                onSave={handleSaveProducerUpdate}
+            />
+        )}
       </main>
       <style>{`
         .input-field { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 1rem; border: 2px solid #F3F4F6; border-radius: 1rem; background-color: #fff; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); } 
