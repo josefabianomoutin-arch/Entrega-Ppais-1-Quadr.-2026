@@ -32,24 +32,35 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({ producers }) => {
      return Math.max(1, ...productData.map(p => p.contractedKg));
   }, [productData]);
 
-  // Dados para o Gráfico de Status de Notas Fiscais
+  // Dados para o Gráfico de Status de Notas Fiscais (Contagem por NF única)
   const invoiceData = useMemo(() => {
-    let sentDeliveries = 0;
-    let pendingDeliveries = 0;
+    const uniqueInvoices = new Map<string, { isSent: boolean }>();
+
     producers.forEach(p => {
         (p.deliveries || []).forEach(d => {
-            if (d.invoiceUploaded) {
-                sentDeliveries++;
-            } else {
-                pendingDeliveries++;
+            if (d.invoiceNumber) {
+                const invoiceKey = `${p.cpf}-${d.invoiceNumber}`;
+                if (!uniqueInvoices.has(invoiceKey)) {
+                    uniqueInvoices.set(invoiceKey, { isSent: d.invoiceUploaded });
+                }
             }
         });
     });
+    
+    let sentCount = 0;
+    let pendingCount = 0;
+    uniqueInvoices.forEach(invoice => {
+        if (invoice.isSent) {
+            sentCount++;
+        } else {
+            pendingCount++;
+        }
+    });
 
-    return { sent: sentDeliveries, pending: pendingDeliveries };
+    return { sent: sentCount, pending: pendingCount };
   }, [producers]);
   
-  const totalDeliveries = invoiceData.sent + invoiceData.pending;
+  const totalInvoices = invoiceData.sent + invoiceData.pending;
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -84,15 +95,15 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({ producers }) => {
       </div>
 
       <div className="bg-white p-6 rounded-2xl shadow-xl border-t-8 border-green-500">
-        <h2 className="text-2xl font-black mb-6 text-gray-700 uppercase tracking-tight">Status das Notas Fiscais (por Entrega)</h2>
-        {totalDeliveries > 0 ? (
+        <h2 className="text-2xl font-black mb-6 text-gray-700 uppercase tracking-tight">Status das Notas Fiscais</h2>
+        {totalInvoices > 0 ? (
         <div className="flex justify-around items-end gap-8 h-64 pt-4">
           <div className="flex flex-col items-center h-full w-1/3">
             <div className="w-full h-full flex items-end justify-center">
                 <div 
                   className="w-full bg-green-500 rounded-t-lg shadow-lg transition-all duration-500 hover:scale-105"
-                  style={{ height: `${(invoiceData.sent / totalDeliveries) * 100}%` }}
-                  title={`${invoiceData.sent} entregas`}
+                  style={{ height: `${(invoiceData.sent / totalInvoices) * 100}%` }}
+                  title={`${invoiceData.sent} notas fiscais`}
                 ></div>
             </div>
             <p className="mt-2 font-bold text-sm text-center">Enviadas: <span className="text-green-600 text-lg">{invoiceData.sent}</span></p>
@@ -101,14 +112,14 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({ producers }) => {
              <div className="w-full h-full flex items-end justify-center">
                 <div 
                   className="w-full bg-red-500 rounded-t-lg shadow-lg transition-all duration-500 hover:scale-105"
-                  style={{ height: `${(invoiceData.pending / totalDeliveries) * 100}%` }}
-                  title={`${invoiceData.pending} entregas`}
+                  style={{ height: `${(invoiceData.pending / totalInvoices) * 100}%` }}
+                  title={`${invoiceData.pending} notas fiscais`}
                 ></div>
              </div>
              <p className="mt-2 font-bold text-sm text-center">Pendentes: <span className="text-red-600 text-lg">{invoiceData.pending}</span></p>
           </div>
         </div>
-        ) : <p className="text-center text-gray-400 italic py-8">Nenhuma entrega registrada para gerar gráfico.</p>}
+        ) : <p className="text-center text-gray-400 italic py-8">Nenhuma nota fiscal registrada para gerar gráfico.</p>}
       </div>
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 8px; } 
