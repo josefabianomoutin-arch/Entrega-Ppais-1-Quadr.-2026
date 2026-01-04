@@ -4,8 +4,9 @@ import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 import EditProducerModal from './EditProducerModal';
 import AdminGraphs from './AdminGraphs';
+import AdminScheduleView from './AdminScheduleView';
 
-type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs';
+type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule';
 
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
@@ -330,6 +331,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <TabButton tab="contracts" label="Cadastro de Itens"/>
                 <TabButton tab="analytics" label="Gestão dos Produtores"/>
                 <TabButton tab="graphs" label="Gestão dos Itens"/>
+                <TabButton tab="schedule" label="Agenda de Entregas"/>
         </div></div>
 
         {activeTab === 'info' && (
@@ -569,6 +571,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {activeTab === 'analytics' && <AdminAnalytics producers={producers} />}
         
         {activeTab === 'graphs' && <AdminGraphs producers={producers} />}
+
+        {activeTab === 'schedule' && <AdminScheduleView producers={producers} />}
 
         {editingProducer && (
             <EditProducerModal
