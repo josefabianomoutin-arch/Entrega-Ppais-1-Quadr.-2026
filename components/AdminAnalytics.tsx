@@ -153,25 +153,44 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                {isExpanded && (
                                    <div className="p-4 bg-gray-50 border-t animate-slide-down space-y-6">
                                        <div>
-                                            <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Itens Contratados</h4>
+                                            <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Itens Contratados (Previsão Mensal)</h4>
                                             <div className="overflow-x-auto">
                                                     <table className="w-full text-xs">
                                                         <thead className="bg-gray-200">
                                                             <tr>
                                                                 <th className="p-2 text-left font-semibold">Item</th>
-                                                                <th className="p-2 text-right font-semibold">Peso (Kg)</th>
-                                                                <th className="p-2 text-right font-semibold">Valor (R$)</th>
+                                                                <th className="p-2 text-left font-semibold">Mês</th>
+                                                                <th className="p-2 text-right font-semibold">Peso Previsto (Kg)</th>
+                                                                <th className="p-2 text-right font-semibold">Valor Previsto (R$)</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {producer.contractItems.length > 0 ? producer.contractItems.map(item => (
-                                                                <tr key={item.name} className="border-b last:border-b-0 bg-white">
-                                                                    <td className="p-2">{item.name}</td>
-                                                                    <td className="p-2 text-right font-mono">{item.totalKg.toFixed(2).replace('.',',')}</td>
-                                                                    <td className="p-2 text-right font-mono">{formatCurrency(item.totalKg * item.valuePerKg)}</td>
-                                                                </tr>
-                                                            )) : (
-                                                                <tr><td colSpan={3} className="p-4 text-center text-gray-500 italic">Nenhum item neste contrato.</td></tr>
+                                                            {producer.contractItems.length > 0 ? producer.contractItems.map(item => {
+                                                                const monthlyKg = item.totalKg / 4;
+                                                                const monthlyValue = (item.totalKg * item.valuePerKg) / 4;
+                                                                const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
+                                                                
+                                                                return (
+                                                                    <React.Fragment key={item.name}>
+                                                                        {months.map((month, index) => (
+                                                                            <tr key={`${item.name}-${month}`} className="border-b bg-white">
+                                                                                {index === 0 ? (
+                                                                                    <td rowSpan={4} className="p-2 align-top border-r font-semibold text-gray-700">{item.name}</td>
+                                                                                ) : null}
+                                                                                <td className="p-2">{month}</td>
+                                                                                <td className="p-2 text-right font-mono">{monthlyKg.toFixed(2).replace('.',',')}</td>
+                                                                                <td className="p-2 text-right font-mono">{formatCurrency(monthlyValue)}</td>
+                                                                            </tr>
+                                                                        ))}
+                                                                        <tr className="bg-gray-100 font-bold border-b-2 border-gray-300">
+                                                                            <td colSpan={2} className="p-2 text-right">Total do Item:</td>
+                                                                            <td className="p-2 text-right font-mono">{item.totalKg.toFixed(2).replace('.',',')}</td>
+                                                                            <td className="p-2 text-right font-mono">{formatCurrency(item.totalKg * item.valuePerKg)}</td>
+                                                                        </tr>
+                                                                    </React.Fragment>
+                                                                )
+                                                            }) : (
+                                                                <tr><td colSpan={4} className="p-4 text-center text-gray-500 italic">Nenhum item neste contrato.</td></tr>
                                                             )}
                                                         </tbody>
                                                     </table>
