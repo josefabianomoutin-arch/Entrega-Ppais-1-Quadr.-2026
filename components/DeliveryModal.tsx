@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { ContractItem, Delivery } from '../types';
 
 interface DeliveryModalProps {
@@ -9,28 +9,44 @@ interface DeliveryModalProps {
   deliveries: Delivery[];
 }
 
+const formatCurrency = (value: number) => {
+    if (isNaN(value)) return 'R$ 0,00';
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+};
+
 const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, contractItems, deliveries }) => {
   const [time, setTime] = useState('08:00');
   const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [itemInputs, setItemInputs] = useState(
-    contractItems.map(() => ({ kg: '', value: '' }))
-  );
+  const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>({});
 
-  const handleKgChange = (index: number, kgValue: string) => {
-    const newInputs = [...itemInputs];
-    let calculatedValue = '';
+  const selectedMonth = date.getMonth();
 
-    const contractItem = contractItems[index];
-    if (contractItem) {
-        const kgNumber = parseFloat(kgValue);
-        if (!isNaN(kgNumber) && kgNumber >= 0) {
-            const totalValue = kgNumber * contractItem.valuePerKg;
-            calculatedValue = totalValue.toFixed(2);
-        }
-    }
-    
-    newInputs[index] = { kg: kgValue, value: calculatedValue };
-    setItemInputs(newInputs);
+  const itemDeliveryInfo = useMemo(() => {
+    return contractItems.map(item => {
+      const monthlyQuotaKg = item.totalKg / 4;
+      
+      const hasDeliveredInMonth = deliveries.some(d => 
+        d.item === item.name && new Date(d.date + 'T00:00:00').getMonth() === selectedMonth
+      );
+
+      const deliveryAmountKg = monthlyQuotaKg;
+      const deliveryAmountValue = monthlyQuotaKg * item.valuePerKg;
+
+      return {
+        name: item.name,
+        isQuotaMet: hasDeliveredInMonth,
+        deliveryAmountKg,
+        deliveryAmountValue,
+        valuePerKg: item.valuePerKg
+      };
+    });
+  }, [contractItems, deliveries, selectedMonth]);
+
+  const handleToggleItem = (itemName: string) => {
+    setSelectedItems(prev => ({
+      ...prev,
+      [itemName]: !prev[itemName]
+    }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -42,60 +58,28 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, co
     }
 
     if (!invoiceNumber.trim()) {
-        alert('Por favor, insira o número da nota fiscal.');
-        return;
+      alert('Por favor, insira o número da nota fiscal.');
+      return;
     }
 
     const deliveriesToSave: { time: string; item: string; kg: number; value: number }[] = [];
     
-    itemInputs.forEach((input, index) => {
-      const kgNumber = parseFloat(input.kg);
-      const valueNumber = parseFloat(input.value);
-      
-      if (input.kg && !isNaN(kgNumber) && kgNumber > 0 && !isNaN(valueNumber)) {
+    itemDeliveryInfo.forEach(itemInfo => {
+      if (selectedItems[itemInfo.name] && !itemInfo.isQuotaMet) {
         deliveriesToSave.push({
           time,
-          item: contractItems[index].name,
-          kg: kgNumber,
-          value: valueNumber,
+          item: itemInfo.name,
+          kg: itemInfo.deliveryAmountKg,
+          value: itemInfo.deliveryAmountValue,
         });
       }
     });
 
     if (deliveriesToSave.length === 0) {
-      alert('Por favor, preencha o campo de quilograma para pelo menos um item.');
+      alert('Por favor, selecione pelo menos um item para entregar.');
       return;
     }
-
-    // Validação de excesso de entrega
-    const deliveredKgByItem = new Map<string, number>();
-    deliveries.forEach(delivery => {
-        const currentKg = deliveredKgByItem.get(delivery.item) || 0;
-        deliveredKgByItem.set(delivery.item, currentKg + delivery.kg);
-    });
-
-    for (const deliveryToSave of deliveriesToSave) {
-        const itemName = deliveryToSave.item;
-        const newKg = deliveryToSave.kg;
-
-        const contractItem = contractItems.find(ci => ci.name === itemName);
-        if (!contractItem) continue;
-
-        const contractedKg = contractItem.totalKg;
-        const alreadyDeliveredKg = deliveredKgByItem.get(itemName) || 0;
-        const totalKgWithNewDelivery = alreadyDeliveredKg + newKg;
-
-        if (totalKgWithNewDelivery > contractedKg) {
-            alert(
-                `ALERTA: A quantidade para o item "${itemName}" excede o total contratado.\n\n` +
-                `Contratado: ${contractedKg.toFixed(2).replace('.', ',')} Kg\n` +
-                `Já entregue: ${alreadyDeliveredKg.toFixed(2).replace('.', ',')} Kg\n` +
-                `Total com esta entrega: ${totalKgWithNewDelivery.toFixed(2).replace('.', ',')} Kg`
-            );
-            return; // Impede o salvamento
-        }
-    }
-
+    
     onSave(deliveriesToSave, invoiceNumber);
   };
   
@@ -131,27 +115,44 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, co
           </div>
           
           <div className="space-y-4 pt-2">
-            <label className="block text-sm font-medium text-gray-700">Itens a serem entregues</label>
+            <label className="block text-sm font-medium text-gray-700">Selecione os itens para entregar (cota mensal)</label>
             <div className="space-y-4 max-h-64 overflow-y-auto p-2 border rounded-md bg-gray-50">
                 {contractItems.length === 0 ? (
                     <p className="text-sm text-gray-500 italic">Nenhum item de contrato encontrado.</p>
                 ) : (
-                    contractItems.map((contractItem, index) => (
-                      <div key={contractItem.name} className="p-3 border rounded-lg bg-white shadow-sm">
-                          <div className="flex justify-between items-baseline mb-2">
-                            <p className="font-semibold text-gray-800">{contractItem.name}</p>
-                            <p className="text-xs text-gray-500">Valor/Kg: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contractItem.valuePerKg)}</p>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                  <label htmlFor={`kg-${index}`} className="block text-xs font-medium text-gray-600 mb-1">Quilograma (Kg)</label>
-                                  <input type="number" id={`kg-${index}`} value={itemInputs[index].kg} onChange={e => handleKgChange(index, e.target.value)} min="0.01" step="0.01" placeholder="Ex: 50.5" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"/>
+                    itemDeliveryInfo.map((itemInfo, index) => (
+                      <div key={itemInfo.name} className={`p-3 border rounded-lg bg-white shadow-sm transition-all ${itemInfo.isQuotaMet ? 'bg-gray-200 opacity-70' : ''}`}>
+                          <div className="flex justify-between items-start mb-2">
+                              <div className="flex items-center gap-3">
+                                  <input
+                                      type="checkbox"
+                                      id={`checkbox-${index}`}
+                                      checked={!!selectedItems[itemInfo.name]}
+                                      onChange={() => handleToggleItem(itemInfo.name)}
+                                      disabled={itemInfo.isQuotaMet}
+                                      className="h-5 w-5 rounded text-green-600 focus:ring-green-500 border-gray-300 disabled:cursor-not-allowed"
+                                  />
+                                  <label htmlFor={`checkbox-${index}`} className={`font-semibold text-gray-800 ${itemInfo.isQuotaMet ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                    {itemInfo.name}
+                                  </label>
                               </div>
-                              <div>
-                                  <label htmlFor={`value-${index}`} className="block text-xs font-medium text-gray-600 mb-1">Valor (R$)</label>
-                                  <input type="number" id={`value-${index}`} value={itemInputs[index].value} readOnly placeholder="Calculado" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 cursor-not-allowed sm:text-sm"/>
-                              </div>
+                              <p className="text-xs text-gray-500 whitespace-nowrap pl-2">Valor/Kg: {formatCurrency(itemInfo.valuePerKg)}</p>
                           </div>
+
+                          {itemInfo.isQuotaMet ? (
+                            <p className="text-center text-sm font-semibold text-green-700 py-2">Cota do mês completa!</p>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-3 mt-2 pl-8">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Quilograma (Kg)</label>
+                                    <input type="text" readOnly value={itemInfo.deliveryAmountKg.toFixed(2).replace('.', ',')} className="mt-1 block w-full px-3 py-2 border-gray-200 rounded-md shadow-sm bg-gray-100 cursor-default sm:text-sm font-mono"/>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Valor (R$)</label>
+                                    <input type="text" readOnly value={formatCurrency(itemInfo.deliveryAmountValue)} className="mt-1 block w-full px-3 py-2 border-gray-200 rounded-md shadow-sm bg-gray-100 cursor-default sm:text-sm font-mono"/>
+                                </div>
+                            </div>
+                          )}
                       </div>
                     ))
                 )}
