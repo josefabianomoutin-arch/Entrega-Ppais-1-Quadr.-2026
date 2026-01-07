@@ -21,6 +21,13 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule'>('register');
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
+  const [emailModalData, setEmailModalData] = useState<{
+    recipient: string;
+    cc: string;
+    subject: string;
+    body: string;
+    mailtoLink: string;
+  } | null>(null);
 
 
   // Efeito para ouvir mudanças no banco de dados em tempo real
@@ -330,14 +337,26 @@ const App: React.FC = () => {
     }
     
     const recipientEmail = 'jfmoutin@sap.sp.gov.br';
+    const ccRecipientEmail = 'rsscaramal@sap.sp.gov.br';
     const subject = `Envio de Nota Fiscal - Produtor: ${producerForEmail.name} (NF: ${invoiceNumber})`;
     const deliveriesForInvoice = (producerForEmail.deliveries || []).filter(d => deliveryIds.includes(d.id));
     const itemsSummary = deliveriesForInvoice
         .map(d => `- ${d.item} (${d.kg.toFixed(2).replace('.',',')} Kg) - Data: ${new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}`)
         .join('\n');
-    const body = `Olá,\n\nEsta é uma submissão de nota fiscal através do aplicativo de gestão PPAIS.\n\n**Detalhes:**\nProdutor: ${producerForEmail.name}\nCPF: ${producerForEmail.cpf}\nNúmero da NF: ${invoiceNumber}\n\n**Entregas associadas a esta NF:**\n${itemsSummary}\n\n----------------------------------------------------\nATENÇÃO: Por favor, anexe o arquivo PDF da nota fiscal a este e-mail antes de enviar.`.trim();
-    const mailtoLink = `mailto:${recipientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.open(mailtoLink, '_blank');
+    const body = `Olá,\n\nEsta é uma submissão de nota fiscal através do aplicativo de gestão PPAIS.\n\n**Detalhes:**\nProdutor: ${producerForEmail.name}\nCPF: ${producerForEmail.cpf}\nNúmero da NF: ${invoiceNumber}\n\n**Entregas associadas a esta NF:**\n${itemsSummary}\n\n----------------------------------------------------\nATENÇÃO: Por favor, anexe o arquivo PDF da nota fiscal a este e-mail antes de enviar.\n\n(Os registros desta operação foram salvos no banco de dados do sistema).`.trim();
+    const mailtoLink = `mailto:${recipientEmail}?cc=${ccRecipientEmail}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    setEmailModalData({
+        recipient: recipientEmail,
+        cc: ccRecipientEmail,
+        subject: subject,
+        body: body,
+        mailtoLink: mailtoLink,
+    });
+  };
+
+  const handleCloseEmailModal = () => {
+    setEmailModalData(null);
   };
 
   useEffect(() => {
@@ -390,6 +409,8 @@ const App: React.FC = () => {
             onAddDeliveries={addDeliveries}
             onCancelDeliveries={cancelDeliveries}
             onInvoiceUpload={markInvoicesAsUploaded}
+            emailModalData={emailModalData}
+            onCloseEmailModal={handleCloseEmailModal}
           />
         ) : (
           <LoginScreen onLogin={handleLogin} />

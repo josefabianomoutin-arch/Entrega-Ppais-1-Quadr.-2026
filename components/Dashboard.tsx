@@ -5,6 +5,7 @@ import DeliveryModal from './DeliveryModal';
 import ViewDeliveryModal from './ViewDeliveryModal';
 import SummaryCard from './SummaryCard';
 import InvoiceUploader from './InvoiceUploader';
+import EmailConfirmationModal from './EmailConfirmationModal';
 
 interface DashboardProps {
   producer: Producer;
@@ -12,9 +13,25 @@ interface DashboardProps {
   onAddDeliveries: (producerCpf: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => void;
   onInvoiceUpload: (producerCpf: string, deliveryIds: string[], invoiceNumber: string) => void;
   onCancelDeliveries: (producerCpf: string, deliveryIds: string[]) => void;
+  emailModalData: {
+    recipient: string;
+    cc: string;
+    subject: string;
+    body: string;
+    mailtoLink: string;
+  } | null;
+  onCloseEmailModal: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveries, onInvoiceUpload, onCancelDeliveries }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+  producer, 
+  onLogout, 
+  onAddDeliveries, 
+  onInvoiceUpload, 
+  onCancelDeliveries,
+  emailModalData,
+  onCloseEmailModal
+}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [deliveriesToShow, setDeliveriesToShow] = useState<Delivery[]>([]);
@@ -163,6 +180,13 @@ const Dashboard: React.FC<DashboardProps> = ({ producer, onLogout, onAddDeliveri
           onAddNew={handleAddNewFromView}
           onCancel={handleCancelDeliveries}
           simulatedToday={SIMULATED_TODAY}
+        />
+      )}
+
+      {emailModalData && (
+        <EmailConfirmationModal
+          data={emailModalData}
+          onClose={onCloseEmailModal}
         />
       )}
     </div>
