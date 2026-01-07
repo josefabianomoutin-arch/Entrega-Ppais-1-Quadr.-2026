@@ -376,6 +376,44 @@ const App: React.FC = () => {
     }
   };
 
+  const reopenInvoice = async (producerCpf: string, invoiceNumber: string) => {
+    const producer = producers.find(p => p.cpf === producerCpf);
+    if (!producer) return;
+  
+    const deliveriesToReopen = producer.deliveries.filter(d => d.invoiceNumber === invoiceNumber);
+    if (deliveriesToReopen.length === 0) return;
+  
+    // Encontra a data e hora mais antigas para usar no novo agendamento pendente
+    const earliestDelivery = deliveriesToReopen.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+  
+    const newPlaceholder: Delivery = {
+      id: `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      date: earliestDelivery.date,
+      time: earliestDelivery.time,
+      item: 'AGENDAMENTO PENDENTE',
+      kg: 0,
+      value: 0,
+      invoiceUploaded: false,
+    };
+  
+    const updatedProducers = producers.map(p => {
+      if (p.cpf === producerCpf) {
+        // Remove todas as entregas antigas associadas a essa NF
+        const remainingDeliveries = p.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+        // Adiciona o novo agendamento pendente
+        const updatedDeliveries = [...remainingDeliveries, newPlaceholder];
+        return { ...p, deliveries: updatedDeliveries };
+      }
+      return p;
+    });
+  
+    try {
+      await writeToDatabase(updatedProducers);
+    } catch(error) {
+      console.error("Falha ao reabrir nota fiscal:", error);
+    }
+  };
+
   const handleCloseEmailModal = () => {
     setEmailModalData(null);
   };
@@ -422,6 +460,7 @@ const App: React.FC = () => {
             onTabChange={setAdminActiveTab}
             registrationStatus={registrationStatus}
             onClearRegistrationStatus={handleClearRegistrationStatus}
+            onReopenInvoice={reopenInvoice}
           />
         ) : currentUser ? (
           <Dashboard 

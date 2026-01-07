@@ -5,8 +5,9 @@ import WeekSelector from './WeekSelector';
 import EditProducerModal from './EditProducerModal';
 import AdminGraphs from './AdminGraphs';
 import AdminScheduleView from './AdminScheduleView';
+import AdminInvoices from './AdminInvoices';
 
-type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule';
+type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices';
 
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
@@ -20,6 +21,7 @@ interface AdminDashboardProps {
   onTabChange: (tab: AdminTab) => void;
   registrationStatus: { success: boolean; message: string } | null;
   onClearRegistrationStatus: () => void;
+  onReopenInvoice: (producerCpf: string, invoiceNumber: string) => Promise<void>;
 }
 
 const formatCurrency = (value: number) => {
@@ -57,7 +59,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     activeTab,
     onTabChange,
     registrationStatus,
-    onClearRegistrationStatus
+    onClearRegistrationStatus,
+    onReopenInvoice
 }) => {
   // Estados para aba de REGISTRO
   const [regName, setRegName] = useState('');
@@ -332,6 +335,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <TabButton tab="analytics" label="Gestão dos Produtores"/>
                 <TabButton tab="graphs" label="Gestão dos Itens"/>
                 <TabButton tab="schedule" label="Agenda de Entregas"/>
+                <TabButton tab="invoices" label="Notas Fiscais"/>
         </div></div>
 
         {activeTab === 'info' && (
@@ -573,6 +577,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {activeTab === 'graphs' && <AdminGraphs producers={producers} />}
 
         {activeTab === 'schedule' && <AdminScheduleView producers={producers} />}
+
+        {activeTab === 'invoices' && <AdminInvoices producers={producers} onReopenInvoice={onReopenInvoice} />}
 
         {editingProducer && (
             <EditProducerModal
