@@ -329,7 +329,7 @@ const App: React.FC = () => {
       return;
     }
     
-    const recipientEmail = 'seu-email-aqui@exemplo.com';
+    const recipientEmail = 'jfmoutin@sap.sp.gov.br';
     const subject = `Envio de Nota Fiscal - Produtor: ${producerForEmail.name} (NF: ${invoiceNumber})`;
     const deliveriesForInvoice = (producerForEmail.deliveries || []).filter(d => deliveryIds.includes(d.id));
     const itemsSummary = deliveriesForInvoice

@@ -40,9 +40,9 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ producers }) => {
 
             <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-3 custom-scrollbar">
                 {sortedProducers.length > 0 ? sortedProducers.map(producer => {
-                    // FIX: Replaced `Array.from` with the spread syntax (`...`) for correct type inference.
-                    // This ensures `scheduledDates` is correctly typed as `string[]`, resolving downstream type errors.
-                    const scheduledDates = [...new Set(producer.deliveries.map(d => d.date))]
+                    // FIX: Explicitly typing the Set with <string> ensures that `scheduledDates` is correctly inferred
+                    // as a string array, resolving downstream type errors with `new Date()` and `formatDate`.
+                    const scheduledDates = [...new Set<string>(producer.deliveries.map(d => d.date))]
                         .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 
                     return (
