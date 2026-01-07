@@ -79,6 +79,71 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Script de migração de dados único para reverter notas de Jan/Fev
+  useEffect(() => {
+    if (!loading && isAdminLoggedIn && producers.length > 0) {
+      const migrationFlag = 'migrationJanFeb2026Complete_v2';
+      if (localStorage.getItem(migrationFlag)) {
+        return;
+      }
+
+      console.log("Executando migração única para notas fiscais de Jan/Fev 2026...");
+
+      let migrationNeeded = false;
+      const producersToUpdate = JSON.parse(JSON.stringify(producers));
+
+      producersToUpdate.forEach((producer: Producer) => {
+        const invoicesToRevert = new Map<string, Delivery[]>();
+
+        (producer.deliveries || []).forEach(delivery => {
+          if (delivery.invoiceNumber && (delivery.date.startsWith('2026-01-') || delivery.date.startsWith('2026-02-'))) {
+            const existing = invoicesToRevert.get(delivery.invoiceNumber) || [];
+            invoicesToRevert.set(delivery.invoiceNumber, [...existing, delivery]);
+          }
+        });
+
+        if (invoicesToRevert.size > 0) {
+          migrationNeeded = true;
+          let currentDeliveries = [...producer.deliveries];
+
+          invoicesToRevert.forEach((deliveriesInInvoice, invoiceNumber) => {
+            console.log(`Revertendo NF ${invoiceNumber} para o produtor ${producer.name}`);
+            const earliestDelivery = deliveriesInInvoice.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+
+            const newPlaceholder: Delivery = {
+              id: `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              date: earliestDelivery.date,
+              time: earliestDelivery.time,
+              item: 'AGENDAMENTO PENDENTE',
+              kg: 0,
+              value: 0,
+              invoiceUploaded: false,
+            };
+            currentDeliveries = currentDeliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+            currentDeliveries.push(newPlaceholder);
+          });
+          producer.deliveries = currentDeliveries;
+        }
+      });
+
+      if (migrationNeeded) {
+        console.log("Aplicando atualizações da migração no banco de dados...");
+        writeToDatabase(producersToUpdate)
+          .then(() => {
+            console.log("Migração concluída com sucesso!");
+            localStorage.setItem(migrationFlag, 'true');
+          })
+          .catch(error => {
+            console.error("A migração falhou:", error);
+          });
+      } else {
+        console.log("Nenhuma nota fiscal encontrada que precise de migração.");
+        localStorage.setItem(migrationFlag, 'true');
+      }
+    }
+  }, [loading, isAdminLoggedIn, producers]);
+
+
   // Helper central para escrever no banco de dados com feedback visual
   // Usado para operações em massa, como salvar contratos.
   const writeToDatabase = async (producersArray: Producer[]) => {
