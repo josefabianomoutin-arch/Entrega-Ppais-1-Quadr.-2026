@@ -277,24 +277,87 @@ const App: React.FC = () => {
      }
   };
 
-  const addDeliveries = async (producerCpf: string, deliveries: Omit<Delivery, 'id' | 'invoiceUploaded'>[]) => {
-    const newDeliveries: Delivery[] = deliveries.map(delivery => ({
-        ...delivery,
+  const scheduleDelivery = async (producerCpf: string, date: string, time: string) => {
+    const placeholderDelivery: Delivery = {
         id: `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        date,
+        time,
+        item: 'AGENDAMENTO PENDENTE',
+        kg: 0,
+        value: 0,
         invoiceUploaded: false,
-    }));
+    };
 
     const updatedProducers = producers.map(p => 
         p.cpf === producerCpf 
-            ? { ...p, deliveries: [...(p.deliveries || []), ...newDeliveries] } 
+            ? { ...p, deliveries: [...(p.deliveries || []), placeholderDelivery] } 
             : p
     );
     
     try {
       await writeToDatabase(updatedProducers);
     } catch(error) {
-      console.error("Falha ao adicionar entregas:", error);
+      console.error("Falha ao agendar entrega:", error);
     }
+  };
+  
+  const fulfillAndInvoiceDelivery = async (
+    producerCpf: string,
+    placeholderDeliveryId: string,
+    invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }
+  ) => {
+      const producer = producers.find(p => p.cpf === producerCpf);
+      if (!producer) return;
+  
+      const placeholder = producer.deliveries.find(d => d.id === placeholderDeliveryId);
+      if (!placeholder) return;
+  
+      const newDeliveries: Delivery[] = invoiceData.fulfilledItems.map(item => ({
+          id: `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          date: placeholder.date,
+          time: placeholder.time,
+          item: item.name,
+          kg: item.kg,
+          value: item.value,
+          invoiceUploaded: true,
+          invoiceNumber: invoiceData.invoiceNumber,
+      }));
+      
+      let allDeliveriesForInvoice: Delivery[] = [];
+  
+      const updatedProducers = producers.map(p => {
+        if (p.cpf === producerCpf) {
+          const filteredDeliveries = p.deliveries.filter(d => d.id !== placeholderDeliveryId);
+          const finalDeliveries = [...filteredDeliveries, ...newDeliveries];
+          allDeliveriesForInvoice = finalDeliveries.filter(d => d.invoiceNumber === invoiceData.invoiceNumber);
+          return { ...p, deliveries: finalDeliveries };
+        }
+        return p;
+      });
+  
+      try {
+        await writeToDatabase(updatedProducers);
+      } catch (error) {
+        console.error("Falha ao faturar entrega:", error);
+        return;
+      }
+      
+      const recipientEmail = 'jfmoutin@sap.sp.gov.br';
+      const ccRecipientEmail = 'rsscaramal@sap.sp.gov.br';
+      const subject = `Envio de Nota Fiscal - Produtor: ${producer.name} (NF: ${invoiceData.invoiceNumber})`;
+      const itemsSummary = allDeliveriesForInvoice
+          .map(d => `- ${d.item} (${(d.kg || 0).toFixed(2).replace('.',',')} Kg) - Data: ${new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}`)
+          .join('\n');
+      const body = `Olá,\n\nEsta é uma submissão de nota fiscal através do aplicativo de gestão PPAIS.\n\n**Detalhes:**\nProdutor: ${producer.name}\nCPF: ${producer.cpf}\nNúmero da NF: ${invoiceData.invoiceNumber}\n\n**Entregas associadas a esta NF:**\n${itemsSummary}\n\n----------------------------------------------------\nATENÇÃO: Por favor, anexe o arquivo PDF da nota fiscal a este e-mail antes de enviar.\n\n(Os registros desta operação foram salvos no banco de dados do sistema).`.trim();
+      const mailtoLink = `mailto:${recipientEmail}?cc=${ccRecipientEmail}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      
+      setEmailModalData({
+          recipient: recipientEmail,
+          cc: ccRecipientEmail,
+          subject: subject,
+          body: body,
+          mailtoLink: mailtoLink,
+      });
   };
 
   const cancelDeliveries = async (producerCpf: string, deliveryIds: string[]) => {
@@ -311,48 +374,6 @@ const App: React.FC = () => {
     } catch(error) {
       console.error("Falha ao cancelar entregas:", error);
     }
-  };
-
-  const markInvoicesAsUploaded = async (producerCpf: string, deliveryIds: string[], invoiceNumber: string) => {
-    const producerForEmail = producers.find(p => p.cpf === producerCpf);
-    if (!producerForEmail) return;
-
-    const updatedProducers = producers.map(p => {
-      if (p.cpf === producerCpf) {
-        const updatedDeliveries = (p.deliveries || []).map(d => 
-          deliveryIds.includes(d.id) 
-            ? { ...d, invoiceUploaded: true, invoiceNumber: invoiceNumber } 
-            : d
-        );
-        return { ...p, deliveries: updatedDeliveries };
-      }
-      return p;
-    });
-
-    try {
-      await writeToDatabase(updatedProducers);
-    } catch (error) {
-      console.error("Falha ao marcar fatura:", error);
-      return;
-    }
-    
-    const recipientEmail = 'jfmoutin@sap.sp.gov.br';
-    const ccRecipientEmail = 'rsscaramal@sap.sp.gov.br';
-    const subject = `Envio de Nota Fiscal - Produtor: ${producerForEmail.name} (NF: ${invoiceNumber})`;
-    const deliveriesForInvoice = (producerForEmail.deliveries || []).filter(d => deliveryIds.includes(d.id));
-    const itemsSummary = deliveriesForInvoice
-        .map(d => `- ${d.item} (${d.kg.toFixed(2).replace('.',',')} Kg) - Data: ${new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}`)
-        .join('\n');
-    const body = `Olá,\n\nEsta é uma submissão de nota fiscal através do aplicativo de gestão PPAIS.\n\n**Detalhes:**\nProdutor: ${producerForEmail.name}\nCPF: ${producerForEmail.cpf}\nNúmero da NF: ${invoiceNumber}\n\n**Entregas associadas a esta NF:**\n${itemsSummary}\n\n----------------------------------------------------\nATENÇÃO: Por favor, anexe o arquivo PDF da nota fiscal a este e-mail antes de enviar.\n\n(Os registros desta operação foram salvos no banco de dados do sistema).`.trim();
-    const mailtoLink = `mailto:${recipientEmail}?cc=${ccRecipientEmail}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
-    setEmailModalData({
-        recipient: recipientEmail,
-        cc: ccRecipientEmail,
-        subject: subject,
-        body: body,
-        mailtoLink: mailtoLink,
-    });
   };
 
   const handleCloseEmailModal = () => {
@@ -406,9 +427,9 @@ const App: React.FC = () => {
           <Dashboard 
             producer={currentUser} 
             onLogout={handleLogout} 
-            onAddDeliveries={addDeliveries}
+            onScheduleDelivery={scheduleDelivery}
             onCancelDeliveries={cancelDeliveries}
-            onInvoiceUpload={markInvoicesAsUploaded}
+            onFulfillAndInvoice={fulfillAndInvoiceDelivery}
             emailModalData={emailModalData}
             onCloseEmailModal={handleCloseEmailModal}
           />

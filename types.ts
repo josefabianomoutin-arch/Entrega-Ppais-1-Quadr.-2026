@@ -3,9 +3,9 @@ export interface Delivery {
   id: string;
   date: string; // ISO string format: 'YYYY-MM-DD'
   time: string; // 'HH:MM'
-  item: string;
-  kg: number;
-  value: number;
+  item?: string;
+  kg?: number;
+  value?: number;
   invoiceUploaded: boolean;
   invoiceNumber?: string;
 }

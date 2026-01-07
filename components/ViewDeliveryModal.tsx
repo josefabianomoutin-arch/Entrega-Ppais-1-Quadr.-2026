@@ -14,20 +14,21 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
   
   const formattedDate = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   const canCancel = new Date(date) >= simulatedToday;
-  const invoiceNumber = deliveries[0]?.invoiceNumber;
+  const invoiceNumber = deliveries.find(d => d.invoiceNumber)?.invoiceNumber;
 
+  const isPlaceholder = deliveries.length === 1 && deliveries[0].item === 'AGENDAMENTO PENDENTE';
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
-  const totalValue = deliveries.reduce((sum, d) => sum + d.value, 0);
+  const totalValue = deliveries.reduce((sum, d) => sum + (d.value || 0), 0);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 animate-fade-in-up">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">Entregas Agendadas</h2>
+          <h2 className="text-2xl font-bold text-gray-800">Detalhes do Dia</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
         </div>
         <p className="text-gray-600">Data: <span className="font-semibold text-green-700">{formattedDate}</span></p>
@@ -37,14 +38,19 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
         </div>
         
         <div className="space-y-3 max-h-64 overflow-y-auto mb-4 border-t border-b py-2">
-            {deliveries.length > 0 ? (
+            {isPlaceholder ? (
+                 <div className="p-3 bg-blue-50 rounded-lg text-center">
+                    <p className="font-bold text-blue-800">Agendamento Pendente</p>
+                    <p className="text-xs text-blue-600">Aguardando preenchimento dos dados da entrega.</p>
+                </div>
+            ) : deliveries.length > 0 ? (
                 deliveries.map(delivery => (
                     <div key={delivery.id} className="p-3 bg-gray-50 rounded-lg flex justify-between items-start text-sm">
                         <div>
                             <p className="font-bold text-gray-800">{delivery.item}</p>
-                            <p className="text-xs text-gray-500">{delivery.kg} Kg</p>
+                            <p className="text-xs text-gray-500">{(delivery.kg || 0).toFixed(2).replace('.', ',')} Kg</p>
                         </div>
-                        <span className="font-semibold text-green-600 whitespace-nowrap pl-4">{formatCurrency(delivery.value)}</span>
+                        <span className="font-semibold text-green-600 whitespace-nowrap pl-4">{formatCurrency(delivery.value || 0)}</span>
                     </div>
                 ))
             ) : (
@@ -61,7 +67,7 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
           {canCancel && (
             <button type="button" onClick={() => onCancel(deliveries.map(d => d.id))} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Cancelar Agendamentos</button>
           )}
-          <button type="button" onClick={onAddNew} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Agendar Outra Entrega</button>
+          <button type="button" onClick={onAddNew} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Agendar Outro Horário</button>
           <button type="button" onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition-colors">Fechar</button>
         </div>
       </div>

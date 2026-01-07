@@ -7,7 +7,7 @@ interface SummaryCardProps {
 
 const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
     // Value calculations
-    const totalDeliveredValue = producer.deliveries.reduce((sum, delivery) => sum + delivery.value, 0);
+    const totalDeliveredValue = producer.deliveries.reduce((sum, delivery) => sum + (delivery.value || 0), 0);
     const remainingValue = producer.initialValue - totalDeliveredValue;
     const valueProgress = producer.initialValue > 0 ? (totalDeliveredValue / producer.initialValue) * 100 : 0;
 
@@ -15,23 +15,27 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
     const deliveredValueByItem = useMemo(() => {
         const valueMap = new Map<string, number>();
         producer.deliveries.forEach(delivery => {
-            const currentVal = valueMap.get(delivery.item) || 0;
-            valueMap.set(delivery.item, currentVal + delivery.value);
+            if (delivery.item && delivery.value) {
+                const currentVal = valueMap.get(delivery.item) || 0;
+                valueMap.set(delivery.item, currentVal + delivery.value);
+            }
         });
         return valueMap;
     }, [producer.deliveries]);
 
     // Weight (Kg) calculations
     const totalContractedKg = producer.contractItems.reduce((sum, item) => sum + item.totalKg, 0);
-    const totalDeliveredKg = producer.deliveries.reduce((sum, delivery) => sum + delivery.kg, 0);
+    const totalDeliveredKg = producer.deliveries.reduce((sum, delivery) => sum + (delivery.kg || 0), 0);
     const remainingKg = totalContractedKg - totalDeliveredKg;
     const kgProgress = totalContractedKg > 0 ? (totalDeliveredKg / totalContractedKg) * 100 : 0;
 
     const deliveredKgByItem = useMemo(() => {
         const kgMap = new Map<string, number>();
         producer.deliveries.forEach(delivery => {
-            const currentKg = kgMap.get(delivery.item) || 0;
-            kgMap.set(delivery.item, currentKg + delivery.kg);
+             if (delivery.item && delivery.kg) {
+                const currentKg = kgMap.get(delivery.item) || 0;
+                kgMap.set(delivery.item, currentKg + delivery.kg);
+            }
         });
         return kgMap;
     }, [producer.deliveries]);
