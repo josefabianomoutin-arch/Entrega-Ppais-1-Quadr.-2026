@@ -111,6 +111,52 @@ const App: React.FC = () => {
     }
   }, [loading, isAdminLoggedIn, producers]);
 
+  // Efeito para excluir agendamentos de produtores com "ITEM FRACASSADO"
+  useEffect(() => {
+    if (!loading && isAdminLoggedIn && producers.length > 0) {
+      const operationFlag = 'deletedSchedules_ItemFracassado_v1';
+      if (localStorage.getItem(operationFlag)) {
+        return;
+      }
+
+      const producersToUpdate = producers.filter(p => 
+        (p.contractItems || []).some(item => item.name === 'ITEM FRACASSADO')
+      );
+
+      if (producersToUpdate.length > 0) {
+        console.log(`Iniciando exclusão de agendamentos para ${producersToUpdate.length} produtores com "ITEM FRACASSADO"...`);
+
+        const updatedProducers = JSON.parse(JSON.stringify(producers));
+        const producerNames: string[] = [];
+
+        producersToUpdate.forEach(producerToClear => {
+            const producerInCopy = updatedProducers.find((p: Producer) => p.cpf === producerToClear.cpf);
+            if(producerInCopy) {
+                producerInCopy.deliveries = [];
+                producerNames.push(producerInCopy.name);
+            }
+        });
+        
+        writeToDatabase(updatedProducers)
+          .then(() => {
+            const successMessage = `Todos os agendamentos dos seguintes produtores foram removidos permanentemente por terem o "ITEM FRACASSADO":\n\n- ${producerNames.join('\n- ')}`;
+            console.log(successMessage);
+            alert(successMessage);
+            localStorage.setItem(operationFlag, 'true');
+          })
+          .catch((error) => {
+            const errorMessage = `Ocorreu um erro ao tentar remover os agendamentos. Por favor, verifique o console para mais detalhes.`;
+            console.error(errorMessage, error);
+            alert(errorMessage);
+          });
+      } else {
+        // Se nenhum produtor for encontrado, marca a operação como concluída para não rodar novamente.
+        console.log('Nenhum produtor com "ITEM FRACASSADO" encontrado para limpeza de agendamentos.');
+        localStorage.setItem(operationFlag, 'true');
+      }
+    }
+  }, [loading, isAdminLoggedIn, producers]);
+
   // Helper central para escrever no banco de dados com feedback visual
   // Usado para operações em massa, como salvar contratos.
   const writeToDatabase = async (producersArray: Producer[]) => {
