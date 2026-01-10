@@ -79,70 +79,37 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Script de migração de dados único para reverter notas de Jan/Fev
+  // Efeito para excluir agendamentos de um produtor específico (operação única)
   useEffect(() => {
     if (!loading && isAdminLoggedIn && producers.length > 0) {
-      const migrationFlag = 'migrationJanFeb2026Complete_v2';
-      if (localStorage.getItem(migrationFlag)) {
+      const operationFlag = 'deletedSchedules_LucimaraMarquesPereira_v1';
+      if (localStorage.getItem(operationFlag)) {
         return;
       }
 
-      console.log("Executando migração única para notas fiscais de Jan/Fev 2026...");
+      const producerToUpdate = producers.find(p => p.name === 'LUCIMARA MARQUES PEREIRA');
 
-      let migrationNeeded = false;
-      const producersToUpdate = JSON.parse(JSON.stringify(producers));
-
-      producersToUpdate.forEach((producer: Producer) => {
-        const invoicesToRevert = new Map<string, Delivery[]>();
-
-        (producer.deliveries || []).forEach(delivery => {
-          if (delivery.invoiceNumber && (delivery.date.startsWith('2026-01-') || delivery.date.startsWith('2026-02-'))) {
-            const existing = invoicesToRevert.get(delivery.invoiceNumber) || [];
-            invoicesToRevert.set(delivery.invoiceNumber, [...existing, delivery]);
-          }
-        });
-
-        if (invoicesToRevert.size > 0) {
-          migrationNeeded = true;
-          let currentDeliveries = [...producer.deliveries];
-
-          invoicesToRevert.forEach((deliveriesInInvoice, invoiceNumber) => {
-            console.log(`Revertendo NF ${invoiceNumber} para o produtor ${producer.name}`);
-            const earliestDelivery = deliveriesInInvoice.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
-
-            const newPlaceholder: Delivery = {
-              id: `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-              date: earliestDelivery.date,
-              time: earliestDelivery.time,
-              item: 'AGENDAMENTO PENDENTE',
-              kg: 0,
-              value: 0,
-              invoiceUploaded: false,
-            };
-            currentDeliveries = currentDeliveries.filter(d => d.invoiceNumber !== invoiceNumber);
-            currentDeliveries.push(newPlaceholder);
-          });
-          producer.deliveries = currentDeliveries;
-        }
-      });
-
-      if (migrationNeeded) {
-        console.log("Aplicando atualizações da migração no banco de dados...");
-        writeToDatabase(producersToUpdate)
+      if (producerToUpdate) {
+        console.log(`Iniciando exclusão de agendamentos para ${producerToUpdate.name}...`);
+        
+        const producerDeliveriesRef = ref(database, `producers/${producerToUpdate.cpf}/deliveries`);
+        
+        set(producerDeliveriesRef, [])
           .then(() => {
-            console.log("Migração concluída com sucesso!");
-            localStorage.setItem(migrationFlag, 'true');
+            console.log(`Agendamentos de ${producerToUpdate.name} excluídos com sucesso.`);
+            alert(`Todos os agendamentos da produtora LUCIMARA MARQUES PEREIRA foram removidos permanentemente, conforme solicitado.`);
+            localStorage.setItem(operationFlag, 'true');
           })
-          .catch(error => {
-            console.error("A migração falhou:", error);
+          .catch((error) => {
+            console.error(`Falha ao excluir agendamentos de ${producerToUpdate.name}:`, error);
+            alert(`Ocorreu um erro ao tentar remover os agendamentos. Por favor, verifique o console para mais detalhes.`);
           });
       } else {
-        console.log("Nenhuma nota fiscal encontrada que precise de migração.");
-        localStorage.setItem(migrationFlag, 'true');
+        // Se o produtor não for encontrado, marca a operação como concluída para não rodar novamente.
+        localStorage.setItem(operationFlag, 'true');
       }
     }
   }, [loading, isAdminLoggedIn, producers]);
-
 
   // Helper central para escrever no banco de dados com feedback visual
   // Usado para operações em massa, como salvar contratos.
