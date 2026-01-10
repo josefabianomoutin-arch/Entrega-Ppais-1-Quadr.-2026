@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { Delivery, ContractItem } from '../types';
 
 interface FulfillmentModalProps {
-  delivery: Delivery;
+  invoiceInfo: { date: string; deliveries: Delivery[] };
   contractItems: ContractItem[];
   onClose: () => void;
   onSave: (invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }) => void;
@@ -19,12 +19,17 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ delivery, contractItems, onClose, onSave }) => {
+const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contractItems, onClose, onSave }) => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [items, setItems] = useState<FulfilledItem[]>([{ id: `item-${Date.now()}`, name: '', kg: '' }]);
 
-  const formattedDate = new Date(delivery.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const formattedDate = new Date(invoiceInfo.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   
+  const earliestTime = useMemo(() => {
+      if (!invoiceInfo.deliveries || invoiceInfo.deliveries.length === 0) return 'N/A';
+      return invoiceInfo.deliveries.map(d => d.time).sort()[0];
+  }, [invoiceInfo.deliveries]);
+
   const handleItemChange = (id: string, field: 'name' | 'kg', value: string) => {
     setItems(currentItems => currentItems.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
@@ -87,7 +92,8 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ delivery, contractI
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
         </div>
         <p className="mb-6 text-gray-600">
-            Data da Entrega: <span className="font-semibold text-green-700">{formattedDate} às {delivery.time}</span>
+            Data da Entrega: <span className="font-semibold text-green-700">{formattedDate}</span>
+            <span className="text-sm text-gray-500 ml-2">(a partir de {earliestTime})</span>
         </p>
         
         <form onSubmit={handleSubmit} className="space-y-6">

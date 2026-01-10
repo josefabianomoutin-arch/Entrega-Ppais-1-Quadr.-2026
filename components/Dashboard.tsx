@@ -14,7 +14,7 @@ interface DashboardProps {
   onScheduleDelivery: (producerCpf: string, date: string, time: string) => void;
   onFulfillAndInvoice: (
     producerCpf: string, 
-    placeholderDeliveryId: string, 
+    placeholderDeliveryIds: string[], 
     invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }
   ) => void;
   onCancelDeliveries: (producerCpf: string, deliveryIds: string[]) => void;
@@ -40,7 +40,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isFulfillmentModalOpen, setIsFulfillmentModalOpen] = useState(false);
-  const [deliveryToFulfill, setDeliveryToFulfill] = useState<Delivery | null>(null);
+  const [invoiceToFulfill, setInvoiceToFulfill] = useState<{ date: string; deliveries: Delivery[] } | null>(null);
   const [deliveriesToShow, setDeliveriesToShow] = useState<Delivery[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
@@ -92,28 +92,42 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const handleOpenFulfillmentModal = (delivery: Delivery) => {
-    setDeliveryToFulfill(delivery);
+  const handleOpenFulfillmentModal = (invoiceInfo: { date: string; deliveries: Delivery[] }) => {
+    setInvoiceToFulfill(invoiceInfo);
     setIsFulfillmentModalOpen(true);
   };
   
   const handleCloseFulfillmentModal = () => {
-    setDeliveryToFulfill(null);
+    setInvoiceToFulfill(null);
     setIsFulfillmentModalOpen(false);
   };
   
   const handleSaveFulfillment = (invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }) => {
-    if (deliveryToFulfill) {
-      onFulfillAndInvoice(producer.cpf, deliveryToFulfill.id, invoiceData);
+    if (invoiceToFulfill) {
+      const placeholderIds = invoiceToFulfill.deliveries.map(d => d.id);
+      onFulfillAndInvoice(producer.cpf, placeholderIds, invoiceData);
     }
     handleCloseFulfillmentModal();
   };
   
-  const pendingFulfillment = useMemo(() => {
-    return producer.deliveries.filter(d => {
+  const pendingDailyInvoices = useMemo(() => {
+    const pending = producer.deliveries.filter(d => {
         const deliveryDate = new Date(d.date + 'T00:00:00');
         return d.item === 'AGENDAMENTO PENDENTE' && deliveryDate < SIMULATED_TODAY;
     });
+
+    const groupedByDate = pending.reduce((acc, delivery) => {
+        if (!acc[delivery.date]) {
+            acc[delivery.date] = [];
+        }
+        acc[delivery.date].push(delivery);
+        return acc;
+    }, {} as Record<string, Delivery[]>);
+
+    return Object.entries(groupedByDate).map(([date, deliveries]) => ({
+        date,
+        deliveries,
+    }));
   }, [producer.deliveries]);
 
 
@@ -133,13 +147,13 @@ const Dashboard: React.FC<DashboardProps> = ({
       </header>
 
       <main className="p-4 md:p-8">
-        {pendingFulfillment.length > 0 && (
+        {pendingDailyInvoices.length > 0 && (
           <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 mb-8 rounded-r-lg shadow" role="alert">
             <div className="flex items-center">
               <svg className="w-6 h-6 mr-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
               <div>
                 <p className="font-bold">Atenção!</p>
-                <p className="text-sm">Você possui {pendingFulfillment.length} entrega(s) para preencher os dados e faturar. <a href="#invoice-uploader-section" className="font-semibold underline hover:text-yellow-900">Verificar agora</a>.</p>
+                <p className="text-sm">Você possui {pendingDailyInvoices.length} dia(s) de entrega para preencher os dados e faturar. <a href="#invoice-uploader-section" className="font-semibold underline hover:text-yellow-900">Verificar agora</a>.</p>
               </div>
             </div>
           </div>
@@ -159,10 +173,10 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <div className="space-y-8">
             <SummaryCard producer={producer} />
-            {pendingFulfillment.length > 0 && (
+            {pendingDailyInvoices.length > 0 && (
                 <div id="invoice-uploader-section">
                     <InvoiceUploader 
-                        pendingDeliveries={pendingFulfillment} 
+                        pendingInvoices={pendingDailyInvoices} 
                         onFulfill={handleOpenFulfillmentModal} 
                     />
                 </div>
@@ -190,9 +204,9 @@ const Dashboard: React.FC<DashboardProps> = ({
         />
       )}
       
-      {isFulfillmentModalOpen && deliveryToFulfill && (
+      {isFulfillmentModalOpen && invoiceToFulfill && (
         <FulfillmentModal
-          delivery={deliveryToFulfill}
+          invoiceInfo={invoiceToFulfill}
           contractItems={producer.contractItems}
           onClose={handleCloseFulfillmentModal}
           onSave={handleSaveFulfillment}

@@ -111,47 +111,44 @@ const App: React.FC = () => {
     }
   }, [loading, isAdminLoggedIn, producers]);
 
-  // Efeito para excluir agendamentos de produtores com "ITEM FRACASSADO"
+  // Efeito para excluir agendamentos de produtores com "ITEM FRACASSADO" (v2 - Robusto)
   useEffect(() => {
     if (!loading && isAdminLoggedIn && producers.length > 0) {
-      const operationFlag = 'deletedSchedules_ItemFracassado_v1';
+      const operationFlag = 'deletedSchedules_ItemFracassado_v2'; // Flag atualizada para garantir a re-execução
       if (localStorage.getItem(operationFlag)) {
         return;
       }
 
-      const producersToUpdate = producers.filter(p => 
+      const producersToClear = producers.filter(p =>
         (p.contractItems || []).some(item => item.name === 'ITEM FRACASSADO')
       );
 
-      if (producersToUpdate.length > 0) {
-        console.log(`Iniciando exclusão de agendamentos para ${producersToUpdate.length} produtores com "ITEM FRACASSADO"...`);
+      if (producersToClear.length > 0) {
+        console.log(`[OP_v2] Encontrados ${producersToClear.length} produtores para limpar agendamentos.`);
 
-        const updatedProducers = JSON.parse(JSON.stringify(producers));
-        const producerNames: string[] = [];
-
-        producersToUpdate.forEach(producerToClear => {
-            const producerInCopy = updatedProducers.find((p: Producer) => p.cpf === producerToClear.cpf);
-            if(producerInCopy) {
-                producerInCopy.deliveries = [];
-                producerNames.push(producerInCopy.name);
-            }
+        // Usa um método mais direto e seguro, apagando apenas o nó de 'deliveries' de cada produtor.
+        const updatePromises = producersToClear.map(producer => {
+          const deliveriesRef = ref(database, `producers/${producer.cpf}/deliveries`);
+          // set(..., null) apaga o nó no Firebase Realtime Database
+          return set(deliveriesRef, null);
         });
-        
-        writeToDatabase(updatedProducers)
+
+        Promise.all(updatePromises)
           .then(() => {
-            const successMessage = `Todos os agendamentos dos seguintes produtores foram removidos permanentemente por terem o "ITEM FRACASSADO":\n\n- ${producerNames.join('\n- ')}`;
+            const producerNames = producersToClear.map(p => p.name);
+            const successMessage = `[CORREÇÃO APLICADA] Agendamentos removidos com sucesso para os seguintes produtores com "ITEM FRACASSADO":\n\n- ${producerNames.join('\n- ')}`;
             console.log(successMessage);
             alert(successMessage);
             localStorage.setItem(operationFlag, 'true');
           })
           .catch((error) => {
-            const errorMessage = `Ocorreu um erro ao tentar remover os agendamentos. Por favor, verifique o console para mais detalhes.`;
+            const errorMessage = "Ocorreu um erro ao tentar remover os agendamentos dos itens fracassados. Por favor, verifique o console para mais detalhes.";
             console.error(errorMessage, error);
             alert(errorMessage);
           });
       } else {
-        // Se nenhum produtor for encontrado, marca a operação como concluída para não rodar novamente.
-        console.log('Nenhum produtor com "ITEM FRACASSADO" encontrado para limpeza de agendamentos.');
+        // Se nenhum produtor for encontrado, ainda marca a operação como concluída.
+        console.log('[OP_v2] Nenhum produtor com "ITEM FRACASSADO" encontrado para limpeza de agendamentos.');
         localStorage.setItem(operationFlag, 'true');
       }
     }
@@ -356,38 +353,41 @@ const App: React.FC = () => {
   };
 
   const scheduleDelivery = async (producerCpf: string, date: string, time: string) => {
-    const placeholderDelivery: Delivery = {
-        id: `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        date,
-        time,
-        item: 'AGENDAMENTO PENDENTE',
-        kg: 0,
-        value: 0,
-        invoiceUploaded: false,
-    };
+    const producerDeliveriesRef = ref(database, `producers/${producerCpf}/deliveries`);
 
-    const updatedProducers = producers.map(p => 
-        p.cpf === producerCpf 
-            ? { ...p, deliveries: [...(p.deliveries || []), placeholderDelivery] } 
-            : p
-    );
-    
     try {
-      await writeToDatabase(updatedProducers);
+        await runTransaction(producerDeliveriesRef, (currentDeliveries: Delivery[] | null) => {
+            const newDelivery: Delivery = {
+                id: `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                date,
+                time,
+                item: 'AGENDAMENTO PENDENTE',
+                kg: 0,
+                value: 0,
+                invoiceUploaded: false,
+            };
+            
+            if (!currentDeliveries) {
+                return [newDelivery];
+            }
+            
+            currentDeliveries.push(newDelivery);
+            return currentDeliveries;
+        });
     } catch(error) {
-      console.error("Falha ao agendar entrega:", error);
+        console.error("Falha na transação de agendamento de entrega:", error);
     }
   };
   
   const fulfillAndInvoiceDelivery = async (
     producerCpf: string,
-    placeholderDeliveryId: string,
+    placeholderDeliveryIds: string[],
     invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }
   ) => {
       const producer = producers.find(p => p.cpf === producerCpf);
       if (!producer) return;
   
-      const placeholder = producer.deliveries.find(d => d.id === placeholderDeliveryId);
+      const placeholder = producer.deliveries.find(d => placeholderDeliveryIds.includes(d.id));
       if (!placeholder) return;
   
       const newDeliveries: Delivery[] = invoiceData.fulfilledItems.map(item => ({
@@ -405,7 +405,7 @@ const App: React.FC = () => {
   
       const updatedProducers = producers.map(p => {
         if (p.cpf === producerCpf) {
-          const filteredDeliveries = p.deliveries.filter(d => d.id !== placeholderDeliveryId);
+          const filteredDeliveries = p.deliveries.filter(d => !placeholderDeliveryIds.includes(d.id));
           const finalDeliveries = [...filteredDeliveries, ...newDeliveries];
           allDeliveriesForInvoice = finalDeliveries.filter(d => d.invoiceNumber === invoiceData.invoiceNumber);
           return { ...p, deliveries: finalDeliveries };
