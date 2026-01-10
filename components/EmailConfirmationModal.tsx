@@ -32,6 +32,7 @@ const CopyableField: React.FC<{label: string, value: string}> = ({ label, value 
 const EmailConfirmationModal: React.FC<EmailConfirmationModalProps> = ({ data, onClose }) => {
   const openMailClient = () => {
     window.open(data.mailtoLink, '_blank');
+    onClose(); // Fecha o modal imediatamente após abrir o cliente de e-mail
   };
 
   return (
