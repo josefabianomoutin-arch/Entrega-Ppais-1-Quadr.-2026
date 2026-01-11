@@ -162,7 +162,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                 <th className="p-2 text-left font-semibold">Mês</th>
                                                                 <th className="p-2 text-right font-semibold">Peso Previsto (Kg)</th>
                                                                 <th className="p-2 text-right font-semibold text-green-700">Peso Entregue (Kg)</th>
-                                                                <th className="p-2 text-right font-semibold text-blue-700">Peso Restante (Kg)</th>
+                                                                <th className="p-2 text-right font-semibold text-red-700">Peso Restante (Kg)</th>
                                                                 <th className="p-2 text-right font-semibold">Valor Previsto (R$)</th>
                                                             </tr>
                                                         </thead>
@@ -176,6 +176,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                 const totalDeliveredKgForItem = deliveriesForItem.reduce((sum, d) => sum + (d.kg || 0), 0);
                                                                 const totalRemainingKgForItem = item.totalKg - totalDeliveredKgForItem;
 
+                                                                let surplusFromPreviousMonth = 0;
+
                                                                 return (
                                                                     <React.Fragment key={item.name}>
                                                                         {months.map((month, index) => {
@@ -183,7 +185,12 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                                 .filter(d => new Date(d.date + 'T00:00:00').getMonth() === index)
                                                                                 .reduce((sum, d) => sum + (d.kg || 0), 0);
                                                                             
-                                                                            const remainingInMonth = monthlyKg - deliveredInMonth;
+                                                                            const surplusApplied = surplusFromPreviousMonth;
+                                                                            const adjustedMonthlyKg = monthlyKg - surplusApplied;
+                                                                            const remainingInMonth = adjustedMonthlyKg - deliveredInMonth;
+
+                                                                            // Calcula o excedente para o próximo mês
+                                                                            surplusFromPreviousMonth = remainingInMonth < 0 ? -remainingInMonth : 0;
                                                                             
                                                                             return (
                                                                                 <tr key={`${item.name}-${month}`} className="border-b bg-white">
@@ -191,9 +198,12 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                                         <td rowSpan={4} className="p-2 align-top border-r font-semibold text-gray-700">{item.name}</td>
                                                                                     ) : null}
                                                                                     <td className="p-2">{month}</td>
-                                                                                    <td className="p-2 text-right font-mono">{monthlyKg.toFixed(2).replace('.',',')}</td>
+                                                                                    <td className="p-2 text-right font-mono" title={surplusApplied > 0 ? `Valor ajustado pelo excedente de ${surplusApplied.toFixed(2).replace('.',',')}kg do mês anterior` : ''}>
+                                                                                      {adjustedMonthlyKg.toFixed(2).replace('.',',')}
+                                                                                      {surplusApplied > 0 && <span className="text-blue-500 font-bold">*</span>}
+                                                                                    </td>
                                                                                     <td className="p-2 text-right font-mono font-semibold text-green-600">{deliveredInMonth.toFixed(2).replace('.',',')}</td>
-                                                                                    <td className={`p-2 text-right font-mono font-semibold ${remainingInMonth < 0 ? 'text-red-600' : 'text-blue-600'}`}>{remainingInMonth.toFixed(2).replace('.',',')}</td>
+                                                                                    <td className="p-2 text-right font-mono font-semibold text-red-600">{remainingInMonth.toFixed(2).replace('.',',')}</td>
                                                                                     <td className="p-2 text-right font-mono">{formatCurrency(monthlyValue)}</td>
                                                                                 </tr>
                                                                             );
@@ -202,7 +212,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                             <td colSpan={2} className="p-2 text-right">Total do Item:</td>
                                                                             <td className="p-2 text-right font-mono">{item.totalKg.toFixed(2).replace('.',',')}</td>
                                                                             <td className="p-2 text-right font-mono text-green-700">{totalDeliveredKgForItem.toFixed(2).replace('.',',')}</td>
-                                                                            <td className={`p-2 text-right font-mono ${totalRemainingKgForItem < 0 ? 'text-red-600' : 'text-blue-700'}`}>{totalRemainingKgForItem.toFixed(2).replace('.',',')}</td>
+                                                                            <td className="p-2 text-right font-mono text-red-700">{totalRemainingKgForItem.toFixed(2).replace('.',',')}</td>
                                                                             <td className="p-2 text-right font-mono">{formatCurrency(item.totalKg * item.valuePerKg)}</td>
                                                                         </tr>
                                                                     </React.Fragment>
