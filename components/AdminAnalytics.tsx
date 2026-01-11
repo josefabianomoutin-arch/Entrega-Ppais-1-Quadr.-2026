@@ -161,6 +161,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                 <th className="p-2 text-left font-semibold">Item</th>
                                                                 <th className="p-2 text-left font-semibold">Mês</th>
                                                                 <th className="p-2 text-right font-semibold">Peso Previsto (Kg)</th>
+                                                                <th className="p-2 text-right font-semibold text-green-700">Peso Entregue (Kg)</th>
+                                                                <th className="p-2 text-right font-semibold text-blue-700">Peso Restante (Kg)</th>
                                                                 <th className="p-2 text-right font-semibold">Valor Previsto (R$)</th>
                                                             </tr>
                                                         </thead>
@@ -170,27 +172,43 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                 const monthlyValue = (item.totalKg * item.valuePerKg) / 4;
                                                                 const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
                                                                 
+                                                                const deliveriesForItem = producer.deliveries.filter(d => d.item === item.name && d.kg);
+                                                                const totalDeliveredKgForItem = deliveriesForItem.reduce((sum, d) => sum + (d.kg || 0), 0);
+                                                                const totalRemainingKgForItem = item.totalKg - totalDeliveredKgForItem;
+
                                                                 return (
                                                                     <React.Fragment key={item.name}>
-                                                                        {months.map((month, index) => (
-                                                                            <tr key={`${item.name}-${month}`} className="border-b bg-white">
-                                                                                {index === 0 ? (
-                                                                                    <td rowSpan={4} className="p-2 align-top border-r font-semibold text-gray-700">{item.name}</td>
-                                                                                ) : null}
-                                                                                <td className="p-2">{month}</td>
-                                                                                <td className="p-2 text-right font-mono">{monthlyKg.toFixed(2).replace('.',',')}</td>
-                                                                                <td className="p-2 text-right font-mono">{formatCurrency(monthlyValue)}</td>
-                                                                            </tr>
-                                                                        ))}
+                                                                        {months.map((month, index) => {
+                                                                            const deliveredInMonth = deliveriesForItem
+                                                                                .filter(d => new Date(d.date + 'T00:00:00').getMonth() === index)
+                                                                                .reduce((sum, d) => sum + (d.kg || 0), 0);
+                                                                            
+                                                                            const remainingInMonth = monthlyKg - deliveredInMonth;
+                                                                            
+                                                                            return (
+                                                                                <tr key={`${item.name}-${month}`} className="border-b bg-white">
+                                                                                    {index === 0 ? (
+                                                                                        <td rowSpan={4} className="p-2 align-top border-r font-semibold text-gray-700">{item.name}</td>
+                                                                                    ) : null}
+                                                                                    <td className="p-2">{month}</td>
+                                                                                    <td className="p-2 text-right font-mono">{monthlyKg.toFixed(2).replace('.',',')}</td>
+                                                                                    <td className="p-2 text-right font-mono font-semibold text-green-600">{deliveredInMonth.toFixed(2).replace('.',',')}</td>
+                                                                                    <td className={`p-2 text-right font-mono font-semibold ${remainingInMonth < 0 ? 'text-red-600' : 'text-blue-600'}`}>{remainingInMonth.toFixed(2).replace('.',',')}</td>
+                                                                                    <td className="p-2 text-right font-mono">{formatCurrency(monthlyValue)}</td>
+                                                                                </tr>
+                                                                            );
+                                                                        })}
                                                                         <tr className="bg-gray-100 font-bold border-b-2 border-gray-300">
                                                                             <td colSpan={2} className="p-2 text-right">Total do Item:</td>
                                                                             <td className="p-2 text-right font-mono">{item.totalKg.toFixed(2).replace('.',',')}</td>
+                                                                            <td className="p-2 text-right font-mono text-green-700">{totalDeliveredKgForItem.toFixed(2).replace('.',',')}</td>
+                                                                            <td className={`p-2 text-right font-mono ${totalRemainingKgForItem < 0 ? 'text-red-600' : 'text-blue-700'}`}>{totalRemainingKgForItem.toFixed(2).replace('.',',')}</td>
                                                                             <td className="p-2 text-right font-mono">{formatCurrency(item.totalKg * item.valuePerKg)}</td>
                                                                         </tr>
                                                                     </React.Fragment>
                                                                 )
                                                             }) : (
-                                                                <tr><td colSpan={4} className="p-4 text-center text-gray-500 italic">Nenhum item neste contrato.</td></tr>
+                                                                <tr><td colSpan={6} className="p-4 text-center text-gray-500 italic">Nenhum item neste contrato.</td></tr>
                                                             )}
                                                         </tbody>
                                                     </table>
