@@ -61,40 +61,83 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
     const handleExportCSV = () => {
         const headers = [
             "Produtor",
-            "Valor Contratado (R$)",
-            "Valor Entregue (R$)",
-            "Progresso (%)",
-            "Peso Contratado (Kg)",
-            "Peso Entregue (Kg)"
+            "CPF",
+            "Item",
+            "Mês",
+            "Peso Previsto (Kg)",
+            "Peso Entregue (Kg)",
+            "Peso Restante (Kg)",
+            "Valor Previsto (R$)",
+            "Observação"
         ];
-
-        const csvRows = [headers.join(';')]; // Usa ponto e vírgula para compatibilidade com Excel em PT-BR
-
+    
+        const csvRows = [headers.join(';')];
+    
         producers.forEach(p => {
-            const contractedValue = p.initialValue;
-            const deliveredValue = p.deliveries.reduce((s, d) => s + d.value, 0);
-            const progress = contractedValue > 0 ? (deliveredValue / contractedValue) * 100 : 0;
-            const contractedKg = p.contractItems.reduce((s, item) => s + item.totalKg, 0);
-            const deliveredKg = p.deliveries.reduce((s, d) => s + d.kg, 0);
-
-            const row = [
-                `"${p.name}"`,
-                String(contractedValue.toFixed(2)).replace('.', ','),
-                String(deliveredValue.toFixed(2)).replace('.', ','),
-                String(progress.toFixed(2)).replace('.', ','),
-                String(contractedKg.toFixed(2)).replace('.', ','),
-                String(deliveredKg.toFixed(2)).replace('.', ','),
-            ];
-            csvRows.push(row.join(';'));
+            csvRows.push(''); // Add a blank line for spacing before each producer
+            
+            p.contractItems.forEach(item => {
+                const monthlyKg = item.totalKg / 4;
+                const monthlyValue = (item.totalKg * item.valuePerKg) / 4;
+                const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
+                const deliveriesForItem = p.deliveries.filter(d => d.item === item.name && d.kg);
+                let surplusFromPreviousMonth = 0;
+    
+                months.forEach((month, index) => {
+                    const deliveredInMonth = deliveriesForItem
+                        .filter(d => new Date(d.date + 'T00:00:00').getMonth() === index)
+                        .reduce((sum, d) => sum + (d.kg || 0), 0);
+                    
+                    const surplusApplied = surplusFromPreviousMonth;
+                    const adjustedMonthlyKg = monthlyKg - surplusApplied;
+                    const remainingInMonth = adjustedMonthlyKg - deliveredInMonth;
+    
+                    surplusFromPreviousMonth = remainingInMonth < 0 ? -remainingInMonth : 0;
+    
+                    const observation = surplusApplied > 0 
+                        ? `Ajustado pelo excedente de ${surplusApplied.toFixed(2).replace('.', ',')}kg do mês anterior.` 
+                        : '';
+    
+                    const row = [
+                        `"${p.name}"`,
+                        `'${p.cpf}`, // Prefix with ' to treat as text in Excel
+                        `"${item.name}"`,
+                        month,
+                        String(adjustedMonthlyKg.toFixed(2)).replace('.', ','),
+                        String(deliveredInMonth.toFixed(2)).replace('.', ','),
+                        String(remainingInMonth.toFixed(2)).replace('.', ','),
+                        String(monthlyValue.toFixed(2)).replace('.', ','),
+                        `"${observation}"`
+                    ];
+                    csvRows.push(row.join(';'));
+                });
+    
+                // Total row for the item
+                const totalDeliveredKgForItem = deliveriesForItem.reduce((sum, d) => sum + (d.kg || 0), 0);
+                const totalRemainingKgForItem = item.totalKg - totalDeliveredKgForItem;
+                const totalRow = [
+                    "",
+                    "",
+                    `"Total ${item.name}"`,
+                    "",
+                    String(item.totalKg.toFixed(2)).replace('.', ','),
+                    String(totalDeliveredKgForItem.toFixed(2)).replace('.', ','),
+                    String(totalRemainingKgForItem.toFixed(2)).replace('.', ','),
+                    String((item.totalKg * item.valuePerKg).toFixed(2)).replace('.', ','),
+                    ""
+                ];
+                csvRows.push(totalRow.join(';'));
+                csvRows.push(''); // Blank line after each item
+            });
         });
-
+    
         const csvString = csvRows.join('\n');
-        const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' }); // BOM for UTF-8
+        const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
         
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', 'relatorio_produtores_ppais_2026.csv');
+        link.setAttribute('download', 'relatorio_detalhado_produtores.csv');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
