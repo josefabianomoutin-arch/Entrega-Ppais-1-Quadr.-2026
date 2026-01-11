@@ -188,8 +188,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                             const surplusApplied = surplusFromPreviousMonth;
                                                                             const adjustedMonthlyKg = monthlyKg - surplusApplied;
                                                                             const remainingInMonth = adjustedMonthlyKg - deliveredInMonth;
-
-                                                                            // Calcula o excedente para o próximo mês
+                                                                            
                                                                             surplusFromPreviousMonth = remainingInMonth < 0 ? -remainingInMonth : 0;
                                                                             
                                                                             return (
@@ -203,7 +202,9 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                                       {surplusApplied > 0 && <span className="text-blue-500 font-bold">*</span>}
                                                                                     </td>
                                                                                     <td className="p-2 text-right font-mono font-semibold text-green-600">{deliveredInMonth.toFixed(2).replace('.',',')}</td>
-                                                                                    <td className="p-2 text-right font-mono font-semibold text-red-600">{remainingInMonth.toFixed(2).replace('.',',')}</td>
+                                                                                    <td className={`p-2 text-right font-mono font-semibold ${remainingInMonth > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                                                        {Math.max(0, remainingInMonth).toFixed(2).replace('.',',')}
+                                                                                    </td>
                                                                                     <td className="p-2 text-right font-mono">{formatCurrency(monthlyValue)}</td>
                                                                                 </tr>
                                                                             );
@@ -212,7 +213,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                                                             <td colSpan={2} className="p-2 text-right">Total do Item:</td>
                                                                             <td className="p-2 text-right font-mono">{item.totalKg.toFixed(2).replace('.',',')}</td>
                                                                             <td className="p-2 text-right font-mono text-green-700">{totalDeliveredKgForItem.toFixed(2).replace('.',',')}</td>
-                                                                            <td className="p-2 text-right font-mono text-red-700">{totalRemainingKgForItem.toFixed(2).replace('.',',')}</td>
+                                                                            <td className={`p-2 text-right font-mono font-bold ${totalRemainingKgForItem > 0 ? 'text-red-700' : 'text-green-700'}`}>{totalRemainingKgForItem.toFixed(2).replace('.',',')}</td>
                                                                             <td className="p-2 text-right font-mono">{formatCurrency(item.totalKg * item.valuePerKg)}</td>
                                                                         </tr>
                                                                     </React.Fragment>
