@@ -167,7 +167,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
             <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                     <h3 className="text-lg font-bold text-gray-800">Detalhes do Contrato por Produtor</h3>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                          <input 
                             type="text" 
                             placeholder="Pesquisar produtor..." 

@@ -6,8 +6,9 @@ import EditProducerModal from './EditProducerModal';
 import AdminGraphs from './AdminGraphs';
 import AdminScheduleView from './AdminScheduleView';
 import AdminInvoices from './AdminInvoices';
+import AdminPerCapita from './AdminPerCapita';
 
-type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices';
+type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita';
 
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
@@ -336,6 +337,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <TabButton tab="graphs" label="Gestão dos Itens"/>
                 <TabButton tab="schedule" label="Agenda de Entregas"/>
                 <TabButton tab="invoices" label="Notas Fiscais"/>
+                <TabButton tab="perCapita" label="Cálculo Per Capta"/>
         </div></div>
 
         {activeTab === 'info' && (
@@ -579,6 +581,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {activeTab === 'schedule' && <AdminScheduleView producers={producers} />}
 
         {activeTab === 'invoices' && <AdminInvoices producers={producers} onReopenInvoice={onReopenInvoice} />}
+
+        {activeTab === 'perCapita' && <AdminPerCapita producers={producers} />}
 
         {editingProducer && (
             <EditProducerModal
