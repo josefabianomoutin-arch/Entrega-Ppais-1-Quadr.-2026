@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Supplier } from '../types';
 
 interface AdminPerCapitaProps {
@@ -11,9 +11,22 @@ const formatCurrency = (value: number) => {
 };
 
 const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
-    const [staffCount, setStaffCount] = useState<number>(0);
-    const [inmateCount, setInmateCount] = useState<number>(0);
+    // Inicializa o estado buscando os valores salvos no localStorage, ou usa 0 como padrão.
+    const [staffCount, setStaffCount] = useState<number>(() => {
+        const saved = localStorage.getItem('perCapitaStaffCount');
+        return saved ? parseInt(saved, 10) : 0;
+    });
+    const [inmateCount, setInmateCount] = useState<number>(() => {
+        const saved = localStorage.getItem('perCapitaInmateCount');
+        return saved ? parseInt(saved, 10) : 0;
+    });
     
+    // Efeito que salva os valores no localStorage sempre que eles forem alterados.
+    useEffect(() => {
+        localStorage.setItem('perCapitaStaffCount', String(staffCount));
+        localStorage.setItem('perCapitaInmateCount', String(inmateCount));
+    }, [staffCount, inmateCount]);
+
     // Agrega o total de Kg e o valor total para cada item de todos os contratos
     const itemData = useMemo(() => {
       const data = new Map<string, { totalKg: number; totalValue: number }>();
