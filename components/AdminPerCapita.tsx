@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Supplier } from '../types';
+import { resolutionData } from './resolutionData';
 
 interface AdminPerCapitaProps {
   suppliers: Supplier[];
@@ -11,7 +12,6 @@ const formatCurrency = (value: number) => {
 };
 
 const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
-    // Inicializa o estado buscando os valores salvos no localStorage, ou usa 0 como padrão.
     const [staffCount, setStaffCount] = useState<number>(() => {
         const saved = localStorage.getItem('perCapitaStaffCount');
         return saved ? parseInt(saved, 10) : 0;
@@ -20,14 +20,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
         const saved = localStorage.getItem('perCapitaInmateCount');
         return saved ? parseInt(saved, 10) : 0;
     });
+    const [showComparison, setShowComparison] = useState(false);
     
-    // Efeito que salva os valores no localStorage sempre que eles forem alterados.
     useEffect(() => {
         localStorage.setItem('perCapitaStaffCount', String(staffCount));
         localStorage.setItem('perCapitaInmateCount', String(inmateCount));
     }, [staffCount, inmateCount]);
 
-    // Agrega o total de Kg e o valor total para cada item de todos os contratos
     const itemData = useMemo(() => {
       const data = new Map<string, { totalKg: number; totalValue: number }>();
       suppliers.forEach(p => {
@@ -43,30 +42,22 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
         .sort((a, b) => a.name.localeCompare(b.name));
     }, [suppliers]);
 
-    // Calcula o denominador da fórmula per capta
     const perCapitaDenominator = useMemo(() => {
         return inmateCount + (staffCount / 3);
     }, [inmateCount, staffCount]);
 
-    // Calcula o valor total do per capta em KG
     const totalPerCaptaKg = useMemo(() => {
-        if (perCapitaDenominator === 0) {
-            return 0;
-        }
+        if (perCapitaDenominator === 0) return 0;
         const totalKgOfAllItems = itemData.reduce((sum, item) => sum + item.totalKg, 0);
         return (totalKgOfAllItems / perCapitaDenominator) / 4;
     }, [itemData, perCapitaDenominator]);
     
-    // Calcula o valor total do per capta em R$
     const totalPerCaptaValue = useMemo(() => {
-        if (perCapitaDenominator === 0) {
-            return 0;
-        }
+        if (perCapitaDenominator === 0) return 0;
         const totalValueOfAllItems = itemData.reduce((sum, item) => sum + item.totalValue, 0);
         return (totalValueOfAllItems / perCapitaDenominator) / 4;
     }, [itemData, perCapitaDenominator]);
 
-    // Calcula o valor total de todos os contratos
     const totalContractValue = useMemo(() => {
         return itemData.reduce((sum, item) => sum + item.totalValue, 0);
     }, [itemData]);
@@ -162,6 +153,78 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                     </tbody>
                 </table>
             </div>
+
+             <div className="text-center my-10 border-t pt-10">
+                <button 
+                    onClick={() => setShowComparison(!showComparison)}
+                    className="px-8 py-4 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition-all transform hover:scale-105"
+                >
+                    {showComparison ? 'Ocultar Comparativo' : 'Comparar com Resolução'}
+                </button>
+            </div>
+
+            {showComparison && (
+                <div className="mt-8 animate-fade-in">
+                    <h3 className="text-2xl font-black text-gray-800 mb-6 text-center uppercase tracking-tighter">
+                        Comparativo com a Resolução (Total Contratado p/ 4 Meses)
+                    </h3>
+                    <div className="overflow-x-auto border rounded-lg">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-100 text-xs uppercase text-gray-600">
+                                <tr>
+                                    <th className="p-3 text-left">Item</th>
+                                    <th className="p-3 text-right">Contratado</th>
+                                    <th className="p-3 text-right">Requerido</th>
+                                    <th className="p-3 text-right">Diferença</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {itemData.map(item => {
+                                    const reference = resolutionData[item.name.toUpperCase()];
+                                    if (!reference) {
+                                        return (
+                                            <tr key={item.name} className="hover:bg-gray-50">
+                                                <td className="p-3 font-semibold text-gray-800">{item.name}</td>
+                                                <td className="p-3 text-right font-mono">{item.totalKg.toFixed(2).replace('.', ',')} kg</td>
+                                                <td colSpan={2} className="p-3 text-center text-gray-400 italic">Não consta na resolução</td>
+                                            </tr>
+                                        );
+                                    }
+
+                                    const requiredTotalRaw = reference.value * perCapitaDenominator * 4;
+                                    const acquiredTotalKg = item.totalKg;
+                                    
+                                    let requiredDisplay = '';
+                                    let differenceDisplay = '';
+                                    let differenceColor = 'text-gray-500';
+
+                                    if (reference.unit === 'g') {
+                                        const requiredTotalKg = requiredTotalRaw / 1000;
+                                        const difference = acquiredTotalKg - requiredTotalKg;
+                                        
+                                        requiredDisplay = `${requiredTotalKg.toFixed(2).replace('.', ',')} kg`;
+                                        differenceDisplay = `${difference >= 0 ? '+' : ''}${difference.toFixed(2).replace('.', ',')} kg`;
+                                        differenceColor = difference >= 0 ? 'text-blue-600' : 'text-red-600';
+                                    } else {
+                                        requiredDisplay = `${requiredTotalRaw.toLocaleString('pt-BR')} ${reference.unit === 'ml' ? 'ml' : 'unidades'}`;
+                                        differenceDisplay = 'N/A';
+                                    }
+
+                                    return (
+                                         <tr key={item.name} className="hover:bg-gray-50">
+                                            <td className="p-3 font-semibold text-gray-800">{item.name}</td>
+                                            <td className="p-3 text-right font-mono">{acquiredTotalKg.toFixed(2).replace('.', ',')} kg</td>
+                                            <td className="p-3 text-right font-mono">{requiredDisplay}</td>
+                                            <td className={`p-3 text-right font-mono font-bold ${differenceColor}`}>{differenceDisplay}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
 
             <style>{`
                 .input-field { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 1rem; border: 2px solid #F3F4F6; border-radius: 1rem; background-color: #fff; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); } 
