@@ -37,11 +37,11 @@ interface ItemCentricInput {
   name: string;
   suppliers: SupplierSlot[];
   // Campos para a UI de entrada
-  ui_unit: 'kg' | 'dz' | 'un' | 'pacote' | 'balde' | 'saco';
+  ui_compositeUnit: string;
+  ui_unit: 'kg' | 'dz' | 'un' | 'pacote' | 'pote' | 'balde' | 'saco';
   ui_quantity: string;
   ui_valuePerUnit: string;
   ui_kgConversion: string;
-  ui_packageSize: string; // Reutilizado para pacotes, baldes e sacos
   // Campos de dados reais (calculados)
   totalKg: string;
   valuePerKg: string;
@@ -54,14 +54,26 @@ const initialItemCentricInput = (): ItemCentricInput => ({
   id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
   name: '',
   suppliers: Array(15).fill(null).map(initialSupplierSlot),
+  ui_compositeUnit: 'kg-1',
   ui_unit: 'kg',
   ui_quantity: '',
   ui_valuePerUnit: '',
   ui_kgConversion: '1',
-  ui_packageSize: '',
   totalKg: '',
   valuePerKg: '',
 });
+
+const unitOptions = [
+    { value: 'kg-1', label: 'Quilograma (Kg)' },
+    { value: 'balde-18', label: 'Balde (18 Kg)' },
+    { value: 'saco-50', label: 'Saco (50 Kg)' },
+    { value: 'pacote-0.5', label: 'Pacote (500g)' },
+    { value: 'pacote-0.4', label: 'Pacote (400g)' },
+    { value: 'pote-0.2', label: 'Pote (200g)' },
+    { value: 'pacote-0.15', label: 'Pacote (150g)' },
+    { value: 'dz-auto', label: 'Dúzia' },
+    { value: 'un-auto', label: 'Unidade' },
+];
 
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
@@ -154,11 +166,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 ...data.supplierCpfs.map(cpf => ({ supplierCpf: cpf })),
                 ...Array(Math.max(0, 15 - data.supplierCpfs.length)).fill(null).map(initialSupplierSlot)
             ],
+            ui_compositeUnit: 'kg-1',
             ui_unit: 'kg',
             ui_quantity: totalKgStr,
             ui_valuePerUnit: valuePerKgStr,
             ui_kgConversion: '1',
-            ui_packageSize: '',
         };
     });
 
@@ -235,17 +247,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const newItems = [...itemCentricContracts];
     let itemToUpdate = { ...newItems[index], [field]: value };
   
-    if (field === 'ui_unit') {
-      itemToUpdate.ui_kgConversion = value === 'kg' ? '1' : '';
-      itemToUpdate.ui_packageSize = '';
-      if (value === 'balde') itemToUpdate.ui_kgConversion = '18';
-      if (value === 'saco') itemToUpdate.ui_kgConversion = '50';
+    if (field === 'ui_compositeUnit') {
+        const [unit, conversion] = value.split('-');
+        itemToUpdate.ui_unit = unit;
+        itemToUpdate.ui_kgConversion = conversion === 'auto' ? '' : conversion;
     }
-  
-    if (field === 'ui_packageSize') {
-      itemToUpdate.ui_kgConversion = value;
-    }
-  
+    
     const unit = itemToUpdate.ui_unit;
     const quantity = parseFloat(String(itemToUpdate.ui_quantity).replace(',', '.')) || 0;
     const valuePerUnit = parseFloat(String(itemToUpdate.ui_valuePerUnit).replace(',', '.')) || 0;
@@ -254,7 +261,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (unit === 'kg') {
       itemToUpdate.totalKg = String(quantity);
       itemToUpdate.valuePerKg = String(valuePerUnit);
-      itemToUpdate.ui_kgConversion = '1';
     } else {
       if (quantity > 0 && kgConversion > 0) {
         itemToUpdate.totalKg = (quantity * kgConversion).toFixed(3);
@@ -462,13 +468,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             const totalItemValue = totalKgNum * valKgNum;
                             const kgPerProd = assignedCount > 0 ? totalKgNum / assignedCount : 0;
                             const valPerProd = assignedCount > 0 ? totalItemValue / assignedCount : 0;
-                            const unitLabels = { kg: 'Kg', dz: 'Dúzia', un: 'Unidade', pacote: 'Pacote', balde: 'Balde', saco: 'Saco' };
-                            const packageOptions = [
-                                { label: '500g', value: '0.5' },
-                                { label: '400g', value: '0.4' },
-                                { label: '200g', value: '0.2' },
-                                { label: '150g', value: '0.15' },
-                            ];
+                            
+                            const selectedUnitOption = unitOptions.find(opt => opt.value === item.ui_compositeUnit) || unitOptions[0];
+                            const currentUnitLabel = selectedUnitOption.label;
                             
                             return (
                             <div key={item.id} className="p-6 border-2 rounded-2xl relative bg-white shadow-lg border-l-[12px] border-l-blue-600 transition-all hover:scale-[1.01]">
@@ -487,51 +489,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome do Produto</label>
                                       <input value={item.name} onChange={(e) => handleItemUIChange(index, 'name', e.target.value.toUpperCase())} placeholder="EX: ARROZ AGULHINHA" className="input-field font-black text-blue-900 uppercase"/>
                                   </div>
-
-                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Unidade</label>
-                                        <select value={item.ui_unit} onChange={(e) => handleItemUIChange(index, 'ui_unit', e.target.value as ItemCentricInput['ui_unit'])} className="input-field font-bold">
-                                            <option value="kg">Quilograma (Kg)</option>
-                                            <option value="pacote">Pacote</option>
-                                            <option value="balde">Balde</option>
-                                            <option value="saco">Saco</option>
-                                            <option value="dz">Dúzia</option>
-                                            <option value="un">Unidade</option>
-                                        </select>
-                                    </div>
-                                    {(item.ui_unit === 'pacote' || item.ui_unit === 'balde' || item.ui_unit === 'saco') && (
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                                                {item.ui_unit === 'pacote' && 'Tamanho do Pacote'}
-                                                {item.ui_unit === 'balde' && 'Tamanho do Balde'}
-                                                {item.ui_unit === 'saco' && 'Tamanho do Saco'}
-                                            </label>
-                                            <select value={item.ui_packageSize} onChange={(e) => handleItemUIChange(index, 'ui_packageSize', e.target.value)} className="input-field font-bold">
-                                                <option value="">-- Selecione --</option>
-                                                {item.ui_unit === 'pacote' && packageOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                                                {item.ui_unit === 'balde' && <option value="18">18kg</option>}
-                                                {item.ui_unit === 'saco' && <option value="50">50kg</option>}
-                                            </select>
-                                        </div>
-                                    )}
+                                  
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Unidade de Medida</label>
+                                    <select 
+                                        value={item.ui_compositeUnit} 
+                                        onChange={(e) => handleItemUIChange(index, 'ui_compositeUnit', e.target.value)} 
+                                        className="input-field font-bold"
+                                    >
+                                        {unitOptions.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
                                   </div>
 
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                       <div className="space-y-1">
-                                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Quantidade ({unitLabels[item.ui_unit]})</label>
+                                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Quantidade ({currentUnitLabel})</label>
                                           <input type="text" value={item.ui_quantity} onChange={(e) => handleItemUIChange(index, 'ui_quantity', e.target.value)} placeholder="0,00" className="input-field font-mono text-lg"/>
                                       </div>
                                       <div className="space-y-1">
-                                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Preço por {unitLabels[item.ui_unit]}</label>
+                                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Preço por {currentUnitLabel}</label>
                                           <input type="text" value={item.ui_valuePerUnit} onChange={(e) => handleItemUIChange(index, 'ui_valuePerUnit', e.target.value)} placeholder="0,00" className="input-field font-mono text-lg text-green-700"/>
                                       </div>
                                   </div>
 
-                                  {(item.ui_unit === 'dz' || item.ui_unit === 'un') && (
+                                  {(item.ui_compositeUnit === 'dz-auto' || item.ui_compositeUnit === 'un-auto') && (
                                       <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                                           <label className="block text-[10px] font-black text-yellow-800 uppercase tracking-widest ml-1">Fator de Conversão</label>
-                                          <p className="text-xs text-yellow-700 mb-1">Informe o peso de uma {unitLabels[item.ui_unit]} em Kg.</p>
+                                          <p className="text-xs text-yellow-700 mb-1">Informe o peso de uma {item.ui_unit === 'dz' ? 'dúzia' : 'unidade'} em Kg.</p>
                                           <input type="text" value={item.ui_kgConversion} onChange={(e) => handleItemUIChange(index, 'ui_kgConversion', e.target.value)} placeholder={`Ex: 0.6 para uma dúzia de ovos`} className="input-field text-sm font-mono"/>
                                       </div>
                                   )}
