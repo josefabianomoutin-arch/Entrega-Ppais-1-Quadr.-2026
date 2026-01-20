@@ -132,7 +132,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {itemData.map(item => {
+                        {itemData.length > 0 ? itemData.map(item => {
                             const perCapitaKg = perCapitaDenominator > 0 ? (item.totalKg / perCapitaDenominator) / 4 : 0;
                             const perCapitaValue = perCapitaDenominator > 0 ? (item.totalValue / perCapitaDenominator) / 4 : 0;
                             return (
@@ -149,7 +149,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     </td>
                                 </tr>
                             );
-                        })}
+                        }) : (
+                            <tr>
+                                <td colSpan={4} className="p-8 text-center text-gray-400 italic">
+                                    Nenhum item de contrato cadastrado para calcular o per capta.
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
@@ -179,7 +185,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {itemData.map(item => {
+                                {itemData.length > 0 ? itemData.map(item => {
                                     const reference = resolutionData[item.name.toUpperCase()];
                                     if (!reference) {
                                         return (
@@ -218,7 +224,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                             <td className={`p-3 text-right font-mono font-bold ${differenceColor}`}>{differenceDisplay}</td>
                                         </tr>
                                     );
-                                })}
+                                }) : (
+                                    <tr>
+                                        <td colSpan={4} className="p-8 text-center text-gray-400 italic">
+                                            Nenhum item de contrato cadastrado para comparar com a resolução.
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
