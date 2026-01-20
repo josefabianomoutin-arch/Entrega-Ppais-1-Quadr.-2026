@@ -3,8 +3,8 @@ import type { Supplier } from '../types';
 
 interface InvoiceInfo {
     id: string;
-    producerName: string;
-    producerCpf: string;
+    supplierName: string;
+    supplierCpf: string;
     invoiceNumber: string;
     date: string; // The earliest date associated with this invoice
     totalValue: number;
@@ -13,7 +13,7 @@ interface InvoiceInfo {
 
 interface AdminInvoicesProps {
     suppliers: Supplier[];
-    onReopenInvoice: (producerCpf: string, invoiceNumber: string) => void;
+    onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -28,18 +28,18 @@ const formatDate = (dateString: string) => {
 
 const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoice }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortKey, setSortKey] = useState<'producerName' | 'date' | 'totalValue'>('date');
+    const [sortKey, setSortKey] = useState<'supplierName' | 'date' | 'totalValue'>('date');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
 
     const allInvoices = useMemo((): InvoiceInfo[] => {
         const invoicesMap = new Map<string, InvoiceInfo>();
 
-        suppliers.forEach(producer => {
+        suppliers.forEach(supplier => {
             const deliveriesByInvoice = new Map<string, any[]>();
             
-            // Group deliveries by invoice number for this producer
-            (producer.deliveries || []).forEach(delivery => {
+            // Group deliveries by invoice number for this supplier
+            (supplier.deliveries || []).forEach(delivery => {
                 if (delivery.invoiceNumber) {
                     const existing = deliveriesByInvoice.get(delivery.invoiceNumber) || [];
                     deliveriesByInvoice.set(delivery.invoiceNumber, [...existing, delivery]);
@@ -47,7 +47,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
             });
 
             deliveriesByInvoice.forEach((deliveries, invoiceNumber) => {
-                const invoiceId = `${producer.cpf}-${invoiceNumber}`;
+                const invoiceId = `${supplier.cpf}-${invoiceNumber}`;
                 const totalValue = deliveries.reduce((sum, d) => sum + (d.value || 0), 0);
                 const items = deliveries.map(d => ({ name: d.item || 'N/A', kg: d.kg || 0, value: d.value || 0 })).filter(d => d.name !== 'AGENDAMENTO PENDENTE');
                 
@@ -57,8 +57,8 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
 
                 invoicesMap.set(invoiceId, {
                     id: invoiceId,
-                    producerName: producer.name,
-                    producerCpf: producer.cpf,
+                    supplierName: supplier.name,
+                    supplierCpf: supplier.cpf,
                     invoiceNumber,
                     date: earliestDate,
                     totalValue,
@@ -72,14 +72,14 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
     
     const filteredAndSortedInvoices = useMemo(() => {
         const filtered = allInvoices.filter(invoice => 
-            invoice.producerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             invoice.invoiceNumber.includes(searchTerm)
         );
 
         return filtered.sort((a, b) => {
             let comp = 0;
-            if (sortKey === 'producerName') {
-                comp = a.producerName.localeCompare(b.producerName);
+            if (sortKey === 'supplierName') {
+                comp = a.supplierName.localeCompare(b.supplierName);
             } else if (sortKey === 'date') {
                 comp = new Date(b.date).getTime() - new Date(a.date).getTime();
             } else if (sortKey === 'totalValue') {
@@ -89,7 +89,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
         });
     }, [allInvoices, searchTerm, sortKey, sortDirection]);
 
-    const handleSort = (key: 'producerName' | 'date' | 'totalValue') => {
+    const handleSort = (key: 'supplierName' | 'date' | 'totalValue') => {
         if (key === sortKey) {
             setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
         } else {
@@ -102,10 +102,10 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
         setExpandedInvoiceId(prev => prev === invoiceId ? null : invoiceId);
     };
 
-    const handleReopenClick = (producerCpf: string, invoiceNumber: string) => {
+    const handleReopenClick = (supplierCpf: string, invoiceNumber: string) => {
         const confirmationMessage = `Tem certeza que deseja reabrir esta nota fiscal (NF: ${invoiceNumber})?\n\nTodas as entregas associadas serão revertidas para UM ÚNICO 'AGENDAMENTO PENDENTE' e o fornecedor precisará faturá-las novamente.\n\nEsta ação não pode ser desfeita.`;
         if (window.confirm(confirmationMessage)) {
-            onReopenInvoice(producerCpf, invoiceNumber);
+            onReopenInvoice(supplierCpf, invoiceNumber);
         }
     };
 
@@ -129,7 +129,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                         <tr>
-                            <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('producerName')}>Fornecedor</th>
+                            <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('supplierName')}>Fornecedor</th>
                             <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('date')}>Data</th>
                             <th className="p-3 text-left">Nº Nota Fiscal</th>
                             <th className="p-3 text-right cursor-pointer" onClick={() => handleSort('totalValue')}>Valor Total</th>
@@ -143,7 +143,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                             return (
                                 <React.Fragment key={invoice.id}>
                                     <tr className="border-b hover:bg-gray-50 transition-colors">
-                                        <td className="p-3 font-bold text-gray-800">{invoice.producerName}</td>
+                                        <td className="p-3 font-bold text-gray-800">{invoice.supplierName}</td>
                                         <td className="p-3 font-mono">{formatDate(invoice.date)}</td>
                                         <td className="p-3 font-mono">{invoice.invoiceNumber}</td>
                                         <td className="p-3 text-right font-mono font-bold text-green-700">{formatCurrency(invoice.totalValue)}</td>
@@ -154,7 +154,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                         </td>
                                         <td className="p-3 text-center">
                                              <button 
-                                                onClick={() => handleReopenClick(invoice.producerCpf, invoice.invoiceNumber)}
+                                                onClick={() => handleReopenClick(invoice.supplierCpf, invoice.invoiceNumber)}
                                                 className="bg-orange-100 text-orange-700 hover:bg-orange-200 text-xs font-bold px-3 py-1 rounded-full transition-colors"
                                                 title="Reverter para agendamento pendente"
                                              >

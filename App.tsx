@@ -10,7 +10,7 @@ import { firebaseConfig } from './firebaseConfig';
 // Inicializa o Firebase e obtém uma referência ao banco de dados
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
-const suppliersRef = ref(database, 'producers');
+const suppliersRef = ref(database, 'suppliers');
 
 
 const App: React.FC = () => {
@@ -92,7 +92,7 @@ const App: React.FC = () => {
       if (supplierToUpdate) {
         console.log(`Iniciando exclusão de agendamentos para ${supplierToUpdate.name}...`);
         
-        const supplierDeliveriesRef = ref(database, `producers/${supplierToUpdate.cpf}/deliveries`);
+        const supplierDeliveriesRef = ref(database, `suppliers/${supplierToUpdate.cpf}/deliveries`);
         
         set(supplierDeliveriesRef, [])
           .then(() => {
@@ -128,7 +128,7 @@ const App: React.FC = () => {
 
         // Usa um método mais direto e seguro, apagando apenas o nó de 'deliveries' de cada fornecedor.
         const updatePromises = suppliersToClear.map(supplier => {
-          const deliveriesRef = ref(database, `producers/${supplier.cpf}/deliveries`);
+          const deliveriesRef = ref(database, `suppliers/${supplier.cpf}/deliveries`);
           // set(..., null) apaga o nó no Firebase Realtime Database
           return set(deliveriesRef, null);
         });
@@ -236,7 +236,7 @@ const App: React.FC = () => {
       // Usa uma transação para garantir uma operação de escrita atômica e segura.
       // Esta é a verificação definitiva no servidor.
       const transactionResult = await runTransaction(suppliersRef, (currentData) => {
-        // currentData será null se o nó 'producers' não existir, ou um objeto.
+        // currentData será null se o nó 'suppliers' não existir, ou um objeto.
         const suppliersObject = currentData || {};
 
         // Verificação final no servidor: se o CPF/CNPJ já existir, aborta a transação.
@@ -358,7 +358,7 @@ const App: React.FC = () => {
   };
 
   const scheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
-    const supplierDeliveriesRef = ref(database, `producers/${supplierCpf}/deliveries`);
+    const supplierDeliveriesRef = ref(database, `suppliers/${supplierCpf}/deliveries`);
 
     try {
         await runTransaction(supplierDeliveriesRef, (currentDeliveries: Delivery[] | null) => {

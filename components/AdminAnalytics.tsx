@@ -19,29 +19,29 @@ const formatDate = (dateString: string) => {
 const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     const [sortKey, setSortKey] = useState<'name' | 'progress' | 'delivered' | 'contracted'>('progress');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-    const [producerSearchTerm, setProducerSearchTerm] = useState('');
-    const [expandedProducerCpf, setExpandedProducerCpf] = useState<string | null>(null);
+    const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
+    const [expandedSupplierCpf, setExpandedSupplierCpf] = useState<string | null>(null);
 
     const analyticsData = useMemo(() => {
         const totalContracted = suppliers.reduce((sum, p) => sum + p.initialValue, 0);
-        const totalDelivered = suppliers.reduce((sum, p) => sum + p.deliveries.reduce((dSum, d) => dSum + d.value, 0), 0);
+        const totalDelivered = suppliers.reduce((sum, p) => sum + p.deliveries.reduce((dSum, d) => dSum + (d.value || 0), 0), 0);
         
         return {
             totalContracted,
             totalDelivered,
             progress: totalContracted > 0 ? (totalDelivered / totalContracted) * 100 : 0,
-            producerCount: suppliers.length,
+            supplierCount: suppliers.length,
         };
     }, [suppliers]);
     
     const filteredSuppliers = useMemo(() => {
-      return suppliers.filter(p => p.name.toLowerCase().includes(producerSearchTerm.toLowerCase()));
-    }, [suppliers, producerSearchTerm]);
+      return suppliers.filter(p => p.name.toLowerCase().includes(supplierSearchTerm.toLowerCase()));
+    }, [suppliers, supplierSearchTerm]);
 
     const sortedSuppliers = useMemo(() => {
       return [...filteredSuppliers].sort((a, b) => {
-            const aDelivered = a.deliveries.reduce((sum, d) => sum + d.value, 0);
-            const bDelivered = b.deliveries.reduce((sum, d) => sum + d.value, 0);
+            const aDelivered = a.deliveries.reduce((sum, d) => sum + (d.value || 0), 0);
+            const bDelivered = b.deliveries.reduce((sum, d) => sum + (d.value || 0), 0);
             const aProgress = a.initialValue > 0 ? aDelivered / a.initialValue : 0;
             const bProgress = b.initialValue > 0 ? bDelivered / b.initialValue : 0;
             let comp = 0;
@@ -74,7 +74,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
         const csvRows = [headers.join(';')];
     
         suppliers.forEach(p => {
-            csvRows.push(''); // Add a blank line for spacing before each producer
+            csvRows.push(''); // Add a blank line for spacing before each supplier
             
             p.contractItems.forEach(item => {
                 const monthlyKg = item.totalKg / 4;
@@ -160,7 +160,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                 </div>
                 <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-indigo-500">
                     <p className="text-xs text-gray-400 font-bold uppercase">Fornecedores</p>
-                    <p className="text-xl font-black text-indigo-800">{analyticsData.producerCount}</p>
+                    <p className="text-xl font-black text-indigo-800">{analyticsData.supplierCount}</p>
                 </div>
             </div>
 
@@ -171,8 +171,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                          <input 
                             type="text" 
                             placeholder="Pesquisar fornecedor..." 
-                            value={producerSearchTerm} 
-                            onChange={(e) => setProducerSearchTerm(e.target.value)}
+                            value={supplierSearchTerm} 
+                            onChange={(e) => setSupplierSearchTerm(e.target.value)}
                             className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all"
                         />
                          <button onClick={handleExportCSV} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">
@@ -182,14 +182,14 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                     </div>
                 </div>
                 <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                   {filteredSuppliers.length > 0 ? filteredSuppliers.map(producer => {
-                       const isExpanded = expandedProducerCpf === producer.cpf;
+                   {filteredSuppliers.length > 0 ? filteredSuppliers.map(supplier => {
+                       const isExpanded = expandedSupplierCpf === supplier.cpf;
                        return (
-                           <div key={producer.cpf} className={`border rounded-xl transition-all ${isExpanded ? 'ring-2 ring-blue-500 bg-white' : 'bg-gray-50/50 hover:bg-white'}`}>
-                               <div className="p-4 cursor-pointer flex justify-between items-center" onClick={() => setExpandedProducerCpf(isExpanded ? null : producer.cpf)}>
-                                   <span className="font-bold text-gray-700">{producer.name}</span>
+                           <div key={supplier.cpf} className={`border rounded-xl transition-all ${isExpanded ? 'ring-2 ring-blue-500 bg-white' : 'bg-gray-50/50 hover:bg-white'}`}>
+                               <div className="p-4 cursor-pointer flex justify-between items-center" onClick={() => setExpandedSupplierCpf(isExpanded ? null : supplier.cpf)}>
+                                   <span className="font-bold text-gray-700">{supplier.name}</span>
                                    <div className="flex items-center gap-4">
-                                       <span className="text-sm font-bold text-blue-600">{formatCurrency(producer.initialValue)}</span>
+                                       <span className="text-sm font-bold text-blue-600">{formatCurrency(supplier.initialValue)}</span>
                                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                                    </div>
                                </div>
@@ -210,12 +210,12 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {producer.contractItems.length > 0 ? producer.contractItems.map(item => {
+                                                            {supplier.contractItems.length > 0 ? supplier.contractItems.map(item => {
                                                                 const monthlyKg = item.totalKg / 4;
                                                                 const monthlyValue = (item.totalKg * item.valuePerKg) / 4;
                                                                 const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
                                                                 
-                                                                const deliveriesForItem = producer.deliveries.filter(d => d.item === item.name && d.kg);
+                                                                const deliveriesForItem = supplier.deliveries.filter(d => d.item === item.name && d.kg);
                                                                 const totalDeliveredKgForItem = deliveriesForItem.reduce((sum, d) => sum + (d.kg || 0), 0);
                                                                 const totalRemainingKgForItem = item.totalKg - totalDeliveredKgForItem;
 
@@ -282,12 +282,12 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {producer.deliveries.length > 0 ? producer.deliveries.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(delivery => (
+                                                            {supplier.deliveries.length > 0 ? supplier.deliveries.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(delivery => (
                                                                 <tr key={delivery.id} className="border-b last:border-b-0 bg-white">
                                                                     <td className="p-2 font-mono">{formatDate(delivery.date)}</td>
                                                                     <td className="p-2">{delivery.item}</td>
                                                                     <td className="p-2 font-mono">{delivery.invoiceNumber || '-'}</td>
-                                                                    <td className="p-2 text-right font-mono">{formatCurrency(delivery.value)}</td>
+                                                                    <td className="p-2 text-right font-mono">{formatCurrency(delivery.value || 0)}</td>
                                                                     <td className="p-2 text-center">
                                                                         {delivery.invoiceUploaded ? (
                                                                             <span className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full">Enviada</span>
@@ -326,7 +326,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                         </thead>
                         <tbody>
                             {sortedSuppliers.length > 0 ? sortedSuppliers.map(p => {
-                                const deliveredValue = p.deliveries.reduce((s, d) => s + d.value, 0);
+                                const deliveredValue = p.deliveries.reduce((s, d) => s + (d.value || 0), 0);
                                 const contractedValue = p.initialValue;
                                 const progress = contractedValue > 0 ? (deliveredValue / contractedValue) * 100 : 0;
                                 return (

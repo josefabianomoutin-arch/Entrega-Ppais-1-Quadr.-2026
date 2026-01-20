@@ -22,7 +22,7 @@ interface AdminDashboardProps {
   onTabChange: (tab: AdminTab) => void;
   registrationStatus: { success: boolean; message: string } | null;
   onClearRegistrationStatus: () => void;
-  onReopenInvoice: (producerCpf: string, invoiceNumber: string) => Promise<void>;
+  onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => Promise<void>;
 }
 
 const formatCurrency = (value: number) => {
