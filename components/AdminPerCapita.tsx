@@ -29,6 +29,15 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ producers }) => {
         return inmateCount + (staffCount / 3);
     }, [inmateCount, staffCount]);
 
+    // Calcula o valor total do per capta somando todos os itens
+    const totalPerCaptaValue = useMemo(() => {
+        if (perCapitaDenominator === 0) {
+            return 0;
+        }
+        const totalKgOfAllItems = itemData.reduce((sum, item) => sum + item.totalKg, 0);
+        return (totalKgOfAllItems / perCapitaDenominator) / 4;
+    }, [itemData, perCapitaDenominator]);
+
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-5xl mx-auto border-t-8 border-green-500 animate-fade-in">
             <div className="text-center mb-10">
@@ -41,7 +50,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ producers }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
                 <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">População Carcerária</label>
                     <input 
@@ -65,6 +74,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ producers }) => {
                 <div className="bg-blue-50/50 p-4 rounded-xl text-center flex flex-col justify-center border">
                     <p className="text-[10px] text-blue-500 uppercase font-black tracking-tighter mb-1">Total de Consumidores (Base)</p>
                     <p className="text-2xl font-black text-blue-700">{perCapitaDenominator.toLocaleString('pt-BR', {maximumFractionDigits: 2})}</p>
+                </div>
+                 <div className="bg-green-50/50 p-4 rounded-xl text-center flex flex-col justify-center border border-green-200">
+                    <p className="text-[10px] text-green-600 uppercase font-black tracking-tighter mb-1">Total Per Capta Mensal</p>
+                    <p className="text-2xl font-black text-green-700">
+                        {totalPerCaptaValue.toFixed(4).replace('.', ',')}
+                        <span className="text-base font-medium ml-1">Kg</span>
+                    </p>
                 </div>
             </div>
 
