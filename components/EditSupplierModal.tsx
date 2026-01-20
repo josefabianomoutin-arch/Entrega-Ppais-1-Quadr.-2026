@@ -1,20 +1,22 @@
 import React, { useState } from 'react';
 import type { Supplier } from '../types';
+import WeekSelector from './WeekSelector';
 
 interface EditSupplierModalProps {
   supplier: Supplier;
   suppliers: Supplier[]; // For validation
   onClose: () => void;
-  onSave: (oldCpf: string, newName: string, newCpf: string) => Promise<string | null>;
+  onSave: (oldCpf: string, newName: string, newCpf: string, newAllowedWeeks: number[]) => Promise<string | null>;
 }
 
 const EditSupplierModal: React.FC<EditSupplierModalProps> = ({ supplier, suppliers, onClose, onSave }) => {
   const [name, setName] = useState(supplier.name);
   const [cpf, setCpf] = useState(supplier.cpf);
+  const [allowedWeeks, setAllowedWeeks] = useState<number[]>(supplier.allowedWeeks || []);
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const hasChanges = name !== supplier.name || cpf !== supplier.cpf;
+  const hasChanges = name !== supplier.name || cpf !== supplier.cpf || JSON.stringify(allowedWeeks.sort()) !== JSON.stringify((supplier.allowedWeeks || []).sort());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +46,7 @@ const EditSupplierModal: React.FC<EditSupplierModalProps> = ({ supplier, supplie
     }
 
     setIsSaving(true);
-    const saveError = await onSave(supplier.cpf, finalName, finalCpf);
+    const saveError = await onSave(supplier.cpf, finalName, finalCpf, allowedWeeks);
     setIsSaving(false);
 
     if (saveError) {
@@ -55,7 +57,7 @@ const EditSupplierModal: React.FC<EditSupplierModalProps> = ({ supplier, supplie
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4" aria-modal="true" role="dialog">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in-up">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl p-6 animate-fade-in-up">
         <div className="flex justify-between items-start mb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Editar Fornecedor</h2>
@@ -65,31 +67,42 @@ const EditSupplierModal: React.FC<EditSupplierModalProps> = ({ supplier, supplie
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <label htmlFor="edit-name" className="block text-sm font-medium text-gray-700">Nome do Fornecedor</label>
-            <input 
-              id="edit-name"
-              type="text"
-              value={name} 
-              onChange={(e) => setName(e.target.value.toUpperCase())} 
-              required 
-              placeholder="NOME DO FORNECEDOR" 
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label htmlFor="edit-name" className="block text-sm font-medium text-gray-700">Nome do Fornecedor</label>
+              <input 
+                id="edit-name"
+                type="text"
+                value={name} 
+                onChange={(e) => setName(e.target.value.toUpperCase())} 
+                required 
+                placeholder="NOME DO FORNECEDOR" 
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="edit-cpf" className="block text-sm font-medium text-gray-700">CPF/CNPJ (Senha)</label>
+              <input 
+                id="edit-cpf"
+                type="text"
+                value={cpf} 
+                onChange={(e) => setCpf(e.target.value.replace(/[^\d]/g, ''))}
+                maxLength={14}
+                required 
+                placeholder="CPF/CNPJ (APENAS NÚMEROS)" 
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 font-mono"
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="edit-cpf" className="block text-sm font-medium text-gray-700">CPF/CNPJ (Senha)</label>
-            <input 
-              id="edit-cpf"
-              type="text"
-              value={cpf} 
-              onChange={(e) => setCpf(e.target.value.replace(/[^\d]/g, ''))}
-              maxLength={14}
-              required 
-              placeholder="CPF/CNPJ (APENAS NÚMEROS)" 
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 font-mono"
+          <div className="space-y-2 pt-4 border-t">
+            <label className="block text-sm font-medium text-gray-700">Semanas Disponíveis para Agendamento</label>
+            <WeekSelector
+                selectedWeeks={allowedWeeks}
+                onWeekToggle={(week) => setAllowedWeeks(p => p.includes(week) ? p.filter(w => w !== week) : [...p, week])}
             />
+            <p className="text-xs text-gray-500 mt-1">Selecione as semanas em que este fornecedor pode fazer entregas. Deixe em branco para permitir todas as semanas.</p>
           </div>
 
           {error && <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm text-center font-semibold">{error}</p>}

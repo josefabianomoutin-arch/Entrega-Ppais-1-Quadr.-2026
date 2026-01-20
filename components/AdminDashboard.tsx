@@ -13,7 +13,7 @@ type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'sc
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
   onUpdateSuppliers: (updatedSuppliers: Supplier[]) => void;
-  onUpdateSupplier: (oldCpf: string, newName: string, newCpf: string) => Promise<string | null>;
+  onUpdateSupplier: (oldCpf: string, newName: string, newCpf: string, newAllowedWeeks: number[]) => Promise<string | null>;
   onLogout: () => void;
   suppliers: Supplier[];
   onResetData: () => void;
@@ -33,21 +33,36 @@ const formatCurrency = (value: number) => {
 // Tipos para o estado da UI de Gestão por Item
 interface SupplierSlot { supplierCpf: string; }
 interface ItemCentricInput {
+  id: string;
   name: string;
+  suppliers: SupplierSlot[];
+  // Campos para a UI de entrada
+  ui_unit: 'kg' | 'dz' | 'un' | 'pacote' | 'balde' | 'saco';
+  ui_quantity: string;
+  ui_valuePerUnit: string;
+  ui_kgConversion: string;
+  ui_packageSize: string; // Reutilizado para pacotes, baldes e sacos
+  // Campos de dados reais (calculados)
   totalKg: string;
   valuePerKg: string;
-  suppliers: SupplierSlot[];
-  id: string; // Adicionado para rastrear a ordem de criação
 }
 
+
 const initialSupplierSlot = (): SupplierSlot => ({ supplierCpf: '' });
+
 const initialItemCentricInput = (): ItemCentricInput => ({
-  name: '', 
-  totalKg: '', 
-  valuePerKg: '',
+  id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+  name: '',
   suppliers: Array(15).fill(null).map(initialSupplierSlot),
-  id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  ui_unit: 'kg',
+  ui_quantity: '',
+  ui_valuePerUnit: '',
+  ui_kgConversion: '1',
+  ui_packageSize: '',
+  totalKg: '',
+  valuePerKg: '',
 });
+
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
     onRegister, 
@@ -108,49 +123,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Sincroniza o estado da UI de contratos com os dados mais recentes dos fornecedores
   useEffect(() => {
-    // Roda a sincronização apenas quando a aba de contratos estiver ativa.
-    if (activeTab !== 'contracts') {
-      return;
-    }
+    if (activeTab !== 'contracts') return;
 
     const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; supplierCpfs: string[]; order: number }>();
 
     suppliers.forEach(supplier => {
         (supplier.contractItems || []).forEach(item => {
-            const order = item.order ?? Infinity; // Default para itens antigos sem ordem
-            
+            const order = item.order ?? Infinity;
             if (!itemsMap.has(item.name)) {
                 itemsMap.set(item.name, { totalKg: 0, valuePerKg: item.valuePerKg, supplierCpfs: [], order: order });
             }
-
             const entry = itemsMap.get(item.name)!;
             entry.totalKg += item.totalKg;
-
-            // Mantém o menor número de 'order' encontrado para um item, que representa sua criação original
-            if (order < entry.order) {
-                entry.order = order;
-            }
-
-            if (!entry.supplierCpfs.includes(supplier.cpf)) {
-                entry.supplierCpfs.push(supplier.cpf);
-            }
+            if (order < entry.order) entry.order = order;
+            if (!entry.supplierCpfs.includes(supplier.cpf)) entry.supplierCpfs.push(supplier.cpf);
         });
     });
 
-    // Converte o Map para um array e ordena pela propriedade 'order'
     const sortedItems = Array.from(itemsMap.entries()).sort(([, a], [, b]) => a.order - b.order);
 
-    // Reconstrói o estado da UI a partir dos itens ordenados
     const uiState: ItemCentricInput[] = sortedItems.map(([name, data], index) => {
+        const totalKgStr = String(data.totalKg);
+        const valuePerKgStr = String(data.valuePerKg);
         return {
             id: `item-loaded-${index}-${name}`,
             name,
-            totalKg: String(data.totalKg),
-            valuePerKg: String(data.valuePerKg),
+            totalKg: totalKgStr,
+            valuePerKg: valuePerKgStr,
             suppliers: [
                 ...data.supplierCpfs.map(cpf => ({ supplierCpf: cpf })),
                 ...Array(Math.max(0, 15 - data.supplierCpfs.length)).fill(null).map(initialSupplierSlot)
-            ]
+            ],
+            ui_unit: 'kg',
+            ui_quantity: totalKgStr,
+            ui_valuePerUnit: valuePerKgStr,
+            ui_kgConversion: '1',
+            ui_packageSize: '',
         };
     });
 
@@ -169,14 +177,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsRegistering(false);
   };
   
-  const handleSaveSupplierUpdate = async (oldCpf: string, newName: string, newCpf: string): Promise<string | null> => {
-    const errorMessage = await onUpdateSupplier(oldCpf, newName, newCpf);
+  const handleSaveSupplierUpdate = async (oldCpf: string, newName: string, newCpf: string, newAllowedWeeks: number[]): Promise<string | null> => {
+    const errorMessage = await onUpdateSupplier(oldCpf, newName, newCpf, newAllowedWeeks);
     if (errorMessage) {
         setUpdateStatus({ success: false, message: errorMessage });
-        return errorMessage; // Retorna o erro para o modal
+        return errorMessage;
     } else {
         setUpdateStatus({ success: true, message: 'Fornecedor atualizado com sucesso!' });
-        setEditingSupplier(null); // Fecha o modal em caso de sucesso
+        setEditingSupplier(null);
         return null;
     }
   };
@@ -198,8 +206,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             const totalKg = parseFloat(uiItem.totalKg);
             const valuePerKg = parseFloat(uiItem.valuePerKg);
             
-            if (isNaN(totalKg) || totalKg <= 0 || isNaN(valuePerKg) || valuePerKg <= 0) {
-                setContractError(`O item "${name}" (atribuído a fornecedores) possui valores inválidos.`);
+            if (isNaN(totalKg) || totalKg <= 0 || isNaN(valuePerKg) || valuePerKg < 0) { // value can be 0
+                setContractError(`O item "${name}" possui valores inválidos para peso ou preço. Verifique os campos de quantidade, preço e conversão.`);
                 return;
             }
 
@@ -208,18 +216,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             for (const supplierCpf of assignedSupplierCpfs) {
                 const supplier = supplierMap.get(supplierCpf);
                 if (supplier) {
-                    supplier.contractItems.push({
-                        name,
-                        totalKg: kgPerSupplier,
-                        valuePerKg,
-                        order: index // Salva a posição do item na lista como 'order'
-                    });
+                    supplier.contractItems.push({ name, totalKg: kgPerSupplier, valuePerKg, order: index });
                 }
             }
         }
     }
 
-    // Recalcula o valor inicial total de cada fornecedor
     updatedSuppliers.forEach(p => {
         p.initialValue = p.contractItems.reduce((sum, item) => sum + (item.totalKg * item.valuePerKg), 0);
     });
@@ -229,11 +231,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTimeout(() => setContractSuccess(''), 3000);
   };
   
-  const handleItemChange = (index: number, field: 'name' | 'totalKg' | 'valuePerKg', value: string) => {
+  const handleItemUIChange = (index: number, field: keyof ItemCentricInput, value: any) => {
     const newItems = [...itemCentricContracts];
-    newItems[index] = { ...newItems[index], [field]: value };
+    let itemToUpdate = { ...newItems[index], [field]: value };
+  
+    if (field === 'ui_unit') {
+      itemToUpdate.ui_kgConversion = value === 'kg' ? '1' : '';
+      itemToUpdate.ui_packageSize = '';
+      if (value === 'balde') itemToUpdate.ui_kgConversion = '18';
+      if (value === 'saco') itemToUpdate.ui_kgConversion = '50';
+    }
+  
+    if (field === 'ui_packageSize') {
+      itemToUpdate.ui_kgConversion = value;
+    }
+  
+    const unit = itemToUpdate.ui_unit;
+    const quantity = parseFloat(String(itemToUpdate.ui_quantity).replace(',', '.')) || 0;
+    const valuePerUnit = parseFloat(String(itemToUpdate.ui_valuePerUnit).replace(',', '.')) || 0;
+    const kgConversion = parseFloat(String(itemToUpdate.ui_kgConversion).replace(',', '.')) || 0;
+  
+    if (unit === 'kg') {
+      itemToUpdate.totalKg = String(quantity);
+      itemToUpdate.valuePerKg = String(valuePerUnit);
+      itemToUpdate.ui_kgConversion = '1';
+    } else {
+      if (quantity > 0 && kgConversion > 0) {
+        itemToUpdate.totalKg = (quantity * kgConversion).toFixed(3);
+        itemToUpdate.valuePerKg = (valuePerUnit / kgConversion).toFixed(3);
+      } else {
+        itemToUpdate.totalKg = '0';
+        itemToUpdate.valuePerKg = '0';
+      }
+    }
+  
+    newItems[index] = itemToUpdate;
     setItemCentricContracts(newItems);
   };
+  
 
   const handleSupplierSelectionChange = (itemIndex: number, slotIndex: number, supplierCpf: string) => {
     const newItems = [...itemCentricContracts];
@@ -257,9 +292,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleResetClick = () => {
-      onResetData();
-  };
+  const handleResetClick = () => { onResetData(); };
   
   const handleBackupData = () => {
       const jsonData = JSON.stringify(suppliers, null, 2);
@@ -269,48 +302,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const date = new Date().toISOString().slice(0, 10);
       a.href = url;
       a.download = `backup-fornecedores-ppais-2026-${date}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
   };
 
   const handleRestoreClick = () => {
-    if (!restoreFile) {
-      setRestoreMessage({ type: 'error', text: 'Nenhum arquivo selecionado.' });
-      return;
-    }
-    
-    if (!window.confirm('ATENÇÃO: A restauração irá APAGAR TODOS os dados da nuvem e substituí-los pelo conteúdo do arquivo de backup. Esta ação é irreversível e afetará todos os usuários. Deseja continuar?')) {
-        return;
-    }
+    if (!restoreFile) { setRestoreMessage({ type: 'error', text: 'Nenhum arquivo selecionado.' }); return; }
+    if (!window.confirm('ATENÇÃO: A restauração irá APAGAR TODOS os dados da nuvem e substituí-los pelo conteúdo do arquivo de backup. Esta ação é irreversível e afetará todos os usuários. Deseja continuar?')) return;
 
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
         const content = event.target?.result as string;
         const backupSuppliers: Supplier[] = JSON.parse(content);
-        
-        // Validação simples do arquivo
-        if (!Array.isArray(backupSuppliers) || (backupSuppliers.length > 0 && !backupSuppliers[0].cpf)) {
-           throw new Error('Arquivo de backup inválido ou corrompido.');
-        }
-
+        if (!Array.isArray(backupSuppliers) || (backupSuppliers.length > 0 && !backupSuppliers[0].cpf)) throw new Error('Arquivo de backup inválido ou corrompido.');
         const success = await onRestoreData(backupSuppliers);
         if (success) {
-          setRestoreMessage({ type: 'success', text: 'Dados restaurados com sucesso na nuvem!' });
-          setRestoreFile(null);
+          setRestoreMessage({ type: 'success', text: 'Dados restaurados com sucesso na nuvem!' }); setRestoreFile(null);
         } else {
            throw new Error('Falha na operação de restauração.');
         }
-
-      } catch (error: any) {
-        setRestoreMessage({ type: 'error', text: `Erro: ${error.message}` });
-      }
+      } catch (error: any) { setRestoreMessage({ type: 'error', text: `Erro: ${error.message}` }); }
     };
-    reader.onerror = () => {
-      setRestoreMessage({ type: 'error', text: 'Erro ao ler o arquivo.' });
-    };
+    reader.onerror = () => { setRestoreMessage({ type: 'error', text: 'Erro ao ler o arquivo.' }); };
     reader.readAsText(restoreFile);
   };
 
@@ -346,7 +360,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <h2 className="text-2xl font-black mb-2 text-gray-700 uppercase tracking-tight">Como os Dados Funcionam?</h2>
                     <p className="text-gray-500 mb-6">Todos os dados agora são salvos em um <strong>banco de dados central na nuvem</strong>. A sincronização entre todos os computadores é <strong>automática e em tempo real</strong>.</p>
                     <p className="text-sm text-gray-500 mb-6">As ferramentas abaixo são para <strong>segurança e recuperação de desastres</strong>, não para o uso diário.</p>
-                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="bg-gray-50 p-4 rounded-xl border-l-4 border-blue-400">
                             <h3 className="font-bold text-gray-800 mb-2">1. Backup (Cópia de Segurança)</h3>
@@ -358,12 +371,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                     </div>
                 </div>
-
                 <div className="bg-red-50 p-6 rounded-2xl shadow-md border-2 border-dashed border-red-300">
                     <h3 className="text-lg font-bold mb-4 text-center text-red-800 uppercase tracking-tighter">Ferramentas de Gerenciamento</h3>
                     <div className="space-y-4">
                         <button onClick={handleBackupData} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors text-sm uppercase">Fazer Backup (Salvar cópia local)</button>
-                        
                         <div className="pt-2 border-t-2 border-red-200">
                            <div className="flex items-center space-x-2">
                                 <label htmlFor="restore-input" className="w-full cursor-pointer text-center py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl transition-colors text-sm uppercase">Selecionar Arquivo de Backup</label>
@@ -377,7 +388,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             )}
                             {restoreMessage.text && <p className={`text-xs text-center mt-2 font-bold ${restoreMessage.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>{restoreMessage.text}</p>}
                         </div>
-                        
                         <button onClick={handleResetClick} className="w-full py-3 bg-red-800 hover:bg-red-900 text-white font-bold rounded-xl transition-colors text-sm uppercase mt-4">Resetar Tudo (Apaga dados da nuvem)</button>
                     </div>
                 </div>
@@ -412,11 +422,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-xl border-t-8 border-blue-600 overflow-hidden">
                 <h2 className="text-2xl font-black mb-2 text-gray-700 uppercase tracking-tight">Fornecedores Cadastrados ({suppliers.length})</h2>
-                {updateStatus && (
-                    <p className={`text-xs text-center p-2 my-2 rounded-lg font-bold ${updateStatus.success ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50'}`}>
-                        {updateStatus.message}
-                    </p>
-                )}
+                {updateStatus && ( <p className={`text-xs text-center p-2 my-2 rounded-lg font-bold ${updateStatus.success ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50'}`}>{updateStatus.message}</p> )}
                 <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                     {suppliers.length > 0 ? suppliers.map(p => (
                     <div key={p.cpf} className="p-4 bg-gray-50 rounded-xl flex justify-between items-center text-sm border border-gray-100 hover:bg-white transition-colors group">
@@ -426,11 +432,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="font-bold text-[10px] text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">{p.contractItems.length} itens</span>
-                            <button 
-                                onClick={() => setEditingSupplier(p)}
-                                className="text-gray-400 hover:text-blue-600 p-2 rounded-full transition-colors"
-                                aria-label={`Editar ${p.name}`}
-                            >
+                            <button onClick={() => setEditingSupplier(p)} className="text-gray-400 hover:text-blue-600 p-2 rounded-full transition-colors" aria-label={`Editar ${p.name}`}>
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z" /></svg>
                             </button>
                         </div>
@@ -455,12 +457,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             const assignedCount = activeSuppliers.length;
                             const isExpanded = expandedItemIndex === index;
                             
-                            const totalKg = parseFloat(item.totalKg) || 0;
-                            const valKg = parseFloat(item.valuePerKg) || 0;
-                            const totalItemValue = totalKg * valKg;
-                            
-                            const kgPerProd = assignedCount > 0 ? totalKg / assignedCount : 0;
+                            const totalKgNum = parseFloat(item.totalKg) || 0;
+                            const valKgNum = parseFloat(item.valuePerKg) || 0;
+                            const totalItemValue = totalKgNum * valKgNum;
+                            const kgPerProd = assignedCount > 0 ? totalKgNum / assignedCount : 0;
                             const valPerProd = assignedCount > 0 ? totalItemValue / assignedCount : 0;
+                            const unitLabels = { kg: 'Kg', dz: 'Dúzia', un: 'Unidade', pacote: 'Pacote', balde: 'Balde', saco: 'Saco' };
+                            const packageOptions = [
+                                { label: '500g', value: '0.5' },
+                                { label: '400g', value: '0.4' },
+                                { label: '200g', value: '0.2' },
+                                { label: '150g', value: '0.15' },
+                            ];
                             
                             return (
                             <div key={item.id} className="p-6 border-2 rounded-2xl relative bg-white shadow-lg border-l-[12px] border-l-blue-600 transition-all hover:scale-[1.01]">
@@ -470,27 +478,72 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         <h3 className="font-black text-2xl text-blue-950 uppercase tracking-tighter">{item.name || 'ITEM PENDENTE'}</h3>
                                     </div>
                                     <button type="button" onClick={() => handleRemoveItem(index)} className="text-red-300 hover:text-red-600 transition-colors p-2 rounded-full hover:bg-red-50">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2
- 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                     </button>
                                 </div>
                                 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="space-y-4">
+                                  <div className="space-y-1">
+                                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome do Produto</label>
+                                      <input value={item.name} onChange={(e) => handleItemUIChange(index, 'name', e.target.value.toUpperCase())} placeholder="EX: ARROZ AGULHINHA" className="input-field font-black text-blue-900 uppercase"/>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome do Produto</label>
-                                        <input value={item.name} onChange={(e) => handleItemChange(index, 'name', e.target.value.toUpperCase())} placeholder="EX: ARROZ AGULHINHA" className="input-field font-black text-blue-900 uppercase"/>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Unidade</label>
+                                        <select value={item.ui_unit} onChange={(e) => handleItemUIChange(index, 'ui_unit', e.target.value as ItemCentricInput['ui_unit'])} className="input-field font-bold">
+                                            <option value="kg">Quilograma (Kg)</option>
+                                            <option value="pacote">Pacote</option>
+                                            <option value="balde">Balde</option>
+                                            <option value="saco">Saco</option>
+                                            <option value="dz">Dúzia</option>
+                                            <option value="un">Unidade</option>
+                                        </select>
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Peso Total Contratado (Kg)</label>
-                                        <input type="number" step="0.01" value={item.totalKg} onChange={(e) => handleItemChange(index, 'totalKg', e.target.value)} placeholder="0,00" className="input-field font-mono text-lg"/>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Preço por Quilograma (R$)</label>
-                                        <input type="number" step="0.01" value={item.valuePerKg} onChange={(e) => handleItemChange(index, 'valuePerKg', e.target.value)} placeholder="0,00" className="input-field font-mono text-lg text-green-700"/>
-                                    </div>
+                                    {(item.ui_unit === 'pacote' || item.ui_unit === 'balde' || item.ui_unit === 'saco') && (
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                                {item.ui_unit === 'pacote' && 'Tamanho do Pacote'}
+                                                {item.ui_unit === 'balde' && 'Tamanho do Balde'}
+                                                {item.ui_unit === 'saco' && 'Tamanho do Saco'}
+                                            </label>
+                                            <select value={item.ui_packageSize} onChange={(e) => handleItemUIChange(index, 'ui_packageSize', e.target.value)} className="input-field font-bold">
+                                                <option value="">-- Selecione --</option>
+                                                {item.ui_unit === 'pacote' && packageOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                                {item.ui_unit === 'balde' && <option value="18">18kg</option>}
+                                                {item.ui_unit === 'saco' && <option value="50">50kg</option>}
+                                            </select>
+                                        </div>
+                                    )}
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div className="space-y-1">
+                                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Quantidade ({unitLabels[item.ui_unit]})</label>
+                                          <input type="text" value={item.ui_quantity} onChange={(e) => handleItemUIChange(index, 'ui_quantity', e.target.value)} placeholder="0,00" className="input-field font-mono text-lg"/>
+                                      </div>
+                                      <div className="space-y-1">
+                                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Preço por {unitLabels[item.ui_unit]}</label>
+                                          <input type="text" value={item.ui_valuePerUnit} onChange={(e) => handleItemUIChange(index, 'ui_valuePerUnit', e.target.value)} placeholder="0,00" className="input-field font-mono text-lg text-green-700"/>
+                                      </div>
+                                  </div>
+
+                                  {(item.ui_unit === 'dz' || item.ui_unit === 'un') && (
+                                      <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                                          <label className="block text-[10px] font-black text-yellow-800 uppercase tracking-widest ml-1">Fator de Conversão</label>
+                                          <p className="text-xs text-yellow-700 mb-1">Informe o peso de uma {unitLabels[item.ui_unit]} em Kg.</p>
+                                          <input type="text" value={item.ui_kgConversion} onChange={(e) => handleItemUIChange(index, 'ui_kgConversion', e.target.value)} placeholder={`Ex: 0.6 para uma dúzia de ovos`} className="input-field text-sm font-mono"/>
+                                      </div>
+                                  )}
+
+                                  <div className="mt-2 bg-gray-50 p-3 rounded-lg border text-xs">
+                                      <p className="font-bold text-gray-600">Valores Calculados para Contrato:</p>
+                                      <p>Peso Total: <span className="font-mono font-bold text-blue-700">{(parseFloat(item.totalKg) || 0).toFixed(2).replace('.',',')} Kg</span></p>
+                                      <p>Preço por Kg: <span className="font-mono font-bold text-blue-700">{formatCurrency(parseFloat(item.valuePerKg) || 0)}</span></p>
+                                  </div>
                                 </div>
 
-                                {/* PAINEL DE RESUMO EXCLUSIVO */}
+
                                 <div className="mt-8 bg-blue-50/50 border-2 border-blue-100 rounded-2xl overflow-hidden shadow-inner">
                                     <div className="bg-blue-100/50 px-4 py-2 border-b-2 border-blue-100 flex justify-between items-center">
                                         <span className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">Resumo de Cálculos do Contrato</span>
@@ -503,7 +556,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         </div>
                                         <div className="text-center md:border-r-2 border-blue-100/50">
                                             <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter mb-1">Peso Total</p>
-                                            <p className="text-lg font-black text-gray-900">{totalKg.toLocaleString('pt-BR')} <span className="text-xs">Kg</span></p>
+                                            <p className="text-lg font-black text-gray-900">{totalKgNum.toLocaleString('pt-BR')} <span className="text-xs">Kg</span></p>
                                         </div>
                                         <div className="text-center md:border-r-2 border-blue-100/50">
                                             <p className="text-[10px] text-blue-500 uppercase font-black tracking-tighter mb-1">Cota Valor / Forn</p>
@@ -526,11 +579,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         {item.suppliers.map((slot, slotIndex) => (
                                             <div key={slotIndex} className="flex space-x-2 items-center group">
                                                 <span className="text-[10px] font-black text-gray-300 w-5 group-hover:text-blue-500 transition-colors">{slotIndex + 1}</span>
-                                                <select 
-                                                    value={slot.supplierCpf} 
-                                                    onChange={e => handleSupplierSelectionChange(index, slotIndex, e.target.value)} 
-                                                    className="input-field py-2 text-xs font-bold border-gray-100 bg-gray-50/50 hover:border-blue-300 transition-all cursor-pointer"
-                                                >
+                                                <select value={slot.supplierCpf} onChange={e => handleSupplierSelectionChange(index, slotIndex, e.target.value)} className="input-field py-2 text-xs font-bold border-gray-100 bg-gray-50/50 hover:border-blue-300 transition-all cursor-pointer">
                                                     <option value="">-- SELECIONAR --</option>
                                                     {suppliers.map(p => <option key={p.cpf} value={p.cpf}>{p.name}</option>)}
                                                 </select>
@@ -550,19 +599,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     )}
                     
                     <div className="space-y-4">
-                        {contractError && (
-                            <div className="bg-red-50 border-l-8 border-red-500 p-4 rounded-xl text-red-700 flex items-center gap-4 animate-shake">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-                                <span className="font-black uppercase text-sm">{contractError}</span>
-                            </div>
-                        )}
-                        {contractSuccess && (
-                            <div className="bg-green-50 border-l-8 border-green-500 p-4 rounded-xl text-green-700 flex items-center gap-4 animate-fade-in">
-                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                                 <span className="font-black uppercase text-sm">{contractSuccess}</span>
-                            </div>
-                        )}
-
+                        {contractError && ( <div className="bg-red-50 border-l-8 border-red-500 p-4 rounded-xl text-red-700 flex items-center gap-4 animate-shake"> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg> <span className="font-black uppercase text-sm">{contractError}</span> </div> )}
+                        {contractSuccess && ( <div className="bg-green-50 border-l-8 border-green-500 p-4 rounded-xl text-green-700 flex items-center gap-4 animate-fade-in"> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg> <span className="font-black uppercase text-sm">{contractSuccess}</span> </div> )}
                         <div className="flex justify-center pt-6">
                             <button type="submit" className="w-full max-w-2xl py-5 text-white bg-blue-700 hover:bg-blue-800 font-black text-xl rounded-2xl shadow-2xl transition-all transform hover:scale-105 active:scale-95 uppercase tracking-widest flex items-center justify-center gap-4">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
@@ -575,23 +613,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         )}
 
         {activeTab === 'analytics' && <AdminAnalytics suppliers={suppliers} />}
-        
         {activeTab === 'graphs' && <AdminGraphs suppliers={suppliers} />}
-
         {activeTab === 'schedule' && <AdminScheduleView suppliers={suppliers} />}
-
         {activeTab === 'invoices' && <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} />}
-
         {activeTab === 'perCapita' && <AdminPerCapita suppliers={suppliers} />}
-
-        {editingSupplier && (
-            <EditSupplierModal
-                supplier={editingSupplier}
-                suppliers={suppliers}
-                onClose={() => setEditingSupplier(null)}
-                onSave={handleSaveSupplierUpdate}
-            />
-        )}
+        {editingSupplier && ( <EditSupplierModal supplier={editingSupplier} suppliers={suppliers} onClose={() => setEditingSupplier(null)} onSave={handleSaveSupplierUpdate} /> )}
       </main>
       <style>{`
         .input-field { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 1rem; border: 2px solid #F3F4F6; border-radius: 1rem; background-color: #fff; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); } 

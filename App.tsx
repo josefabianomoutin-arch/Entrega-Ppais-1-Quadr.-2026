@@ -312,7 +312,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateSupplierData = async (oldCpf: string, newName: string, newCpf: string): Promise<string | null> => {
+  const handleUpdateSupplierData = async (oldCpf: string, newName: string, newCpf: string, newAllowedWeeks: number[]): Promise<string | null> => {
     setIsSaving(true);
     const finalName = newName.trim().toUpperCase();
     const finalCpf = newCpf.trim().replace(/[^\d]/g, '');
@@ -345,6 +345,7 @@ const App: React.FC = () => {
         const supplierData = { ...currentData[oldCpf] };
         supplierData.name = finalName;
         supplierData.cpf = finalCpf;
+        supplierData.allowedWeeks = newAllowedWeeks;
 
         // Move os dados se o CPF/CNPJ (a chave) mudou
         if (oldCpf !== finalCpf) {
