@@ -244,7 +244,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
   
   const handleAddItem = () => {
-    if (itemCentricContracts.length < 50) {
+    if (itemCentricContracts.length < 100) {
         setItemCentricContracts([...itemCentricContracts, initialItemCentricInput()]);
         setExpandedItemIndex(itemCentricContracts.length);
     }
@@ -542,7 +542,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         )})}
                     </div>
                     
-                    {itemCentricContracts.length < 50 && (
+                    {itemCentricContracts.length < 100 && (
                         <button type="button" onClick={handleAddItem} className="w-full text-lg font-black text-blue-600 hover:bg-blue-50 py-5 rounded-2xl border-4 border-dashed border-blue-200 flex items-center justify-center space-x-3 transition-all hover:border-blue-400 group shadow-sm">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 group-hover:rotate-90 transition-transform duration-300" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
                             <span className="uppercase tracking-widest">Adicionar Próximo Item</span>
