@@ -34,6 +34,11 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ producers }) => {
             <div className="text-center mb-10">
                 <h2 className="text-3xl font-black text-green-900 uppercase tracking-tighter">Cálculo de Consumo Per Capta</h2>
                 <p className="text-gray-400 font-medium">Estime o consumo mensal por pessoa com base nos totais contratados.</p>
+                <div className="mt-4 bg-gray-50 p-3 rounded-lg border border-gray-200 inline-block">
+                    <p className="text-sm font-mono text-gray-600">
+                        Fórmula: (Peso Total / (Pop. Carcerária + (Servidores / 3))) / 4
+                    </p>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
