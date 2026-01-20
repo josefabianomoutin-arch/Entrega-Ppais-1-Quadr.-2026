@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Supplier } from '../types';
 import AdminAnalytics from './AdminAnalytics';
@@ -65,10 +64,13 @@ const initialItemCentricInput = (): ItemCentricInput => ({
 });
 
 const unitOptions = [
-    { value: 'kg-1', label: 'Quilograma (Kg)' },
-    { value: 'balde-18', label: 'Balde (18 Kg)' },
     { value: 'saco-50', label: 'Saco (50 Kg)' },
+    { value: 'balde-18', label: 'Balde (18 Kg)' },
+    { value: 'embalagem-10', label: 'Embalagem (10 Kg)' },
     { value: 'embalagem-5', label: 'Embalagem (5 Kg)' },
+    { value: 'embalagem-3', label: 'Embalagem (3 Kg)' },
+    { value: 'embalagem-2', label: 'Embalagem (2 Kg)' },
+    { value: 'kg-1', label: 'Quilograma (Kg)' },
     { value: 'embalagem-1', label: 'Embalagem (1 Litro)' },
     { value: 'pacote-0.5', label: 'Pacote (500g)' },
     { value: 'pacote-0.4', label: 'Pacote (400g)' },
