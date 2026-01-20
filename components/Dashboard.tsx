@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { Producer, Delivery } from '../types';
+import type { Supplier, Delivery } from '../types';
 import Calendar from './Calendar';
 import DeliveryModal from './DeliveryModal';
 import ViewDeliveryModal from './ViewDeliveryModal';
@@ -9,15 +9,15 @@ import EmailConfirmationModal from './EmailConfirmationModal';
 import FulfillmentModal from './FulfillmentModal';
 
 interface DashboardProps {
-  producer: Producer;
+  supplier: Supplier;
   onLogout: () => void;
-  onScheduleDelivery: (producerCpf: string, date: string, time: string) => void;
+  onScheduleDelivery: (supplierCpf: string, date: string, time: string) => void;
   onFulfillAndInvoice: (
-    producerCpf: string, 
+    supplierCpf: string, 
     placeholderDeliveryIds: string[], 
     invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }
   ) => void;
-  onCancelDeliveries: (producerCpf: string, deliveryIds: string[]) => void;
+  onCancelDeliveries: (supplierCpf: string, deliveryIds: string[]) => void;
   emailModalData: {
     recipient: string;
     cc: string;
@@ -29,7 +29,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ 
-  producer, 
+  supplier, 
   onLogout, 
   onScheduleDelivery, 
   onFulfillAndInvoice, 
@@ -48,7 +48,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const handleDayClick = (date: Date) => {
     const dateString = date.toISOString().split('T')[0];
-    const deliveriesOnDate = producer.deliveries.filter(d => d.date === dateString);
+    const deliveriesOnDate = supplier.deliveries.filter(d => d.date === dateString);
 
     setSelectedDate(date);
 
@@ -80,14 +80,14 @@ const Dashboard: React.FC<DashboardProps> = ({
   const handleScheduleSave = (time: string) => {
     if (selectedDate) {
       const dateString = selectedDate.toISOString().split('T')[0];
-      onScheduleDelivery(producer.cpf, dateString, time);
+      onScheduleDelivery(supplier.cpf, dateString, time);
     }
     handleCloseModal();
   };
 
   const handleCancelDeliveries = (deliveryIds: string[]) => {
     if(window.confirm('Tem certeza que deseja cancelar estes agendamentos? Esta ação não pode ser desfeita.')) {
-      onCancelDeliveries(producer.cpf, deliveryIds);
+      onCancelDeliveries(supplier.cpf, deliveryIds);
       handleCloseViewModal();
     }
   };
@@ -105,13 +105,13 @@ const Dashboard: React.FC<DashboardProps> = ({
   const handleSaveFulfillment = (invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }) => {
     if (invoiceToFulfill) {
       const placeholderIds = invoiceToFulfill.deliveries.map(d => d.id);
-      onFulfillAndInvoice(producer.cpf, placeholderIds, invoiceData);
+      onFulfillAndInvoice(supplier.cpf, placeholderIds, invoiceData);
     }
     handleCloseFulfillmentModal();
   };
   
   const pendingDailyInvoices = useMemo(() => {
-    const pending = producer.deliveries.filter(d => {
+    const pending = supplier.deliveries.filter(d => {
         const deliveryDate = new Date(d.date + 'T00:00:00');
         return d.item === 'AGENDAMENTO PENDENTE' && deliveryDate < SIMULATED_TODAY;
     });
@@ -128,14 +128,14 @@ const Dashboard: React.FC<DashboardProps> = ({
         date,
         deliveries,
     }));
-  }, [producer.deliveries]);
+  }, [supplier.deliveries]);
 
 
   return (
     <div className="min-h-screen text-gray-800">
       <header className="bg-white/80 backdrop-blur-sm shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-green-800">Olá, {producer.name}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-green-800">Olá, {supplier.name}</h1>
           <p className="text-sm text-gray-500">Bem-vindo ao seu painel de entregas</p>
         </div>
         <button
@@ -165,14 +165,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <p className="text-center text-gray-500 mb-6">Clique em um dia para agendar ou visualizar uma entrega.</p>
                 <Calendar 
                   onDayClick={handleDayClick} 
-                  deliveries={producer.deliveries} 
+                  deliveries={supplier.deliveries} 
                   simulatedToday={SIMULATED_TODAY} 
-                  allowedWeeks={producer.allowedWeeks}
+                  allowedWeeks={supplier.allowedWeeks}
                 />
             </div>
           </div>
           <div className="space-y-8">
-            <SummaryCard producer={producer} />
+            <SummaryCard supplier={supplier} />
             {pendingDailyInvoices.length > 0 && (
                 <div id="invoice-uploader-section">
                     <InvoiceUploader 
@@ -207,7 +207,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       {isFulfillmentModalOpen && invoiceToFulfill && (
         <FulfillmentModal
           invoiceInfo={invoiceToFulfill}
-          contractItems={producer.contractItems}
+          contractItems={supplier.contractItems}
           onClose={handleCloseFulfillmentModal}
           onSave={handleSaveFulfillment}
         />

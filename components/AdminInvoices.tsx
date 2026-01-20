@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { Producer } from '../types';
+import type { Supplier } from '../types';
 
 interface InvoiceInfo {
     id: string;
@@ -12,7 +12,7 @@ interface InvoiceInfo {
 }
 
 interface AdminInvoicesProps {
-    producers: Producer[];
+    suppliers: Supplier[];
     onReopenInvoice: (producerCpf: string, invoiceNumber: string) => void;
 }
 
@@ -26,7 +26,7 @@ const formatDate = (dateString: string) => {
     return date.toLocaleDateString('pt-BR');
 };
 
-const AdminInvoices: React.FC<AdminInvoicesProps> = ({ producers, onReopenInvoice }) => {
+const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoice }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortKey, setSortKey] = useState<'producerName' | 'date' | 'totalValue'>('date');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -35,7 +35,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ producers, onReopenInvoic
     const allInvoices = useMemo((): InvoiceInfo[] => {
         const invoicesMap = new Map<string, InvoiceInfo>();
 
-        producers.forEach(producer => {
+        suppliers.forEach(producer => {
             const deliveriesByInvoice = new Map<string, any[]>();
             
             // Group deliveries by invoice number for this producer
@@ -68,7 +68,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ producers, onReopenInvoic
         });
 
         return Array.from(invoicesMap.values());
-    }, [producers]);
+    }, [suppliers]);
     
     const filteredAndSortedInvoices = useMemo(() => {
         const filtered = allInvoices.filter(invoice => 
@@ -103,7 +103,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ producers, onReopenInvoic
     };
 
     const handleReopenClick = (producerCpf: string, invoiceNumber: string) => {
-        const confirmationMessage = `Tem certeza que deseja reabrir esta nota fiscal (NF: ${invoiceNumber})?\n\nTodas as entregas associadas serão revertidas para UM ÚNICO 'AGENDAMENTO PENDENTE' e o produtor precisará faturá-las novamente.\n\nEsta ação não pode ser desfeita.`;
+        const confirmationMessage = `Tem certeza que deseja reabrir esta nota fiscal (NF: ${invoiceNumber})?\n\nTodas as entregas associadas serão revertidas para UM ÚNICO 'AGENDAMENTO PENDENTE' e o fornecedor precisará faturá-las novamente.\n\nEsta ação não pode ser desfeita.`;
         if (window.confirm(confirmationMessage)) {
             onReopenInvoice(producerCpf, invoiceNumber);
         }
@@ -114,11 +114,11 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ producers, onReopenInvoic
             <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 border-b pb-6">
                  <div>
                     <h2 className="text-3xl font-black text-teal-900 uppercase tracking-tighter">Consulta de Notas Fiscais</h2>
-                    <p className="text-gray-400 font-medium">Visualize todas as notas fiscais enviadas pelos produtores.</p>
+                    <p className="text-gray-400 font-medium">Visualize todas as notas fiscais enviadas pelos fornecedores.</p>
                 </div>
                 <input
                     type="text"
-                    placeholder="Pesquisar por produtor ou NF..."
+                    placeholder="Pesquisar por fornecedor ou NF..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full sm:w-auto border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-400 transition-all"
@@ -129,7 +129,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ producers, onReopenInvoic
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                         <tr>
-                            <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('producerName')}>Produtor</th>
+                            <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('producerName')}>Fornecedor</th>
                             <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('date')}>Data</th>
                             <th className="p-3 text-left">Nº Nota Fiscal</th>
                             <th className="p-3 text-right cursor-pointer" onClick={() => handleSort('totalValue')}>Valor Total</th>

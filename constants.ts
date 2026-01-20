@@ -1,7 +1,7 @@
 
-import type { Producer } from './types';
+import type { Supplier } from './types';
 
-export const initialProducers: Producer[] = [];
+export const initialSuppliers: Supplier[] = [];
 
 export const MONTHS_2026 = [
   { name: 'Janeiro', number: 0 },

@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import type { Producer } from '../types';
+import type { Supplier } from '../types';
 
 interface AdminPerCapitaProps {
-  producers: Producer[];
+  suppliers: Supplier[];
 }
 
 const formatCurrency = (value: number) => {
@@ -10,14 +10,14 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ producers }) => {
+const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
     const [staffCount, setStaffCount] = useState<number>(0);
     const [inmateCount, setInmateCount] = useState<number>(0);
     
     // Agrega o total de Kg e o valor total para cada item de todos os contratos
     const itemData = useMemo(() => {
       const data = new Map<string, { totalKg: number; totalValue: number }>();
-      producers.forEach(p => {
+      suppliers.forEach(p => {
         (p.contractItems || []).forEach(item => {
           const current = data.get(item.name) || { totalKg: 0, totalValue: 0 };
           current.totalKg += item.totalKg;
@@ -28,7 +28,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ producers }) => {
       return Array.from(data.entries())
         .map(([name, values]) => ({ name, ...values }))
         .sort((a, b) => a.name.localeCompare(b.name));
-    }, [producers]);
+    }, [suppliers]);
 
     // Calcula o denominador da fórmula per capta
     const perCapitaDenominator = useMemo(() => {

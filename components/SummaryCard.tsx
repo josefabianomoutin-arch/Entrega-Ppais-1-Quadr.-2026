@@ -1,44 +1,44 @@
 import React, { useMemo } from 'react';
-import type { Producer } from '../types';
+import type { Supplier } from '../types';
 
 interface SummaryCardProps {
-    producer: Producer;
+    supplier: Supplier;
 }
 
-const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
+const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
     // Value calculations
-    const totalDeliveredValue = producer.deliveries.reduce((sum, delivery) => sum + (delivery.value || 0), 0);
-    const remainingValue = producer.initialValue - totalDeliveredValue;
-    const valueProgress = producer.initialValue > 0 ? (totalDeliveredValue / producer.initialValue) * 100 : 0;
+    const totalDeliveredValue = supplier.deliveries.reduce((sum, delivery) => sum + (delivery.value || 0), 0);
+    const remainingValue = supplier.initialValue - totalDeliveredValue;
+    const valueProgress = supplier.initialValue > 0 ? (totalDeliveredValue / supplier.initialValue) * 100 : 0;
 
 
     const deliveredValueByItem = useMemo(() => {
         const valueMap = new Map<string, number>();
-        producer.deliveries.forEach(delivery => {
+        supplier.deliveries.forEach(delivery => {
             if (delivery.item && delivery.value) {
                 const currentVal = valueMap.get(delivery.item) || 0;
                 valueMap.set(delivery.item, currentVal + delivery.value);
             }
         });
         return valueMap;
-    }, [producer.deliveries]);
+    }, [supplier.deliveries]);
 
     // Weight (Kg) calculations
-    const totalContractedKg = producer.contractItems.reduce((sum, item) => sum + item.totalKg, 0);
-    const totalDeliveredKg = producer.deliveries.reduce((sum, delivery) => sum + (delivery.kg || 0), 0);
+    const totalContractedKg = supplier.contractItems.reduce((sum, item) => sum + item.totalKg, 0);
+    const totalDeliveredKg = supplier.deliveries.reduce((sum, delivery) => sum + (delivery.kg || 0), 0);
     const remainingKg = totalContractedKg - totalDeliveredKg;
     const kgProgress = totalContractedKg > 0 ? (totalDeliveredKg / totalContractedKg) * 100 : 0;
 
     const deliveredKgByItem = useMemo(() => {
         const kgMap = new Map<string, number>();
-        producer.deliveries.forEach(delivery => {
+        supplier.deliveries.forEach(delivery => {
              if (delivery.item && delivery.kg) {
                 const currentKg = kgMap.get(delivery.item) || 0;
                 kgMap.set(delivery.item, currentKg + delivery.kg);
             }
         });
         return kgMap;
-    }, [producer.deliveries]);
+    }, [supplier.deliveries]);
 
     // Formatting helpers
     const formatCurrency = (value: number) => {
@@ -56,7 +56,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
             {/* General Summary */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 pb-4 border-b text-sm">
                 <span className="text-gray-500">Valor Total do Contrato:</span>
-                <span className="font-bold text-gray-800 text-right">{formatCurrency(producer.initialValue)}</span>
+                <span className="font-bold text-gray-800 text-right">{formatCurrency(supplier.initialValue)}</span>
                 
                 <span className="text-gray-500">Peso Total do Contrato:</span>
                 <span className="font-bold text-gray-800 text-right">{formatKg(totalContractedKg)}</span>
@@ -72,7 +72,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ producer }) => {
             <div className="py-4 space-y-4">
                 <h3 className="font-semibold text-gray-600">Detalhes por Produto</h3>
                 <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                    {producer.contractItems.map(item => {
+                    {supplier.contractItems.map(item => {
                         const itemTotalValue = item.totalKg * item.valuePerKg;
                         const deliveredValue = deliveredValueByItem.get(item.name) || 0;
                         const remainingItemValue = itemTotalValue - deliveredValue;

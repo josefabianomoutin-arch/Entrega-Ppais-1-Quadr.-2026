@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Producer, Delivery } from './types';
+import type { Supplier, Delivery } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -10,13 +10,13 @@ import { firebaseConfig } from './firebaseConfig';
 // Inicializa o Firebase e obtém uma referência ao banco de dados
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
-const producersRef = ref(database, 'producers');
+const suppliersRef = ref(database, 'producers');
 
 
 const App: React.FC = () => {
-  const [producers, setProducers] = useState<Producer[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<Producer | null>(null);
+  const [currentUser, setCurrentUser] = useState<Supplier | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule'>('register');
@@ -33,20 +33,20 @@ const App: React.FC = () => {
   // Efeito para ouvir mudanças no banco de dados em tempo real
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = onValue(producersRef, (snapshot) => {
+    const unsubscribe = onValue(suppliersRef, (snapshot) => {
       try {
         const data = snapshot.val();
         
-        // Se não houver dados ou não for um objeto, significa que não há produtores.
+        // Se não houver dados ou não for um objeto, significa que não há fornecedores.
         if (!data || typeof data !== 'object') {
-          setProducers([]);
+          setSuppliers([]);
           return;
         }
 
-        // Converte o objeto de produtores (chaveado por CPF) em um array.
-        const producersArray: Producer[] = Object.values(data)
+        // Converte o objeto de fornecedores (chaveado por CPF/CNPJ) em um array.
+        const suppliersArray: Supplier[] = Object.values(data)
           .filter(
-            (p): p is Producer => 
+            (p): p is Supplier => 
               p && 
               typeof p === 'object' && 
               typeof (p as any).cpf === 'string' && (p as any).cpf.trim() !== '' &&
@@ -63,80 +63,80 @@ const App: React.FC = () => {
           }))
           .sort((a, b) => a.name.localeCompare(b.name)); // Garante ordem consistente
         
-        setProducers(producersArray);
+        setSuppliers(suppliersArray);
       } catch (error) {
         console.error("Erro ao processar dados do Firebase:", error);
-        setProducers([]); // Reseta para um estado seguro em caso de erro
+        setSuppliers([]); // Reseta para um estado seguro em caso de erro
       } finally {
         setLoading(false);
       }
     }, (error) => {
       console.error("Falha ao ler dados do Firebase: ", error);
       setLoading(false);
-      setProducers([]);
+      setSuppliers([]);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Efeito para excluir agendamentos de um produtor específico (operação única)
+  // Efeito para excluir agendamentos de um fornecedor específico (operação única)
   useEffect(() => {
-    if (!loading && isAdminLoggedIn && producers.length > 0) {
+    if (!loading && isAdminLoggedIn && suppliers.length > 0) {
       const operationFlag = 'deletedSchedules_LucimaraMarquesPereira_v1';
       if (localStorage.getItem(operationFlag)) {
         return;
       }
 
-      const producerToUpdate = producers.find(p => p.name === 'LUCIMARA MARQUES PEREIRA');
+      const supplierToUpdate = suppliers.find(p => p.name === 'LUCIMARA MARQUES PEREIRA');
 
-      if (producerToUpdate) {
-        console.log(`Iniciando exclusão de agendamentos para ${producerToUpdate.name}...`);
+      if (supplierToUpdate) {
+        console.log(`Iniciando exclusão de agendamentos para ${supplierToUpdate.name}...`);
         
-        const producerDeliveriesRef = ref(database, `producers/${producerToUpdate.cpf}/deliveries`);
+        const supplierDeliveriesRef = ref(database, `producers/${supplierToUpdate.cpf}/deliveries`);
         
-        set(producerDeliveriesRef, [])
+        set(supplierDeliveriesRef, [])
           .then(() => {
-            console.log(`Agendamentos de ${producerToUpdate.name} excluídos com sucesso.`);
-            alert(`Todos os agendamentos da produtora LUCIMARA MARQUES PEREIRA foram removidos permanentemente, conforme solicitado.`);
+            console.log(`Agendamentos de ${supplierToUpdate.name} excluídos com sucesso.`);
+            alert(`Todos os agendamentos da fornecedora LUCIMARA MARQUES PEREIRA foram removidos permanentemente, conforme solicitado.`);
             localStorage.setItem(operationFlag, 'true');
           })
           .catch((error) => {
-            console.error(`Falha ao excluir agendamentos de ${producerToUpdate.name}:`, error);
+            console.error(`Falha ao excluir agendamentos de ${supplierToUpdate.name}:`, error);
             alert(`Ocorreu um erro ao tentar remover os agendamentos. Por favor, verifique o console para mais detalhes.`);
           });
       } else {
-        // Se o produtor não for encontrado, marca a operação como concluída para não rodar novamente.
+        // Se o fornecedor não for encontrado, marca a operação como concluída para não rodar novamente.
         localStorage.setItem(operationFlag, 'true');
       }
     }
-  }, [loading, isAdminLoggedIn, producers]);
+  }, [loading, isAdminLoggedIn, suppliers]);
 
-  // Efeito para excluir agendamentos de produtores com "ITEM FRACASSADO" (v2 - Robusto)
+  // Efeito para excluir agendamentos de fornecedores com "ITEM FRACASSADO" (v2 - Robusto)
   useEffect(() => {
-    if (!loading && isAdminLoggedIn && producers.length > 0) {
+    if (!loading && isAdminLoggedIn && suppliers.length > 0) {
       const operationFlag = 'deletedSchedules_ItemFracassado_v2'; // Flag atualizada para garantir a re-execução
       if (localStorage.getItem(operationFlag)) {
         return;
       }
 
-      const producersToClear = producers.filter(p =>
+      const suppliersToClear = suppliers.filter(p =>
         (p.contractItems || []).some(item => item.name === 'ITEM FRACASSADO')
       );
 
-      if (producersToClear.length > 0) {
-        console.log(`[OP_v2] Encontrados ${producersToClear.length} produtores para limpar agendamentos.`);
+      if (suppliersToClear.length > 0) {
+        console.log(`[OP_v2] Encontrados ${suppliersToClear.length} fornecedores para limpar agendamentos.`);
 
-        // Usa um método mais direto e seguro, apagando apenas o nó de 'deliveries' de cada produtor.
-        const updatePromises = producersToClear.map(producer => {
-          const deliveriesRef = ref(database, `producers/${producer.cpf}/deliveries`);
+        // Usa um método mais direto e seguro, apagando apenas o nó de 'deliveries' de cada fornecedor.
+        const updatePromises = suppliersToClear.map(supplier => {
+          const deliveriesRef = ref(database, `producers/${supplier.cpf}/deliveries`);
           // set(..., null) apaga o nó no Firebase Realtime Database
           return set(deliveriesRef, null);
         });
 
         Promise.all(updatePromises)
           .then(() => {
-            const producerNames = producersToClear.map(p => p.name);
-            const successMessage = `[CORREÇÃO APLICADA] Agendamentos removidos com sucesso para os seguintes produtores com "ITEM FRACASSADO":\n\n- ${producerNames.join('\n- ')}`;
+            const supplierNames = suppliersToClear.map(p => p.name);
+            const successMessage = `[CORREÇÃO APLICADA] Agendamentos removidos com sucesso para os seguintes fornecedores com "ITEM FRACASSADO":\n\n- ${supplierNames.join('\n- ')}`;
             console.log(successMessage);
             alert(successMessage);
             localStorage.setItem(operationFlag, 'true');
@@ -147,26 +147,26 @@ const App: React.FC = () => {
             alert(errorMessage);
           });
       } else {
-        // Se nenhum produtor for encontrado, ainda marca a operação como concluída.
-        console.log('[OP_v2] Nenhum produtor com "ITEM FRACASSADO" encontrado para limpeza de agendamentos.');
+        // Se nenhum fornecedor for encontrado, ainda marca a operação como concluída.
+        console.log('[OP_v2] Nenhum fornecedor com "ITEM FRACASSADO" encontrado para limpeza de agendamentos.');
         localStorage.setItem(operationFlag, 'true');
       }
     }
-  }, [loading, isAdminLoggedIn, producers]);
+  }, [loading, isAdminLoggedIn, suppliers]);
 
   // Helper central para escrever no banco de dados com feedback visual
   // Usado para operações em massa, como salvar contratos.
-  const writeToDatabase = async (producersArray: Producer[]) => {
+  const writeToDatabase = async (suppliersArray: Supplier[]) => {
     setIsSaving(true);
     try {
-      const producersObject = producersArray.reduce((acc, producer) => {
-        if (producer && producer.cpf) {
-          acc[producer.cpf] = producer;
+      const suppliersObject = suppliersArray.reduce((acc, supplier) => {
+        if (supplier && supplier.cpf) {
+          acc[supplier.cpf] = supplier;
         }
         return acc;
-      }, {} as { [key: string]: Producer });
+      }, {} as { [key: string]: Supplier });
 
-      await set(producersRef, producersObject);
+      await set(suppliersRef, suppliersObject);
     } catch (error) {
       console.error("Falha ao salvar dados no Firebase", error);
       throw error;
@@ -184,7 +184,7 @@ const App: React.FC = () => {
     }
     const upperCaseName = name.toUpperCase();
     const sanitizedCpf = cpf.replace(/[^\d]/g, '');
-    const user = producers.find(p => p.name === upperCaseName && p.cpf === sanitizedCpf);
+    const user = suppliers.find(p => p.name === upperCaseName && p.cpf === sanitizedCpf);
 
     if (user) {
       setCurrentUser(user);
@@ -201,24 +201,29 @@ const App: React.FC = () => {
     const finalCpf = cpf.trim().replace(/[^\d]/g, '');
   
     if (!finalName || !finalCpf) {
-      setRegistrationStatus({ success: false, message: 'Nome e CPF são obrigatórios.' });
+      setRegistrationStatus({ success: false, message: 'Nome e CPF/CNPJ são obrigatórios.' });
+      setIsSaving(false);
+      return;
+    }
+    if (finalCpf.length !== 11 && finalCpf.length !== 14) {
+      setRegistrationStatus({ success: false, message: 'O CPF deve ter 11 dígitos e o CNPJ 14.' });
       setIsSaving(false);
       return;
     }
     
     // Validação rápida no lado do cliente para feedback imediato
-    if (producers.some(p => p.cpf === finalCpf)) {
-      setRegistrationStatus({ success: false, message: 'Este CPF já está cadastrado.' });
+    if (suppliers.some(p => p.cpf === finalCpf)) {
+      setRegistrationStatus({ success: false, message: 'Este CPF/CNPJ já está cadastrado.' });
       setIsSaving(false);
       return;
     }
-    if (producers.some(p => p.name === finalName)) {
-      setRegistrationStatus({ success: false, message: 'Este nome de produtor já está em uso.' });
+    if (suppliers.some(p => p.name === finalName)) {
+      setRegistrationStatus({ success: false, message: 'Este nome de fornecedor já está em uso.' });
       setIsSaving(false);
       return;
     }
     
-    const newProducer: Producer = {
+    const newSupplier: Supplier = {
       name: finalName,
       cpf: finalCpf,
       initialValue: 0,
@@ -230,26 +235,26 @@ const App: React.FC = () => {
     try {
       // Usa uma transação para garantir uma operação de escrita atômica e segura.
       // Esta é a verificação definitiva no servidor.
-      const transactionResult = await runTransaction(producersRef, (currentData) => {
+      const transactionResult = await runTransaction(suppliersRef, (currentData) => {
         // currentData será null se o nó 'producers' não existir, ou um objeto.
-        const producersObject = currentData || {};
+        const suppliersObject = currentData || {};
 
-        // Verificação final no servidor: se o CPF já existir, aborta a transação.
-        if (producersObject[finalCpf]) {
+        // Verificação final no servidor: se o CPF/CNPJ já existir, aborta a transação.
+        if (suppliersObject[finalCpf]) {
           return; // Retornar undefined aborta a transação.
         }
         
-        // Adiciona o novo produtor ao objeto de produtores.
-        producersObject[finalCpf] = newProducer;
-        return producersObject; // Retorna os dados atualizados para serem salvos.
+        // Adiciona o novo fornecedor ao objeto de fornecedores.
+        suppliersObject[finalCpf] = newSupplier;
+        return suppliersObject; // Retorna os dados atualizados para serem salvos.
       });
 
       if (transactionResult.committed) {
         // Sucesso! O listener onValue cuidará da atualização da UI.
-        setRegistrationStatus({ success: true, message: `Produtor "${finalName}" cadastrado com sucesso!` });
+        setRegistrationStatus({ success: true, message: `Fornecedor "${finalName}" cadastrado com sucesso!` });
       } else {
-        // A transação foi abortada por nós porque o produtor já existe.
-        setRegistrationStatus({ success: false, message: 'Cadastro cancelado. O CPF já existe no servidor.' });
+        // A transação foi abortada por nós porque o fornecedor já existe.
+        setRegistrationStatus({ success: false, message: 'Cadastro cancelado. O CPF/CNPJ já existe no servidor.' });
       }
 
     } catch (error: any) {
@@ -267,45 +272,45 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateProducerData = async (oldCpf: string, newName: string, newCpf: string): Promise<string | null> => {
+  const handleUpdateSupplierData = async (oldCpf: string, newName: string, newCpf: string): Promise<string | null> => {
     setIsSaving(true);
     const finalName = newName.trim().toUpperCase();
     const finalCpf = newCpf.trim().replace(/[^\d]/g, '');
 
     if (!finalName || !finalCpf) {
-      return 'Nome e CPF são obrigatórios.';
+      return 'Nome e CPF/CNPJ são obrigatórios.';
     }
 
     // Validação prévia para fornecer feedback rápido
-    if (producers.some(p => p.cpf === finalCpf && p.cpf !== oldCpf)) {
+    if (suppliers.some(p => p.cpf === finalCpf && p.cpf !== oldCpf)) {
       setIsSaving(false);
-      return 'Este CPF já está cadastrado para outro produtor.';
+      return 'Este CPF/CNPJ já está cadastrado para outro fornecedor.';
     }
-    if (producers.some(p => p.name === finalName && p.cpf !== oldCpf)) {
+    if (suppliers.some(p => p.name === finalName && p.cpf !== oldCpf)) {
       setIsSaving(false);
-      return 'Este nome de produtor já está em uso.';
+      return 'Este nome de fornecedor já está em uso.';
     }
 
     try {
-      const transactionResult = await runTransaction(producersRef, (currentData) => {
+      const transactionResult = await runTransaction(suppliersRef, (currentData) => {
         if (!currentData || !currentData[oldCpf]) {
-          return; // Aborta se o produtor original não existir mais
+          return; // Aborta se o fornecedor original não existir mais
         }
         
         // Validação final no servidor para evitar condições de corrida
         if (oldCpf !== finalCpf && currentData[finalCpf]) {
-            return; // Aborta se o novo CPF já foi pego
+            return; // Aborta se o novo CPF/CNPJ já foi pego
         }
 
-        const producerData = { ...currentData[oldCpf] };
-        producerData.name = finalName;
-        producerData.cpf = finalCpf;
+        const supplierData = { ...currentData[oldCpf] };
+        supplierData.name = finalName;
+        supplierData.cpf = finalCpf;
 
-        // Move os dados se o CPF (a chave) mudou
+        // Move os dados se o CPF/CNPJ (a chave) mudou
         if (oldCpf !== finalCpf) {
           delete currentData[oldCpf];
         }
-        currentData[finalCpf] = producerData;
+        currentData[finalCpf] = supplierData;
         
         return currentData;
       });
@@ -327,8 +332,8 @@ const App: React.FC = () => {
     setRegistrationStatus(null);
   };
 
-  const handleUpdateProducers = (updatedProducers: Producer[]) => {
-    writeToDatabase(updatedProducers);
+  const handleUpdateSuppliers = (updatedSuppliers: Supplier[]) => {
+    writeToDatabase(updatedSuppliers);
   };
 
   const handleLogout = () => {
@@ -342,9 +347,9 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRestoreData = async (backupProducers: Producer[]): Promise<boolean> => {
+  const handleRestoreData = async (backupSuppliers: Supplier[]): Promise<boolean> => {
      try {
-        await writeToDatabase(backupProducers);
+        await writeToDatabase(backupSuppliers);
         return true;
      } catch (error) {
         console.error('Erro ao restaurar dados:', error);
@@ -352,11 +357,11 @@ const App: React.FC = () => {
      }
   };
 
-  const scheduleDelivery = async (producerCpf: string, date: string, time: string) => {
-    const producerDeliveriesRef = ref(database, `producers/${producerCpf}/deliveries`);
+  const scheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
+    const supplierDeliveriesRef = ref(database, `producers/${supplierCpf}/deliveries`);
 
     try {
-        await runTransaction(producerDeliveriesRef, (currentDeliveries: Delivery[] | null) => {
+        await runTransaction(supplierDeliveriesRef, (currentDeliveries: Delivery[] | null) => {
             const newDelivery: Delivery = {
                 id: `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 date,
@@ -380,14 +385,14 @@ const App: React.FC = () => {
   };
   
   const fulfillAndInvoiceDelivery = async (
-    producerCpf: string,
+    supplierCpf: string,
     placeholderDeliveryIds: string[],
     invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }
   ) => {
-      const producer = producers.find(p => p.cpf === producerCpf);
-      if (!producer) return;
+      const supplier = suppliers.find(p => p.cpf === supplierCpf);
+      if (!supplier) return;
   
-      const placeholder = producer.deliveries.find(d => placeholderDeliveryIds.includes(d.id));
+      const placeholder = supplier.deliveries.find(d => placeholderDeliveryIds.includes(d.id));
       if (!placeholder) return;
   
       const newDeliveries: Delivery[] = invoiceData.fulfilledItems.map(item => ({
@@ -403,8 +408,8 @@ const App: React.FC = () => {
       
       let allDeliveriesForInvoice: Delivery[] = [];
   
-      const updatedProducers = producers.map(p => {
-        if (p.cpf === producerCpf) {
+      const updatedSuppliers = suppliers.map(p => {
+        if (p.cpf === supplierCpf) {
           const filteredDeliveries = p.deliveries.filter(d => !placeholderDeliveryIds.includes(d.id));
           const finalDeliveries = [...filteredDeliveries, ...newDeliveries];
           allDeliveriesForInvoice = finalDeliveries.filter(d => d.invoiceNumber === invoiceData.invoiceNumber);
@@ -414,7 +419,7 @@ const App: React.FC = () => {
       });
   
       try {
-        await writeToDatabase(updatedProducers);
+        await writeToDatabase(updatedSuppliers);
       } catch (error) {
         console.error("Falha ao faturar entrega:", error);
         return;
@@ -422,11 +427,11 @@ const App: React.FC = () => {
       
       const recipientEmail = 'jfmoutin@sap.sp.gov.br';
       const ccRecipientEmail = 'rsscaramal@sap.sp.gov.br';
-      const subject = `Envio de Nota Fiscal - Produtor: ${producer.name} (NF: ${invoiceData.invoiceNumber})`;
+      const subject = `Envio de Nota Fiscal - Fornecedor: ${supplier.name} (NF: ${invoiceData.invoiceNumber})`;
       const itemsSummary = allDeliveriesForInvoice
           .map(d => `- ${d.item} (${(d.kg || 0).toFixed(2).replace('.',',')} Kg) - Data: ${new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}`)
           .join('\n');
-      const body = `Olá,\n\nEsta é uma submissão de nota fiscal através do aplicativo de gestão PPAIS.\n\n**Detalhes:**\nProdutor: ${producer.name}\nCPF: ${producer.cpf}\nNúmero da NF: ${invoiceData.invoiceNumber}\n\n**Entregas associadas a esta NF:**\n${itemsSummary}\n\n----------------------------------------------------\nATENÇÃO: Por favor, anexe o arquivo PDF da nota fiscal a este e-mail antes de enviar.\n\n(Os registros desta operação foram salvos no banco de dados do sistema).`.trim();
+      const body = `Olá,\n\nEsta é uma submissão de nota fiscal através do aplicativo de gestão PPAIS.\n\n**Detalhes:**\nFornecedor: ${supplier.name}\nCPF/CNPJ: ${supplier.cpf}\nNúmero da NF: ${invoiceData.invoiceNumber}\n\n**Entregas associadas a esta NF:**\n${itemsSummary}\n\n----------------------------------------------------\nATENÇÃO: Por favor, anexe o arquivo PDF da nota fiscal a este e-mail antes de enviar.\n\n(Os registros desta operação foram salvos no banco de dados do sistema).`.trim();
       const mailtoLink = `mailto:${recipientEmail}?cc=${ccRecipientEmail}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       
       setEmailModalData({
@@ -438,9 +443,9 @@ const App: React.FC = () => {
       });
   };
 
-  const cancelDeliveries = async (producerCpf: string, deliveryIds: string[]) => {
-    const updatedProducers = producers.map(p => {
-        if (p.cpf === producerCpf) {
+  const cancelDeliveries = async (supplierCpf: string, deliveryIds: string[]) => {
+    const updatedSuppliers = suppliers.map(p => {
+        if (p.cpf === supplierCpf) {
             const updatedDeliveries = (p.deliveries || []).filter(d => !deliveryIds.includes(d.id));
             return { ...p, deliveries: updatedDeliveries };
         }
@@ -448,17 +453,17 @@ const App: React.FC = () => {
     });
 
     try {
-      await writeToDatabase(updatedProducers);
+      await writeToDatabase(updatedSuppliers);
     } catch(error) {
       console.error("Falha ao cancelar entregas:", error);
     }
   };
 
-  const reopenInvoice = async (producerCpf: string, invoiceNumber: string) => {
-    const producer = producers.find(p => p.cpf === producerCpf);
-    if (!producer) return;
+  const reopenInvoice = async (supplierCpf: string, invoiceNumber: string) => {
+    const supplier = suppliers.find(p => p.cpf === supplierCpf);
+    if (!supplier) return;
   
-    const deliveriesToReopen = producer.deliveries.filter(d => d.invoiceNumber === invoiceNumber);
+    const deliveriesToReopen = supplier.deliveries.filter(d => d.invoiceNumber === invoiceNumber);
     if (deliveriesToReopen.length === 0) return;
   
     // Encontra a data e hora mais antigas para usar no novo agendamento pendente
@@ -474,8 +479,8 @@ const App: React.FC = () => {
       invoiceUploaded: false,
     };
   
-    const updatedProducers = producers.map(p => {
-      if (p.cpf === producerCpf) {
+    const updatedSuppliers = suppliers.map(p => {
+      if (p.cpf === supplierCpf) {
         // Remove todas as entregas antigas associadas a essa NF
         const remainingDeliveries = p.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
         // Adiciona o novo agendamento pendente
@@ -486,7 +491,7 @@ const App: React.FC = () => {
     });
   
     try {
-      await writeToDatabase(updatedProducers);
+      await writeToDatabase(updatedSuppliers);
     } catch(error) {
       console.error("Falha ao reabrir nota fiscal:", error);
     }
@@ -498,10 +503,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (currentUser) {
-      const updatedUser = producers.find(p => p.cpf === currentUser.cpf);
+      const updatedUser = suppliers.find(p => p.cpf === currentUser.cpf);
       setCurrentUser(updatedUser || null);
     }
-  }, [producers, currentUser?.cpf]);
+  }, [suppliers, currentUser?.cpf]);
 
 
   if (loading) {
@@ -527,10 +532,10 @@ const App: React.FC = () => {
 
         {isAdminLoggedIn ? (
           <AdminDashboard 
-            producers={producers}
+            suppliers={suppliers}
             onRegister={handleRegister} 
-            onUpdateProducers={handleUpdateProducers} 
-            onUpdateProducer={handleUpdateProducerData}
+            onUpdateSuppliers={handleUpdateSuppliers} 
+            onUpdateSupplier={handleUpdateSupplierData}
             onLogout={handleLogout}
             onResetData={handleResetData}
             onRestoreData={handleRestoreData}
@@ -542,7 +547,7 @@ const App: React.FC = () => {
           />
         ) : currentUser ? (
           <Dashboard 
-            producer={currentUser} 
+            supplier={currentUser} 
             onLogout={handleLogout} 
             onScheduleDelivery={scheduleDelivery}
             onCancelDeliveries={cancelDeliveries}

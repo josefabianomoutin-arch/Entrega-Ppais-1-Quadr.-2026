@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import type { Producer } from '../types';
+import type { Supplier } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
-import EditProducerModal from './EditProducerModal';
+import EditSupplierModal from './EditSupplierModal';
 import AdminGraphs from './AdminGraphs';
 import AdminScheduleView from './AdminScheduleView';
 import AdminInvoices from './AdminInvoices';
@@ -12,12 +12,12 @@ type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'sc
 
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
-  onUpdateProducers: (updatedProducers: Producer[]) => void;
-  onUpdateProducer: (oldCpf: string, newName: string, newCpf: string) => Promise<string | null>;
+  onUpdateSuppliers: (updatedSuppliers: Supplier[]) => void;
+  onUpdateSupplier: (oldCpf: string, newName: string, newCpf: string) => Promise<string | null>;
   onLogout: () => void;
-  producers: Producer[];
+  suppliers: Supplier[];
   onResetData: () => void;
-  onRestoreData: (backupProducers: Producer[]) => Promise<boolean>;
+  onRestoreData: (backupSuppliers: Supplier[]) => Promise<boolean>;
   activeTab: AdminTab;
   onTabChange: (tab: AdminTab) => void;
   registrationStatus: { success: boolean; message: string } | null;
@@ -31,30 +31,30 @@ const formatCurrency = (value: number) => {
 };
 
 // Tipos para o estado da UI de Gestão por Item
-interface ProducerSlot { producerCpf: string; }
+interface SupplierSlot { supplierCpf: string; }
 interface ItemCentricInput {
   name: string;
   totalKg: string;
   valuePerKg: string;
-  producers: ProducerSlot[];
+  suppliers: SupplierSlot[];
   id: string; // Adicionado para rastrear a ordem de criação
 }
 
-const initialProducerSlot = (): ProducerSlot => ({ producerCpf: '' });
+const initialSupplierSlot = (): SupplierSlot => ({ supplierCpf: '' });
 const initialItemCentricInput = (): ItemCentricInput => ({
   name: '', 
   totalKg: '', 
   valuePerKg: '',
-  producers: Array(15).fill(null).map(initialProducerSlot),
+  suppliers: Array(15).fill(null).map(initialSupplierSlot),
   id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 });
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
     onRegister, 
-    onUpdateProducers,
-    onUpdateProducer,
+    onUpdateSuppliers,
+    onUpdateSupplier,
     onLogout, 
-    producers, 
+    suppliers, 
     onResetData, 
     onRestoreData,
     activeTab,
@@ -68,7 +68,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [regCpf, setRegCpf] = useState('');
   const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [editingProducer, setEditingProducer] = useState<Producer | null>(null);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [updateStatus, setUpdateStatus] = useState<{ success: boolean; message: string } | null>(null);
 
 
@@ -106,21 +106,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [updateStatus]);
 
 
-  // Sincroniza o estado da UI de contratos com os dados mais recentes dos produtores
+  // Sincroniza o estado da UI de contratos com os dados mais recentes dos fornecedores
   useEffect(() => {
     // Roda a sincronização apenas quando a aba de contratos estiver ativa.
     if (activeTab !== 'contracts') {
       return;
     }
 
-    const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; producerCpfs: string[]; order: number }>();
+    const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; supplierCpfs: string[]; order: number }>();
 
-    producers.forEach(producer => {
-        (producer.contractItems || []).forEach(item => {
+    suppliers.forEach(supplier => {
+        (supplier.contractItems || []).forEach(item => {
             const order = item.order ?? Infinity; // Default para itens antigos sem ordem
             
             if (!itemsMap.has(item.name)) {
-                itemsMap.set(item.name, { totalKg: 0, valuePerKg: item.valuePerKg, producerCpfs: [], order: order });
+                itemsMap.set(item.name, { totalKg: 0, valuePerKg: item.valuePerKg, supplierCpfs: [], order: order });
             }
 
             const entry = itemsMap.get(item.name)!;
@@ -131,8 +131,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 entry.order = order;
             }
 
-            if (!entry.producerCpfs.includes(producer.cpf)) {
-                entry.producerCpfs.push(producer.cpf);
+            if (!entry.supplierCpfs.includes(supplier.cpf)) {
+                entry.supplierCpfs.push(supplier.cpf);
             }
         });
     });
@@ -147,9 +147,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             name,
             totalKg: String(data.totalKg),
             valuePerKg: String(data.valuePerKg),
-            producers: [
-                ...data.producerCpfs.map(cpf => ({ producerCpf: cpf })),
-                ...Array(Math.max(0, 15 - data.producerCpfs.length)).fill(null).map(initialProducerSlot)
+            suppliers: [
+                ...data.supplierCpfs.map(cpf => ({ supplierCpf: cpf })),
+                ...Array(Math.max(0, 15 - data.supplierCpfs.length)).fill(null).map(initialSupplierSlot)
             ]
         };
     });
@@ -159,7 +159,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     } else {
         setItemCentricContracts([initialItemCentricInput()]);
     }
-  }, [producers, activeTab]);
+  }, [suppliers, activeTab]);
 
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
@@ -169,14 +169,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsRegistering(false);
   };
   
-  const handleSaveProducerUpdate = async (oldCpf: string, newName: string, newCpf: string): Promise<string | null> => {
-    const errorMessage = await onUpdateProducer(oldCpf, newName, newCpf);
+  const handleSaveSupplierUpdate = async (oldCpf: string, newName: string, newCpf: string): Promise<string | null> => {
+    const errorMessage = await onUpdateSupplier(oldCpf, newName, newCpf);
     if (errorMessage) {
         setUpdateStatus({ success: false, message: errorMessage });
         return errorMessage; // Retorna o erro para o modal
     } else {
-        setUpdateStatus({ success: true, message: 'Produtor atualizado com sucesso!' });
-        setEditingProducer(null); // Fecha o modal em caso de sucesso
+        setUpdateStatus({ success: true, message: 'Fornecedor atualizado com sucesso!' });
+        setEditingSupplier(null); // Fecha o modal em caso de sucesso
         return null;
     }
   };
@@ -184,33 +184,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleSaveContracts = (e: React.FormEvent) => {
     e.preventDefault(); setContractError(''); setContractSuccess('');
 
-    const updatedProducers: Producer[] = producers.map(p => ({ ...p, contractItems: [], initialValue: 0 }));
-    const producerMap = new Map(updatedProducers.map(p => [p.cpf, p]));
+    const updatedSuppliers: Supplier[] = suppliers.map(p => ({ ...p, contractItems: [], initialValue: 0 }));
+    const supplierMap = new Map(updatedSuppliers.map(p => [p.cpf, p]));
 
     for (let index = 0; index < itemCentricContracts.length; index++) {
         const uiItem = itemCentricContracts[index];
         const name = uiItem.name.trim().toUpperCase();
         if (!name) continue;
 
-        const assignedProducerCpfs = uiItem.producers.map(p => p.producerCpf).filter(cpf => cpf !== '');
+        const assignedSupplierCpfs = uiItem.suppliers.map(p => p.supplierCpf).filter(cpf => cpf !== '');
         
-        if (assignedProducerCpfs.length > 0) {
+        if (assignedSupplierCpfs.length > 0) {
             const totalKg = parseFloat(uiItem.totalKg);
             const valuePerKg = parseFloat(uiItem.valuePerKg);
             
             if (isNaN(totalKg) || totalKg <= 0 || isNaN(valuePerKg) || valuePerKg <= 0) {
-                setContractError(`O item "${name}" (atribuído a produtores) possui valores inválidos.`);
+                setContractError(`O item "${name}" (atribuído a fornecedores) possui valores inválidos.`);
                 return;
             }
 
-            const kgPerProducer = totalKg / assignedProducerCpfs.length;
+            const kgPerSupplier = totalKg / assignedSupplierCpfs.length;
 
-            for (const producerCpf of assignedProducerCpfs) {
-                const producer = producerMap.get(producerCpf);
-                if (producer) {
-                    producer.contractItems.push({
+            for (const supplierCpf of assignedSupplierCpfs) {
+                const supplier = supplierMap.get(supplierCpf);
+                if (supplier) {
+                    supplier.contractItems.push({
                         name,
-                        totalKg: kgPerProducer,
+                        totalKg: kgPerSupplier,
                         valuePerKg,
                         order: index // Salva a posição do item na lista como 'order'
                     });
@@ -219,12 +219,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         }
     }
 
-    // Recalcula o valor inicial total de cada produtor
-    updatedProducers.forEach(p => {
+    // Recalcula o valor inicial total de cada fornecedor
+    updatedSuppliers.forEach(p => {
         p.initialValue = p.contractItems.reduce((sum, item) => sum + (item.totalKg * item.valuePerKg), 0);
     });
 
-    onUpdateProducers(updatedProducers);
+    onUpdateSuppliers(updatedSuppliers);
     setContractSuccess('Contratos salvos com sucesso!');
     setTimeout(() => setContractSuccess(''), 3000);
   };
@@ -235,11 +235,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setItemCentricContracts(newItems);
   };
 
-  const handleProducerSelectionChange = (itemIndex: number, slotIndex: number, producerCpf: string) => {
+  const handleSupplierSelectionChange = (itemIndex: number, slotIndex: number, supplierCpf: string) => {
     const newItems = [...itemCentricContracts];
-    const newProducers = [...newItems[itemIndex].producers];
-    newProducers[slotIndex] = { producerCpf };
-    newItems[itemIndex] = { ...newItems[itemIndex], producers: newProducers };
+    const newSuppliers = [...newItems[itemIndex].suppliers];
+    newSuppliers[slotIndex] = { supplierCpf };
+    newItems[itemIndex] = { ...newItems[itemIndex], suppliers: newSuppliers };
     setItemCentricContracts(newItems);
   };
   
@@ -262,13 +262,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
   
   const handleBackupData = () => {
-      const jsonData = JSON.stringify(producers, null, 2);
+      const jsonData = JSON.stringify(suppliers, null, 2);
       const blob = new Blob([jsonData], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       const date = new Date().toISOString().slice(0, 10);
       a.href = url;
-      a.download = `backup-ppais-2026-${date}.json`;
+      a.download = `backup-fornecedores-ppais-2026-${date}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -289,14 +289,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     reader.onload = async (event) => {
       try {
         const content = event.target?.result as string;
-        const backupProducers: Producer[] = JSON.parse(content);
+        const backupSuppliers: Supplier[] = JSON.parse(content);
         
         // Validação simples do arquivo
-        if (!Array.isArray(backupProducers) || (backupProducers.length > 0 && !backupProducers[0].cpf)) {
+        if (!Array.isArray(backupSuppliers) || (backupSuppliers.length > 0 && !backupSuppliers[0].cpf)) {
            throw new Error('Arquivo de backup inválido ou corrompido.');
         }
 
-        const success = await onRestoreData(backupProducers);
+        const success = await onRestoreData(backupSuppliers);
         if (success) {
           setRestoreMessage({ type: 'success', text: 'Dados restaurados com sucesso na nuvem!' });
           setRestoreFile(null);
@@ -331,9 +331,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <main className="p-4 md:p-8">
         <div className="mb-8 flex justify-center border-b"><div className="flex flex-wrap justify-center space-x-2 p-1 bg-gray-100/50 rounded-xl">
                 <TabButton tab="info" label="Backup e Segurança"/>
-                <TabButton tab="register" label="Cadastro de Produtores"/>
+                <TabButton tab="register" label="Cadastro de Fornecedores"/>
                 <TabButton tab="contracts" label="Cadastro de Itens"/>
-                <TabButton tab="analytics" label="Gestão dos Produtores"/>
+                <TabButton tab="analytics" label="Gestão dos Fornecedores"/>
                 <TabButton tab="graphs" label="Gestão dos Itens"/>
                 <TabButton tab="schedule" label="Agenda de Entregas"/>
                 <TabButton tab="invoices" label="Notas Fiscais"/>
@@ -388,12 +388,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
             <div className="space-y-8">
                 <div className="bg-white p-6 rounded-2xl shadow-xl border-t-8 border-green-500">
-                    <h2 className="text-2xl font-black mb-6 text-gray-700 uppercase tracking-tight">Novo Produtor</h2>
+                    <h2 className="text-2xl font-black mb-6 text-gray-700 uppercase tracking-tight">Novo Fornecedor</h2>
                     <form className="space-y-6" onSubmit={handleRegisterSubmit}>
                         <div className="space-y-3">
                             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Dados de Acesso</label>
-                            <input value={regName} onChange={(e) => setRegName(e.target.value.toUpperCase())} required placeholder="NOME DO PRODUTOR" className="input-field font-bold"/>
-                            <input value={regCpf} onChange={(e) => setRegCpf(e.target.value.replace(/[^\d]/g, ''))} maxLength={11} required placeholder="CPF (SENHA)" className="input-field font-mono"/>
+                            <input value={regName} onChange={(e) => setRegName(e.target.value.toUpperCase())} required placeholder="NOME DO FORNECEDOR" className="input-field font-bold"/>
+                            <input value={regCpf} onChange={(e) => setRegCpf(e.target.value.replace(/[^\d]/g, ''))} maxLength={14} required placeholder="CPF/CNPJ (SENHA)" className="input-field font-mono"/>
                         </div>
                         <div className="space-y-4 pt-2">
                             <h3 className="text-sm font-black text-gray-600 border-b pb-2 uppercase tracking-widest">Semanas Disponíveis</h3>
@@ -411,23 +411,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-xl border-t-8 border-blue-600 overflow-hidden">
-                <h2 className="text-2xl font-black mb-2 text-gray-700 uppercase tracking-tight">Produtores Cadastrados ({producers.length})</h2>
+                <h2 className="text-2xl font-black mb-2 text-gray-700 uppercase tracking-tight">Fornecedores Cadastrados ({suppliers.length})</h2>
                 {updateStatus && (
                     <p className={`text-xs text-center p-2 my-2 rounded-lg font-bold ${updateStatus.success ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50'}`}>
                         {updateStatus.message}
                     </p>
                 )}
                 <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                    {producers.length > 0 ? producers.map(p => (
+                    {suppliers.length > 0 ? suppliers.map(p => (
                     <div key={p.cpf} className="p-4 bg-gray-50 rounded-xl flex justify-between items-center text-sm border border-gray-100 hover:bg-white transition-colors group">
                         <div>
                             <p className="font-black text-gray-800 group-hover:text-blue-600 transition-colors">{p.name}</p>
-                            <p className="text-[10px] text-gray-400 font-mono">CPF: ...{p.cpf.slice(-4)}</p>
+                            <p className="text-[10px] text-gray-400 font-mono">CPF/CNPJ: ...{p.cpf.slice(-4)}</p>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="font-bold text-[10px] text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">{p.contractItems.length} itens</span>
                             <button 
-                                onClick={() => setEditingProducer(p)}
+                                onClick={() => setEditingSupplier(p)}
                                 className="text-gray-400 hover:text-blue-600 p-2 rounded-full transition-colors"
                                 aria-label={`Editar ${p.name}`}
                             >
@@ -451,8 +451,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <form className="space-y-10" onSubmit={handleSaveContracts}>
                     <div className="space-y-6 max-h-[65vh] overflow-y-auto pr-3 custom-scrollbar p-2">
                         {itemCentricContracts.map((item, index) => {
-                            const activeProducers = item.producers.filter(p => p.producerCpf !== '');
-                            const assignedCount = activeProducers.length;
+                            const activeSuppliers = item.suppliers.filter(p => p.supplierCpf !== '');
+                            const assignedCount = activeSuppliers.length;
                             const isExpanded = expandedItemIndex === index;
                             
                             const totalKg = parseFloat(item.totalKg) || 0;
@@ -494,7 +494,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 <div className="mt-8 bg-blue-50/50 border-2 border-blue-100 rounded-2xl overflow-hidden shadow-inner">
                                     <div className="bg-blue-100/50 px-4 py-2 border-b-2 border-blue-100 flex justify-between items-center">
                                         <span className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">Resumo de Cálculos do Contrato</span>
-                                        <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full shadow-sm">{assignedCount} PRODUTORES</span>
+                                        <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full shadow-sm">{assignedCount} FORNECEDORES</span>
                                     </div>
                                     <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-6">
                                         <div className="text-center md:border-r-2 border-blue-100/50">
@@ -506,11 +506,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                             <p className="text-lg font-black text-gray-900">{totalKg.toLocaleString('pt-BR')} <span className="text-xs">Kg</span></p>
                                         </div>
                                         <div className="text-center md:border-r-2 border-blue-100/50">
-                                            <p className="text-[10px] text-blue-500 uppercase font-black tracking-tighter mb-1">Cota Valor / Prod</p>
+                                            <p className="text-[10px] text-blue-500 uppercase font-black tracking-tighter mb-1">Cota Valor / Forn</p>
                                             <p className="text-lg font-black text-blue-700">{formatCurrency(valPerProd)}</p>
                                         </div>
                                         <div className="text-center">
-                                            <p className="text-[10px] text-blue-500 uppercase font-black tracking-tighter mb-1">Cota Peso / Prod</p>
+                                            <p className="text-[10px] text-blue-500 uppercase font-black tracking-tighter mb-1">Cota Peso / Forn</p>
                                             <p className="text-lg font-black text-blue-700">{kgPerProd.toLocaleString('pt-BR')} <span className="text-xs">Kg</span></p>
                                         </div>
                                     </div>
@@ -518,21 +518,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 
                                 <button type="button" onClick={() => setExpandedItemIndex(isExpanded ? null : index)} className={`w-full text-xs font-black p-4 mt-6 rounded-xl transition-all flex items-center justify-center gap-3 uppercase tracking-widest ${isExpanded ? 'bg-blue-600 text-white shadow-xl translate-y-[-2px]' : 'bg-white text-blue-600 border-2 border-blue-200 hover:bg-blue-50'}`}>
                                     <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-                                    {isExpanded ? 'Fechar Lista de Vinculados' : `Configurar Produtores (${assignedCount})`}
+                                    {isExpanded ? 'Fechar Lista de Vinculados' : `Configurar Fornecedores (${assignedCount})`}
                                 </button>
 
                                 {isExpanded && (
                                     <div className="mt-4 pt-6 border-t-2 border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-slide-down">
-                                        {item.producers.map((slot, slotIndex) => (
+                                        {item.suppliers.map((slot, slotIndex) => (
                                             <div key={slotIndex} className="flex space-x-2 items-center group">
                                                 <span className="text-[10px] font-black text-gray-300 w-5 group-hover:text-blue-500 transition-colors">{slotIndex + 1}</span>
                                                 <select 
-                                                    value={slot.producerCpf} 
-                                                    onChange={e => handleProducerSelectionChange(index, slotIndex, e.target.value)} 
+                                                    value={slot.supplierCpf} 
+                                                    onChange={e => handleSupplierSelectionChange(index, slotIndex, e.target.value)} 
                                                     className="input-field py-2 text-xs font-bold border-gray-100 bg-gray-50/50 hover:border-blue-300 transition-all cursor-pointer"
                                                 >
                                                     <option value="">-- SELECIONAR --</option>
-                                                    {producers.map(p => <option key={p.cpf} value={p.cpf}>{p.name}</option>)}
+                                                    {suppliers.map(p => <option key={p.cpf} value={p.cpf}>{p.name}</option>)}
                                                 </select>
                                             </div>
                                         ))}
@@ -574,22 +574,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
         )}
 
-        {activeTab === 'analytics' && <AdminAnalytics producers={producers} />}
+        {activeTab === 'analytics' && <AdminAnalytics suppliers={suppliers} />}
         
-        {activeTab === 'graphs' && <AdminGraphs producers={producers} />}
+        {activeTab === 'graphs' && <AdminGraphs suppliers={suppliers} />}
 
-        {activeTab === 'schedule' && <AdminScheduleView producers={producers} />}
+        {activeTab === 'schedule' && <AdminScheduleView suppliers={suppliers} />}
 
-        {activeTab === 'invoices' && <AdminInvoices producers={producers} onReopenInvoice={onReopenInvoice} />}
+        {activeTab === 'invoices' && <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} />}
 
-        {activeTab === 'perCapita' && <AdminPerCapita producers={producers} />}
+        {activeTab === 'perCapita' && <AdminPerCapita suppliers={suppliers} />}
 
-        {editingProducer && (
-            <EditProducerModal
-                producer={editingProducer}
-                producers={producers}
-                onClose={() => setEditingProducer(null)}
-                onSave={handleSaveProducerUpdate}
+        {editingSupplier && (
+            <EditSupplierModal
+                supplier={editingSupplier}
+                suppliers={suppliers}
+                onClose={() => setEditingSupplier(null)}
+                onSave={handleSaveSupplierUpdate}
             />
         )}
       </main>

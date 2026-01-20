@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import type { Producer } from '../types';
+import type { Supplier } from '../types';
 
 interface AdminAnalyticsProps {
-  producers: Producer[];
+  suppliers: Supplier[];
 }
 
 const formatCurrency = (value: number) => {
@@ -16,30 +16,30 @@ const formatDate = (dateString: string) => {
 };
 
 
-const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
+const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     const [sortKey, setSortKey] = useState<'name' | 'progress' | 'delivered' | 'contracted'>('progress');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [producerSearchTerm, setProducerSearchTerm] = useState('');
     const [expandedProducerCpf, setExpandedProducerCpf] = useState<string | null>(null);
 
     const analyticsData = useMemo(() => {
-        const totalContracted = producers.reduce((sum, p) => sum + p.initialValue, 0);
-        const totalDelivered = producers.reduce((sum, p) => sum + p.deliveries.reduce((dSum, d) => dSum + d.value, 0), 0);
+        const totalContracted = suppliers.reduce((sum, p) => sum + p.initialValue, 0);
+        const totalDelivered = suppliers.reduce((sum, p) => sum + p.deliveries.reduce((dSum, d) => dSum + d.value, 0), 0);
         
         return {
             totalContracted,
             totalDelivered,
             progress: totalContracted > 0 ? (totalDelivered / totalContracted) * 100 : 0,
-            producerCount: producers.length,
+            producerCount: suppliers.length,
         };
-    }, [producers]);
+    }, [suppliers]);
     
-    const filteredProducers = useMemo(() => {
-      return producers.filter(p => p.name.toLowerCase().includes(producerSearchTerm.toLowerCase()));
-    }, [producers, producerSearchTerm]);
+    const filteredSuppliers = useMemo(() => {
+      return suppliers.filter(p => p.name.toLowerCase().includes(producerSearchTerm.toLowerCase()));
+    }, [suppliers, producerSearchTerm]);
 
-    const sortedProducers = useMemo(() => {
-      return [...filteredProducers].sort((a, b) => {
+    const sortedSuppliers = useMemo(() => {
+      return [...filteredSuppliers].sort((a, b) => {
             const aDelivered = a.deliveries.reduce((sum, d) => sum + d.value, 0);
             const bDelivered = b.deliveries.reduce((sum, d) => sum + d.value, 0);
             const aProgress = a.initialValue > 0 ? aDelivered / a.initialValue : 0;
@@ -51,7 +51,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
             else comp = b.initialValue - a.initialValue;
             return sortDirection === 'asc' ? comp : -comp;
         });
-    }, [filteredProducers, sortKey, sortDirection]);
+    }, [filteredSuppliers, sortKey, sortDirection]);
 
     const handleSort = (key: 'name' | 'progress' | 'delivered' | 'contracted') => {
       if (key === sortKey) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -60,8 +60,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
 
     const handleExportCSV = () => {
         const headers = [
-            "Produtor",
-            "CPF",
+            "Fornecedor",
+            "CPF/CNPJ",
             "Item",
             "Mês",
             "Peso Previsto (Kg)",
@@ -73,7 +73,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
     
         const csvRows = [headers.join(';')];
     
-        producers.forEach(p => {
+        suppliers.forEach(p => {
             csvRows.push(''); // Add a blank line for spacing before each producer
             
             p.contractItems.forEach(item => {
@@ -137,7 +137,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', 'relatorio_detalhado_produtores.csv');
+        link.setAttribute('download', 'relatorio_detalhado_fornecedores.csv');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -159,18 +159,18 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                     <p className="text-xl font-black text-yellow-600">{analyticsData.progress.toFixed(1)}%</p>
                 </div>
                 <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-indigo-500">
-                    <p className="text-xs text-gray-400 font-bold uppercase">Produtores</p>
+                    <p className="text-xs text-gray-400 font-bold uppercase">Fornecedores</p>
                     <p className="text-xl font-black text-indigo-800">{analyticsData.producerCount}</p>
                 </div>
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                    <h3 className="text-lg font-bold text-gray-800">Detalhes do Contrato por Produtor</h3>
+                    <h3 className="text-lg font-bold text-gray-800">Detalhes do Contrato por Fornecedor</h3>
                     <div className="flex items-center gap-2 flex-wrap">
                          <input 
                             type="text" 
-                            placeholder="Pesquisar produtor..." 
+                            placeholder="Pesquisar fornecedor..." 
                             value={producerSearchTerm} 
                             onChange={(e) => setProducerSearchTerm(e.target.value)}
                             className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all"
@@ -182,7 +182,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                     </div>
                 </div>
                 <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                   {filteredProducers.length > 0 ? filteredProducers.map(producer => {
+                   {filteredSuppliers.length > 0 ? filteredSuppliers.map(producer => {
                        const isExpanded = expandedProducerCpf === producer.cpf;
                        return (
                            <div key={producer.cpf} className={`border rounded-xl transition-all ${isExpanded ? 'ring-2 ring-blue-500 bg-white' : 'bg-gray-50/50 hover:bg-white'}`}>
@@ -308,24 +308,24 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                            </div>
                        );
                    }) : (
-                        <div className="text-center py-10"><p className="text-gray-400 italic">Nenhum produtor encontrado.</p></div>
+                        <div className="text-center py-10"><p className="text-gray-400 italic">Nenhum fornecedor encontrado.</p></div>
                    )}
                 </div>
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-lg font-bold mb-4">Desempenho Geral dos Produtores</h3>
+                <h3 className="text-lg font-bold mb-4">Desempenho Geral dos Fornecedores</h3>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                             <tr>
-                                <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('name')}>Produtor</th>
+                                <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('name')}>Fornecedor</th>
                                 <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('progress')}>Progresso da Entrega</th>
                                 <th className="p-3 text-right cursor-pointer" onClick={() => handleSort('delivered')}>Entregue / Contratado (R$)</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {sortedProducers.length > 0 ? sortedProducers.map(p => {
+                            {sortedSuppliers.length > 0 ? sortedSuppliers.map(p => {
                                 const deliveredValue = p.deliveries.reduce((s, d) => s + d.value, 0);
                                 const contractedValue = p.initialValue;
                                 const progress = contractedValue > 0 ? (deliveredValue / contractedValue) * 100 : 0;
@@ -350,7 +350,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ producers }) => {
                                     </tr>
                                 );
                             }) : (
-                                <tr><td colSpan={3} className="p-8 text-center text-gray-400 italic">Nenhum dado de produtor para exibir.</td></tr>
+                                <tr><td colSpan={3} className="p-8 text-center text-gray-400 italic">Nenhum dado de fornecedor para exibir.</td></tr>
                             )}
                         </tbody>
                     </table>

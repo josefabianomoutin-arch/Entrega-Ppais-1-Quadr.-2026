@@ -17,9 +17,9 @@ export interface ContractItem {
   order?: number;
 }
 
-export interface Producer {
+export interface Supplier {
   name: string;
-  cpf: string; // Atua como senha e identificador único
+  cpf: string; // Atua como senha e identificador único (CPF ou CNPJ)
   initialValue: number;
   contractItems: ContractItem[];
   deliveries: Delivery[];

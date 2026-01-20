@@ -1,16 +1,16 @@
 import React, { useMemo } from 'react';
-import type { Producer } from '../types';
+import type { Supplier } from '../types';
 
 interface AdminGraphsProps {
-  producers: Producer[];
+  suppliers: Supplier[];
 }
 
-const AdminGraphs: React.FC<AdminGraphsProps> = ({ producers }) => {
+const AdminGraphs: React.FC<AdminGraphsProps> = ({ suppliers }) => {
   // Dados para o Gráfico de Entrega de Produtos
   const productData = useMemo(() => {
     const data = new Map<string, { contractedKg: number; deliveredKg: number }>();
 
-    producers.forEach(p => {
+    suppliers.forEach(p => {
       (p.contractItems || []).forEach(item => {
         const current = data.get(item.name) || { contractedKg: 0, deliveredKg: 0 };
         current.contractedKg += item.totalKg;
@@ -26,7 +26,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({ producers }) => {
     return Array.from(data.entries())
       .map(([name, values]) => ({ name, ...values }))
       .sort((a, b) => b.contractedKg - a.contractedKg);
-  }, [producers]);
+  }, [suppliers]);
   
   const maxContractedKg = useMemo(() => {
      return Math.max(1, ...productData.map(p => p.contractedKg));
@@ -36,7 +36,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({ producers }) => {
   const invoiceData = useMemo(() => {
     const uniqueInvoices = new Map<string, { isSent: boolean }>();
 
-    producers.forEach(p => {
+    suppliers.forEach(p => {
         (p.deliveries || []).forEach(d => {
             if (d.invoiceNumber) {
                 const invoiceKey = `${p.cpf}-${d.invoiceNumber}`;
@@ -58,7 +58,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({ producers }) => {
     });
 
     return { sent: sentCount, pending: pendingCount };
-  }, [producers]);
+  }, [suppliers]);
   
   const totalInvoices = invoiceData.sent + invoiceData.pending;
 

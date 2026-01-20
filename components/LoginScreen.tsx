@@ -24,12 +24,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         <div className="text-center">
           <h1 className="text-3xl font-bold text-green-800">Entrega Ppais 1º Quadr. 2026</h1>
           <p className="mt-2 text-gray-600">
-            Gestão de Entregas dos Produtores
+            Gestão de Entregas dos Fornecedores
           </p>
         </div>
         
         <div className="mt-4 text-center text-sm text-yellow-800 bg-yellow-100 p-3 rounded-lg border border-yellow-300">
-            <p><strong>Atenção:</strong> O nome do produtor deve ser em <strong>MAIÚSCULA</strong> e o CPF (senha) apenas com <strong>números sem pontos</strong>.</p>
+            <p><strong>Atenção:</strong> O nome do fornecedor deve ser em <strong>MAIÚSCULA</strong> e a senha (CPF/CNPJ) apenas com <strong>números</strong>.</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLoginSubmit}>
@@ -40,7 +40,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               required 
               value={loginName} 
               onChange={(e) => setLoginName(e.target.value.toUpperCase())} 
-              placeholder="Usuário (Produtor ou Administrador)" 
+              placeholder="Usuário (Fornecedor ou Administrador)" 
               className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
             />
             <input 
@@ -49,8 +49,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               required 
               value={loginCpf} 
               onChange={(e) => setLoginCpf(e.target.value.replace(/[^\d]/g, ''))}
-              maxLength={11}
-              placeholder="Senha (CPF do produtor)" 
+              maxLength={14}
+              placeholder="Senha (CPF/CNPJ do fornecedor)" 
               className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
             />
           </div>
