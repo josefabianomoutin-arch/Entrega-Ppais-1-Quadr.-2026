@@ -491,8 +491,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="space-y-4">
                       {itemCentricContracts.map((item, index) => {
                           const isExpanded = index === expandedItemIndex;
-                          const [unit, kgConversion] = item.ui_compositeUnit.split('-');
-                          const isSpecialUnit = kgConversion === 'auto';
+                          const [unit, kgConversionFactorStr] = item.ui_compositeUnit.split('-');
+                          const isSpecialUnit = kgConversionFactorStr === 'auto';
+
+                          const quantity = parseFloat(item.ui_quantity.replace(',', '.')) || 0;
+                          const valuePerUnit = parseFloat(item.ui_valuePerUnit.replace(',', '.')) || 0;
+                      
+                          const conversionFactor = isSpecialUnit 
+                              ? parseFloat(item.ui_kgConversion.replace(',', '.')) || 0 
+                              : parseFloat(kgConversionFactorStr) || 0;
+                      
+                          const showWeightCalc = quantity > 0 && conversionFactor > 0;
+                          const showValueCalc = showWeightCalc && valuePerUnit > 0;
 
                           return (
                               <div key={item.id} className={`border rounded-xl transition-all ${isExpanded ? 'bg-white ring-2 ring-indigo-400' : 'bg-gray-50'}`}>
@@ -525,6 +535,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         <input type="text" placeholder="Valor por Unidade" value={item.ui_valuePerUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_valuePerUnit', e.target.value)} className="w-full p-2 border rounded-md font-mono" />
                                         {isSpecialUnit && <input type="text" placeholder={`Peso total da ${unit === 'dz' ? 'Dúzia' : 'Unidade'} (Kg)`} value={item.ui_kgConversion} onChange={(e) => handleItemCentricChange(item.id, 'ui_kgConversion', e.target.value)} className="w-full p-2 border rounded-md font-mono" />}
                                       </div>
+
+                                      {showWeightCalc && (
+                                          <div className="mt-4 p-4 bg-indigo-50 border-l-4 border-indigo-300 rounded-r-lg text-sm">
+                                              <h4 className="font-semibold text-indigo-800 mb-3 text-xs uppercase tracking-wider">Resumo do Cálculo</h4>
+                                              <div className={`grid grid-cols-1 ${showValueCalc ? 'md:grid-cols-2' : ''} gap-x-6 gap-y-2 font-mono`}>
+                                                  <div className="space-y-1">
+                                                      <p className="text-xs text-gray-500">Peso Total</p>
+                                                      <p className="text-gray-800 break-words">
+                                                          {quantity.toLocaleString('pt-BR')} &times; {conversionFactor.toLocaleString('pt-BR')} = <span className="font-bold text-indigo-700">{parseFloat(item.totalKg).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 3})} Kg</span>
+                                                      </p>
+                                                  </div>
+                                                  {showValueCalc && (
+                                                      <div className="space-y-1">
+                                                          <p className="text-xs text-gray-500">Valor / Kg</p>
+                                                          <p className="text-gray-800 break-words">
+                                                              {formatCurrency(valuePerUnit)} &divide; {conversionFactor.toLocaleString('pt-BR')} = <span className="font-bold text-green-700">{formatCurrency(parseFloat(item.valuePerKg))}</span>
+                                                          </p>
+                                                      </div>
+                                                  )}
+                                              </div>
+                                          </div>
+                                      )}
                                       
                                       <div>
                                           <h4 className="font-semibold mb-2">Fornecedores ({item.suppliers.filter(s => s.supplierCpf).length} selecionados)</h4>
