@@ -4,7 +4,7 @@ import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set, runTransaction } from 'firebase/database';
+import { getDatabase, ref, onValue, set, runTransaction, get } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
 
 // Inicializa o Firebase e obtém uma referência ao banco de dados
@@ -29,6 +29,46 @@ const App: React.FC = () => {
     mailtoLink: string;
   } | null>(null);
 
+  // Efeito para migrar dados de 'producers' para 'suppliers' (operação única)
+  useEffect(() => {
+    const runMigration = async () => {
+        const migrationFlag = 'migrated_producers_to_suppliers_v2';
+        if (localStorage.getItem(migrationFlag)) {
+            return; // A migração já foi executada, não faz nada.
+        }
+
+        console.log("Verificando a necessidade de migração de dados de '/producers' para '/suppliers'...");
+        const producersRef = ref(database, 'producers');
+        
+        try {
+            const producersSnapshot = await get(producersRef);
+            if (producersSnapshot.exists()) {
+                const producersData = producersSnapshot.val();
+                console.log("Dados antigos de 'produtores' encontrados. Iniciando migração...");
+
+                // Move os dados para o novo local '/suppliers'
+                await set(suppliersRef, producersData);
+                console.log("Dados migrados com sucesso para '/suppliers'.");
+
+                // Remove os dados do local antigo para evitar futuras migrações
+                await set(producersRef, null);
+                console.log("Nó antigo '/producers' removido.");
+
+                alert("Seus dados de cadastro antigos foram encontrados e atualizados para a nova versão do sistema com sucesso! O aplicativo será recarregado para exibir os dados.");
+                localStorage.setItem(migrationFlag, 'true');
+                window.location.reload(); // Recarrega para garantir que o onValue listener pegue os dados migrados
+            } else {
+                console.log("Nenhum dado antigo ('/producers') encontrado. Nenhuma migração é necessária.");
+                localStorage.setItem(migrationFlag, 'true'); // Marca como verificado para não rodar de novo
+            }
+        } catch (error) {
+            console.error("Ocorreu um erro crítico durante a migração de dados:", error);
+            alert("Ocorreu um erro ao tentar atualizar sua base de dados. Por favor, verifique o console para mais detalhes e contate o suporte se o problema persistir.");
+        }
+    };
+
+    runMigration();
+  }, []);
 
   // Efeito para ouvir mudanças no banco de dados em tempo real
   useEffect(() => {
