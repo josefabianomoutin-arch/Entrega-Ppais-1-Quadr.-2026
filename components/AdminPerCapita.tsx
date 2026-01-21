@@ -189,9 +189,9 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                             <tr key={item.name} className="bg-blue-50 hover:bg-blue-100">
                                                 <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
                                                 <td className="p-3 font-semibold text-blue-900">{item.name}</td>
-                                                <td className="p-3 text-center text-blue-800 italic font-mono">NC</td>
-                                                <td className="p-3 text-center text-blue-800 italic font-mono">NC</td>
-                                                <td className="p-3 text-center text-blue-800 italic font-mono">NC</td>
+                                                <td className="p-3 text-center text-blue-800 font-mono">-</td>
+                                                <td className="p-3 text-center text-blue-800 font-mono">-</td>
+                                                <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">{contractedTotalKg.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">-</td>
                                             </tr>
