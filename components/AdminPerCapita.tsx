@@ -176,6 +176,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     <th className="p-3 text-right">Consumo Semanal</th>
                                     <th className="p-3 text-right">Requerido (4 Semanas)</th>
                                     <th className="p-3 text-right">Contratado (4 Semanas)</th>
+                                    <th className="p-3 text-right">Entregue</th>
                                     <th className="p-3 text-right">Diferença</th>
                                 </tr>
                             </thead>
@@ -183,6 +184,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                 {itemData.length > 0 ? itemData.map((item, index) => {
                                     const reference = resolutionData[item.name.toUpperCase()];
                                     const contractedTotalKg = item.totalKg;
+                                    
+                                    const totalDeliveredKgForItem = suppliers.reduce((total, supplier) => {
+                                        const deliveredBySupplier = (supplier.deliveries || [])
+                                            .filter(d => d.item === item.name && d.kg)
+                                            .reduce((sum, d) => sum + (d.kg || 0), 0);
+                                        return total + deliveredBySupplier;
+                                    }, 0);
 
                                     if (!reference) {
                                         return (
@@ -193,6 +201,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">{contractedTotalKg.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
+                                                <td className="p-3 text-right font-mono font-bold text-green-700">{totalDeliveredKgForItem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">-</td>
                                             </tr>
                                         );
@@ -246,12 +255,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                             <td className="p-3 text-right font-mono text-gray-600">{formatConsumption(reference.weeklyConsumption)}</td>
                                             <td className="p-3 text-right font-mono font-bold">{requiredDisplay}</td>
                                             <td className="p-3 text-right font-mono font-bold text-gray-800">{contractedTotalKg.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
+                                            <td className="p-3 text-right font-mono font-bold text-green-700">{totalDeliveredKgForItem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
                                             <td className={`p-3 text-right font-mono font-bold ${differenceColor}`}>{differenceDisplay}</td>
                                         </tr>
                                     );
                                 }) : (
                                     <tr>
-                                        <td colSpan={7} className="p-8 text-center text-gray-400 italic">
+                                        <td colSpan={8} className="p-8 text-center text-gray-400 italic">
                                             Nenhum item de contrato cadastrado para comparar.
                                         </td>
                                     </tr>
