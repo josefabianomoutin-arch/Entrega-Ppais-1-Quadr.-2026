@@ -65,6 +65,7 @@ const initialItemCentricInput = (): ItemCentricInput => ({
 
 const unitOptions = [
     { value: 'saco-50', label: 'Saco (50 Kg)' },
+    { value: 'saco-25', label: 'Saco (25 Kg)' },
     { value: 'balde-18', label: 'Balde (18 Kg)' },
     { value: 'embalagem-10', label: 'Embalagem (10 Kg)' },
     { value: 'embalagem-5', label: 'Embalagem (5 Kg)' },
@@ -169,8 +170,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const sortedItems = [...itemsMap.entries()].sort((a, b) => a[1].order - b[1].order);
 
     const newItemCentricContracts = sortedItems.map(([name, data]) => {
-        // FIX: Added missing ui_unit property to satisfy the ItemCentricInput interface.
-        // It is derived by splitting the ui_compositeUnit string (e.g., "kg-1" -> "kg").
         const item: ItemCentricInput = {
             id: `item-${name}-${Math.random()}`,
             name,
@@ -190,8 +189,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if(data.unit === 'un-auto') {
             const totalKg = data.totalQty;
             const valuePerKg = data.valuePerUnit;
-            // Não é possível recriar ui_quantity e ui_valuePerUnit sem o peso individual,
-            // então forçamos o usuário a re-inserir se for editar. Os totais estão corretos.
             item.ui_quantity = '';
             item.ui_valuePerUnit = '';
             item.totalKg = String(totalKg);
@@ -236,19 +233,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   updatedItem.ui_kgConversion = ''; 
               }
 
-              // Recalcula os campos derivados quando a UI muda
               if (field.startsWith('ui_')) {
                   const [unit, kgConversionFactorStr] = updatedItem.ui_compositeUnit.split('-');
                   const quantity = parseFloat(updatedItem.ui_quantity.replace(',', '.')) || 0;
                   const valuePerUnit = parseFloat(updatedItem.ui_valuePerUnit.replace(',', '.')) || 0;
 
-                  if (unit === 'un') { // Apenas 'unidade' tem conversão de peso manual
+                  if (unit === 'un') { 
                       const kgPerUnit = parseFloat(updatedItem.ui_kgConversion.replace(',', '.')) || 0;
                       updatedItem.totalKg = (quantity * kgPerUnit).toFixed(3);
                       updatedItem.valuePerKg = kgPerUnit > 0 ? (valuePerUnit / kgPerUnit).toFixed(3) : '0';
-                  } else { // Todos os outros são tratados como unidades (kg, dúzia, balde, etc)
-                      updatedItem.totalKg = String(quantity); // `totalKg` armazena a QUANTIDADE DE UNIDADES
-                      updatedItem.valuePerKg = String(valuePerUnit); // `valuePerKg` armazena o VALOR POR UNIDADE
+                  } else {
+                      updatedItem.totalKg = String(quantity);
+                      updatedItem.valuePerKg = String(valuePerUnit);
                   }
               }
 
@@ -435,7 +431,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           
           {activeTab === 'register' && (
             <div className="space-y-10">
-                {/* Formulário de Cadastro */}
                 <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-500">
                     <h2 className="text-2xl font-bold mb-6 text-gray-700">Cadastrar Novo Fornecedor</h2>
                      {registrationStatus && (
@@ -470,7 +465,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </form>
                 </div>
 
-                {/* Lista de Fornecedores */}
                  <div className="bg-white p-6 rounded-2xl shadow-lg">
                     <h2 className="text-2xl font-bold mb-1 text-gray-700">Fornecedores Cadastrados</h2>
                     <p className="text-sm text-gray-400 mb-4">Total: {suppliers.length}</p>
@@ -500,8 +494,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {activeTab === 'contracts' && (
               <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-indigo-500">
-                  <h2 className="text-3xl font-black text-indigo-900 uppercase tracking-tighter mb-2">Gestão de Contratos por Item</h2>
-                  <p className="text-gray-400 font-medium mb-6">Cadastre os itens do contrato e distribua entre os fornecedores.</p>
+                  <h2 className="text-3xl font-black text-indigo-900 uppercase tracking-tighter mb-2">Gestão de Contratos (por Item)</h2>
+                  <p className="text-gray-400 font-medium mb-6">Defina os itens do contrato e distribua as quantidades entre os fornecedores.</p>
 
                   {contractError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm font-semibold">{contractError}</div>}
                   {contractSuccess && <div className="bg-green-100 text-green-700 p-3 rounded-md mb-4 text-sm font-semibold">{contractSuccess}</div>}
@@ -512,7 +506,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           const [unit, kgConversionFactorStr] = item.ui_compositeUnit.split('-');
                           const isUnit = unit === 'un';
 
-                          // Para exibição, calculamos os valores com base na lógica da UI
                           const quantity = parseFloat(item.ui_quantity.replace(',', '.')) || 0;
                           const valuePerUnit = parseFloat(item.ui_valuePerUnit.replace(',', '.')) || 0;
                           const conversionFactor = isUnit ? (parseFloat(item.ui_kgConversion.replace(',', '.')) || 0) : (parseFloat(kgConversionFactorStr) || 1);
@@ -532,7 +525,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       </div>
                                        <div className="flex items-center gap-4">
                                           <div className="text-right">
-                                            <p className="text-xs text-gray-500">{isUnit ? 'Peso Total' : 'Quantidade'}</p>
+                                            <p className="text-xs text-gray-500">{isUnit ? 'Peso Total (Kg)' : 'Qtd. Total'}</p>
                                             <p className="font-mono font-semibold text-indigo-700">
                                               {isUnit ? totalDisplayWeight.toLocaleString('pt-BR') : totalDisplayUnits.toLocaleString('pt-BR')} {displayUnitAbbreviation}
                                             </p>
@@ -552,7 +545,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         <select value={item.ui_compositeUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_compositeUnit', e.target.value)} className="w-full p-2 border rounded-md bg-gray-50">
                                             {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                         </select>
-                                        <input type="text" placeholder={`Quantidade de ${unitLabel}s`} value={item.ui_quantity} onChange={(e) => handleItemCentricChange(item.id, 'ui_quantity', e.target.value)} className="w-full p-2 border rounded-md font-mono" />
+                                        <input type="text" placeholder={`Qtd. de ${unitLabel}`} value={item.ui_quantity} onChange={(e) => handleItemCentricChange(item.id, 'ui_quantity', e.target.value)} className="w-full p-2 border rounded-md font-mono" />
                                         <input type="text" placeholder={`Valor por ${unitLabel}`} value={item.ui_valuePerUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_valuePerUnit', e.target.value)} className="w-full p-2 border rounded-md font-mono" />
                                         {isUnit && <input type="text" placeholder={`Peso da Unidade (Kg)`} value={item.ui_kgConversion} onChange={(e) => handleItemCentricChange(item.id, 'ui_kgConversion', e.target.value)} className="w-full p-2 border rounded-md font-mono" />}
                                       </div>
@@ -584,7 +577,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   <div className="mt-6 pt-6 border-t flex justify-between items-center">
                       <button onClick={handleAddItem} className="bg-blue-100 text-blue-700 hover:bg-blue-200 font-bold py-2 px-4 rounded-lg transition-colors text-sm">Adicionar Novo Item</button>
-                      <button onClick={handleSaveContracts} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg transition-colors">Salvar Contratos</button>
+                      <button onClick={handleSaveContracts} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg transition-colors">Salvar Todos os Itens</button>
                   </div>
               </div>
           )}

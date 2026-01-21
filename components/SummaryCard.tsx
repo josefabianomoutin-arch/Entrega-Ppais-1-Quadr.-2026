@@ -75,7 +75,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
 
     return (
         <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
-            <h2 className="text-xl font-semibold mb-4 text-gray-700">Resumo Financeiro</h2>
+            <h2 className="text-xl font-semibold mb-4 text-gray-700">Resumo do Contrato</h2>
             
             {/* General Summary */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 pb-4 border-b text-sm">

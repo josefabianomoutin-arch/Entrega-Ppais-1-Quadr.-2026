@@ -83,12 +83,13 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
         const csvRows = [headers.join(';')];
     
         suppliers.forEach(p => {
-            csvRows.push(''); // Add a blank line for spacing before each supplier
+            csvRows.push('');
             
             p.contractItems.forEach(item => {
                 const totalItemWeight = getContractItemWeight(item);
+                const itemTotalValue = item.totalKg * item.valuePerKg;
                 const monthlyKg = totalItemWeight / 4;
-                const monthlyValue = item.initialValue / 4; // Use initialValue do item se disponível, ou recalcular
+                const monthlyValue = itemTotalValue / 4;
                 const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
                 const deliveriesForItem = p.deliveries.filter(d => d.item === item.name && d.kg);
                 let surplusFromPreviousMonth = 0;
@@ -110,7 +111,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     
                     const row = [
                         `"${p.name}"`,
-                        `'${p.cpf}`, // Prefix with ' to treat as text in Excel
+                        `'${p.cpf}`,
                         `"${item.name}"`,
                         month,
                         String(adjustedMonthlyKg.toFixed(2)).replace('.', ','),
@@ -122,10 +123,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                     csvRows.push(row.join(';'));
                 });
     
-                // Total row for the item
                 const totalDeliveredKgForItem = deliveriesForItem.reduce((sum, d) => sum + (d.kg || 0), 0);
                 const totalRemainingKgForItem = totalItemWeight - totalDeliveredKgForItem;
-                const itemTotalValue = (p.initialValue / p.contractItems.length); // Aproximação do valor do item
                 const row = [
                     "",
                     "",
@@ -138,7 +137,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                     ""
                 ];
                 csvRows.push(row.join(';'));
-                csvRows.push(''); // Blank line after each item
+                csvRows.push('');
             });
         });
     
@@ -148,7 +147,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', 'relatorio_detalhado_fornecedores.csv');
+        link.setAttribute('download', 'relatorio_analitico_fornecedores.csv');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -156,6 +155,9 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
 
     return (
         <div className="space-y-8 animate-fade-in pb-12">
+            <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-500">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Relatório Analítico de Contratos</h2>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-blue-500">
                     <p className="text-xs text-gray-400 font-bold uppercase">Contratado</p>
@@ -177,7 +179,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
 
             <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                    <h3 className="text-lg font-bold text-gray-800">Detalhes do Contrato por Fornecedor</h3>
+                    <h3 className="text-lg font-bold text-gray-800">Desempenho Detalhado por Fornecedor</h3>
                     <div className="flex items-center gap-2 flex-wrap">
                          <input 
                             type="text" 
@@ -224,7 +226,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                                             {supplier.contractItems.length > 0 ? supplier.contractItems.map(item => {
                                                                 const totalItemWeight = getContractItemWeight(item);
                                                                 const monthlyKg = totalItemWeight / 4;
-                                                                const itemTotalValue = item.totalKg * item.valuePerKg; // Qty * ValuePerUnit
+                                                                const itemTotalValue = item.totalKg * item.valuePerKg;
                                                                 const monthlyValue = itemTotalValue / 4;
                                                                 const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
                                                                 
