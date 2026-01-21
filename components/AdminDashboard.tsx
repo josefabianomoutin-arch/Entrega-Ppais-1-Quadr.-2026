@@ -38,7 +38,7 @@ interface ItemCentricInput {
   suppliers: SupplierSlot[];
   // Campos para a UI de entrada
   ui_compositeUnit: string;
-  ui_unit: 'kg' | 'dz' | 'un' | 'pacote' | 'pote' | 'balde' | 'saco' | 'embalagem';
+  ui_unit: 'kg' | 'dz' | 'un' | 'pacote' | 'pote' | 'balde' | 'saco' | 'embalagem' | 'litro';
   ui_quantity: string;
   ui_valuePerUnit: string;
   ui_kgConversion: string;
@@ -72,6 +72,7 @@ const unitOptions = [
     { value: 'embalagem-3', label: 'Embalagem (3 Kg)' },
     { value: 'embalagem-2', label: 'Embalagem (2 Kg)' },
     { value: 'kg-1', label: 'Quilograma (Kg)' },
+    { value: 'litro-1', label: 'Litros (Lts)' },
     { value: 'embalagem-0.9', label: 'Embalagem (900ml)' },
     { value: 'embalagem-0.7', label: 'Embalagem (700ml)' },
     { value: 'pacote-0.5', label: 'Pacote (500g)' },
@@ -514,7 +515,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           const totalDisplayUnits = quantity;
                           
                           const unitLabel = unitOptions.find(opt => opt.value === item.ui_compositeUnit)?.label.split(' (')[0] || unit;
-                          const displayUnitAbbreviation = isUnit ? 'Kg' : (unit === 'dz' ? 'Dz' : (unit === 'kg' ? 'Kg' : 'Unid.'));
+                          const displayUnitAbbreviation = isUnit ? 'Kg' : (unit === 'dz' ? 'Dz' : (unit === 'kg' ? 'Kg' : (unit === 'litro' ? 'Lts' : 'Unid.')));
 
                           return (
                               <div key={item.id} className={`border rounded-xl transition-all ${isExpanded ? 'bg-white ring-2 ring-indigo-400' : 'bg-gray-50'}`}>
