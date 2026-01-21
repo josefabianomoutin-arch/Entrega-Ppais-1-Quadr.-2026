@@ -176,8 +176,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     <th className="p-3 text-right">Consumo Semanal</th>
                                     <th className="p-3 text-right">Requerido (4 Semanas)</th>
                                     <th className="p-3 text-right">Contratado (4 Semanas)</th>
-                                    <th className="p-3 text-right">Entregue</th>
                                     <th className="p-3 text-right">Diferença</th>
+                                    <th className="p-3 text-right">Entregue</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -201,8 +201,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">{contractedTotalKg.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
-                                                <td className="p-3 text-right font-mono font-bold text-green-700">{totalDeliveredKgForItem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">-</td>
+                                                <td className="p-3 text-right font-mono font-bold text-green-700">{totalDeliveredKgForItem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
                                             </tr>
                                         );
                                     }
@@ -255,8 +255,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                             <td className="p-3 text-right font-mono text-gray-600">{formatConsumption(reference.weeklyConsumption)}</td>
                                             <td className="p-3 text-right font-mono font-bold">{requiredDisplay}</td>
                                             <td className="p-3 text-right font-mono font-bold text-gray-800">{contractedTotalKg.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
-                                            <td className="p-3 text-right font-mono font-bold text-green-700">{totalDeliveredKgForItem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
                                             <td className={`p-3 text-right font-mono font-bold ${differenceColor}`}>{differenceDisplay}</td>
+                                            <td className="p-3 text-right font-mono font-bold text-green-700">{totalDeliveredKgForItem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
                                         </tr>
                                     );
                                 }) : (
