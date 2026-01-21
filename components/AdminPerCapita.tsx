@@ -177,7 +177,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                             <tbody className="divide-y divide-gray-100">
                                 {itemData.length > 0 ? itemData.map(item => {
                                     const reference = resolutionData[item.name.toUpperCase()];
-                                    
                                     const contractedTotalKg = item.totalKg;
 
                                     if (!reference) {
@@ -191,16 +190,43 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                         );
                                     }
                                     
-                                    const required = reference.monthlyConsumption;
-                                    let differenceDisplay = 'N/A (unidades incomp.)';
+                                    const perCapitaRequired = reference.monthlyConsumption;
+                                    let totalRequiredKg = 0;
+                                    let requiredDisplay = 'N/A';
+
+                                    if (perCapitaDenominator > 0) {
+                                        const unit = perCapitaRequired.unit.toLowerCase();
+                                        const value = perCapitaRequired.value;
+
+                                        if (unit === 'g') {
+                                            totalRequiredKg = (value / 1000) * perCapitaDenominator;
+                                            requiredDisplay = `${totalRequiredKg.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
+                                        } else if (unit === 'ml') {
+                                            const totalLiters = (value / 1000) * perCapitaDenominator;
+                                            requiredDisplay = `${totalLiters.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} L`;
+                                        } else if (unit === 'l') {
+                                            const totalLiters = value * perCapitaDenominator;
+                                            requiredDisplay = `${totalLiters.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`;
+                                        } else if (unit === 'unid.') {
+                                            const totalUnits = value * perCapitaDenominator;
+                                            requiredDisplay = `${totalUnits.toLocaleString('pt-BR')} unid.`;
+                                        } else {
+                                            requiredDisplay = formatConsumption(perCapitaRequired);
+                                        }
+                                    } else {
+                                        const unit = perCapitaRequired.unit.toLowerCase();
+                                        if (unit === 'g' || unit === 'kg') requiredDisplay = '0,000 kg';
+                                        else if (unit === 'ml' || unit === 'l') requiredDisplay = '0,000 L';
+                                        else if (unit === 'unid.') requiredDisplay = '0 unid.';
+                                        else requiredDisplay = `0 ${perCapitaRequired.unit}`;
+                                    }
+                                    
+                                    let differenceDisplay = 'N/A (unid. incomp.)';
                                     let differenceColor = 'text-gray-500';
 
-                                    // Compara apenas se a unidade requerida for 'g' (gramas)
-                                    if (required.unit.toLowerCase() === 'g') {
-                                        const requiredKg = required.value / 1000;
-                                        const difference = contractedTotalKg - requiredKg;
-                                        
-                                        differenceDisplay = `${difference >= 0 ? '+' : ''}${difference.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg`;
+                                    if (totalRequiredKg > 0) {
+                                        const difference = contractedTotalKg - totalRequiredKg;
+                                        differenceDisplay = `${difference >= 0 ? '+' : ''}${difference.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
                                         differenceColor = difference >= 0 ? 'text-blue-600' : 'text-red-600';
                                     }
 
@@ -209,7 +235,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                             <td className="p-3 font-semibold text-gray-800">{item.name}</td>
                                             <td className="p-3 text-left font-mono text-gray-500">{reference.frequency}</td>
                                             <td className="p-3 text-right font-mono text-gray-600">{formatConsumption(reference.weeklyConsumption)}</td>
-                                            <td className="p-3 text-right font-mono font-bold">{formatConsumption(required)}</td>
+                                            <td className="p-3 text-right font-mono font-bold">{requiredDisplay}</td>
                                             <td className="p-3 text-right font-mono font-bold text-gray-800">{contractedTotalKg.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
                                             <td className={`p-3 text-right font-mono font-bold ${differenceColor}`}>{differenceDisplay}</td>
                                         </tr>

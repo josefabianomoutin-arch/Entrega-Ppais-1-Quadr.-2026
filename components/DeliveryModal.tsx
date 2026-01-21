@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
 
+interface MonthlyQuota {
+  name: string;
+  monthlyQuotaKg: number;
+  deliveredThisMonthKg: number;
+  remainingThisMonthKg: number;
+}
+
 interface DeliveryModalProps {
   date: Date;
   onClose: () => void;
   onSave: (time: string) => void;
+  monthlyQuotas: MonthlyQuota[];
 }
 
-const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave }) => {
+const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, monthlyQuotas }) => {
   const [time, setTime] = useState('08:00');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -31,7 +39,34 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave }) 
         </div>
         <p className="mb-6 text-gray-600">Data selecionada: <span className="font-semibold text-green-700">{formattedDate}</span></p>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="mb-6 border-t pt-4">
+            <h3 className="text-lg font-semibold text-gray-700 mb-3">Meta de Entrega para {date.toLocaleString('pt-BR', { month: 'long' })}</h3>
+            <div className="space-y-4 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                {monthlyQuotas.length > 0 ? monthlyQuotas.map(quota => {
+                    const progress = quota.monthlyQuotaKg > 0 ? (quota.deliveredThisMonthKg / quota.monthlyQuotaKg) * 100 : 0;
+                    return (
+                        <div key={quota.name} className="text-sm">
+                            <p className="font-bold text-gray-800">{quota.name}</p>
+                            <div className="w-full bg-gray-200 rounded-full h-4 my-1 relative shadow-inner">
+                                <div 
+                                    className="bg-green-500 h-4 rounded-full transition-all duration-300" 
+                                    style={{ width: `${Math.min(100, progress)}%` }}
+                                />
+                                 <span className="absolute inset-0 text-white text-[10px] font-bold flex items-center justify-center mix-blend-lighten">{progress.toFixed(0)}%</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-gray-500">
+                                <span>Entregue: {quota.deliveredThisMonthKg.toFixed(2).replace('.', ',')} Kg</span>
+                                <span>Meta: {quota.monthlyQuotaKg.toFixed(2).replace('.', ',')} Kg</span>
+                            </div>
+                        </div>
+                    )
+                }) : (
+                    <p className="text-sm text-gray-400 italic text-center">Nenhum item contratado para este fornecedor.</p>
+                )}
+            </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 border-t pt-4">
           <div>
             <label htmlFor="time" className="block text-sm font-medium text-gray-700">Horário da Entrega (08:00 às 16:00)</label>
             <input 
@@ -60,6 +95,8 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave }) 
         .animate-fade-in-up {
           animation: fade-in-up 0.3s ease-out forwards;
         }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
       `}</style>
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { Supplier, Delivery } from '../types';
+import type { Supplier, Delivery, ContractItem } from '../types';
 import Calendar from './Calendar';
 import DeliveryModal from './DeliveryModal';
 import ViewDeliveryModal from './ViewDeliveryModal';
@@ -27,6 +27,16 @@ interface DashboardProps {
   } | null;
   onCloseEmailModal: () => void;
 }
+
+const getContractItemWeight = (item: ContractItem): number => {
+    const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
+    if (unitType === 'un') return item.totalKg;
+    if (unitType === 'dz') return 0;
+    const quantity = item.totalKg;
+    const unitWeight = parseFloat(unitWeightStr) || 1;
+    return quantity * unitWeight;
+};
+
 
 const Dashboard: React.FC<DashboardProps> = ({ 
   supplier, 
@@ -130,6 +140,34 @@ const Dashboard: React.FC<DashboardProps> = ({
     }));
   }, [supplier.deliveries]);
 
+  const monthlyQuotas = useMemo(() => {
+    if (!selectedDate || !supplier.contractItems) return [];
+    
+    const currentMonth = selectedDate.getMonth();
+
+    return supplier.contractItems.map(item => {
+        const totalContractedKg = getContractItemWeight(item);
+        const monthlyQuotaKg = totalContractedKg / 4;
+
+        const deliveredThisMonthKg = supplier.deliveries
+            .filter(d => 
+                d.item === item.name && 
+                new Date(d.date + 'T00:00:00').getMonth() === currentMonth
+            )
+            .reduce((sum, d) => sum + (d.kg || 0), 0);
+
+        const remainingThisMonthKg = monthlyQuotaKg - deliveredThisMonthKg;
+
+        return {
+            name: item.name,
+            monthlyQuotaKg,
+            deliveredThisMonthKg,
+            remainingThisMonthKg,
+        };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+
+  }, [selectedDate, supplier.contractItems, supplier.deliveries]);
+
 
   return (
     <div className="min-h-screen text-gray-800">
@@ -190,6 +228,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           date={selectedDate}
           onClose={handleCloseModal}
           onSave={handleScheduleSave}
+          monthlyQuotas={monthlyQuotas}
         />
       )}
 
