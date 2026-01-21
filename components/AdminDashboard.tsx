@@ -277,7 +277,8 @@ useEffect(() => {
       console.error("Erro ao processar atualização de contrato em tempo real:", e);
       setContractError('Erro ao calcular totais. Verifique os dados dos itens.');
     }
-  }, [itemCentricContracts, supplierIdentities, onLiveUpdate, activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemCentricContracts, onLiveUpdate, activeTab]);
 
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
