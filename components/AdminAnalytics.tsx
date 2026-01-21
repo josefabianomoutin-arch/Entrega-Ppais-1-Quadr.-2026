@@ -16,10 +16,18 @@ const formatDate = (dateString: string) => {
 };
 
 const getContractItemWeight = (item: Supplier['contractItems'][0]): number => {
+    if (!item) return 0;
     const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
-    if (unitType === 'un') return item.totalKg;
-    if (unitType === 'dz') return 0;
-    const quantity = item.totalKg;
+    
+    const quantity = item.totalKg || 0;
+
+    if (unitType === 'un') {
+        return quantity;
+    }
+    if (unitType === 'dz') {
+        return 0;
+    }
+
     const unitWeight = parseFloat(unitWeightStr) || 1;
     return quantity * unitWeight;
 };
@@ -87,7 +95,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
             
             p.contractItems.forEach(item => {
                 const totalItemWeight = getContractItemWeight(item);
-                const itemTotalValue = item.totalKg * item.valuePerKg;
+                const itemTotalValue = (item.totalKg || 0) * (item.valuePerKg || 0);
                 const monthlyKg = totalItemWeight / 4;
                 const monthlyValue = itemTotalValue / 4;
                 const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
@@ -226,7 +234,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                                             {supplier.contractItems.length > 0 ? supplier.contractItems.map(item => {
                                                                 const totalItemWeight = getContractItemWeight(item);
                                                                 const monthlyKg = totalItemWeight / 4;
-                                                                const itemTotalValue = item.totalKg * item.valuePerKg;
+                                                                const itemTotalValue = (item.totalKg || 0) * (item.valuePerKg || 0);
                                                                 const monthlyValue = itemTotalValue / 4;
                                                                 const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
                                                                 

@@ -14,14 +14,36 @@ interface FulfilledItem {
     kg: string;
 }
 
+interface ValidationErrors {
+    [itemId: string]: string;
+}
+
 const formatCurrency = (value: number) => {
     if (isNaN(value)) return 'R$ 0,00';
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+const getContractItemWeight = (item: ContractItem): number => {
+    if (!item) return 0;
+    const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
+    
+    const quantity = item.totalKg || 0;
+
+    if (unitType === 'un') {
+        return quantity;
+    }
+    if (unitType === 'dz') {
+        return 0;
+    }
+
+    const unitWeight = parseFloat(unitWeightStr) || 1;
+    return quantity * unitWeight;
+};
+
 const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contractItems, onClose, onSave }) => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [items, setItems] = useState<FulfilledItem[]>([{ id: `item-${Date.now()}`, name: '', kg: '' }]);
+  const [errors, setErrors] = useState<ValidationErrors>({});
 
   const formattedDate = new Date(invoiceInfo.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   
@@ -30,8 +52,44 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
       return invoiceInfo.deliveries.map(d => d.time).sort()[0];
   }, [invoiceInfo.deliveries]);
 
+  const validateKg = (itemId: string, itemName: string, kgString: string): string => {
+    if (!itemName || !kgString) return '';
+
+    const contractItem = contractItems.find(ci => ci.name === itemName);
+    if (!contractItem) return 'Item do contrato não encontrado.';
+
+    const totalContractedKg = getContractItemWeight(contractItem);
+    const monthlyQuotaKg = totalContractedKg / 4;
+
+    const minAllowed = monthlyQuotaKg * 0.90;
+    const maxAllowed = monthlyQuotaKg * 1.10;
+
+    const kg = parseFloat(kgString.replace(',', '.'));
+    if (isNaN(kg)) return 'Valor de peso inválido.';
+
+    if (kg < minAllowed || kg > maxAllowed) {
+        return `O peso deve estar entre ${minAllowed.toFixed(2).replace('.', ',')} e ${maxAllowed.toFixed(2).replace('.', ',')} Kg.`;
+    }
+
+    return '';
+  };
+
   const handleItemChange = (id: string, field: 'name' | 'kg', value: string) => {
-    setItems(currentItems => currentItems.map(item => item.id === id ? { ...item, [field]: value } : item));
+    let newKg = field === 'kg' ? value.replace(/[^0-9,.]/g, '') : '';
+
+    setItems(currentItems => {
+        const updatedItems = currentItems.map(item => item.id === id ? { ...item, [field]: field === 'kg' ? newKg : value } : item);
+        
+        // Find the specific item that was changed to get its name for validation
+        const changedItem = updatedItems.find(item => item.id === id);
+        if (changedItem) {
+            const kgToValidate = field === 'kg' ? newKg : changedItem.kg;
+            const validationError = validateKg(id, changedItem.name, kgToValidate);
+            setErrors(prevErrors => ({ ...prevErrors, [id]: validationError }));
+        }
+
+        return updatedItems;
+    });
   };
 
   const handleAddItem = () => {
@@ -40,6 +98,11 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
 
   const handleRemoveItem = (id: string) => {
     setItems(currentItems => currentItems.filter(item => item.id !== id));
+    setErrors(prevErrors => {
+        const newErrors = { ...prevErrors };
+        delete newErrors[id];
+        return newErrors;
+    });
   };
 
   const totalValue = useMemo(() => {
@@ -49,18 +112,15 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
       
       if (contractItem && !isNaN(kg)) {
         const [unitType, unitWeightStr] = (contractItem.unit || 'kg-1').split('-');
-        let valuePerKg = contractItem.valuePerKg; // Para 'kg' e 'un', este já é o valor/kg
+        let valuePerKg = contractItem.valuePerKg || 0; // Para 'kg' e 'un', este já é o valor/kg
         
-        // Para unidades como 'balde-18', 'saco-50', etc., valuePerKg armazena o valor por unidade.
-        // Precisamos calcular o valor/kg real para o faturamento.
         if (unitType !== 'kg' && unitType !== 'un' && unitType !== 'dz') {
             const unitWeight = parseFloat(unitWeightStr);
             if (unitWeight > 0) {
-                valuePerKg = contractItem.valuePerKg / unitWeight; // value_per_unit / weight_of_unit
+                valuePerKg = (contractItem.valuePerKg || 0) / unitWeight; // value_per_unit / weight_of_unit
             }
         }
         
-        // Dúzias não podem ser faturadas por Kg. Devem ser faturadas em um modal separado no futuro.
         if (unitType === 'dz') return total;
 
         return total + (kg * valuePerKg);
@@ -78,6 +138,19 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
       return;
     }
 
+    // Final validation check
+    const finalErrors: ValidationErrors = {};
+    items.forEach(item => {
+        const error = validateKg(item.id, item.name, item.kg);
+        if (error) finalErrors[item.id] = error;
+    });
+    setErrors(finalErrors);
+    if(Object.values(finalErrors).some(e => e)) {
+        alert('Existem erros nos itens. Por favor, corrija os valores de peso antes de salvar.');
+        return;
+    }
+
+
     const fulfilledItems = items.map(item => {
         const contractItem = contractItems.find(ci => ci.name === item.name);
         const kg = parseFloat(item.kg.replace(',', '.'));
@@ -85,23 +158,15 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
         if (!contractItem || isNaN(kg) || kg <= 0) return null;
         
         const [unitType, unitWeightStr] = (contractItem.unit || 'kg-1').split('-');
-        
-        // Ignora dúzias neste modal, pois não são medidas em Kg.
         if (unitType === 'dz') return null;
         
-        let valuePerKg = contractItem.valuePerKg;
+        let valuePerKg = contractItem.valuePerKg || 0;
         if (unitType !== 'kg' && unitType !== 'un') {
             const unitWeight = parseFloat(unitWeightStr);
-            if (unitWeight > 0) {
-                valuePerKg = contractItem.valuePerKg / unitWeight;
-            }
+            if (unitWeight > 0) valuePerKg = (contractItem.valuePerKg || 0) / unitWeight;
         }
 
-        return {
-            name: item.name,
-            kg: kg,
-            value: kg * valuePerKg
-        };
+        return { name: item.name, kg: kg, value: kg * valuePerKg };
     }).filter((item): item is { name: string; kg: number; value: number } => item !== null);
 
     if (fulfilledItems.length === 0) {
@@ -116,8 +181,10 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
       return contractItems.filter(ci => {
           const [unitType] = (ci.unit || 'kg-1').split('-');
           return unitType !== 'dz'; // Filtra itens em dúzia que não podem ser faturados por kg
-      });
+      }).sort((a,b) => a.name.localeCompare(b.name));
   }, [contractItems]);
+
+  const isSaveDisabled = Object.values(errors).some(e => e) || items.some(i => !i.name || !i.kg);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
@@ -147,44 +214,48 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
                             const kg = parseFloat(item.kg.replace(',','.'));
                              if (contractItem && !isNaN(kg)) {
                                 const [unitType, unitWeightStr] = (contractItem.unit || 'kg-1').split('-');
-                                let valuePerKg = contractItem.valuePerKg; 
+                                let valuePerKg = contractItem.valuePerKg || 0; 
                                 if (unitType !== 'kg' && unitType !== 'un' && unitType !== 'dz') {
                                     const unitWeight = parseFloat(unitWeightStr);
-                                    if (unitWeight > 0) valuePerKg = contractItem.valuePerKg / unitWeight;
+                                    if (unitWeight > 0) valuePerKg = (contractItem.valuePerKg || 0) / unitWeight;
                                 }
                                 if(unitType !== 'dz') itemValue = kg * valuePerKg;
                             }
                         }
+                        const error = errors[item.id];
 
                         return (
-                        <div key={item.id} className="p-3 border rounded-lg bg-white shadow-sm flex flex-col sm:flex-row items-center gap-4">
-                            <select 
-                                value={item.name} 
-                                onChange={e => handleItemChange(item.id, 'name', e.target.value)}
-                                className="w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                            >
-                                <option value="">-- Selecione o Item --</option>
-                                {availableContractItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
-                            </select>
-                            <input
-                                type="text"
-                                value={item.kg}
-                                onChange={e => handleItemChange(item.id, 'kg', e.target.value.replace(/[^0-9,.]/g, ''))}
-                                placeholder="Peso (Kg)"
-                                className="w-full sm:w-1/4 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm font-mono"
-                            />
-                            <div className="w-full sm:w-1/4 text-center sm:text-right">
-                                {item.name && contractItem && !isNaN(parseFloat(item.kg.replace(',','.'))) ? (
-                                    <span className="text-sm font-semibold text-green-600">
-                                        {formatCurrency(itemValue)}
-                                    </span>
-                                ) : (
-                                    <span className="text-sm text-gray-400">--</span>
-                                )}
+                        <div key={item.id} className="p-3 border rounded-lg bg-white shadow-sm">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                <select 
+                                    value={item.name} 
+                                    onChange={e => handleItemChange(item.id, 'name', e.target.value)}
+                                    className="w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                >
+                                    <option value="">-- Selecione o Item --</option>
+                                    {availableContractItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
+                                </select>
+                                <input
+                                    type="text"
+                                    value={item.kg}
+                                    onChange={e => handleItemChange(item.id, 'kg', e.target.value)}
+                                    placeholder="Peso (Kg)"
+                                    className={`w-full sm:w-1/4 px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm font-mono`}
+                                />
+                                <div className="w-full sm:w-1/4 text-center sm:text-right">
+                                    {item.name && contractItem && !isNaN(parseFloat(item.kg.replace(',','.'))) ? (
+                                        <span className="text-sm font-semibold text-green-600">
+                                            {formatCurrency(itemValue)}
+                                        </span>
+                                    ) : (
+                                        <span className="text-sm text-gray-400">--</span>
+                                    )}
+                                </div>
+                                <button type="button" onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-700 p-1 rounded-full" title="Remover Item">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
                             </div>
-                            <button type="button" onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-700 p-1 rounded-full" title="Remover Item">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
+                            {error && <p className="text-red-600 text-xs mt-1 pl-1">{error}</p>}
                         </div>
                     )})}
                      <button type="button" onClick={handleAddItem} className="w-full text-sm text-blue-600 hover:bg-blue-50 py-2 rounded-md border-2 border-dashed flex items-center justify-center gap-2">
@@ -201,7 +272,13 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
             
             <div className="pt-6 flex justify-end space-x-3">
                 <button type="button" onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition-colors">Cancelar</button>
-                <button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Salvar e Enviar NF</button>
+                <button 
+                    type="submit" 
+                    disabled={isSaveDisabled}
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                    Salvar e Enviar NF
+                </button>
             </div>
         </form>
       </div>

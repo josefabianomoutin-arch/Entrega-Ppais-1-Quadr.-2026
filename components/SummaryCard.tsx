@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import type { Supplier } from '../types';
+import { MONTHS_2026 } from '../constants';
 
 interface SummaryCardProps {
     supplier: Supplier;
@@ -7,11 +8,14 @@ interface SummaryCardProps {
 
 // Helper para calcular o peso total real de um item de contrato
 const getContractItemWeight = (item: Supplier['contractItems'][0]): number => {
+    if (!item) return 0;
     const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
     
+    const quantity = item.totalKg || 0;
+
     // Para 'unidade', totalKg já é o peso total.
     if (unitType === 'un') {
-        return item.totalKg;
+        return quantity;
     }
     
     // Para 'dúzia', não temos um peso definido, então retornamos 0 para o total de Kg.
@@ -20,7 +24,6 @@ const getContractItemWeight = (item: Supplier['contractItems'][0]): number => {
     }
 
     // Para outros (kg, balde, saco), totalKg armazena a quantidade. Multiplicamos pelo peso da unidade.
-    const quantity = item.totalKg;
     const unitWeight = parseFloat(unitWeightStr) || 1; // Padrão de 1 para 'kg-1'
     return quantity * unitWeight;
 };
@@ -32,18 +35,6 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
     const remainingValue = supplier.initialValue - totalDeliveredValue;
     const valueProgress = supplier.initialValue > 0 ? (totalDeliveredValue / supplier.initialValue) * 100 : 0;
 
-
-    const deliveredValueByItem = useMemo(() => {
-        const valueMap = new Map<string, number>();
-        supplier.deliveries.forEach(delivery => {
-            if (delivery.item && delivery.value) {
-                const currentVal = valueMap.get(delivery.item) || 0;
-                valueMap.set(delivery.item, currentVal + delivery.value);
-            }
-        });
-        return valueMap;
-    }, [supplier.deliveries]);
-
     // Weight (Kg) calculations
     const totalContractedKg = useMemo(() => {
         return supplier.contractItems.reduce((sum, item) => sum + getContractItemWeight(item), 0);
@@ -53,16 +44,40 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
     const remainingKg = totalContractedKg - totalDeliveredKg;
     const kgProgress = totalContractedKg > 0 ? (totalDeliveredKg / totalContractedKg) * 100 : 0;
 
-    const deliveredKgByItem = useMemo(() => {
-        const kgMap = new Map<string, number>();
-        supplier.deliveries.forEach(delivery => {
-             if (delivery.item && delivery.kg) {
-                const currentKg = kgMap.get(delivery.item) || 0;
-                kgMap.set(delivery.item, currentKg + delivery.kg);
+    const monthlyDataByItem = useMemo(() => {
+        const data = new Map<string, any[]>();
+        
+        supplier.contractItems.forEach(item => {
+            const itemMonthlyData = [];
+            const itemTotalValue = (item.totalKg || 0) * (item.valuePerKg || 0);
+            const itemTotalKg = getContractItemWeight(item);
+
+            const monthlyValueQuota = itemTotalValue / 4;
+            const monthlyKgQuota = itemTotalKg / 4;
+
+            for (const month of MONTHS_2026) {
+                const deliveredInMonth = supplier.deliveries
+                    .filter(d => d.item === item.name && new Date(d.date + 'T00:00:00').getMonth() === month.number);
+                
+                const deliveredValue = deliveredInMonth.reduce((sum, d) => sum + (d.value || 0), 0);
+                const deliveredKg = deliveredInMonth.reduce((sum, d) => sum + (d.kg || 0), 0);
+
+                itemMonthlyData.push({
+                    monthName: month.name,
+                    contractedValue: monthlyValueQuota,
+                    contractedKg: monthlyKgQuota,
+                    deliveredValue,
+                    deliveredKg,
+                    remainingValue: monthlyValueQuota - deliveredValue,
+                    remainingKg: monthlyKgQuota - deliveredKg,
+                });
             }
+            data.set(item.name, itemMonthlyData);
         });
-        return kgMap;
-    }, [supplier.deliveries]);
+
+        return data;
+    }, [supplier.contractItems, supplier.deliveries]);
+
 
     // Formatting helpers
     const formatCurrency = (value: number) => {
@@ -95,45 +110,42 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
             {/* Item Breakdown */}
             <div className="py-4 space-y-4">
                 <h3 className="font-semibold text-gray-600">Detalhes por Produto</h3>
-                <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                     {supplier.contractItems.map(item => {
-                        const [unitType] = (item.unit || 'kg-1').split('-');
-                        const isUnitBased = unitType !== 'un';
-
-                        const itemTotalValue = isUnitBased 
-                            ? item.totalKg * item.valuePerKg  // quantity * value_per_unit
-                            : item.totalKg * item.valuePerKg; // total_weight * value_per_kg (same formula, different meanings)
-
-                        const deliveredValue = deliveredValueByItem.get(item.name) || 0;
-                        const remainingItemValue = itemTotalValue - deliveredValue;
-
-                        const itemTotalKg = getContractItemWeight(item);
-                        const deliveredItemKg = deliveredKgByItem.get(item.name) || 0;
-                        const remainingItemKg = itemTotalKg - deliveredItemKg;
-
+                        const itemMonthlyData = monthlyDataByItem.get(item.name) || [];
                         return (
                             <div key={item.name} className="p-3 bg-gray-50 rounded-lg text-sm">
                                 <p className="font-bold text-gray-800 mb-2">{item.name}</p>
-                                <div className="grid grid-cols-3 gap-x-2 text-xs">
-                                    {/* Headers */}
-                                    <span className="font-semibold text-gray-500"></span>
-                                    <span className="font-semibold text-gray-600 text-right">Valor</span>
-                                    <span className="font-semibold text-gray-600 text-right">Peso</span>
-                                    
-                                    {/* Contracted */}
-                                    <span className="text-gray-500">Contratado</span>
-                                    <span className="text-right">{formatCurrency(itemTotalValue)}</span>
-                                    <span className="text-right">{formatKg(itemTotalKg)}</span>
-
-                                    {/* Delivered */}
-                                    <span className="text-gray-500">Entregue</span>
-                                    <span className="text-green-600 text-right">{formatCurrency(deliveredValue)}</span>
-                                    <span className="text-green-600 text-right">{formatKg(deliveredItemKg)}</span>
-
-                                    {/* Remaining */}
-                                    <span className="text-gray-500 font-semibold">Restante</span>
-                                    <span className="text-blue-600 font-semibold text-right">{formatCurrency(remainingItemValue)}</span>
-                                    <span className="text-blue-600 font-semibold text-right">{formatKg(remainingItemKg)}</span>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="bg-gray-100">
+                                                <th className="p-2 text-left font-semibold text-gray-600">Mês</th>
+                                                <th className="p-2 text-right font-semibold text-gray-600">Contratado</th>
+                                                <th className="p-2 text-right font-semibold text-green-600">Entregue</th>
+                                                <th className="p-2 text-right font-semibold text-blue-600">Restante</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {itemMonthlyData.map(data => (
+                                                <tr key={data.monthName} className="border-t">
+                                                    <td className="p-2 font-semibold">{data.monthName}</td>
+                                                    <td className="p-2 text-right">
+                                                        <div>{formatCurrency(data.contractedValue)}</div>
+                                                        <div className="text-gray-500">{formatKg(data.contractedKg)}</div>
+                                                    </td>
+                                                    <td className="p-2 text-right text-green-600">
+                                                        <div>{formatCurrency(data.deliveredValue)}</div>
+                                                        <div className="text-gray-500">{formatKg(data.deliveredKg)}</div>
+                                                    </td>
+                                                    <td className="p-2 text-right font-bold text-blue-600">
+                                                         <div>{formatCurrency(data.remainingValue)}</div>
+                                                        <div className="text-gray-500">{formatKg(data.remainingKg)}</div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         );

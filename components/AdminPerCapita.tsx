@@ -11,11 +11,19 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-const getContractItemWeight = (item: { totalKg: number, unit?: string }): number => {
+const getContractItemWeight = (item: { totalKg?: number, unit?: string }): number => {
+    if (!item) return 0;
     const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
-    if (unitType === 'un') return item.totalKg;
-    if (unitType === 'dz') return 0;
-    const quantity = item.totalKg;
+    
+    const quantity = item.totalKg || 0;
+
+    if (unitType === 'un') {
+        return quantity;
+    }
+    if (unitType === 'dz') {
+        return 0;
+    }
+
     const unitWeight = parseFloat(unitWeightStr) || 1;
     return quantity * unitWeight;
 };
@@ -44,12 +52,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
           
           current.totalKg += getContractItemWeight(item);
 
-          const [unitType] = (item.unit || 'kg-1').split('-');
-            if (unitType === 'un') {
-                current.totalValue += item.totalKg * item.valuePerKg; // total_weight * value_per_kg
-            } else {
-                current.totalValue += item.totalKg * item.valuePerKg; // quantity_of_units * value_per_unit
-            }
+          const itemTotalValue = (item.totalKg || 0) * (item.valuePerKg || 0);
+          current.totalValue += itemTotalValue;
 
           data.set(item.name, current);
         });
@@ -166,6 +170,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                         <table className="w-full text-sm">
                             <thead className="bg-gray-100 text-xs uppercase text-gray-600">
                                 <tr>
+                                    <th className="p-3 text-center">#</th>
                                     <th className="p-3 text-left">Item</th>
                                     <th className="p-3 text-left">Frequência</th>
                                     <th className="p-3 text-right">Consumo Semanal</th>
@@ -175,17 +180,20 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {itemData.length > 0 ? itemData.map(item => {
+                                {itemData.length > 0 ? itemData.map((item, index) => {
                                     const reference = resolutionData[item.name.toUpperCase()];
                                     const contractedTotalKg = item.totalKg;
 
                                     if (!reference) {
                                         return (
-                                            <tr key={item.name} className="hover:bg-gray-50">
-                                                <td className="p-3 font-semibold text-gray-800">{item.name}</td>
-                                                <td colSpan={3} className="p-3 text-center text-gray-400 italic">Não consta na lista de requeridos</td>
-                                                <td className="p-3 text-right font-mono">{contractedTotalKg.toFixed(2).replace('.', ',')} kg</td>
-                                                <td className="p-3 text-right font-mono">-</td>
+                                            <tr key={item.name} className="bg-blue-50 hover:bg-blue-100">
+                                                <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
+                                                <td className="p-3 font-semibold text-blue-900">{item.name}</td>
+                                                <td className="p-3 text-center text-blue-800 italic font-mono">NC</td>
+                                                <td className="p-3 text-center text-blue-800 italic font-mono">NC</td>
+                                                <td className="p-3 text-center text-blue-800 italic font-mono">NC</td>
+                                                <td className="p-3 text-right font-mono font-bold text-blue-900">{contractedTotalKg.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
+                                                <td className="p-3 text-right font-mono font-bold text-blue-900">-</td>
                                             </tr>
                                         );
                                     }
@@ -232,6 +240,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
 
                                     return (
                                          <tr key={item.name} className="hover:bg-gray-50">
+                                            <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
                                             <td className="p-3 font-semibold text-gray-800">{item.name}</td>
                                             <td className="p-3 text-left font-mono text-gray-500">{reference.frequency}</td>
                                             <td className="p-3 text-right font-mono text-gray-600">{formatConsumption(reference.weeklyConsumption)}</td>
@@ -242,7 +251,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     );
                                 }) : (
                                     <tr>
-                                        <td colSpan={6} className="p-8 text-center text-gray-400 italic">
+                                        <td colSpan={7} className="p-8 text-center text-gray-400 italic">
                                             Nenhum item de contrato cadastrado para comparar.
                                         </td>
                                     </tr>
