@@ -71,7 +71,8 @@ const unitOptions = [
     { value: 'embalagem-3', label: 'Embalagem (3 Kg)' },
     { value: 'embalagem-2', label: 'Embalagem (2 Kg)' },
     { value: 'kg-1', label: 'Quilograma (Kg)' },
-    { value: 'embalagem-1', label: 'Embalagem (1 Litro)' },
+    { value: 'embalagem-0.9', label: 'Embalagem (900ml)' },
+    { value: 'embalagem-0.7', label: 'Embalagem (700ml)' },
     { value: 'pacote-0.5', label: 'Pacote (500g)' },
     { value: 'pacote-0.4', label: 'Pacote (400g)' },
     { value: 'pacote-0.3', label: 'Pacote (300g)' },
@@ -538,22 +539,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         {isSpecialUnit && <input type="text" placeholder={`Peso total da ${unit === 'dz' ? 'Dúzia' : 'Unidade'} (Kg)`} value={item.ui_kgConversion} onChange={(e) => handleItemCentricChange(item.id, 'ui_kgConversion', e.target.value)} className="w-full p-2 border rounded-md font-mono" />}
                                       </div>
 
-                                      {showWeightCalc && (
+                                       {showWeightCalc && (
                                           <div className="mt-4 p-4 bg-indigo-50 border-l-4 border-indigo-300 rounded-r-lg text-sm">
-                                              <h4 className="font-semibold text-indigo-800 mb-3 text-xs uppercase tracking-wider">Resumo do Cálculo</h4>
-                                              <div className={`grid grid-cols-1 ${showValueCalc ? 'md:grid-cols-2' : ''} gap-x-6 gap-y-2 font-mono`}>
-                                                  <div className="space-y-1">
-                                                      <p className="text-xs text-gray-500">Peso Total</p>
-                                                      <p className="text-gray-800 break-words">
-                                                          {quantity.toLocaleString('pt-BR')} &times; {conversionFactor.toLocaleString('pt-BR')} = <span className="font-bold text-indigo-700">{parseFloat(item.totalKg).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 3})} Kg</span>
-                                                      </p>
+                                              <h4 className="font-semibold text-indigo-800 mb-3 text-xs uppercase tracking-wider">Resumo do Cálculo (Baseado nos valores que você digitou)</h4>
+                                              <div className="space-y-4 font-mono">
+                                                  <div>
+                                                      <p className="text-xs text-gray-600 font-sans font-semibold">1. Cálculo do Peso Total (Kg)</p>
+                                                      <div className="pl-4 border-l-2 border-gray-300 ml-1 py-1 mt-1">
+                                                          <p className="text-gray-800 break-words flex items-center flex-wrap gap-x-2">
+                                                              <span className="p-1 bg-white border rounded" title="Quantidade Informada">{quantity.toLocaleString('pt-BR')}</span>
+                                                              <span className="text-gray-500 text-xs font-sans">Qtd.</span>
+                                                              <span className="text-xl font-sans text-gray-400">&times;</span>
+                                                              <span className="p-1 bg-white border rounded" title="Fator de Conversão da Unidade">{conversionFactor.toLocaleString('pt-BR')}</span>
+                                                              <span className="text-gray-500 text-xs font-sans">Kg/Unid.</span>
+                                                              <span className="text-xl font-sans text-gray-400">=</span>
+                                                              <span className="font-bold text-indigo-700 text-lg ml-2 p-1 bg-indigo-100 rounded">{parseFloat(item.totalKg).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 3})} Kg</span>
+                                                          </p>
+                                                      </div>
                                                   </div>
                                                   {showValueCalc && (
-                                                      <div className="space-y-1">
-                                                          <p className="text-xs text-gray-500">Valor / Kg</p>
-                                                          <p className="text-gray-800 break-words">
-                                                              {formatCurrency(valuePerUnit)} &divide; {conversionFactor.toLocaleString('pt-BR')} = <span className="font-bold text-green-700">{formatCurrency(parseFloat(item.valuePerKg))}</span>
-                                                          </p>
+                                                      <div>
+                                                          <p className="text-xs text-gray-600 font-sans font-semibold">2. Cálculo do Valor por Kg (R$)</p>
+                                                          <div className="pl-4 border-l-2 border-gray-300 ml-1 py-1 mt-1">
+                                                              <p className="text-gray-800 break-words flex items-center flex-wrap gap-x-2">
+                                                                  <span className="p-1 bg-white border rounded" title="Valor por Unidade Informado">{formatCurrency(valuePerUnit)}</span>
+                                                                  <span className="text-gray-500 text-xs font-sans">Valor/Unid.</span>
+                                                                  <span className="text-xl font-sans text-gray-400">&divide;</span>
+                                                                  <span className="p-1 bg-white border rounded" title="Fator de Conversão da Unidade">{conversionFactor.toLocaleString('pt-BR')}</span>
+                                                                  <span className="text-gray-500 text-xs font-sans">Kg/Unid.</span>
+                                                                  <span className="text-xl font-sans text-gray-400">=</span>
+                                                                  <span className="font-bold text-green-700 text-lg ml-2 p-1 bg-green-100 rounded">{formatCurrency(parseFloat(item.valuePerKg))}</span>
+                                                              </p>
+                                                          </div>
                                                       </div>
                                                   )}
                                               </div>
