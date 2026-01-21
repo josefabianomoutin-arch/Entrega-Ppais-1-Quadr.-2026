@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Supplier, ContractItem } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
@@ -12,7 +12,8 @@ type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'sc
 
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
-  onUpdateSuppliers: (updatedSuppliers: Supplier[]) => void;
+  onLiveUpdate: (updatedSuppliers: Supplier[]) => void;
+  onPersistSuppliers: (suppliersToPersist: Supplier[]) => void;
   onUpdateSupplier: (oldCpf: string, newName: string, newCpf: string, newAllowedWeeks: number[]) => Promise<string | null>;
   onLogout: () => void;
   suppliers: Supplier[];
@@ -38,7 +39,7 @@ interface ItemCentricInput {
   suppliers: SupplierSlot[];
   // Campos para a UI de entrada
   ui_compositeUnit: string;
-  ui_unit: 'kg' | 'dz' | 'un' | 'pacote' | 'pote' | 'balde' | 'saco' | 'embalagem' | 'litro';
+  ui_unit: 'kg' | 'dz' | 'un' | 'pacote' | 'pote' | 'balde' | 'saco' | 'embalagem' | 'litro' | 'caixa';
   ui_quantity: string;
   ui_valuePerUnit: string;
   ui_kgConversion: string;
@@ -73,6 +74,8 @@ const unitOptions = [
     { value: 'embalagem-2', label: 'Embalagem (2 Kg)' },
     { value: 'kg-1', label: 'Quilograma (Kg)' },
     { value: 'litro-1', label: 'Litros (Lts)' },
+    { value: 'embalagem-1', label: 'Embalagem Plástica (1 Litro)' },
+    { value: 'caixa-1', label: 'Caixa (1 Litro)' },
     { value: 'embalagem-0.9', label: 'Embalagem (900ml)' },
     { value: 'embalagem-0.7', label: 'Embalagem (700ml)' },
     { value: 'pacote-0.5', label: 'Pacote (500g)' },
@@ -88,7 +91,8 @@ const unitOptions = [
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
     onRegister, 
-    onUpdateSuppliers,
+    onLiveUpdate,
+    onPersistSuppliers,
     onUpdateSupplier,
     onLogout, 
     suppliers, 
@@ -118,6 +122,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Estados para ZONA CRÍTICA (Backup/Restore)
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoreMessage, setRestoreMessage] = useState({ type: '', text: '' });
+
+  // Memoiza uma lista estável de CPFs e nomes para evitar loops de re-renderização
+  const supplierIdentities = useMemo(() => suppliers.map(s => ({ cpf: s.cpf, name: s.name, allowedWeeks: s.allowedWeeks || [], deliveries: s.deliveries || [] })), [suppliers]);
 
   useEffect(() => {
     if (registrationStatus) {
@@ -204,6 +211,64 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
 }, [suppliers, activeTab]);
 
+// Efeito para atualizar o estado global em tempo real enquanto o admin edita os contratos
+useEffect(() => {
+    if (activeTab !== 'contracts') return;
+  
+    const newSuppliersState: Supplier[] = supplierIdentities.map(identity => ({
+      ...identity,
+      contractItems: [],
+      initialValue: 0,
+    }));
+  
+    try {
+      itemCentricContracts.forEach((item, itemIndex) => {
+        const totalNum = parseFloat(item.totalKg);
+        const valueNum = parseFloat(item.valuePerKg);
+  
+        if (!item.name.trim() || isNaN(totalNum) || isNaN(valueNum) || totalNum <= 0) {
+          return; // Ignora itens incompletos ou inválidos sem gerar erro
+        }
+  
+        const participatingSuppliers = item.suppliers.filter(s => s.supplierCpf);
+        if (participatingSuppliers.length === 0) {
+          return; // Ignora itens sem fornecedor
+        }
+  
+        const numPerSupplier = totalNum / participatingSuppliers.length;
+  
+        participatingSuppliers.forEach(slot => {
+          const supplier = newSuppliersState.find(p => p.cpf === slot.supplierCpf);
+          if (supplier) {
+            supplier.contractItems.push({
+              name: item.name.trim(),
+              totalKg: numPerSupplier,
+              valuePerKg: valueNum,
+              unit: item.ui_compositeUnit,
+              order: itemIndex,
+            });
+          }
+        });
+      });
+  
+      newSuppliersState.forEach(p => {
+        p.initialValue = p.contractItems.reduce((sum, item) => {
+          const [unitType] = (item.unit || 'kg-1').split('-');
+          if (unitType === 'un') {
+            return sum + (item.totalKg * item.valuePerKg);
+          }
+          return sum + (item.totalKg * item.valuePerKg);
+        }, 0);
+      });
+  
+      onLiveUpdate(newSuppliersState);
+      setContractError(''); // Limpa erros se a lógica passar
+    } catch (e: any) {
+      console.error("Erro ao processar atualização de contrato em tempo real:", e);
+      setContractError('Erro ao calcular totais. Verifique os dados dos itens.');
+    }
+  }, [itemCentricContracts, supplierIdentities, onLiveUpdate, activeTab]);
+
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,63 +333,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleSaveContracts = () => {
+    // A lógica de cálculo já foi feita pelo useEffect. Aqui, apenas validamos e persistimos.
     setContractError('');
     setContractSuccess('');
 
-    const newSuppliersState = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
-    
-    newSuppliersState.forEach(p => p.contractItems = []);
-
-    try {
-        itemCentricContracts.forEach((item, itemIndex) => {
-            if (!item.name.trim()) {
-                throw new Error(`O item #${itemIndex + 1} não tem nome.`);
-            }
-
-            const totalNum = parseFloat(item.totalKg);
-            const valueNum = parseFloat(item.valuePerKg);
-
-            if (isNaN(totalNum) || isNaN(valueNum) || totalNum <= 0) {
-                throw new Error(`O item "${item.name}" tem valores inválidos.`);
-            }
-            
-            const participatingSuppliers = item.suppliers.filter(s => s.supplierCpf);
-            if (participatingSuppliers.length === 0) {
-                 throw new Error(`O item "${item.name}" não foi atribuído a nenhum fornecedor.`);
-            }
-            
-            const numPerSupplier = totalNum / participatingSuppliers.length;
-
-            participatingSuppliers.forEach(slot => {
-                const supplier = newSuppliersState.find(p => p.cpf === slot.supplierCpf);
-                if (supplier) {
-                    supplier.contractItems.push({
-                        name: item.name.trim(),
-                        totalKg: numPerSupplier,
-                        valuePerKg: valueNum,
-                        unit: item.ui_compositeUnit,
-                        order: itemIndex
-                    });
-                }
-            });
-        });
-    } catch (e: any) {
-        setContractError(e.message);
-        return;
-    }
-    
-    newSuppliersState.forEach(p => {
-        p.initialValue = p.contractItems.reduce((sum, item) => {
-            const [unitType] = (item.unit || 'kg-1').split('-');
-            if (unitType === 'un') {
-                return sum + (item.totalKg * item.valuePerKg); // total_weight * value_per_kg
-            }
-            return sum + (item.totalKg * item.valuePerKg); // quantity_of_units * value_per_unit
-        }, 0);
+    // Validação final antes de salvar
+    const hasInvalidItems = itemCentricContracts.some(item => {
+        if (!item.name.trim()) return true;
+        const totalNum = parseFloat(item.totalKg);
+        const valueNum = parseFloat(item.valuePerKg);
+        if (isNaN(totalNum) || isNaN(valueNum) || totalNum <= 0) return true;
+        const participatingSuppliers = item.suppliers.filter(s => s.supplierCpf);
+        if (participatingSuppliers.length === 0) return true;
+        return false;
     });
 
-    onUpdateSuppliers(newSuppliersState);
-    setContractSuccess('Contratos salvos com sucesso!');
+    if (hasInvalidItems && itemCentricContracts.length > 1) { // Permite salvar se for apenas um item em branco
+         setContractError('Existem itens incompletos ou com valores inválidos que não serão salvos.');
+    }
+
+    onPersistSuppliers(suppliers);
+    setContractSuccess('Contratos salvos na nuvem com sucesso!');
     setTimeout(() => setContractSuccess(''), 4000);
   };
 

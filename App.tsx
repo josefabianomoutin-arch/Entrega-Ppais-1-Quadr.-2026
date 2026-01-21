@@ -373,8 +373,14 @@ const App: React.FC = () => {
     setRegistrationStatus(null);
   };
 
-  const handleUpdateSuppliers = (updatedSuppliers: Supplier[]) => {
-    writeToDatabase(updatedSuppliers);
+  // Atualiza o estado local para feedback instantâneo na UI
+  const handleLiveUpdateSuppliers = (updatedSuppliers: Supplier[]) => {
+    setSuppliers(updatedSuppliers);
+  };
+
+  // Persiste o estado atual no banco de dados
+  const handlePersistSuppliers = (suppliersToPersist: Supplier[]) => {
+      writeToDatabase(suppliersToPersist);
   };
 
   const handleLogout = () => {
@@ -575,7 +581,8 @@ const App: React.FC = () => {
           <AdminDashboard 
             suppliers={suppliers}
             onRegister={handleRegister} 
-            onUpdateSuppliers={handleUpdateSuppliers} 
+            onLiveUpdate={handleLiveUpdateSuppliers}
+            onPersistSuppliers={handlePersistSuppliers}
             onUpdateSupplier={handleUpdateSupplierData}
             onLogout={handleLogout}
             onResetData={handleResetData}
