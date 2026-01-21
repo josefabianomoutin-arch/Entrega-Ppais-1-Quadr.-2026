@@ -74,8 +74,10 @@ const unitOptions = [
     { value: 'embalagem-1', label: 'Embalagem (1 Litro)' },
     { value: 'pacote-0.5', label: 'Pacote (500g)' },
     { value: 'pacote-0.4', label: 'Pacote (400g)' },
+    { value: 'pacote-0.3', label: 'Pacote (300g)' },
     { value: 'pote-0.2', label: 'Pote (200g)' },
     { value: 'pacote-0.15', label: 'Pacote (150g)' },
+    { value: 'pacote-0.03', label: 'Pacote (30g)' },
     { value: 'dz-auto', label: 'Dúzia' },
     { value: 'un-auto', label: 'Unidade' },
 ];
