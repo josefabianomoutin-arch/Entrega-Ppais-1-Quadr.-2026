@@ -5,6 +5,27 @@ interface SummaryCardProps {
     supplier: Supplier;
 }
 
+// Helper para calcular o peso total real de um item de contrato
+const getContractItemWeight = (item: Supplier['contractItems'][0]): number => {
+    const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
+    
+    // Para 'unidade', totalKg já é o peso total.
+    if (unitType === 'un') {
+        return item.totalKg;
+    }
+    
+    // Para 'dúzia', não temos um peso definido, então retornamos 0 para o total de Kg.
+    if (unitType === 'dz') {
+        return 0;
+    }
+
+    // Para outros (kg, balde, saco), totalKg armazena a quantidade. Multiplicamos pelo peso da unidade.
+    const quantity = item.totalKg;
+    const unitWeight = parseFloat(unitWeightStr) || 1; // Padrão de 1 para 'kg-1'
+    return quantity * unitWeight;
+};
+
+
 const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
     // Value calculations
     const totalDeliveredValue = supplier.deliveries.reduce((sum, delivery) => sum + (delivery.value || 0), 0);
@@ -24,7 +45,10 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
     }, [supplier.deliveries]);
 
     // Weight (Kg) calculations
-    const totalContractedKg = supplier.contractItems.reduce((sum, item) => sum + item.totalKg, 0);
+    const totalContractedKg = useMemo(() => {
+        return supplier.contractItems.reduce((sum, item) => sum + getContractItemWeight(item), 0);
+    }, [supplier.contractItems]);
+
     const totalDeliveredKg = supplier.deliveries.reduce((sum, delivery) => sum + (delivery.kg || 0), 0);
     const remainingKg = totalContractedKg - totalDeliveredKg;
     const kgProgress = totalContractedKg > 0 ? (totalDeliveredKg / totalContractedKg) * 100 : 0;
@@ -73,11 +97,17 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
                 <h3 className="font-semibold text-gray-600">Detalhes por Produto</h3>
                 <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                     {supplier.contractItems.map(item => {
-                        const itemTotalValue = item.totalKg * item.valuePerKg;
+                        const [unitType] = (item.unit || 'kg-1').split('-');
+                        const isUnitBased = unitType !== 'un';
+
+                        const itemTotalValue = isUnitBased 
+                            ? item.totalKg * item.valuePerKg  // quantity * value_per_unit
+                            : item.totalKg * item.valuePerKg; // total_weight * value_per_kg (same formula, different meanings)
+
                         const deliveredValue = deliveredValueByItem.get(item.name) || 0;
                         const remainingItemValue = itemTotalValue - deliveredValue;
 
-                        const itemTotalKg = item.totalKg;
+                        const itemTotalKg = getContractItemWeight(item);
                         const deliveredItemKg = deliveredKgByItem.get(item.name) || 0;
                         const remainingItemKg = itemTotalKg - deliveredItemKg;
 

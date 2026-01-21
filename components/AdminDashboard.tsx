@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Supplier } from '../types';
+import type { Supplier, ContractItem } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 import EditSupplierModal from './EditSupplierModal';
@@ -43,8 +43,8 @@ interface ItemCentricInput {
   ui_valuePerUnit: string;
   ui_kgConversion: string;
   // Campos de dados reais (calculados)
-  totalKg: string;
-  valuePerKg: string;
+  totalKg: string; // Para 'un', é o peso total. Para outros, é a quantidade de unidades (dúzias, baldes, sacos, etc).
+  valuePerKg: string; // Para 'un', é o valor/kg. Para outros, é o valor por unidade.
 }
 
 
@@ -145,16 +145,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     if (activeTab !== 'contracts') return;
 
-    const itemsMap = new Map<string, { totalKg: number; valuePerKg: number; supplierCpfs: string[]; order: number }>();
+    const itemsMap = new Map<string, { totalQty: number; valuePerUnit: number; supplierCpfs: string[]; order: number, unit: string }>();
 
     suppliers.forEach(supplier => {
         (supplier.contractItems || []).forEach(item => {
             const order = item.order ?? Infinity;
             if (!itemsMap.has(item.name)) {
-                itemsMap.set(item.name, { totalKg: 0, valuePerKg: item.valuePerKg, supplierCpfs: [], order: order });
+                itemsMap.set(item.name, { totalQty: 0, valuePerUnit: item.valuePerKg, supplierCpfs: [], order: order, unit: item.unit || 'kg-1' });
             }
             const existing = itemsMap.get(item.name)!;
-            existing.totalKg += item.totalKg;
+            existing.totalQty += item.totalKg;
             existing.supplierCpfs.push(supplier.cpf);
         });
     });
@@ -169,21 +169,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const sortedItems = [...itemsMap.entries()].sort((a, b) => a[1].order - b[1].order);
 
     const newItemCentricContracts = sortedItems.map(([name, data]) => {
+        // FIX: Added missing ui_unit property to satisfy the ItemCentricInput interface.
+        // It is derived by splitting the ui_compositeUnit string (e.g., "kg-1" -> "kg").
         const item: ItemCentricInput = {
             id: `item-${name}-${Math.random()}`,
             name,
-            totalKg: String(data.totalKg),
-            valuePerKg: String(data.valuePerKg),
-            // A UI de entrada será preenchida com valores padrão, pois não são armazenados
-            ui_compositeUnit: 'kg-1',
-            ui_unit: 'kg',
-            ui_quantity: String(data.totalKg),
-            ui_valuePerUnit: String(data.valuePerKg),
-            ui_kgConversion: '1',
             suppliers: Array(15).fill(null).map((_, i) => ({
                 supplierCpf: data.supplierCpfs[i] || ''
             })),
+            ui_compositeUnit: data.unit,
+            ui_unit: data.unit.split('-')[0] as ItemCentricInput['ui_unit'],
+            ui_quantity: String(data.totalQty),
+            ui_valuePerUnit: String(data.valuePerUnit),
+            ui_kgConversion: '', // Será preenchido se for 'un-auto'
+            totalKg: String(data.totalQty),
+            valuePerKg: String(data.valuePerUnit),
         };
+        
+        // Recalcula o estado da UI para 'un-auto' para exibir os valores corretamente
+        if(data.unit === 'un-auto') {
+            const totalKg = data.totalQty;
+            const valuePerKg = data.valuePerUnit;
+            // Não é possível recriar ui_quantity e ui_valuePerUnit sem o peso individual,
+            // então forçamos o usuário a re-inserir se for editar. Os totais estão corretos.
+            item.ui_quantity = '';
+            item.ui_valuePerUnit = '';
+            item.totalKg = String(totalKg);
+            item.valuePerKg = String(valuePerKg);
+        }
+
         return item;
     });
 
@@ -217,24 +231,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               if (item.id !== id) return item;
 
               const updatedItem = { ...item, [field]: value };
+              
+              if (field === 'ui_compositeUnit' && value.endsWith('-auto')) {
+                  updatedItem.ui_kgConversion = ''; 
+              }
 
               // Recalcula os campos derivados quando a UI muda
               if (field.startsWith('ui_')) {
-                  const [unit, kgConversionFactor] = updatedItem.ui_compositeUnit.split('-');
-
+                  const [unit, kgConversionFactorStr] = updatedItem.ui_compositeUnit.split('-');
                   const quantity = parseFloat(updatedItem.ui_quantity.replace(',', '.')) || 0;
                   const valuePerUnit = parseFloat(updatedItem.ui_valuePerUnit.replace(',', '.')) || 0;
-                  
-                  if (kgConversionFactor === 'auto') {
-                      // Para Dúzia/Unidade, o Fator de Conversão é o peso da unidade
+
+                  if (unit === 'un') { // Apenas 'unidade' tem conversão de peso manual
                       const kgPerUnit = parseFloat(updatedItem.ui_kgConversion.replace(',', '.')) || 0;
                       updatedItem.totalKg = (quantity * kgPerUnit).toFixed(3);
                       updatedItem.valuePerKg = kgPerUnit > 0 ? (valuePerUnit / kgPerUnit).toFixed(3) : '0';
-
-                  } else {
-                      const kgConversion = parseFloat(kgConversionFactor);
-                      updatedItem.totalKg = (quantity * kgConversion).toFixed(3);
-                      updatedItem.valuePerKg = kgConversion > 0 ? (valuePerUnit / kgConversion).toFixed(3) : '0';
+                  } else { // Todos os outros são tratados como unidades (kg, dúzia, balde, etc)
+                      updatedItem.totalKg = String(quantity); // `totalKg` armazena a QUANTIDADE DE UNIDADES
+                      updatedItem.valuePerKg = String(valuePerUnit); // `valuePerKg` armazena o VALOR POR UNIDADE
                   }
               }
 
@@ -262,21 +276,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     const newSuppliersState = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
     
-    // 1. Limpa todos os contractItems existentes para reconstruir do zero
     newSuppliersState.forEach(p => p.contractItems = []);
 
-    // 2. Itera sobre a UI de "Gestão por Item" para popular os contratos
     try {
         itemCentricContracts.forEach((item, itemIndex) => {
             if (!item.name.trim()) {
-                throw new Error(`O item #${itemIndex + 1} não tem nome. Remova-o ou preencha o nome.`);
+                throw new Error(`O item #${itemIndex + 1} não tem nome.`);
             }
 
-            const totalKgNum = parseFloat(item.totalKg);
-            const valuePerKgNum = parseFloat(item.valuePerKg);
+            const totalNum = parseFloat(item.totalKg);
+            const valueNum = parseFloat(item.valuePerKg);
 
-            if (isNaN(totalKgNum) || isNaN(valuePerKgNum) || totalKgNum <= 0) {
-                throw new Error(`O item "${item.name}" tem valores inválidos. Verifique a quantidade e o valor.`);
+            if (isNaN(totalNum) || isNaN(valueNum) || totalNum <= 0) {
+                throw new Error(`O item "${item.name}" tem valores inválidos.`);
             }
             
             const participatingSuppliers = item.suppliers.filter(s => s.supplierCpf);
@@ -284,15 +296,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  throw new Error(`O item "${item.name}" não foi atribuído a nenhum fornecedor.`);
             }
             
-            const kgPerSupplier = totalKgNum / participatingSuppliers.length;
+            const numPerSupplier = totalNum / participatingSuppliers.length;
 
             participatingSuppliers.forEach(slot => {
                 const supplier = newSuppliersState.find(p => p.cpf === slot.supplierCpf);
                 if (supplier) {
                     supplier.contractItems.push({
                         name: item.name.trim(),
-                        totalKg: kgPerSupplier,
-                        valuePerKg: valuePerKgNum,
+                        totalKg: numPerSupplier,
+                        valuePerKg: valueNum,
+                        unit: item.ui_compositeUnit,
                         order: itemIndex
                     });
                 }
@@ -303,12 +316,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         return;
     }
     
-    // 3. Atualiza o valor inicial (initialValue) de cada fornecedor
     newSuppliersState.forEach(p => {
-        p.initialValue = p.contractItems.reduce((sum, item) => sum + (item.totalKg * item.valuePerKg), 0);
+        p.initialValue = p.contractItems.reduce((sum, item) => {
+            const [unitType] = (item.unit || 'kg-1').split('-');
+            if (unitType === 'un') {
+                return sum + (item.totalKg * item.valuePerKg); // total_weight * value_per_kg
+            }
+            return sum + (item.totalKg * item.valuePerKg); // quantity_of_units * value_per_unit
+        }, 0);
     });
 
-    // 4. Salva no banco de dados
     onUpdateSuppliers(newSuppliersState);
     setContractSuccess('Contratos salvos com sucesso!');
     setTimeout(() => setContractSuccess(''), 4000);
@@ -352,7 +369,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           setRestoreMessage({ type: 'error', text: 'Erro ao ler o arquivo. Certifique-se de que é um backup válido.' });
         } finally {
             setRestoreFile(null);
-            // Clear input
             const fileInput = document.getElementById('restore-file-input') as HTMLInputElement;
             if(fileInput) fileInput.value = '';
         }
@@ -362,7 +378,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   
   const totalContractedValue = suppliers.reduce((sum, p) => sum + p.initialValue, 0);
 
-  // FIX: Replaced JSX.Element with React.ReactElement to fix "Cannot find namespace 'JSX'" error.
   const tabs: { id: AdminTab; name: string; icon: React.ReactElement }[] = [
     { id: 'register', name: 'Gestão de Fornecedores', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 11a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1z" /></svg> },
     { id: 'contracts', name: 'Gestão por Item', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" /></svg> },
@@ -495,17 +510,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       {itemCentricContracts.map((item, index) => {
                           const isExpanded = index === expandedItemIndex;
                           const [unit, kgConversionFactorStr] = item.ui_compositeUnit.split('-');
-                          const isSpecialUnit = kgConversionFactorStr === 'auto';
+                          const isUnit = unit === 'un';
 
+                          // Para exibição, calculamos os valores com base na lógica da UI
                           const quantity = parseFloat(item.ui_quantity.replace(',', '.')) || 0;
                           const valuePerUnit = parseFloat(item.ui_valuePerUnit.replace(',', '.')) || 0;
-                      
-                          const conversionFactor = isSpecialUnit 
-                              ? parseFloat(item.ui_kgConversion.replace(',', '.')) || 0 
-                              : parseFloat(kgConversionFactorStr) || 0;
-                      
-                          const showWeightCalc = quantity > 0 && conversionFactor > 0;
-                          const showValueCalc = showWeightCalc && valuePerUnit > 0;
+                          const conversionFactor = isUnit ? (parseFloat(item.ui_kgConversion.replace(',', '.')) || 0) : (parseFloat(kgConversionFactorStr) || 1);
+
+                          const totalDisplayWeight = isUnit ? (quantity * conversionFactor) : (quantity * conversionFactor);
+                          const totalDisplayUnits = quantity;
+                          
+                          const unitLabel = unitOptions.find(opt => opt.value === item.ui_compositeUnit)?.label.split(' (')[0] || unit;
+                          const displayUnitAbbreviation = isUnit ? 'Kg' : (unit === 'dz' ? 'Dz' : (unit === 'kg' ? 'Kg' : 'Unid.'));
 
                           return (
                               <div key={item.id} className={`border rounded-xl transition-all ${isExpanded ? 'bg-white ring-2 ring-indigo-400' : 'bg-gray-50'}`}>
@@ -516,12 +532,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       </div>
                                        <div className="flex items-center gap-4">
                                           <div className="text-right">
-                                            <p className="text-xs text-gray-500">Peso Total</p>
-                                            <p className="font-mono font-semibold text-indigo-700">{parseFloat(item.totalKg || '0').toLocaleString('pt-BR')} Kg</p>
+                                            <p className="text-xs text-gray-500">{isUnit ? 'Peso Total' : 'Quantidade'}</p>
+                                            <p className="font-mono font-semibold text-indigo-700">
+                                              {isUnit ? totalDisplayWeight.toLocaleString('pt-BR') : totalDisplayUnits.toLocaleString('pt-BR')} {displayUnitAbbreviation}
+                                            </p>
                                           </div>
                                           <div className="text-right">
-                                            <p className="text-xs text-gray-500">Valor/Kg</p>
-                                            <p className="font-mono font-semibold text-green-700">{formatCurrency(parseFloat(item.valuePerKg || '0'))}</p>
+                                            <p className="text-xs text-gray-500">{isUnit ? 'Valor/Kg' : `Valor/${unitLabel}`}</p>
+                                            <p className="font-mono font-semibold text-green-700">{formatCurrency(isUnit ? (parseFloat(item.valuePerKg) || 0) : valuePerUnit)}</p>
                                           </div>
                                           <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" /></svg>
                                       </div>
@@ -534,48 +552,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         <select value={item.ui_compositeUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_compositeUnit', e.target.value)} className="w-full p-2 border rounded-md bg-gray-50">
                                             {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                         </select>
-                                        <input type="text" placeholder="Quantidade" value={item.ui_quantity} onChange={(e) => handleItemCentricChange(item.id, 'ui_quantity', e.target.value)} className="w-full p-2 border rounded-md font-mono" />
-                                        <input type="text" placeholder="Valor por Unidade" value={item.ui_valuePerUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_valuePerUnit', e.target.value)} className="w-full p-2 border rounded-md font-mono" />
-                                        {isSpecialUnit && <input type="text" placeholder={`Peso total da ${unit === 'dz' ? 'Dúzia' : 'Unidade'} (Kg)`} value={item.ui_kgConversion} onChange={(e) => handleItemCentricChange(item.id, 'ui_kgConversion', e.target.value)} className="w-full p-2 border rounded-md font-mono" />}
+                                        <input type="text" placeholder={`Quantidade de ${unitLabel}s`} value={item.ui_quantity} onChange={(e) => handleItemCentricChange(item.id, 'ui_quantity', e.target.value)} className="w-full p-2 border rounded-md font-mono" />
+                                        <input type="text" placeholder={`Valor por ${unitLabel}`} value={item.ui_valuePerUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_valuePerUnit', e.target.value)} className="w-full p-2 border rounded-md font-mono" />
+                                        {isUnit && <input type="text" placeholder={`Peso da Unidade (Kg)`} value={item.ui_kgConversion} onChange={(e) => handleItemCentricChange(item.id, 'ui_kgConversion', e.target.value)} className="w-full p-2 border rounded-md font-mono" />}
                                       </div>
-
-                                       {showWeightCalc && (
-                                          <div className="mt-4 p-4 bg-indigo-50 border-l-4 border-indigo-300 rounded-r-lg text-sm">
-                                              <h4 className="font-semibold text-indigo-800 mb-3 text-xs uppercase tracking-wider">Resumo do Cálculo (Baseado nos valores que você digitou)</h4>
-                                              <div className="space-y-4 font-mono">
-                                                  <div>
-                                                      <p className="text-xs text-gray-600 font-sans font-semibold">1. Cálculo do Peso Total (Kg)</p>
-                                                      <div className="pl-4 border-l-2 border-gray-300 ml-1 py-1 mt-1">
-                                                          <p className="text-gray-800 break-words flex items-center flex-wrap gap-x-2">
-                                                              <span className="p-1 bg-white border rounded" title="Quantidade Informada">{quantity.toLocaleString('pt-BR')}</span>
-                                                              <span className="text-gray-500 text-xs font-sans">Qtd.</span>
-                                                              <span className="text-xl font-sans text-gray-400">&times;</span>
-                                                              <span className="p-1 bg-white border rounded" title="Fator de Conversão da Unidade">{conversionFactor.toLocaleString('pt-BR')}</span>
-                                                              <span className="text-gray-500 text-xs font-sans">Kg/Unid.</span>
-                                                              <span className="text-xl font-sans text-gray-400">=</span>
-                                                              <span className="font-bold text-indigo-700 text-lg ml-2 p-1 bg-indigo-100 rounded">{parseFloat(item.totalKg).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 3})} Kg</span>
-                                                          </p>
-                                                      </div>
-                                                  </div>
-                                                  {showValueCalc && (
-                                                      <div>
-                                                          <p className="text-xs text-gray-600 font-sans font-semibold">2. Cálculo do Valor por Kg (R$)</p>
-                                                          <div className="pl-4 border-l-2 border-gray-300 ml-1 py-1 mt-1">
-                                                              <p className="text-gray-800 break-words flex items-center flex-wrap gap-x-2">
-                                                                  <span className="p-1 bg-white border rounded" title="Valor por Unidade Informado">{formatCurrency(valuePerUnit)}</span>
-                                                                  <span className="text-gray-500 text-xs font-sans">Valor/Unid.</span>
-                                                                  <span className="text-xl font-sans text-gray-400">&divide;</span>
-                                                                  <span className="p-1 bg-white border rounded" title="Fator de Conversão da Unidade">{conversionFactor.toLocaleString('pt-BR')}</span>
-                                                                  <span className="text-gray-500 text-xs font-sans">Kg/Unid.</span>
-                                                                  <span className="text-xl font-sans text-gray-400">=</span>
-                                                                  <span className="font-bold text-green-700 text-lg ml-2 p-1 bg-green-100 rounded">{formatCurrency(parseFloat(item.valuePerKg))}</span>
-                                                              </p>
-                                                          </div>
-                                                      </div>
-                                                  )}
-                                              </div>
-                                          </div>
-                                      )}
                                       
                                       <div>
                                           <h4 className="font-semibold mb-2">Fornecedores ({item.suppliers.filter(s => s.supplierCpf).length} selecionados)</h4>

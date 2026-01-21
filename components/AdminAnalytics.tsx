@@ -15,6 +15,15 @@ const formatDate = (dateString: string) => {
     return date.toLocaleDateString('pt-BR');
 };
 
+const getContractItemWeight = (item: Supplier['contractItems'][0]): number => {
+    const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
+    if (unitType === 'un') return item.totalKg;
+    if (unitType === 'dz') return 0;
+    const quantity = item.totalKg;
+    const unitWeight = parseFloat(unitWeightStr) || 1;
+    return quantity * unitWeight;
+};
+
 
 const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     const [sortKey, setSortKey] = useState<'name' | 'progress' | 'delivered' | 'contracted'>('progress');
@@ -77,8 +86,9 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
             csvRows.push(''); // Add a blank line for spacing before each supplier
             
             p.contractItems.forEach(item => {
-                const monthlyKg = item.totalKg / 4;
-                const monthlyValue = (item.totalKg * item.valuePerKg) / 4;
+                const totalItemWeight = getContractItemWeight(item);
+                const monthlyKg = totalItemWeight / 4;
+                const monthlyValue = item.initialValue / 4; // Use initialValue do item se disponível, ou recalcular
                 const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
                 const deliveriesForItem = p.deliveries.filter(d => d.item === item.name && d.kg);
                 let surplusFromPreviousMonth = 0;
@@ -114,19 +124,20 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     
                 // Total row for the item
                 const totalDeliveredKgForItem = deliveriesForItem.reduce((sum, d) => sum + (d.kg || 0), 0);
-                const totalRemainingKgForItem = item.totalKg - totalDeliveredKgForItem;
-                const totalRow = [
+                const totalRemainingKgForItem = totalItemWeight - totalDeliveredKgForItem;
+                const itemTotalValue = (p.initialValue / p.contractItems.length); // Aproximação do valor do item
+                const row = [
                     "",
                     "",
                     `"Total ${item.name}"`,
                     "",
-                    String(item.totalKg.toFixed(2)).replace('.', ','),
+                    String(totalItemWeight.toFixed(2)).replace('.', ','),
                     String(totalDeliveredKgForItem.toFixed(2)).replace('.', ','),
                     String(totalRemainingKgForItem.toFixed(2)).replace('.', ','),
-                    String((item.totalKg * item.valuePerKg).toFixed(2)).replace('.', ','),
+                    String(itemTotalValue.toFixed(2)).replace('.', ','),
                     ""
                 ];
-                csvRows.push(totalRow.join(';'));
+                csvRows.push(row.join(';'));
                 csvRows.push(''); // Blank line after each item
             });
         });
@@ -211,13 +222,15 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                                         </thead>
                                                         <tbody>
                                                             {supplier.contractItems.length > 0 ? supplier.contractItems.map(item => {
-                                                                const monthlyKg = item.totalKg / 4;
-                                                                const monthlyValue = (item.totalKg * item.valuePerKg) / 4;
+                                                                const totalItemWeight = getContractItemWeight(item);
+                                                                const monthlyKg = totalItemWeight / 4;
+                                                                const itemTotalValue = item.totalKg * item.valuePerKg; // Qty * ValuePerUnit
+                                                                const monthlyValue = itemTotalValue / 4;
                                                                 const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
                                                                 
                                                                 const deliveriesForItem = supplier.deliveries.filter(d => d.item === item.name && d.kg);
                                                                 const totalDeliveredKgForItem = deliveriesForItem.reduce((sum, d) => sum + (d.kg || 0), 0);
-                                                                const totalRemainingKgForItem = item.totalKg - totalDeliveredKgForItem;
+                                                                const totalRemainingKgForItem = totalItemWeight - totalDeliveredKgForItem;
 
                                                                 let surplusFromPreviousMonth = 0;
 
@@ -254,10 +267,10 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                                                         })}
                                                                         <tr className="bg-gray-100 font-bold border-b-2 border-gray-300">
                                                                             <td colSpan={2} className="p-2 text-right">Total do Item:</td>
-                                                                            <td className="p-2 text-right font-mono">{item.totalKg.toFixed(2).replace('.',',')}</td>
+                                                                            <td className="p-2 text-right font-mono">{totalItemWeight.toFixed(2).replace('.',',')}</td>
                                                                             <td className="p-2 text-right font-mono text-green-700">{totalDeliveredKgForItem.toFixed(2).replace('.',',')}</td>
                                                                             <td className={`p-2 text-right font-mono font-bold ${totalRemainingKgForItem > 0 ? 'text-red-700' : 'text-green-700'}`}>{totalRemainingKgForItem.toFixed(2).replace('.',',')}</td>
-                                                                            <td className="p-2 text-right font-mono">{formatCurrency(item.totalKg * item.valuePerKg)}</td>
+                                                                            <td className="p-2 text-right font-mono">{formatCurrency(itemTotalValue)}</td>
                                                                         </tr>
                                                                     </React.Fragment>
                                                                 )

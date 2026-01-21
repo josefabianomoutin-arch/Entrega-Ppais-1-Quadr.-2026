@@ -12,8 +12,9 @@ export interface Delivery {
 
 export interface ContractItem {
   name: string;
-  totalKg: number;
-  valuePerKg: number;
+  totalKg: number; // Para 'un', é o peso total. Para outros, é a quantidade de unidades (dúzias, baldes, sacos, etc).
+  valuePerKg: number; // Para 'un', é o valor/kg. Para outros, é o valor por unidade.
+  unit?: string; // Unidade de medida do item, ex: 'balde-18', 'dz-auto', 'kg-1'
   order?: number;
 }
 

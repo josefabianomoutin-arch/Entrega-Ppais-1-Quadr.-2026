@@ -11,6 +11,15 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+const getContractItemWeight = (item: { totalKg: number, unit?: string }): number => {
+    const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
+    if (unitType === 'un') return item.totalKg;
+    if (unitType === 'dz') return 0;
+    const quantity = item.totalKg;
+    const unitWeight = parseFloat(unitWeightStr) || 1;
+    return quantity * unitWeight;
+};
+
 const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
     const [staffCount, setStaffCount] = useState<number>(() => {
         const saved = localStorage.getItem('perCapitaStaffCount');
@@ -28,12 +37,20 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
     }, [staffCount, inmateCount]);
 
     const itemData = useMemo(() => {
-      const data = new Map<string, { totalKg: number; totalValue: number }>();
+      const data = new Map<string, { totalKg: number; totalValue: number; unit?: string }>();
       suppliers.forEach(p => {
         (p.contractItems || []).forEach(item => {
-          const current = data.get(item.name) || { totalKg: 0, totalValue: 0 };
-          current.totalKg += item.totalKg;
-          current.totalValue += item.totalKg * item.valuePerKg;
+          const current = data.get(item.name) || { totalKg: 0, totalValue: 0, unit: item.unit };
+          
+          current.totalKg += getContractItemWeight(item);
+
+          const [unitType] = (item.unit || 'kg-1').split('-');
+            if (unitType === 'un') {
+                current.totalValue += item.totalKg * item.valuePerKg; // total_weight * value_per_kg
+            } else {
+                current.totalValue += item.totalKg * item.valuePerKg; // quantity_of_units * value_per_unit
+            }
+
           data.set(item.name, current);
         });
       });
