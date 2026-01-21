@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Supplier, ContractItem } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
@@ -118,6 +118,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(0);
   const [contractError, setContractError] = useState('');
   const [contractSuccess, setContractSuccess] = useState('');
+  const isInternalUpdate = useRef(false); // Ref para controlar o loop de renderização
 
   // Estados para ZONA CRÍTICA (Backup/Restore)
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
@@ -153,6 +154,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Sincroniza o estado da UI de contratos com os dados mais recentes dos fornecedores
   useEffect(() => {
     if (activeTab !== 'contracts') return;
+
+    // Se a atualização dos 'suppliers' foi causada por uma edição interna,
+    // não reinicializa o formulário para evitar a perda de foco e o "pisca-pisca".
+    if (isInternalUpdate.current) {
+        isInternalUpdate.current = false;
+        return;
+    }
 
     const itemsMap = new Map<string, { totalQty: number; valuePerUnit: number; supplierCpfs: string[]; order: number, unit: string }>();
 
@@ -261,6 +269,8 @@ useEffect(() => {
         }, 0);
       });
   
+      // Marca a próxima atualização como interna para quebrar o ciclo de renderização
+      isInternalUpdate.current = true;
       onLiveUpdate(newSuppliersState);
       setContractError(''); // Limpa erros se a lógica passar
     } catch (e: any) {
