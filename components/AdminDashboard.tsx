@@ -155,13 +155,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     if (activeTab !== 'contracts') return;
 
-    // Se a atualização dos 'suppliers' foi causada por uma edição interna,
-    // não reinicializa o formulário para evitar a perda de foco e o "pisca-pisca".
     if (isInternalUpdate.current) {
         isInternalUpdate.current = false;
         return;
     }
-
+    
+    const precisionFactor = 100000;
     const itemsMap = new Map<string, { totalQty: number; valuePerUnit: number; supplierCpfs: string[]; order: number, unit: string }>();
 
     suppliers.forEach(supplier => {
@@ -171,12 +170,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 itemsMap.set(item.name, { totalQty: 0, valuePerUnit: item.valuePerKg, supplierCpfs: [], order: order, unit: item.unit || 'kg-1' });
             }
             const existing = itemsMap.get(item.name)!;
-            existing.totalQty += item.totalKg;
+
+            // **FIX DEFINITIVO**: Usa matemática de inteiros para somar e evitar erros de ponto flutuante
+            const currentTotalInUnits = Math.round(existing.totalQty * precisionFactor);
+            const itemTotalInUnits = Math.round(item.totalKg * precisionFactor);
+            existing.totalQty = (currentTotalInUnits + itemTotalInUnits) / precisionFactor;
+
             existing.supplierCpfs.push(supplier.cpf);
         });
     });
     
-    // Se não há contratos, inicia com um item em branco
     if (itemsMap.size === 0) {
         setItemCentricContracts([initialItemCentricInput()]);
         setExpandedItemIndex(0);
@@ -196,12 +199,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             ui_unit: data.unit.split('-')[0] as ItemCentricInput['ui_unit'],
             ui_quantity: String(data.totalQty),
             ui_valuePerUnit: String(data.valuePerUnit),
-            ui_kgConversion: '', // Será preenchido se for 'un-auto'
+            ui_kgConversion: '', 
             totalKg: String(data.totalQty),
             valuePerKg: String(data.valuePerUnit),
         };
         
-        // Recalcula o estado da UI para 'un-auto' para exibir os valores corretamente
         if(data.unit === 'un-auto') {
             const totalKg = data.totalQty;
             const valuePerKg = data.valuePerUnit;
