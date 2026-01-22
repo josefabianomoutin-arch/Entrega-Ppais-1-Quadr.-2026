@@ -23,7 +23,7 @@ const App: React.FC = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isAlmoxarifadoLoggedIn, setIsAlmoxarifadoLoggedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'peps' | 'warehouse'>('register');
+  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse'>('register');
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
   const [emailModalData, setEmailModalData] = useState<{
     recipient: string;
