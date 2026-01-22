@@ -19,7 +19,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Supplier | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule'>('register');
+  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'peps'>('register');
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
   const [emailModalData, setEmailModalData] = useState<{
     recipient: string;
@@ -94,10 +94,14 @@ const App: React.FC = () => {
           )
           .map(p => ({
             ...p,
-            // Garante que as propriedades sejam sempre arrays para evitar erros de runtime.
-            // Esta é a correção para a tela branca.
             contractItems: p.contractItems || [],
-            deliveries: p.deliveries || [],
+            deliveries: (p.deliveries || []).map(d => ({
+              ...d,
+              // Initialize new/optional fields for backward compatibility
+              remainingQuantity: typeof d.remainingQuantity === 'number' ? d.remainingQuantity : (d.kg || 0),
+              lots: d.lots || [],
+              withdrawals: d.withdrawals || [],
+            })),
             allowedWeeks: p.allowedWeeks || [],
             initialValue: p.initialValue || 0,
           }))
@@ -451,6 +455,9 @@ const App: React.FC = () => {
           value: item.value,
           invoiceUploaded: true,
           invoiceNumber: invoiceData.invoiceNumber,
+          remainingQuantity: item.kg, // Initialize remaining quantity for PEPS
+          lots: [],
+          withdrawals: []
       }));
       
       let allDeliveriesForInvoice: Delivery[] = [];

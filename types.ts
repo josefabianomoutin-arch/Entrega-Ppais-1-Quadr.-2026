@@ -8,6 +8,20 @@ export interface Delivery {
   value?: number;
   invoiceUploaded: boolean;
   invoiceNumber?: string;
+  // PEPS fields
+  lots?: {
+    id: string;
+    lotNumber: string;
+    initialQuantity: number;
+    remainingQuantity: number;
+    barcode?: string;
+  }[];
+  withdrawals?: {
+    lotId: string;
+    date: string;
+    quantity: number;
+  }[];
+  remainingQuantity?: number; // Total remaining for this delivery item
 }
 
 export interface ContractItem {
