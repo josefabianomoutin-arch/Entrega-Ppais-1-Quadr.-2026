@@ -139,6 +139,11 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
         }
 
         delivery.lots = [...(delivery.lots || []), ...newLotsData];
+        
+        // REVISÃO DE FÓRMULA: Recalcula a quantidade restante da entrega com base na soma de seus lotes.
+        // Isso garante que os lotes sejam a única fonte de verdade para o estoque.
+        delivery.remainingQuantity = (delivery.lots || []).reduce((sum: number, lot: any) => sum + lot.remainingQuantity, 0);
+
 
         onUpdateSuppliers(newSuppliers);
         setActiveLotInputs(newActiveLotInputs);
@@ -167,11 +172,9 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
 
         lot.remainingQuantity -= withdrawalAmount;
         
-        const totalInitialKg = delivery.kg || 0;
-        const totalLotsInitial = (delivery.lots || []).reduce((sum: number, l: any) => sum + l.initialQuantity, 0);
-        const totalLotsRemaining = (delivery.lots || []).reduce((sum: number, l: any) => sum + l.remainingQuantity, 0);
-        
-        delivery.remainingQuantity = totalInitialKg - (totalLotsInitial - totalLotsRemaining);
+        // REVISÃO DE FÓRMULA: A quantidade restante da entrega é a soma das quantidades restantes de todos os seus lotes.
+        // Lógica mais robusta e direta.
+        delivery.remainingQuantity = (delivery.lots || []).reduce((sum: number, l: any) => sum + l.remainingQuantity, 0);
 
         onUpdateSuppliers(newSuppliers);
         setActiveWithdrawalInputs(prev => ({ ...prev, [lotId]: '' }));
@@ -255,19 +258,25 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
                                 {item.deliveries.map(del => {
                                     const deliveryItem = del.deliveryDetails;
                                     const valuePerKg = (deliveryItem.value || 0) / (deliveryItem.kg || 1);
-                                    const remainingValue = (deliveryItem.remainingQuantity || 0) * valuePerKg;
+                                    const deliveryRemainingValue = (deliveryItem.remainingQuantity || 0) * valuePerKg;
                                     const existingLotsCount = deliveryItem.lots?.length || 0;
                                     const slotsToRender = 4 - existingLotsCount;
                                     
                                     return (
                                         <div key={del.id} className="p-4 bg-white rounded-lg border shadow-sm">
-                                            <div className="flex flex-wrap justify-between items-center mb-3 text-xs border-b pb-2 gap-2">
-                                                <span><span className="font-semibold text-gray-600">Fornecedor:</span> {del.supplierName}</span>
-                                                <span><span className="font-semibold text-gray-600">NF:</span> <span className="font-mono">{del.invoiceNumber}</span></span>
-                                                <span><span className="font-semibold text-gray-600">Data:</span> <span className="font-mono">{formatDate(del.date)}</span></span>
-                                                <div className="text-right font-semibold">
-                                                    <p>{formatKg(deliveryItem.kg || 0)}</p>
-                                                    <p className="text-blue-600">{formatCurrency(deliveryItem.value || 0)}</p>
+                                            <div className="flex flex-wrap justify-between items-center mb-3 text-xs border-b pb-2 gap-x-4 gap-y-2">
+                                                <div className='flex flex-col gap-1'>
+                                                    <span><span className="font-semibold text-gray-600">Fornecedor:</span> {del.supplierName}</span>
+                                                    <span><span className="font-semibold text-gray-600">NF:</span> <span className="font-mono">{del.invoiceNumber}</span></span>
+                                                    <span><span className="font-semibold text-gray-600">Data:</span> <span className="font-mono">{formatDate(del.date)}</span></span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-semibold text-gray-500">
+                                                        <span title="Total da Nota">{formatKg(deliveryItem.kg || 0)}</span> / <span className="text-blue-600">{formatCurrency(deliveryItem.value || 0)}</span>
+                                                    </p>
+                                                    <p className="font-bold text-gray-800">
+                                                        <span className="text-green-700" title="Restante na Nota">{formatKg(deliveryItem.remainingQuantity || 0)}</span> / <span className="text-green-700">{formatCurrency(deliveryRemainingValue)}</span>
+                                                    </p>
                                                 </div>
                                             </div>
                                             
