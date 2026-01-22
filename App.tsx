@@ -548,20 +548,118 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRegisterWarehouseMovement = async (movement: Omit<WarehouseMovement, 'id' | 'timestamp'>) => {
-      try {
-          const newMovement: WarehouseMovement = {
-              ...movement,
-              id: `whm-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-              timestamp: new Date().toISOString(),
-          };
-          await runTransaction(warehouseLogRef, (currentLog: WarehouseMovement[] | null) => {
-              return [...(currentLog || []), newMovement];
+  const handleRegisterLotsAndUpdateMovements = async (payload: {
+    supplierCpf: string;
+    itemsWithLots: { deliveryId: string; newLots: { lotNumber: string; quantity: number }[] }[];
+  }): Promise<boolean> => {
+      const { supplierCpf, itemsWithLots } = payload;
+      
+      const newSuppliers = JSON.parse(JSON.stringify(suppliers));
+      const supplier = newSuppliers.find((s: Supplier) => s.cpf === supplierCpf);
+      if (!supplier) return false;
+
+      const newMovements: Omit<WarehouseMovement, 'id' | 'timestamp'>[] = [];
+
+      for (const item of itemsWithLots) {
+          const delivery = supplier.deliveries.find((d: Delivery) => d.id === item.deliveryId);
+          if (!delivery || item.newLots.length === 0) continue;
+
+          const newLots = item.newLots.map((lotData, i) => ({
+              id: `lot-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
+              lotNumber: lotData.lotNumber,
+              barcode: lotData.lotNumber,
+              initialQuantity: lotData.quantity,
+              remainingQuantity: lotData.quantity,
+          }));
+
+          delivery.lots = [...(delivery.lots || []), ...newLots];
+
+          newLots.forEach(lot => {
+              newMovements.push({
+                  type: 'entrada',
+                  lotId: lot.id,
+                  lotNumber: lot.lotNumber,
+                  itemName: delivery.item || 'N/A',
+                  supplierName: supplier.name,
+                  deliveryId: delivery.id,
+                  inboundInvoice: delivery.invoiceNumber,
+                  quantity: lot.initialQuantity
+              });
           });
+      }
+
+      try {
+          await handlePersistSuppliers(newSuppliers);
+          if (newMovements.length > 0) {
+              await runTransaction(warehouseLogRef, (currentLog: WarehouseMovement[] | null) => {
+                  const movementsWithIds = newMovements.map(m => ({
+                      ...m,
+                      id: `whm-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                      timestamp: new Date().toISOString(),
+                  }));
+                  return [...(currentLog || []), ...movementsWithIds];
+              });
+          }
           return true;
       } catch (error) {
-          console.error("Falha ao registrar movimentação de almoxarifado:", error);
+          console.error("Falha ao registrar lotes e movimentações:", error);
           return false;
+      }
+  };
+
+  const handleRegisterWithdrawal = async (payload: {
+      barcode: string;
+      quantity: number;
+      outboundInvoice: string;
+  }): Promise<{ success: boolean; message: string }> => {
+      const { barcode, quantity, outboundInvoice } = payload;
+      
+      let foundLot: any = null, foundDelivery: Delivery | null = null, foundSupplier: Supplier | null = null;
+      for (const s of suppliers) {
+          for (const d of s.deliveries) {
+              const lot = (d.lots || []).find(l => l.barcode === barcode);
+              if (lot) {
+                  foundLot = lot; foundDelivery = d; foundSupplier = s; break;
+              }
+          }
+          if (foundLot) break;
+      }
+
+      if (!foundLot || !foundDelivery || !foundSupplier) return { success: false, message: 'Lote não encontrado.' };
+      if (quantity > foundLot.remainingQuantity) return { success: false, message: `Quantidade de saída excede o estoque do lote (${foundLot.remainingQuantity} Kg).` };
+
+      const newSuppliers = JSON.parse(JSON.stringify(suppliers));
+      const sup = newSuppliers.find((s: Supplier) => s.cpf === foundSupplier!.cpf);
+      const del = sup.deliveries.find((d: Delivery) => d.id === foundDelivery!.id);
+      const lot = del.lots.find((l: any) => l.id === foundLot.id);
+      
+      lot.remainingQuantity -= quantity;
+
+      const newMovement: Omit<WarehouseMovement, 'id'|'timestamp'> = {
+          type: 'saída',
+          lotId: foundLot.id,
+          lotNumber: foundLot.lotNumber,
+          itemName: foundDelivery.item || 'N/A',
+          supplierName: foundSupplier.name,
+          deliveryId: foundDelivery.id,
+          outboundInvoice,
+          quantity
+      };
+
+      try {
+          await handlePersistSuppliers(newSuppliers);
+          await runTransaction(warehouseLogRef, (currentLog: WarehouseMovement[] | null) => {
+              const movementWithId = {
+                  ...newMovement,
+                  id: `whm-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                  timestamp: new Date().toISOString(),
+              };
+              return [...(currentLog || []), movementWithId];
+          });
+          return { success: true, message: 'Saída registrada com sucesso.' };
+      } catch (error) {
+          console.error("Falha ao registrar saída:", error);
+          return { success: false, message: 'Erro ao salvar os dados.' };
       }
   };
 
@@ -628,7 +726,8 @@ const App: React.FC = () => {
             <AlmoxarifadoDashboard
                 suppliers={suppliers}
                 onLogout={handleLogout}
-                onRegisterMovement={handleRegisterWarehouseMovement}
+                onRegisterLots={handleRegisterLotsAndUpdateMovements}
+                onRegisterWithdrawal={handleRegisterWithdrawal}
             />
         ) : (
           <LoginScreen onLogin={handleLogin} />

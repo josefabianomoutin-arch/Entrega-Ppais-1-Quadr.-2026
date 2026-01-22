@@ -52,4 +52,5 @@ export interface WarehouseMovement {
   deliveryId: string;
   inboundInvoice?: string; // Optional, only for 'entrada'
   outboundInvoice?: string; // Optional, only for 'saída'
+  quantity?: number; // How much was moved, especially for 'saída'
 }

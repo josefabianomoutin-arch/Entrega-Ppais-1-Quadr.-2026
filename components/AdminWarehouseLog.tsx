@@ -60,6 +60,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog }) =
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Produto</th>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Lote</th>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Fornecedor</th>
+                            <th className="p-3 text-right text-xs font-bold uppercase text-gray-600">Quantidade</th>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Nota Fiscal</th>
                         </tr>
                     </thead>
@@ -77,13 +78,16 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog }) =
                                 <td className="p-3 font-semibold text-gray-800">{log.itemName}</td>
                                 <td className="p-3 font-mono">{log.lotNumber}</td>
                                 <td className="p-3 text-gray-600 truncate max-w-xs">{log.supplierName}</td>
+                                <td className="p-3 text-right font-mono text-gray-800">
+                                    {log.quantity !== undefined ? `${log.quantity.toFixed(2).replace('.', ',')} Kg` : '-'}
+                                </td>
                                 <td className="p-3 font-mono text-gray-600">
                                     {log.type === 'entrada' ? log.inboundInvoice || 'N/A' : log.outboundInvoice || 'N/A'}
                                 </td>
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={6} className="p-12 text-center text-gray-400 italic">
+                                <td colSpan={7} className="p-12 text-center text-gray-400 italic">
                                     Nenhuma movimentação encontrada para os filtros selecionados.
                                 </td>
                             </tr>
