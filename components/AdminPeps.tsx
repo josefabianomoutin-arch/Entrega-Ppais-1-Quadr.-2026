@@ -45,7 +45,7 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedItemName, setExpandedItemName] = useState<string | null>(null);
     const barcodeInputRef = useRef<HTMLInputElement>(null);
-    const [activeLotInputs, setActiveLotInputs] = useState<Record<string, { lotNumber: string, initialQuantity: string, barcode: string }>>({}); // delivery.id -> lot inputs
+    const [activeLotInputs, setActiveLotInputs] = useState<Record<string, { lotIdentifier: string, initialQuantity: string }>>({});
     const [activeWithdrawalInputs, setActiveWithdrawalInputs] = useState<Record<string, string>>({}); // lot.id -> withdrawal quantity string
 
     // Processa os dados para a nova estrutura focada em itens de carne
@@ -99,8 +99,8 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
     // Manipula a adição de um novo lote a um item de entrega
     const handleAddLot = (deliveryId: string, supplierCpf: string) => {
         const inputs = activeLotInputs[deliveryId];
-        if (!inputs || !inputs.lotNumber || !inputs.initialQuantity) {
-            alert("Por favor, preencha o número do lote e a quantidade.");
+        if (!inputs || !inputs.lotIdentifier || !inputs.initialQuantity) {
+            alert("Por favor, preencha o Lote/Código e a quantidade.");
             return;
         }
 
@@ -123,10 +123,10 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
                 
                 const newLot = {
                     id: `lot-${Date.now()}`,
-                    lotNumber: inputs.lotNumber,
+                    lotNumber: inputs.lotIdentifier,
                     initialQuantity,
                     remainingQuantity: initialQuantity,
-                    barcode: inputs.barcode || '',
+                    barcode: inputs.lotIdentifier,
                 };
                 return { ...d, lots: [...(d.lots || []), newLot] };
             });
@@ -139,7 +139,7 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
 
         if (updatedDelivery?.lots && updatedDelivery.lots.length > originalLotsLength) {
             onUpdateSuppliers(newSuppliers);
-            setActiveLotInputs(prev => ({ ...prev, [deliveryId]: { lotNumber: '', initialQuantity: '', barcode: '' } }));
+            setActiveLotInputs(prev => ({ ...prev, [deliveryId]: { lotIdentifier: '', initialQuantity: '' } }));
         }
     };
     
@@ -293,11 +293,30 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
 
                                             {/* Adicionar Lote */}
                                             {(deliveryItem.lots || []).length < 4 && (
-                                            <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center pt-3 border-t border-dashed">
-                                                <input type="text" value={activeLotInputs[del.id]?.lotNumber || ''} onChange={e => setActiveLotInputs(p => ({ ...p, [del.id]: { ...(p[del.id] || {}), lotNumber: e.target.value } }))} placeholder="Nº do Lote" className="col-span-2 md:col-span-1 border rounded px-2 py-1 text-xs" />
-                                                <input type="text" value={activeLotInputs[del.id]?.initialQuantity || ''} onChange={e => setActiveLotInputs(p => ({ ...p, [del.id]: { ...(p[del.id] || {}), initialQuantity: e.target.value.replace(/[^0-9,.]/g, '') } }))} placeholder="Qtd. (Kg)" className="border rounded px-2 py-1 text-xs font-mono" />
-                                                <input type="text" value={activeLotInputs[del.id]?.barcode || ''} onChange={e => setActiveLotInputs(p => ({ ...p, [del.id]: { ...(p[del.id] || {}), barcode: e.target.value } }))} placeholder="Código de Barras" className="col-span-2 md:col-span-1 border rounded px-2 py-1 text-xs font-mono" />
-                                                <button onClick={() => handleAddLot(del.id, del.supplierCpf)} className="bg-blue-500 text-white rounded px-3 py-1 text-xs font-bold hover:bg-blue-600">Adicionar Lote</button>
+                                            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center pt-3 border-t border-dashed">
+                                                <input
+                                                    id={`lot-identifier-${del.id}`}
+                                                    type="text"
+                                                    value={activeLotInputs[del.id]?.lotIdentifier || ''}
+                                                    onChange={e => setActiveLotInputs(p => ({ ...p, [del.id]: { ...(p[del.id] || {}), lotIdentifier: e.target.value } }))}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            document.getElementById(`lot-quantity-${del.id}`)?.focus();
+                                                        }
+                                                    }}
+                                                    placeholder="Lote / Cód. de Barras"
+                                                    className="sm:col-span-2 border rounded px-2 py-1 text-xs"
+                                                />
+                                                <input
+                                                    id={`lot-quantity-${del.id}`}
+                                                    type="text"
+                                                    value={activeLotInputs[del.id]?.initialQuantity || ''}
+                                                    onChange={e => setActiveLotInputs(p => ({ ...p, [del.id]: { ...(p[del.id] || {}), initialQuantity: e.target.value.replace(/[^0-9,.]/g, '') } }))}
+                                                    placeholder="Qtd. (Kg)"
+                                                    className="sm:col-span-2 border rounded px-2 py-1 text-xs font-mono"
+                                                />
+                                                <button onClick={() => handleAddLot(del.id, del.supplierCpf)} className="sm:col-span-1 bg-blue-500 text-white rounded px-3 py-1 text-xs font-bold hover:bg-blue-600">Adicionar Lote</button>
                                             </div>
                                             )}
                                         </div>
