@@ -239,18 +239,29 @@ useEffect(() => {
         }
   
         const participatingSuppliers = item.suppliers.filter(s => s.supplierCpf);
-        if (participatingSuppliers.length === 0) {
+        const numSuppliers = participatingSuppliers.length;
+        if (numSuppliers === 0) {
           return;
         }
   
-        const numPerSupplier = totalNum / participatingSuppliers.length;
+        // Lógica de distribuição de alta precisão para evitar erros de ponto flutuante
+        const precisionFactor = 100000; // 5 casas decimais
+        const totalInUnits = Math.round(totalNum * precisionFactor);
+        const basePortion = Math.floor(totalInUnits / numSuppliers);
+        let remainder = totalInUnits % numSuppliers;
+
+        const portions = new Array(numSuppliers).fill(basePortion);
+        for (let i = 0; i < remainder; i++) {
+            portions[i]++;
+        }
   
-        participatingSuppliers.forEach(slot => {
+        participatingSuppliers.forEach((slot, index) => {
           const supplier = newSuppliersState.find(p => p.cpf === slot.supplierCpf);
           if (supplier) {
+            const supplierPortion = portions[index] / precisionFactor;
             supplier.contractItems.push({
               name: item.name.trim(),
-              totalKg: numPerSupplier,
+              totalKg: supplierPortion,
               valuePerKg: valueNum,
               unit: item.ui_compositeUnit,
               order: itemIndex,
@@ -268,8 +279,8 @@ useEffect(() => {
 
       const getContractSignature = (s: Supplier) => ({
           cpf: s.cpf,
-          initialValue: s.initialValue.toFixed(2),
-          items: s.contractItems.map(i => `${i.name}-${(i.totalKg || 0).toFixed(2)}-${(i.valuePerKg || 0).toFixed(2)}`).sort()
+          initialValue: (s.initialValue || 0).toFixed(2),
+          items: (s.contractItems || []).map(i => `${i.name}-${(i.totalKg || 0).toFixed(5)}-${(i.valuePerKg || 0).toFixed(2)}`).sort()
       });
 
       const currentSignature = JSON.stringify(suppliers.map(getContractSignature));
@@ -286,8 +297,7 @@ useEffect(() => {
       console.error("Erro ao processar atualização de contrato em tempo real:", e);
       setContractError('Erro ao calcular totais. Verifique os dados dos itens.');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [itemCentricContracts, onLiveUpdate, activeTab]);
+}, [itemCentricContracts, onLiveUpdate, activeTab, suppliers, supplierIdentities]);
 
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
