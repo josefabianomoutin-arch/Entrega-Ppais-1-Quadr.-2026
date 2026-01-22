@@ -45,7 +45,7 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedItemName, setExpandedItemName] = useState<string | null>(null);
     const barcodeInputRef = useRef<HTMLInputElement>(null);
-    const [activeLotInputs, setActiveLotInputs] = useState<Record<string, { lotIdentifier: string, initialQuantity: string }>>({});
+    const [activeLotInputs, setActiveLotInputs] = useState<Record<string, { lotIdentifier: string; initialQuantity: string; }>>({});
     const [activeWithdrawalInputs, setActiveWithdrawalInputs] = useState<Record<string, string>>({}); // lot.id -> withdrawal quantity string
 
     // Processa os dados para a nova estrutura focada em itens de carne
@@ -96,51 +96,52 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
         );
     }, [processedMeatItems, searchTerm]);
 
-    // Manipula a adição de um novo lote a um item de entrega
-    const handleAddLot = (deliveryId: string, supplierCpf: string) => {
-        const inputs = activeLotInputs[deliveryId];
-        if (!inputs || !inputs.lotIdentifier || !inputs.initialQuantity) {
-            alert("Por favor, preencha o Lote/Código e a quantidade.");
-            return;
-        }
+    const handleAddLots = (deliveryId: string, supplierCpf: string, slotsToRender: number) => {
+        const newLotsData = [];
+        const newActiveLotInputs = { ...activeLotInputs };
 
-        const initialQuantity = parseFloat(inputs.initialQuantity.replace(',', '.'));
-        if (isNaN(initialQuantity) || initialQuantity <= 0) {
-            alert("A quantidade do lote deve ser um número positivo.");
-            return;
-        }
-
-        const newSuppliers = suppliers.map(s => {
-            if (s.cpf !== supplierCpf) return s;
-            const newDeliveries = s.deliveries.map(d => {
-                if (d.id !== deliveryId) return d;
-                
-                const currentLotTotal = (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
-                if (currentLotTotal + initialQuantity > (d.kg || 0) + 0.001) { // Tolerância para ponto flutuante
-                    alert(`A soma dos lotes (${(currentLotTotal + initialQuantity).toFixed(2)}kg) não pode exceder a quantidade total do item (${(d.kg || 0).toFixed(2)}kg).`);
-                    return d; // Retorna sem modificar se a validação falhar
+        for (let i = 0; i < slotsToRender; i++) {
+            const inputKey = `${deliveryId}-${i}`;
+            const inputs = activeLotInputs[inputKey];
+            if (inputs && inputs.lotIdentifier && inputs.initialQuantity) {
+                const initialQuantity = parseFloat(inputs.initialQuantity.replace(',', '.'));
+                if (!isNaN(initialQuantity) && initialQuantity > 0) {
+                    newLotsData.push({
+                        lotNumber: inputs.lotIdentifier,
+                        barcode: inputs.lotIdentifier,
+                        initialQuantity: initialQuantity,
+                        remainingQuantity: initialQuantity,
+                        id: `lot-${Date.now()}-${i}`
+                    });
                 }
-                
-                const newLot = {
-                    id: `lot-${Date.now()}`,
-                    lotNumber: inputs.lotIdentifier,
-                    initialQuantity,
-                    remainingQuantity: initialQuantity,
-                    barcode: inputs.lotIdentifier,
-                };
-                return { ...d, lots: [...(d.lots || []), newLot] };
-            });
-            return { ...s, deliveries: newDeliveries };
-        });
-        
-        const originalLotsLength = suppliers.find(s=>s.cpf===supplierCpf)?.deliveries.find(d=>d.id===deliveryId)?.lots?.length || 0;
-        const updatedSupplier = newSuppliers.find(s => s.cpf === supplierCpf);
-        const updatedDelivery = updatedSupplier?.deliveries.find(d => d.id === deliveryId);
-
-        if (updatedDelivery?.lots && updatedDelivery.lots.length > originalLotsLength) {
-            onUpdateSuppliers(newSuppliers);
-            setActiveLotInputs(prev => ({ ...prev, [deliveryId]: { lotIdentifier: '', initialQuantity: '' } }));
+            }
+             delete newActiveLotInputs[inputKey];
         }
+
+        if (newLotsData.length === 0) {
+            alert("Nenhum lote válido para adicionar. Preencha o Lote/Código e a Quantidade.");
+            return;
+        }
+        
+        const newSuppliers = JSON.parse(JSON.stringify(suppliers));
+        const supplier = newSuppliers.find((s: Supplier) => s.cpf === supplierCpf);
+        if (!supplier) return;
+        
+        const delivery = supplier.deliveries.find((d: Delivery) => d.id === deliveryId);
+        if (!delivery) return;
+
+        const currentLotTotal = (delivery.lots || []).reduce((sum: number, lot: any) => sum + lot.initialQuantity, 0);
+        const newLotsTotal = newLotsData.reduce((sum, lot) => sum + lot.initialQuantity, 0);
+
+        if (currentLotTotal + newLotsTotal > (delivery.kg || 0) + 0.001) {
+            alert(`A soma dos lotes (${(currentLotTotal + newLotsTotal).toFixed(2)}kg) não pode exceder a quantidade total do item (${(delivery.kg || 0).toFixed(2)}kg).`);
+            return;
+        }
+
+        delivery.lots = [...(delivery.lots || []), ...newLotsData];
+
+        onUpdateSuppliers(newSuppliers);
+        setActiveLotInputs(newActiveLotInputs);
     };
     
     // Manipula o registro de uma retirada de estoque de um lote
@@ -166,8 +167,11 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
 
         lot.remainingQuantity -= withdrawalAmount;
         
-        // Recalcula a quantidade restante total do item da entrega
-        delivery.remainingQuantity = (delivery.lots || []).reduce((sum: number, l: any) => sum + l.remainingQuantity, 0);
+        const totalInitialKg = delivery.kg || 0;
+        const totalLotsInitial = (delivery.lots || []).reduce((sum: number, l: any) => sum + l.initialQuantity, 0);
+        const totalLotsRemaining = (delivery.lots || []).reduce((sum: number, l: any) => sum + l.remainingQuantity, 0);
+        
+        delivery.remainingQuantity = totalInitialKg - (totalLotsInitial - totalLotsRemaining);
 
         onUpdateSuppliers(newSuppliers);
         setActiveWithdrawalInputs(prev => ({ ...prev, [lotId]: '' }));
@@ -250,74 +254,58 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
                             <div className="p-4 border-t bg-cyan-50/20 space-y-4">
                                 {item.deliveries.map(del => {
                                     const deliveryItem = del.deliveryDetails;
+                                    const valuePerKg = (deliveryItem.value || 0) / (deliveryItem.kg || 1);
+                                    const remainingValue = (deliveryItem.remainingQuantity || 0) * valuePerKg;
+                                    const existingLotsCount = deliveryItem.lots?.length || 0;
+                                    const slotsToRender = 4 - existingLotsCount;
+                                    
                                     return (
                                         <div key={del.id} className="p-4 bg-white rounded-lg border shadow-sm">
-                                            <div className="flex justify-between items-center mb-3 text-xs border-b pb-2">
-                                                <div>
-                                                    <span className="font-semibold text-gray-600">Fornecedor:</span> {del.supplierName}
-                                                </div>
-                                                <div>
-                                                    <span className="font-semibold text-gray-600">NF:</span> <span className="font-mono">{del.invoiceNumber}</span>
-                                                </div>
-                                                <div>
-                                                     <span className="font-semibold text-gray-600">Data:</span> <span className="font-mono">{formatDate(del.date)}</span>
-                                                </div>
-                                                <div className="font-semibold">
-                                                    {formatKg(deliveryItem.kg || 0)}
+                                            <div className="flex flex-wrap justify-between items-center mb-3 text-xs border-b pb-2 gap-2">
+                                                <span><span className="font-semibold text-gray-600">Fornecedor:</span> {del.supplierName}</span>
+                                                <span><span className="font-semibold text-gray-600">NF:</span> <span className="font-mono">{del.invoiceNumber}</span></span>
+                                                <span><span className="font-semibold text-gray-600">Data:</span> <span className="font-mono">{formatDate(del.date)}</span></span>
+                                                <div className="text-right font-semibold">
+                                                    <p>{formatKg(deliveryItem.kg || 0)}</p>
+                                                    <p className="text-blue-600">{formatCurrency(deliveryItem.value || 0)}</p>
                                                 </div>
                                             </div>
                                             
                                             {/* Lista de Lotes */}
                                             <div className="space-y-2 mb-3">
-                                                {(deliveryItem.lots || []).map(lot => (
-                                                <div key={lot.id} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center p-2 bg-gray-50 rounded">
-                                                    <div className="text-xs">
-                                                        <p className="font-semibold">Lote: <span className="font-mono bg-gray-200 px-1 rounded">{lot.lotNumber}</span></p>
-                                                        <p className="text-gray-500">Restante: <span className="font-bold text-black">{formatKg(lot.remainingQuantity)}</span></p>
-                                                    </div>
-                                                    <div className="text-xs text-gray-500 truncate" title={lot.barcode}>
-                                                        Código: <span className="font-mono">{lot.barcode || 'N/A'}</span>
-                                                    </div>
-                                                    <input
-                                                        id={`withdraw-${lot.id}`}
-                                                        type="text"
-                                                        value={activeWithdrawalInputs[lot.id] || ''}
-                                                        onChange={e => setActiveWithdrawalInputs(p => ({ ...p, [lot.id]: e.target.value.replace(/[^0-9,.]/g, '') }))}
-                                                        placeholder="Peso de Saída (Kg)"
-                                                        className="col-span-2 md:col-span-1 border rounded px-2 py-1 text-xs font-mono"
-                                                    />
-                                                    <button onClick={() => handleRegisterWithdrawal(lot.id, del.id, del.supplierCpf)} className="bg-green-500 text-white rounded px-3 py-1 text-xs font-bold hover:bg-green-600">Registrar Saída</button>
-                                                </div>
-                                                ))}
+                                                {(deliveryItem.lots || []).map(lot => {
+                                                    const lotRemainingValue = lot.remainingQuantity * valuePerKg;
+                                                    return (
+                                                        <div key={lot.id} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center p-2 bg-gray-50 rounded">
+                                                            <div className="text-xs">
+                                                                <p className="font-semibold">Lote: <span className="font-mono bg-gray-200 px-1 rounded">{lot.lotNumber}</span></p>
+                                                                <p className="text-gray-500">Restante: <span className="font-bold text-black">{formatKg(lot.remainingQuantity)}</span> / <span className="font-bold text-blue-700">{formatCurrency(lotRemainingValue)}</span></p>
+                                                            </div>
+                                                            <div className="text-xs text-gray-500 truncate" title={lot.barcode}>Código: <span className="font-mono">{lot.barcode || 'N/A'}</span></div>
+                                                            <input id={`withdraw-${lot.id}`} type="text" value={activeWithdrawalInputs[lot.id] || ''} onChange={e => setActiveWithdrawalInputs(p => ({ ...p, [lot.id]: e.target.value.replace(/[^0-9,.]/g, '') }))} placeholder="Peso de Saída (Kg)" className="col-span-2 md:col-span-1 border rounded px-2 py-1 text-xs font-mono"/>
+                                                            <button onClick={() => handleRegisterWithdrawal(lot.id, del.id, del.supplierCpf)} className="bg-green-500 text-white rounded px-3 py-1 text-xs font-bold hover:bg-green-600">Registrar Saída</button>
+                                                        </div>
+                                                    )
+                                                })}
                                             </div>
 
-                                            {/* Adicionar Lote */}
-                                            {(deliveryItem.lots || []).length < 4 && (
-                                            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center pt-3 border-t border-dashed">
-                                                <input
-                                                    id={`lot-identifier-${del.id}`}
-                                                    type="text"
-                                                    value={activeLotInputs[del.id]?.lotIdentifier || ''}
-                                                    onChange={e => setActiveLotInputs(p => ({ ...p, [del.id]: { ...(p[del.id] || {}), lotIdentifier: e.target.value } }))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            document.getElementById(`lot-quantity-${del.id}`)?.focus();
-                                                        }
-                                                    }}
-                                                    placeholder="Lote / Cód. de Barras"
-                                                    className="sm:col-span-2 border rounded px-2 py-1 text-xs"
-                                                />
-                                                <input
-                                                    id={`lot-quantity-${del.id}`}
-                                                    type="text"
-                                                    value={activeLotInputs[del.id]?.initialQuantity || ''}
-                                                    onChange={e => setActiveLotInputs(p => ({ ...p, [del.id]: { ...(p[del.id] || {}), initialQuantity: e.target.value.replace(/[^0-9,.]/g, '') } }))}
-                                                    placeholder="Qtd. (Kg)"
-                                                    className="sm:col-span-2 border rounded px-2 py-1 text-xs font-mono"
-                                                />
-                                                <button onClick={() => handleAddLot(del.id, del.supplierCpf)} className="sm:col-span-1 bg-blue-500 text-white rounded px-3 py-1 text-xs font-bold hover:bg-blue-600">Adicionar Lote</button>
-                                            </div>
+                                            {/* Adicionar Lotes */}
+                                            {slotsToRender > 0 && (
+                                                <div className="pt-3 border-t border-dashed">
+                                                    <h5 className="text-xs font-bold text-gray-500 mb-2">Adicionar Novos Lotes ({slotsToRender} disponíveis)</h5>
+                                                    <div className="space-y-2">
+                                                        {Array.from({ length: slotsToRender }).map((_, index) => {
+                                                            const inputKey = `${del.id}-${index}`;
+                                                            return(
+                                                                <div key={inputKey} className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
+                                                                    <input id={`lot-identifier-${inputKey}`} type="text" value={activeLotInputs[inputKey]?.lotIdentifier || ''} onChange={e => setActiveLotInputs(p => ({ ...p, [inputKey]: { ...(p[inputKey] || {}), lotIdentifier: e.target.value } }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById(`lot-quantity-${inputKey}`)?.focus(); } }} placeholder={`Lote / Cód. Barras #${existingLotsCount + index + 1}`} className="sm:col-span-2 border rounded px-2 py-1 text-xs"/>
+                                                                    <input id={`lot-quantity-${inputKey}`} type="text" value={activeLotInputs[inputKey]?.initialQuantity || ''} onChange={e => setActiveLotInputs(p => ({ ...p, [inputKey]: { ...(p[inputKey] || {}), initialQuantity: e.target.value.replace(/[^0-9,.]/g, '') } }))} placeholder="Qtd. (Kg)" className="sm:col-span-2 border rounded px-2 py-1 text-xs font-mono"/>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                        <button onClick={() => handleAddLots(del.id, del.supplierCpf, slotsToRender)} className="w-full mt-2 bg-blue-500 text-white rounded px-3 py-1.5 text-xs font-bold hover:bg-blue-600">Adicionar Lotes Preenchidos</button>
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
                                     )
