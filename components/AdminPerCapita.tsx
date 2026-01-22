@@ -11,6 +11,24 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+const formatContractedTotal = (quantity: number, unitString?: string): string => {
+    const [unitType] = (unitString || 'kg-1').split('-');
+    
+    // Check for volume units
+    if (['litro', 'embalagem', 'caixa'].some(u => unitType.includes(u))) {
+        // For volume, the stored quantity in `totalKg` is already in Liters
+        return `${quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`;
+    }
+    
+    if (unitType === 'dz') {
+        return `${quantity.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} Dz`;
+    }
+
+    // Default to Kg for everything else (saco, balde, kg, un) as they are weight-based.
+    return `${quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
+};
+
+
 const getContractItemWeight = (item: { totalKg?: number, unit?: string }): number => {
     if (!item) return 0;
     const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
@@ -69,7 +87,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
 
     const totalPerCaptaKg = useMemo(() => {
         if (perCapitaDenominator === 0) return 0;
-        const totalKgOfAllItems = itemData.reduce((sum, item) => sum + item.totalKg, 0);
+        const totalKgOfAllItems = itemData.reduce((sum, item) => {
+            const [unitType] = (item.unit || 'kg-1').split('-');
+             if (['litro', 'embalagem', 'caixa', 'dz'].some(u => unitType.includes(u))) {
+                return sum;
+            }
+            return sum + item.totalKg;
+        }, 0);
         return (totalKgOfAllItems / perCapitaDenominator) / 4;
     }, [itemData, perCapitaDenominator]);
     
@@ -183,12 +207,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                             <tbody className="divide-y divide-gray-100">
                                 {itemData.length > 0 ? itemData.map((item, index) => {
                                     const reference = resolutionData[item.name.toUpperCase()];
-                                    const contractedTotalKg = item.totalKg;
+                                    const contractedTotal = item.totalKg;
+                                    const contractedUnitString = item.unit;
                                     
-                                    const totalDeliveredKgForItem = suppliers.reduce((total, supplier) => {
+                                    const totalDeliveredForItem = suppliers.reduce((total, supplier) => {
                                         const deliveredBySupplier = (supplier.deliveries || [])
-                                            .filter(d => d.item === item.name && d.kg)
-                                            .reduce((sum, d) => sum + (d.kg || 0), 0);
+                                            .filter(d => d.item === item.name && (d.kg || 0) > 0)
+                                            .reduce((sum, d) => sum + getContractItemWeight({ totalKg: d.kg, unit: item.unit }), 0);
                                         return total + deliveredBySupplier;
                                     }, 0);
 
@@ -200,15 +225,16 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
-                                                <td className="p-3 text-right font-mono font-bold text-blue-900">{contractedTotalKg.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
+                                                <td className="p-3 text-right font-mono font-bold text-blue-900">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">-</td>
-                                                <td className="p-3 text-right font-mono font-bold text-green-700">{totalDeliveredKgForItem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
+                                                <td className="p-3 text-right font-mono font-bold text-green-700">{formatContractedTotal(totalDeliveredForItem, contractedUnitString)}</td>
                                             </tr>
                                         );
                                     }
                                     
                                     const perCapitaRequired = reference.monthlyConsumption;
-                                    let totalRequiredKg = 0;
+                                    let totalRequiredValue = 0;
+                                    let requiredUnitType = ''; // 'kg', 'L', 'unid.'
                                     let requiredDisplay = 'N/A';
 
                                     if (perCapitaDenominator > 0) {
@@ -216,17 +242,21 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                         const value = perCapitaRequired.value;
 
                                         if (unit === 'g') {
-                                            totalRequiredKg = (value / 1000) * perCapitaDenominator;
-                                            requiredDisplay = `${totalRequiredKg.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
+                                            totalRequiredValue = (value / 1000) * perCapitaDenominator;
+                                            requiredUnitType = 'kg';
+                                            requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
                                         } else if (unit === 'ml') {
-                                            const totalLiters = (value / 1000) * perCapitaDenominator;
-                                            requiredDisplay = `${totalLiters.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} L`;
+                                            totalRequiredValue = (value / 1000) * perCapitaDenominator;
+                                            requiredUnitType = 'L';
+                                            requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} L`;
                                         } else if (unit === 'l') {
-                                            const totalLiters = value * perCapitaDenominator;
-                                            requiredDisplay = `${totalLiters.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`;
+                                            totalRequiredValue = value * perCapitaDenominator;
+                                            requiredUnitType = 'L';
+                                            requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`;
                                         } else if (unit === 'unid.') {
-                                            const totalUnits = value * perCapitaDenominator;
-                                            requiredDisplay = `${totalUnits.toLocaleString('pt-BR')} unid.`;
+                                            totalRequiredValue = value * perCapitaDenominator;
+                                            requiredUnitType = 'unid.';
+                                            requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR')} unid.`;
                                         } else {
                                             requiredDisplay = formatConsumption(perCapitaRequired);
                                         }
@@ -241,8 +271,15 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     let differenceDisplay = 'N/A (unid. incomp.)';
                                     let differenceColor = 'text-gray-500';
 
-                                    if (totalRequiredKg > 0) {
-                                        const difference = contractedTotalKg - totalRequiredKg;
+                                    const [contractedUnitType] = (contractedUnitString || 'kg-1').split('-');
+                                    const contractedIsVolume = ['litro', 'embalagem', 'caixa'].some(u => contractedUnitType.includes(u));
+
+                                    if (contractedIsVolume && requiredUnitType === 'L') {
+                                        const difference = contractedTotal - totalRequiredValue;
+                                        differenceDisplay = `${difference >= 0 ? '+' : ''}${difference.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} L`;
+                                        differenceColor = difference >= 0 ? 'text-blue-600' : 'text-red-600';
+                                    } else if (!contractedIsVolume && requiredUnitType === 'kg') {
+                                        const difference = contractedTotal - totalRequiredValue;
                                         differenceDisplay = `${difference >= 0 ? '+' : ''}${difference.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
                                         differenceColor = difference >= 0 ? 'text-blue-600' : 'text-red-600';
                                     }
@@ -254,9 +291,9 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                             <td className="p-3 text-left font-mono text-gray-500">{reference.frequency}</td>
                                             <td className="p-3 text-right font-mono text-gray-600">{formatConsumption(reference.weeklyConsumption)}</td>
                                             <td className="p-3 text-right font-mono font-bold">{requiredDisplay}</td>
-                                            <td className="p-3 text-right font-mono font-bold text-gray-800">{contractedTotalKg.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
+                                            <td className="p-3 text-right font-mono font-bold text-gray-800">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
                                             <td className={`p-3 text-right font-mono font-bold ${differenceColor}`}>{differenceDisplay}</td>
-                                            <td className="p-3 text-right font-mono font-bold text-green-700">{totalDeliveredKgForItem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg</td>
+                                            <td className="p-3 text-right font-mono font-bold text-green-700">{formatContractedTotal(totalDeliveredForItem, contractedUnitString)}</td>
                                         </tr>
                                     );
                                 }) : (
