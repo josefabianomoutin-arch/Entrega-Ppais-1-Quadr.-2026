@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import type { Supplier, Delivery } from './types';
+import type { Supplier, Delivery, WarehouseMovement } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
+import AlmoxarifadoDashboard from './components/AlmoxarifadoDashboard';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, onValue, set, runTransaction, get } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
@@ -11,15 +12,18 @@ import { firebaseConfig } from './firebaseConfig';
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 const suppliersRef = ref(database, 'suppliers');
+const warehouseLogRef = ref(database, 'warehouseLog');
 
 
 const App: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [warehouseLog, setWarehouseLog] = useState<WarehouseMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<Supplier | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isAlmoxarifadoLoggedIn, setIsAlmoxarifadoLoggedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'peps'>('register');
+  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'peps' | 'warehouse'>('register');
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
   const [emailModalData, setEmailModalData] = useState<{
     recipient: string;
@@ -73,17 +77,15 @@ const App: React.FC = () => {
   // Efeito para ouvir mudanças no banco de dados em tempo real
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = onValue(suppliersRef, (snapshot) => {
+    const unsubscribeSuppliers = onValue(suppliersRef, (snapshot) => {
       try {
         const data = snapshot.val();
         
-        // Se não houver dados ou não for um objeto, significa que não há fornecedores.
         if (!data || typeof data !== 'object') {
           setSuppliers([]);
           return;
         }
 
-        // Converte o objeto de fornecedores (chaveado por CPF/CNPJ) em um array.
         const suppliersArray: Supplier[] = Object.values(data)
           .filter(
             (p): p is Supplier => 
@@ -97,7 +99,6 @@ const App: React.FC = () => {
             contractItems: p.contractItems || [],
             deliveries: (p.deliveries || []).map(d => ({
               ...d,
-              // Initialize new/optional fields for backward compatibility
               remainingQuantity: typeof d.remainingQuantity === 'number' ? d.remainingQuantity : (d.kg || 0),
               lots: d.lots || [],
               withdrawals: d.withdrawals || [],
@@ -105,23 +106,36 @@ const App: React.FC = () => {
             allowedWeeks: p.allowedWeeks || [],
             initialValue: p.initialValue || 0,
           }))
-          .sort((a, b) => a.name.localeCompare(b.name)); // Garante ordem consistente
+          .sort((a, b) => a.name.localeCompare(b.name));
         
         setSuppliers(suppliersArray);
       } catch (error) {
-        console.error("Erro ao processar dados do Firebase:", error);
-        setSuppliers([]); // Reseta para um estado seguro em caso de erro
+        console.error("Erro ao processar dados de fornecedores do Firebase:", error);
+        setSuppliers([]);
       } finally {
         setLoading(false);
       }
     }, (error) => {
-      console.error("Falha ao ler dados do Firebase: ", error);
+      console.error("Falha ao ler dados de fornecedores do Firebase: ", error);
       setLoading(false);
       setSuppliers([]);
     });
 
-    return () => unsubscribe();
+    const unsubscribeWarehouseLog = onValue(warehouseLogRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data && Array.isArray(data)) {
+        setWarehouseLog(data);
+      } else {
+        setWarehouseLog([]);
+      }
+    });
+
+    return () => {
+      unsubscribeSuppliers();
+      unsubscribeWarehouseLog();
+    };
   }, []);
+
 
   // Efeito para excluir agendamentos de um fornecedor específico (operação única)
   useEffect(() => {
@@ -149,7 +163,6 @@ const App: React.FC = () => {
             alert(`Ocorreu um erro ao tentar remover os agendamentos. Por favor, verifique o console para mais detalhes.`);
           });
       } else {
-        // Se o fornecedor não for encontrado, marca a operação como concluída para não rodar novamente.
         localStorage.setItem(operationFlag, 'true');
       }
     }
@@ -158,7 +171,7 @@ const App: React.FC = () => {
   // Efeito para excluir agendamentos de fornecedores com "ITEM FRACASSADO" (v2 - Robusto)
   useEffect(() => {
     if (!loading && isAdminLoggedIn && suppliers.length > 0) {
-      const operationFlag = 'deletedSchedules_ItemFracassado_v2'; // Flag atualizada para garantir a re-execução
+      const operationFlag = 'deletedSchedules_ItemFracassado_v2';
       if (localStorage.getItem(operationFlag)) {
         return;
       }
@@ -169,11 +182,9 @@ const App: React.FC = () => {
 
       if (suppliersToClear.length > 0) {
         console.log(`[OP_v2] Encontrados ${suppliersToClear.length} fornecedores para limpar agendamentos.`);
-
-        // Usa um método mais direto e seguro, apagando apenas o nó de 'deliveries' de cada fornecedor.
+        
         const updatePromises = suppliersToClear.map(supplier => {
           const deliveriesRef = ref(database, `suppliers/${supplier.cpf}/deliveries`);
-          // set(..., null) apaga o nó no Firebase Realtime Database
           return set(deliveriesRef, null);
         });
 
@@ -191,7 +202,6 @@ const App: React.FC = () => {
             alert(errorMessage);
           });
       } else {
-        // Se nenhum fornecedor for encontrado, ainda marca a operação como concluída.
         console.log('[OP_v2] Nenhum fornecedor com "ITEM FRACASSADO" encontrado para limpeza de agendamentos.');
         localStorage.setItem(operationFlag, 'true');
       }
@@ -199,32 +209,32 @@ const App: React.FC = () => {
   }, [loading, isAdminLoggedIn, suppliers]);
 
   // Helper central para escrever no banco de dados com feedback visual
-  // Usado para operações em massa, como salvar contratos.
-  const writeToDatabase = async (suppliersArray: Supplier[]) => {
-    setIsSaving(true);
-    try {
-      const suppliersObject = suppliersArray.reduce((acc, supplier) => {
-        if (supplier && supplier.cpf) {
-          acc[supplier.cpf] = supplier;
-        }
-        return acc;
-      }, {} as { [key: string]: Supplier });
-
-      await set(suppliersRef, suppliersObject);
-    } catch (error) {
-      console.error("Falha ao salvar dados no Firebase", error);
-      throw error;
-    } finally {
-      setTimeout(() => setIsSaving(false), 500);
-    }
+  const writeToDatabase = async (dbRef: any, data: any) => {
+      setIsSaving(true);
+      try {
+          await set(dbRef, data);
+      } catch (error) {
+          console.error("Falha ao salvar dados no Firebase", error);
+          throw error;
+      } finally {
+          setTimeout(() => setIsSaving(false), 500);
+      }
   };
 
   const handleLogin = (name: string, cpf: string): boolean => {
-    if (name.toLowerCase() === 'administrador' && cpf === '15210361870') {
+    const lowerCaseName = name.toLowerCase();
+    if (lowerCaseName === 'administrador' && cpf === '15210361870') {
       setIsAdminLoggedIn(true);
       setCurrentUser(null);
-      setAdminActiveTab('register'); // Direciona para a aba de cadastro
+      setIsAlmoxarifadoLoggedIn(false);
+      setAdminActiveTab('register');
       return true;
+    }
+    if (lowerCaseName === 'almoxarifado' && cpf === 'almoxarifado123') {
+        setIsAlmoxarifadoLoggedIn(true);
+        setIsAdminLoggedIn(false);
+        setCurrentUser(null);
+        return true;
     }
     const upperCaseName = name.toUpperCase();
     const sanitizedCpf = cpf.replace(/[^\d]/g, '');
@@ -233,6 +243,7 @@ const App: React.FC = () => {
     if (user) {
       setCurrentUser(user);
       setIsAdminLoggedIn(false);
+      setIsAlmoxarifadoLoggedIn(false);
       return true;
     }
     return false;
@@ -255,7 +266,6 @@ const App: React.FC = () => {
       return;
     }
     
-    // Validação rápida no lado do cliente para feedback imediato
     if (suppliers.some(p => p.cpf === finalCpf)) {
       setRegistrationStatus({ success: false, message: 'Este CPF/CNPJ já está cadastrado.' });
       setIsSaving(false);
@@ -277,39 +287,27 @@ const App: React.FC = () => {
     };
   
     try {
-      // Usa uma transação para garantir uma operação de escrita atômica e segura.
-      // Esta é a verificação definitiva no servidor.
       const transactionResult = await runTransaction(suppliersRef, (currentData) => {
-        // currentData será null se o nó 'suppliers' não existir, ou um objeto.
         const suppliersObject = currentData || {};
-
-        // Verificação final no servidor: se o CPF/CNPJ já existir, aborta a transação.
         if (suppliersObject[finalCpf]) {
-          return; // Retornar undefined aborta a transação.
+          return;
         }
-        
-        // Adiciona o novo fornecedor ao objeto de fornecedores.
         suppliersObject[finalCpf] = newSupplier;
-        return suppliersObject; // Retorna os dados atualizados para serem salvos.
+        return suppliersObject;
       });
 
       if (transactionResult.committed) {
-        // Sucesso! O listener onValue cuidará da atualização da UI.
         setRegistrationStatus({ success: true, message: `Fornecedor "${finalName}" cadastrado com sucesso!` });
       } else {
-        // A transação foi abortada por nós porque o fornecedor já existe.
         setRegistrationStatus({ success: false, message: 'Cadastro cancelado. O CPF/CNPJ já existe no servidor.' });
       }
 
     } catch (error: any) {
       console.error("Falha na transação de registro:", error);
       let errorMessage = 'Ocorreu um erro inesperado ao salvar na nuvem. Verifique sua conexão e tente novamente.';
-      
-      // Verifica códigos de erro específicos do Firebase
       if (error && error.code === 'PERMISSION_DENIED') {
-        errorMessage = 'Erro de permissão ao salvar. Verifique as Regras de Segurança do seu banco de dados Firebase. Elas podem estar impedindo a gravação de dados.';
+        errorMessage = 'Erro de permissão ao salvar. Verifique as Regras de Segurança do seu banco de dados Firebase.';
       }
-
       setRegistrationStatus({ success: false, message: errorMessage });
     } finally {
       setIsSaving(false);
@@ -325,7 +323,6 @@ const App: React.FC = () => {
       return 'Nome e CPF/CNPJ são obrigatórios.';
     }
 
-    // Validação prévia para fornecer feedback rápido
     if (suppliers.some(p => p.cpf === finalCpf && p.cpf !== oldCpf)) {
       setIsSaving(false);
       return 'Este CPF/CNPJ já está cadastrado para outro fornecedor.';
@@ -338,12 +335,10 @@ const App: React.FC = () => {
     try {
       const transactionResult = await runTransaction(suppliersRef, (currentData) => {
         if (!currentData || !currentData[oldCpf]) {
-          return; // Aborta se o fornecedor original não existir mais
+          return;
         }
-        
-        // Validação final no servidor para evitar condições de corrida
         if (oldCpf !== finalCpf && currentData[finalCpf]) {
-            return; // Aborta se o novo CPF/CNPJ já foi pego
+            return;
         }
 
         const supplierData = { ...currentData[oldCpf] };
@@ -351,7 +346,6 @@ const App: React.FC = () => {
         supplierData.cpf = finalCpf;
         supplierData.allowedWeeks = newAllowedWeeks;
 
-        // Move os dados se o CPF/CNPJ (a chave) mudou
         if (oldCpf !== finalCpf) {
           delete currentData[oldCpf];
         }
@@ -361,7 +355,7 @@ const App: React.FC = () => {
       });
 
       if (transactionResult.committed) {
-        return null; // Sucesso
+        return null;
       } else {
         return 'A atualização falhou. Os dados podem ter sido alterados simultaneamente por outro usuário.';
       }
@@ -377,30 +371,37 @@ const App: React.FC = () => {
     setRegistrationStatus(null);
   };
 
-  // Atualiza o estado local para feedback instantâneo na UI
-  const handleLiveUpdateSuppliers = (updatedSuppliers: Supplier[]) => {
-    setSuppliers(updatedSuppliers);
-  };
-
   // Persiste o estado atual no banco de dados
   const handlePersistSuppliers = (suppliersToPersist: Supplier[]) => {
-      writeToDatabase(suppliersToPersist);
+      const suppliersObject = suppliersToPersist.reduce((acc, supplier) => {
+        if (supplier && supplier.cpf) {
+          acc[supplier.cpf] = supplier;
+        }
+        return acc;
+      }, {} as { [key: string]: Supplier });
+      writeToDatabase(suppliersRef, suppliersObject);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     setIsAdminLoggedIn(false);
+    setIsAlmoxarifadoLoggedIn(false);
   };
 
   const handleResetData = () => {
     if (window.confirm('Você tem certeza que deseja apagar TODOS os dados do banco de dados na nuvem? Esta ação é irreversível e afetará todos os usuários.')) {
-      writeToDatabase([]);
+      writeToDatabase(suppliersRef, {});
+      writeToDatabase(warehouseLogRef, []);
     }
   };
 
   const handleRestoreData = async (backupSuppliers: Supplier[]): Promise<boolean> => {
      try {
-        await writeToDatabase(backupSuppliers);
+        const suppliersObject = backupSuppliers.reduce((acc, supplier) => {
+          acc[supplier.cpf] = supplier;
+          return acc;
+        }, {} as { [key: string]: Supplier });
+        await writeToDatabase(suppliersRef, suppliersObject);
         return true;
      } catch (error) {
         console.error('Erro ao restaurar dados:', error);
@@ -410,7 +411,6 @@ const App: React.FC = () => {
 
   const scheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
     const supplierDeliveriesRef = ref(database, `suppliers/${supplierCpf}/deliveries`);
-
     try {
         await runTransaction(supplierDeliveriesRef, (currentDeliveries: Delivery[] | null) => {
             const newDelivery: Delivery = {
@@ -422,13 +422,7 @@ const App: React.FC = () => {
                 value: 0,
                 invoiceUploaded: false,
             };
-            
-            if (!currentDeliveries) {
-                return [newDelivery];
-            }
-            
-            currentDeliveries.push(newDelivery);
-            return currentDeliveries;
+            return [...(currentDeliveries || []), newDelivery];
         });
     } catch(error) {
         console.error("Falha na transação de agendamento de entrega:", error);
@@ -455,25 +449,27 @@ const App: React.FC = () => {
           value: item.value,
           invoiceUploaded: true,
           invoiceNumber: invoiceData.invoiceNumber,
-          remainingQuantity: item.kg, // Initialize remaining quantity for PEPS
+          remainingQuantity: item.kg,
           lots: [],
           withdrawals: []
       }));
       
       let allDeliveriesForInvoice: Delivery[] = [];
   
-      const updatedSuppliers = suppliers.map(p => {
+      const suppliersObject = suppliers.reduce((acc, p) => {
         if (p.cpf === supplierCpf) {
           const filteredDeliveries = p.deliveries.filter(d => !placeholderDeliveryIds.includes(d.id));
           const finalDeliveries = [...filteredDeliveries, ...newDeliveries];
           allDeliveriesForInvoice = finalDeliveries.filter(d => d.invoiceNumber === invoiceData.invoiceNumber);
-          return { ...p, deliveries: finalDeliveries };
+          acc[p.cpf] = { ...p, deliveries: finalDeliveries };
+        } else {
+          acc[p.cpf] = p;
         }
-        return p;
-      });
+        return acc;
+      }, {} as { [key: string]: Supplier });
   
       try {
-        await writeToDatabase(updatedSuppliers);
+        await writeToDatabase(suppliersRef, suppliersObject);
       } catch (error) {
         console.error("Falha ao faturar entrega:", error);
         return;
@@ -498,16 +494,18 @@ const App: React.FC = () => {
   };
 
   const cancelDeliveries = async (supplierCpf: string, deliveryIds: string[]) => {
-    const updatedSuppliers = suppliers.map(p => {
+    const suppliersObject = suppliers.reduce((acc, p) => {
         if (p.cpf === supplierCpf) {
             const updatedDeliveries = (p.deliveries || []).filter(d => !deliveryIds.includes(d.id));
-            return { ...p, deliveries: updatedDeliveries };
+            acc[p.cpf] = { ...p, deliveries: updatedDeliveries };
+        } else {
+            acc[p.cpf] = p;
         }
-        return p;
-    });
+        return acc;
+    }, {} as { [key: string]: Supplier });
 
     try {
-      await writeToDatabase(updatedSuppliers);
+      await writeToDatabase(suppliersRef, suppliersObject);
     } catch(error) {
       console.error("Falha ao cancelar entregas:", error);
     }
@@ -520,7 +518,6 @@ const App: React.FC = () => {
     const deliveriesToReopen = supplier.deliveries.filter(d => d.invoiceNumber === invoiceNumber);
     if (deliveriesToReopen.length === 0) return;
   
-    // Encontra a data e hora mais antigas para usar no novo agendamento pendente
     const earliestDelivery = deliveriesToReopen.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
   
     const newPlaceholder: Delivery = {
@@ -533,22 +530,39 @@ const App: React.FC = () => {
       invoiceUploaded: false,
     };
   
-    const updatedSuppliers = suppliers.map(p => {
-      if (p.cpf === supplierCpf) {
-        // Remove todas as entregas antigas associadas a essa NF
-        const remainingDeliveries = p.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
-        // Adiciona o novo agendamento pendente
-        const updatedDeliveries = [...remainingDeliveries, newPlaceholder];
-        return { ...p, deliveries: updatedDeliveries };
-      }
-      return p;
-    });
+    const suppliersObject = suppliers.reduce((acc, p) => {
+        if (p.cpf === supplierCpf) {
+            const remainingDeliveries = p.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+            const updatedDeliveries = [...remainingDeliveries, newPlaceholder];
+            acc[p.cpf] = { ...p, deliveries: updatedDeliveries };
+        } else {
+            acc[p.cpf] = p;
+        }
+        return acc;
+    }, {} as { [key: string]: Supplier });
   
     try {
-      await writeToDatabase(updatedSuppliers);
+      await writeToDatabase(suppliersRef, suppliersObject);
     } catch(error) {
       console.error("Falha ao reabrir nota fiscal:", error);
     }
+  };
+
+  const handleRegisterWarehouseMovement = async (movement: Omit<WarehouseMovement, 'id' | 'timestamp'>) => {
+      try {
+          const newMovement: WarehouseMovement = {
+              ...movement,
+              id: `whm-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              timestamp: new Date().toISOString(),
+          };
+          await runTransaction(warehouseLogRef, (currentLog: WarehouseMovement[] | null) => {
+              return [...(currentLog || []), newMovement];
+          });
+          return true;
+      } catch (error) {
+          console.error("Falha ao registrar movimentação de almoxarifado:", error);
+          return false;
+      }
   };
 
   const handleCloseEmailModal = () => {
@@ -587,8 +601,8 @@ const App: React.FC = () => {
         {isAdminLoggedIn ? (
           <AdminDashboard 
             suppliers={suppliers}
+            warehouseLog={warehouseLog}
             onRegister={handleRegister} 
-            onLiveUpdate={handleLiveUpdateSuppliers}
             onPersistSuppliers={handlePersistSuppliers}
             onUpdateSupplier={handleUpdateSupplierData}
             onLogout={handleLogout}
@@ -610,6 +624,12 @@ const App: React.FC = () => {
             emailModalData={emailModalData}
             onCloseEmailModal={handleCloseEmailModal}
           />
+        ) : isAlmoxarifadoLoggedIn ? (
+            <AlmoxarifadoDashboard
+                suppliers={suppliers}
+                onLogout={handleLogout}
+                onRegisterMovement={handleRegisterWarehouseMovement}
+            />
         ) : (
           <LoginScreen onLogin={handleLogin} />
         )}

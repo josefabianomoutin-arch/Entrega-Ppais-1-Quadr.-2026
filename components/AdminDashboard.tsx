@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { Supplier, ContractItem } from '../types';
+import type { Supplier, ContractItem, WarehouseMovement } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 import EditSupplierModal from './EditSupplierModal';
@@ -8,16 +8,17 @@ import AdminScheduleView from './AdminScheduleView';
 import AdminInvoices from './AdminInvoices';
 import AdminPerCapita from './AdminPerCapita';
 import AdminPeps from './AdminPeps';
+import AdminWarehouseLog from './AdminWarehouseLog';
 
-type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'peps';
+type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'peps' | 'warehouse';
 
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
-  onLiveUpdate: (updatedSuppliers: Supplier[]) => void;
   onPersistSuppliers: (suppliersToPersist: Supplier[]) => void;
   onUpdateSupplier: (oldCpf: string, newName: string, newCpf: string, newAllowedWeeks: number[]) => Promise<string | null>;
   onLogout: () => void;
   suppliers: Supplier[];
+  warehouseLog: WarehouseMovement[];
   onResetData: () => void;
   onRestoreData: (backupSuppliers: Supplier[]) => Promise<boolean>;
   activeTab: AdminTab;
@@ -92,11 +93,11 @@ const unitOptions = [
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
     onRegister, 
-    onLiveUpdate,
     onPersistSuppliers,
     onUpdateSupplier,
     onLogout, 
     suppliers, 
+    warehouseLog,
     onResetData, 
     onRestoreData,
     activeTab,
@@ -411,10 +412,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { id: 'contracts', name: 'Gestão por Item', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" /></svg> },
     { id: 'schedule', name: 'Agenda', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg> },
     { id: 'invoices', name: 'Notas Fiscais', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg> },
+    { id: 'peps', name: 'Gestão PEPS', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg> },
+    { id: 'warehouse', name: 'Controle de Almoxarifado', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 8a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm-1 4a1 1 0 011-1h2a1 1 0 110 2H5a1 1 0 01-1-1zm8-4a1 1 0 00-1-1h-2a1 1 0 100 2h2a1 1 0 001-1z" /><path fillRule="evenodd" d="M2 3a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H3a1 1 0 01-1-1V3zm2 1h12v12H4V4z" clipRule="evenodd" /></svg> },
     { id: 'analytics', name: 'Relatório Analítico', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg> },
     { id: 'graphs', name: 'Gráficos', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a1 1 0 001 1h8a1 1 0 100-2H5V5a1 1 0 00-2 0V3zm12 1a1 1 0 011 1v10h1.5a.5.5 0 010 1H14a1 1 0 01-1-1V5a1 1 0 011-1zm-4 3a1 1 0 011 1v6h1.5a.5.5 0 010 1H10a1 1 0 01-1-1V8a1 1 0 011-1z" clipRule="evenodd" /></svg> },
     { id: 'perCapita', name: 'Cálculo Per Capta', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg> },
-    { id: 'peps', name: 'Gestão PEPS', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg> },
     { id: 'info', name: 'Zona Crítica', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg> },
   ];
   
@@ -617,10 +619,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           
           {activeTab === 'schedule' && <AdminScheduleView suppliers={suppliers} />}
           {activeTab === 'invoices' && <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} />}
+          {activeTab === 'peps' && <AdminPeps suppliers={suppliers} onUpdateSuppliers={onPersistSuppliers} />}
+          {activeTab === 'warehouse' && <AdminWarehouseLog warehouseLog={warehouseLog} />}
           {activeTab === 'analytics' && <AdminAnalytics suppliers={suppliers} />}
           {activeTab === 'graphs' && <AdminGraphs suppliers={suppliers} />}
           {activeTab === 'perCapita' && <AdminPerCapita suppliers={suppliers} />}
-          {activeTab === 'peps' && <AdminPeps suppliers={suppliers} onUpdateSuppliers={onPersistSuppliers} />}
+          
 
           {activeTab === 'info' && (
             <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-red-500 space-y-8">

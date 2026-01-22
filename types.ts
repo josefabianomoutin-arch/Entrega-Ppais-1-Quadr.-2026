@@ -40,3 +40,15 @@ export interface Supplier {
   deliveries: Delivery[];
   allowedWeeks: number[];
 }
+
+export interface WarehouseMovement {
+  id: string;
+  type: 'entrada' | 'saída';
+  timestamp: string; // ISO string for date and time
+  lotId: string;
+  lotNumber: string;
+  itemName: string;
+  supplierName: string;
+  deliveryId: string;
+  outboundInvoice?: string; // Optional, only for 'saída'
+}
