@@ -235,12 +235,12 @@ useEffect(() => {
         const valueNum = parseFloat(item.valuePerKg);
   
         if (!item.name.trim() || isNaN(totalNum) || isNaN(valueNum) || totalNum <= 0) {
-          return; // Ignora itens incompletos ou inválidos sem gerar erro
+          return;
         }
   
         const participatingSuppliers = item.suppliers.filter(s => s.supplierCpf);
         if (participatingSuppliers.length === 0) {
-          return; // Ignora itens sem fornecedor
+          return;
         }
   
         const numPerSupplier = totalNum / participatingSuppliers.length;
@@ -261,24 +261,32 @@ useEffect(() => {
   
       newSuppliersState.forEach(p => {
         p.initialValue = p.contractItems.reduce((sum, item) => {
-          const [unitType] = (item.unit || 'kg-1').split('-');
-          if (unitType === 'un') {
-            return sum + (item.totalKg * item.valuePerKg);
-          }
-          return sum + (item.totalKg * item.valuePerKg);
+            const value = (item.totalKg || 0) * (item.valuePerKg || 0);
+            return sum + value;
         }, 0);
       });
+
+      const getContractSignature = (s: Supplier) => ({
+          cpf: s.cpf,
+          initialValue: s.initialValue.toFixed(2),
+          items: s.contractItems.map(i => `${i.name}-${(i.totalKg || 0).toFixed(2)}-${(i.valuePerKg || 0).toFixed(2)}`).sort()
+      });
+
+      const currentSignature = JSON.stringify(suppliers.map(getContractSignature));
+      const newSignature = JSON.stringify(newSuppliersState.map(getContractSignature));
+
+      if (currentSignature === newSignature) {
+          return;
+      }
   
-      // Marca a próxima atualização como interna para quebrar o ciclo de renderização
       isInternalUpdate.current = true;
       onLiveUpdate(newSuppliersState);
-      setContractError(''); // Limpa erros se a lógica passar
+      setContractError('');
     } catch (e: any) {
       console.error("Erro ao processar atualização de contrato em tempo real:", e);
       setContractError('Erro ao calcular totais. Verifique os dados dos itens.');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemCentricContracts, onLiveUpdate, activeTab]);
+}, [itemCentricContracts, supplierIdentities, suppliers, onLiveUpdate, activeTab]);
 
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
@@ -311,7 +319,7 @@ useEffect(() => {
               }
 
               if (field.startsWith('ui_')) {
-                  const [unit, kgConversionFactorStr] = updatedItem.ui_compositeUnit.split('-');
+                  const [unit] = updatedItem.ui_compositeUnit.split('-');
                   const quantity = parseFloat(updatedItem.ui_quantity.replace(',', '.')) || 0;
                   const valuePerUnit = parseFloat(updatedItem.ui_valuePerUnit.replace(',', '.')) || 0;
 
