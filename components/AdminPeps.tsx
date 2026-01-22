@@ -139,11 +139,7 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
         }
 
         delivery.lots = [...(delivery.lots || []), ...newLotsData];
-        
-        // REVISÃO DE FÓRMULA: Recalcula a quantidade restante da entrega com base na soma de seus lotes.
-        // Isso garante que os lotes sejam a única fonte de verdade para o estoque.
         delivery.remainingQuantity = (delivery.lots || []).reduce((sum: number, lot: any) => sum + lot.remainingQuantity, 0);
-
 
         onUpdateSuppliers(newSuppliers);
         setActiveLotInputs(newActiveLotInputs);
@@ -171,9 +167,6 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
         }
 
         lot.remainingQuantity -= withdrawalAmount;
-        
-        // REVISÃO DE FÓRMULA: A quantidade restante da entrega é a soma das quantidades restantes de todos os seus lotes.
-        // Lógica mais robusta e direta.
         delivery.remainingQuantity = (delivery.lots || []).reduce((sum: number, l: any) => sum + l.remainingQuantity, 0);
 
         onUpdateSuppliers(newSuppliers);
@@ -195,6 +188,7 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
                            const input = document.getElementById(`withdraw-${foundLot.id}`);
                            input?.focus();
                         }, 100);
+                        e.currentTarget.value = ''; // Limpa o campo após a leitura
                         return;
                     }
                 }
@@ -264,58 +258,84 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
                                     
                                     return (
                                         <div key={del.id} className="p-4 bg-white rounded-lg border shadow-sm">
-                                            <div className="flex flex-wrap justify-between items-center mb-3 text-xs border-b pb-2 gap-x-4 gap-y-2">
-                                                <div className='flex flex-col gap-1'>
-                                                    <span><span className="font-semibold text-gray-600">Fornecedor:</span> {del.supplierName}</span>
-                                                    <span><span className="font-semibold text-gray-600">NF:</span> <span className="font-mono">{del.invoiceNumber}</span></span>
-                                                    <span><span className="font-semibold text-gray-600">Data:</span> <span className="font-mono">{formatDate(del.date)}</span></span>
+                                            {/* CABEÇALHO DA NOTA FISCAL */}
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 border-b pb-4">
+                                                <div>
+                                                    <p className="text-xs font-bold text-gray-500 uppercase">Fornecedor</p>
+                                                    <p className="font-semibold text-gray-800 truncate">{del.supplierName}</p>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="font-semibold text-gray-500">
-                                                        <span title="Total da Nota">{formatKg(deliveryItem.kg || 0)}</span> / <span className="text-blue-600">{formatCurrency(deliveryItem.value || 0)}</span>
-                                                    </p>
-                                                    <p className="font-bold text-gray-800">
-                                                        <span className="text-green-700" title="Restante na Nota">{formatKg(deliveryItem.remainingQuantity || 0)}</span> / <span className="text-green-700">{formatCurrency(deliveryRemainingValue)}</span>
-                                                    </p>
+                                                <div>
+                                                    <p className="text-xs font-bold text-gray-500 uppercase">Nota Fiscal / Data</p>
+                                                    <p className="font-semibold font-mono text-gray-800">{del.invoiceNumber} <span className="text-gray-500 font-sans">({formatDate(del.date)})</span></p>
                                                 </div>
-                                            </div>
-                                            
-                                            {/* Lista de Lotes */}
-                                            <div className="space-y-2 mb-3">
-                                                {(deliveryItem.lots || []).map(lot => {
-                                                    const lotRemainingValue = lot.remainingQuantity * valuePerKg;
-                                                    return (
-                                                        <div key={lot.id} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center p-2 bg-gray-50 rounded">
-                                                            <div className="text-xs">
-                                                                <p className="font-semibold">Lote: <span className="font-mono bg-gray-200 px-1 rounded">{lot.lotNumber}</span></p>
-                                                                <p className="text-gray-500">Restante: <span className="font-bold text-black">{formatKg(lot.remainingQuantity)}</span> / <span className="font-bold text-blue-700">{formatCurrency(lotRemainingValue)}</span></p>
-                                                            </div>
-                                                            <div className="text-xs text-gray-500 truncate" title={lot.barcode}>Código: <span className="font-mono">{lot.barcode || 'N/A'}</span></div>
-                                                            <input id={`withdraw-${lot.id}`} type="text" value={activeWithdrawalInputs[lot.id] || ''} onChange={e => setActiveWithdrawalInputs(p => ({ ...p, [lot.id]: e.target.value.replace(/[^0-9,.]/g, '') }))} placeholder="Peso de Saída (Kg)" className="col-span-2 md:col-span-1 border rounded px-2 py-1 text-xs font-mono"/>
-                                                            <button onClick={() => handleRegisterWithdrawal(lot.id, del.id, del.supplierCpf)} className="bg-green-500 text-white rounded px-3 py-1 text-xs font-bold hover:bg-green-600">Registrar Saída</button>
-                                                        </div>
-                                                    )
-                                                })}
+                                                <div className="text-left md:text-right">
+                                                    <p className="text-xs font-bold text-gray-500 uppercase">Sobra / Total da Nota (Kg)</p>
+                                                    <p className="font-semibold text-gray-800">
+                                                        <span className="text-green-700" title="Sobra">{formatKg(deliveryItem.remainingQuantity || 0)}</span> / <span title="Total">{formatKg(deliveryItem.kg || 0)}</span>
+                                                    </p>
+                                                    <p className="font-semibold text-green-700" title="Valor da Sobra">{formatCurrency(deliveryRemainingValue)}</p>
+                                                </div>
                                             </div>
 
-                                            {/* Adicionar Lotes */}
-                                            {slotsToRender > 0 && (
-                                                <div className="pt-3 border-t border-dashed">
-                                                    <h5 className="text-xs font-bold text-gray-500 mb-2">Adicionar Novos Lotes ({slotsToRender} disponíveis)</h5>
-                                                    <div className="space-y-2">
-                                                        {Array.from({ length: slotsToRender }).map((_, index) => {
-                                                            const inputKey = `${del.id}-${index}`;
-                                                            return(
-                                                                <div key={inputKey} className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
-                                                                    <input id={`lot-identifier-${inputKey}`} type="text" value={activeLotInputs[inputKey]?.lotIdentifier || ''} onChange={e => setActiveLotInputs(p => ({ ...p, [inputKey]: { ...(p[inputKey] || {}), lotIdentifier: e.target.value } }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById(`lot-quantity-${inputKey}`)?.focus(); } }} placeholder={`Lote / Cód. Barras #${existingLotsCount + index + 1}`} className="sm:col-span-2 border rounded px-2 py-1 text-xs"/>
-                                                                    <input id={`lot-quantity-${inputKey}`} type="text" value={activeLotInputs[inputKey]?.initialQuantity || ''} onChange={e => setActiveLotInputs(p => ({ ...p, [inputKey]: { ...(p[inputKey] || {}), initialQuantity: e.target.value.replace(/[^0-9,.]/g, '') } }))} placeholder="Qtd. (Kg)" className="sm:col-span-2 border rounded px-2 py-1 text-xs font-mono"/>
+                                            {/* ÁREA DE LOTES E AÇÕES */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                {/* COLUNA ESQUERDA: LOTES ATUAIS */}
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-gray-700 mb-2">Lotes Atuais</h4>
+                                                    <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar-small">
+                                                        {(deliveryItem.lots && deliveryItem.lots.length > 0) ? (deliveryItem.lots || []).map(lot => {
+                                                            const lotRemainingValue = lot.remainingQuantity * valuePerKg;
+                                                            return (
+                                                                <div key={lot.id} className="p-2 bg-gray-50 rounded-md border">
+                                                                    <div className="flex justify-between items-start mb-2">
+                                                                        <div>
+                                                                            <p className="text-xs font-semibold">Lote: <span className="font-mono bg-gray-200 px-1 rounded">{lot.lotNumber}</span></p>
+                                                                            <p className="text-xs text-gray-500 truncate" title={lot.barcode}>Código: <span className="font-mono">{lot.barcode || 'N/A'}</span></p>
+                                                                        </div>
+                                                                        <div className="text-right flex-shrink-0 ml-2">
+                                                                            <p className="text-xs font-bold">{formatKg(lot.remainingQuantity)}</p>
+                                                                            <p className="text-xs font-bold text-blue-700">{formatCurrency(lotRemainingValue)}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <input id={`withdraw-${lot.id}`} type="text" value={activeWithdrawalInputs[lot.id] || ''} onChange={e => setActiveWithdrawalInputs(p => ({ ...p, [lot.id]: e.target.value.replace(/[^0-9,.]/g, '') }))} placeholder="Saída (Kg)" className="flex-grow border rounded px-2 py-1 text-xs font-mono"/>
+                                                                        <button onClick={() => handleRegisterWithdrawal(lot.id, del.id, del.supplierCpf)} className="bg-green-500 text-white rounded px-3 py-1 text-xs font-bold hover:bg-green-600 whitespace-nowrap">Dar Saída</button>
+                                                                    </div>
                                                                 </div>
                                                             )
-                                                        })}
-                                                        <button onClick={() => handleAddLots(del.id, del.supplierCpf, slotsToRender)} className="w-full mt-2 bg-blue-500 text-white rounded px-3 py-1.5 text-xs font-bold hover:bg-blue-600">Adicionar Lotes Preenchidos</button>
+                                                        }) : (
+                                                            <div className="text-center p-4 bg-gray-50 rounded-md">
+                                                                <p className="text-xs text-gray-400 italic">Nenhum lote cadastrado para esta nota.</p>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
-                                            )}
+
+                                                {/* COLUNA DIREITA: ADICIONAR NOVOS LOTES */}
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-gray-700 mb-2">Adicionar Novos Lotes</h4>
+                                                    {slotsToRender > 0 ? (
+                                                        <div className="p-2 bg-gray-50 rounded-md border">
+                                                            <div className="space-y-2">
+                                                                {Array.from({ length: slotsToRender }).map((_, index) => {
+                                                                    const inputKey = `${del.id}-${index}`;
+                                                                    return(
+                                                                        <div key={inputKey} className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-center">
+                                                                            <input id={`lot-identifier-${inputKey}`} type="text" value={activeLotInputs[inputKey]?.lotIdentifier || ''} onChange={e => setActiveLotInputs(p => ({ ...p, [inputKey]: { ...(p[inputKey] || {}), lotIdentifier: e.target.value } }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById(`lot-quantity-${inputKey}`)?.focus(); } }} placeholder={`Lote / Cód. Barras #${existingLotsCount + index + 1}`} className="border rounded px-2 py-1 text-xs"/>
+                                                                            <input id={`lot-quantity-${inputKey}`} type="text" value={activeLotInputs[inputKey]?.initialQuantity || ''} onChange={e => setActiveLotInputs(p => ({ ...p, [inputKey]: { ...(p[inputKey] || {}), initialQuantity: e.target.value.replace(/[^0-9,.]/g, '') } }))} placeholder="Qtd. (Kg)" className="border rounded px-2 py-1 text-xs font-mono"/>
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                                <button onClick={() => handleAddLots(del.id, del.supplierCpf, slotsToRender)} className="w-full mt-2 bg-blue-500 text-white rounded px-3 py-1.5 text-xs font-bold hover:bg-blue-600">Adicionar Lotes Preenchidos</button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                         <div className="text-center p-4 bg-gray-50 rounded-md">
+                                                            <p className="text-xs text-gray-400 italic">Limite de 4 lotes por nota atingido.</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     )
                                 })}
@@ -325,6 +345,12 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
                     )
                 })}
             </div>
+             <style>{`
+                .custom-scrollbar-small::-webkit-scrollbar { width: 4px; } 
+                .custom-scrollbar-small::-webkit-scrollbar-track { background: #f8fafc; }
+                .custom-scrollbar-small::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+                .custom-scrollbar-small::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+             `}</style>
         </div>
     );
 };
