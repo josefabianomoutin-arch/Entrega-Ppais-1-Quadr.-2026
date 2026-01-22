@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 
 interface LoginScreenProps {
   onLogin: (name: string, cpf: string) => boolean;
@@ -17,6 +17,30 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       setLoginError('');
     }
   };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Permite senha alfanumérica para o usuário 'almoxarifado'
+    if (loginName.toLowerCase() === 'almoxarifado') {
+      setLoginCpf(value);
+    } else {
+      // Mantém a restrição de apenas números para fornecedores e admin
+      setLoginCpf(value.replace(/[^\d]/g, ''));
+    }
+  };
+  
+  const passwordPlaceholder = useMemo(() => {
+    const name = loginName.toLowerCase();
+    if (name === 'almoxarifado') {
+        return "Senha";
+    }
+    if (name === 'administrador') {
+        return "Senha (CPF do administrador)";
+    }
+    return "Senha (CPF/CNPJ do fornecedor)";
+  }, [loginName]);
+  
+  const isAlmoxarifadoLogin = loginName.toLowerCase() === 'almoxarifado';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -40,17 +64,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               required 
               value={loginName} 
               onChange={(e) => setLoginName(e.target.value.toUpperCase())} 
-              placeholder="Usuário (Fornecedor ou Administrador)" 
+              placeholder="Usuário (Fornecedor, Admin, Almoxarifado)" 
               className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
             />
             <input 
-              type="password" 
+              type={isAlmoxarifadoLogin ? "text" : "password"} 
               autoComplete="current-password" 
               required 
               value={loginCpf} 
-              onChange={(e) => setLoginCpf(e.target.value.replace(/[^\d]/g, ''))}
-              maxLength={14}
-              placeholder="Senha (CPF/CNPJ do fornecedor)" 
+              onChange={handlePasswordChange}
+              maxLength={isAlmoxarifadoLogin ? undefined : 14}
+              placeholder={passwordPlaceholder} 
               className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
             />
           </div>
