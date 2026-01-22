@@ -25,6 +25,7 @@ interface AdminDashboardProps {
   registrationStatus: { success: boolean; message: string } | null;
   onClearRegistrationStatus: () => void;
   onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => Promise<void>;
+  onDeleteWarehouseEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
 }
 
 const formatCurrency = (value: number) => {
@@ -103,7 +104,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     onTabChange,
     registrationStatus,
     onClearRegistrationStatus,
-    onReopenInvoice
+    onReopenInvoice,
+    onDeleteWarehouseEntry
 }) => {
   // Estados para aba de REGISTRO
   const [regName, setRegName] = useState('');
@@ -617,7 +619,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           
           {activeTab === 'schedule' && <AdminScheduleView suppliers={suppliers} />}
           {activeTab === 'invoices' && <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} />}
-          {activeTab === 'warehouse' && <AdminWarehouseLog warehouseLog={warehouseLog} />}
+          {activeTab === 'warehouse' && <AdminWarehouseLog warehouseLog={warehouseLog} onDeleteEntry={onDeleteWarehouseEntry} />}
           {activeTab === 'analytics' && <AdminAnalytics suppliers={suppliers} />}
           {activeTab === 'graphs' && <AdminGraphs suppliers={suppliers} />}
           {activeTab === 'perCapita' && <AdminPerCapita suppliers={suppliers} />}

@@ -676,6 +676,48 @@ const App: React.FC = () => {
       }
   };
 
+  const handleDeleteWarehouseEntry = async (logToDelete: WarehouseMovement): Promise<{ success: boolean; message: string }> => {
+    if (logToDelete.type !== 'entrada') {
+        return { success: false, message: 'Apenas entradas de estoque podem ser excluídas.' };
+    }
+
+    const newSuppliers = JSON.parse(JSON.stringify(suppliers));
+    let entryFoundAndDeleted = false;
+
+    for (const supplier of newSuppliers) {
+        for (const delivery of supplier.deliveries) {
+            if (delivery.id === logToDelete.deliveryId) {
+                const lotIndex = (delivery.lots || []).findIndex((l: any) => l.id === logToDelete.lotId);
+
+                if (lotIndex > -1) {
+                    delivery.lots.splice(lotIndex, 1);
+                    entryFoundAndDeleted = true;
+                    // Recalculate delivery totals
+                    delivery.kg = (delivery.lots || []).reduce((sum: number, lot: any) => sum + lot.initialQuantity, 0);
+                    delivery.remainingQuantity = (delivery.lots || []).reduce((sum: number, lot: any) => sum + lot.remainingQuantity, 0);
+                    break; 
+                }
+            }
+        }
+        if (entryFoundAndDeleted) break;
+    }
+
+    if (!entryFoundAndDeleted) {
+        return { success: false, message: 'Não foi possível encontrar o lote correspondente para exclusão.' };
+    }
+
+    const newWarehouseLog = warehouseLog.filter(log => log.id !== logToDelete.id);
+
+    try {
+        await handlePersistSuppliers(newSuppliers);
+        await writeToDatabase(warehouseLogRef, newWarehouseLog);
+        return { success: true, message: 'Entrada de estoque excluída com sucesso. O saldo foi retornado ao contrato.' };
+    } catch (error) {
+        console.error("Falha ao excluir entrada de estoque:", error);
+        return { success: false, message: 'Ocorreu um erro ao salvar as alterações.' };
+    }
+  };
+
   const handleCloseEmailModal = () => {
     setEmailModalData(null);
   };
@@ -724,6 +766,7 @@ const App: React.FC = () => {
             registrationStatus={registrationStatus}
             onClearRegistrationStatus={handleClearRegistrationStatus}
             onReopenInvoice={reopenInvoice}
+            onDeleteWarehouseEntry={handleDeleteWarehouseEntry}
           />
         ) : currentUser ? (
           <Dashboard 

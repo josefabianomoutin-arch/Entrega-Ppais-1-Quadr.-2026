@@ -3,11 +3,13 @@ import type { WarehouseMovement } from '../types';
 
 interface AdminWarehouseLogProps {
     warehouseLog: WarehouseMovement[];
+    onDeleteEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
 }
 
-const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog }) => {
+const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, onDeleteEntry }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'entrada' | 'saída'>('all');
+    const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
     const filteredLog = useMemo(() => {
         return warehouseLog
@@ -23,6 +25,16 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog }) =
             })
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }, [warehouseLog, searchTerm, filterType]);
+
+    const handleDelete = async (log: WarehouseMovement) => {
+        const confirmationMessage = `Tem certeza que deseja excluir esta entrada?\n\nItem: ${log.itemName}\nLote: ${log.lotNumber}\nQuantidade: ${(log.quantity || 0).toFixed(2).replace('.', ',')} Kg\nFornecedor: ${log.supplierName}\n\nEsta ação irá remover o lote do estoque e devolver o saldo ao contrato. A ação não pode ser desfeita.`;
+        if (window.confirm(confirmationMessage)) {
+            setIsDeleting(log.id);
+            const result = await onDeleteEntry(log);
+            alert(result.message); // Simple feedback
+            setIsDeleting(null);
+        }
+    };
 
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-gray-700 animate-fade-in">
@@ -62,6 +74,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog }) =
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Fornecedor</th>
                             <th className="p-3 text-right text-xs font-bold uppercase text-gray-600">Quantidade</th>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Nota Fiscal</th>
+                            <th className="p-3 text-center text-xs font-bold uppercase text-gray-600">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -84,10 +97,31 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog }) =
                                 <td className="p-3 font-mono text-gray-600">
                                     {log.type === 'entrada' ? log.inboundInvoice || 'N/A' : log.outboundInvoice || 'N/A'}
                                 </td>
+                                <td className="p-3 text-center">
+                                    {log.type === 'entrada' && (
+                                        <button
+                                            onClick={() => handleDelete(log)}
+                                            disabled={isDeleting === log.id}
+                                            className="text-red-500 hover:text-red-700 disabled:text-gray-300 disabled:cursor-wait p-1 rounded-full transition-colors"
+                                            title="Excluir Entrada"
+                                        >
+                                            {isDeleting === log.id ? (
+                                                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                            ) : (
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            )}
+                                        </button>
+                                    )}
+                                </td>
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={7} className="p-12 text-center text-gray-400 italic">
+                                <td colSpan={8} className="p-12 text-center text-gray-400 italic">
                                     Nenhuma movimentação encontrada para os filtros selecionados.
                                 </td>
                             </tr>
