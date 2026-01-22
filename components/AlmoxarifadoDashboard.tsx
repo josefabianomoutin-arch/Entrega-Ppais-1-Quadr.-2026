@@ -1,13 +1,17 @@
-import React, { useState, useMemo } from 'react';
-import type { Supplier, Delivery, WarehouseMovement } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { Supplier, Delivery } from '../types';
 
 interface AlmoxarifadoDashboardProps {
     suppliers: Supplier[];
     onLogout: () => void;
-    onRegisterLots: (payload: {
+    onRegisterEntry: (payload: {
         supplierCpf: string;
-        itemsWithLots: { deliveryId: string; newLots: { lotNumber: string; quantity: number }[] }[];
-    }) => Promise<boolean>;
+        itemName: string;
+        invoiceNumber: string;
+        invoiceDate: string;
+        lotNumber: string;
+        quantity: number;
+    }) => Promise<{ success: boolean; message: string }>;
     onRegisterWithdrawal: (payload: {
         barcode: string;
         quantity: number;
@@ -15,130 +19,164 @@ interface AlmoxarifadoDashboardProps {
     }) => Promise<{ success: boolean; message: string }>;
 }
 
-const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers, onLogout, onRegisterLots, onRegisterWithdrawal }) => {
+const getContractItemWeight = (item: { totalKg?: number, unit?: string }): number => {
+    if (!item || !item.totalKg) return 0;
+    const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
+    if (unitType === 'un') return item.totalKg;
+    if (unitType === 'dz') return 0;
+    return item.totalKg * (parseFloat(unitWeightStr) || 1);
+};
+
+
+const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers, onLogout, onRegisterEntry, onRegisterWithdrawal }) => {
     const [activeTab, setActiveTab] = useState<'entrada' | 'saída'>('entrada');
     const [isProcessing, setIsProcessing] = useState(false);
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     // --- ENTRADA STATE ---
-    const [selectedSupplierCpf, setSelectedSupplierCpf] = useState<string>('');
-    const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
-    const [newLotEntries, setNewLotEntries] = useState<Record<string, { id: string, lotNumber: string, quantity: string }[]>>({});
+    const [selectedEntryItem, setSelectedEntryItem] = useState('');
+    const [entrySupplierCpf, setEntrySupplierCpf] = useState('');
+    const [entryInvoice, setEntryInvoice] = useState('');
+    const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
+    const [entryLot, setEntryLot] = useState('');
+    const [entryQty, setEntryQty] = useState('');
 
     // --- SAÍDA STATE ---
+    const [selectedExitItem, setSelectedExitItem] = useState('');
     const [exitBarcode, setExitBarcode] = useState('');
-    const [exitQuantity, setExitQuantity] = useState('');
+    const [exitQty, setExitQty] = useState('');
     const [exitInvoice, setExitInvoice] = useState('');
 
-    const clearFeedback = () => {
+    useEffect(() => {
         if (feedback) {
-            setTimeout(() => setFeedback(null), 5000);
+            const timer = setTimeout(() => setFeedback(null), 5000);
+            return () => clearTimeout(timer);
         }
-    };
+    }, [feedback]);
 
-    const pendingInvoices = useMemo(() => {
-        if (!selectedSupplierCpf) return [];
-        const supplier = suppliers.find(s => s.cpf === selectedSupplierCpf);
-        if (!supplier) return [];
-
-        const invoices = new Map<string, { date: string; deliveries: Delivery[] }>();
-        (supplier.deliveries || []).forEach(delivery => {
-            if (delivery.invoiceNumber && delivery.item !== 'AGENDAMENTO PENDENTE') {
-                const existing = invoices.get(delivery.invoiceNumber) || { date: delivery.date, deliveries: [] };
-                existing.deliveries.push(delivery);
-                invoices.set(delivery.invoiceNumber, existing);
-            }
-        });
-
-        return Array.from(invoices.values()).filter(invoice => 
-            invoice.deliveries.some(d => {
-                const totalInLots = (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
-                return (d.kg || 0) > totalInLots;
-            })
-        ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    }, [suppliers, selectedSupplierCpf]);
-
-    const handleAddLotField = (deliveryId: string) => {
-        setNewLotEntries(prev => ({
-            ...prev,
-            [deliveryId]: [...(prev[deliveryId] || []), { id: `lot-temp-${Date.now()}`, lotNumber: '', quantity: '' }]
-        }));
-    };
+    const allContractItems = useMemo(() => {
+        const items = new Map<string, { name: string }>();
+        suppliers.forEach(s => s.contractItems.forEach(ci => items.set(ci.name, { name: ci.name })));
+        return Array.from(items.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }, [suppliers]);
     
-    // FIX: Refactored to be more explicit for the TypeScript type checker, resolving an error where prev[deliveryId] was being inferred as unknown.
-    const handleLotInputChange = (deliveryId: string, tempId: string, field: 'lotNumber' | 'quantity', value: string) => {
-        const cleanValue = field === 'quantity' ? value.replace(/[^0-9,.]/g, '') : value;
-        setNewLotEntries(prev => {
-            const currentLots = prev[deliveryId] || [];
-            return {
-                ...prev,
-                [deliveryId]: currentLots.map(lot =>
-                    lot.id === tempId ? { ...lot, [field]: cleanValue } : lot
-                )
-            };
-        });
-    };
+    const suppliersForItem = useMemo(() => {
+        if (!selectedEntryItem) return [];
+        return suppliers
+            .filter(s => s.contractItems.some(ci => ci.name === selectedEntryItem))
+            .sort((a,b) => a.name.localeCompare(b.name));
+    }, [selectedEntryItem, suppliers]);
 
+    const entryItemData = useMemo(() => {
+        if (!selectedEntryItem) return null;
+        let totalContratado = 0;
+        let totalRecebido = 0;
+
+        suppliers.forEach(s => {
+            s.contractItems.forEach(ci => {
+                if (ci.name === selectedEntryItem) {
+                    totalContratado += getContractItemWeight(ci);
+                }
+            });
+            s.deliveries.forEach(d => {
+                if (d.item === selectedEntryItem) {
+                    totalRecebido += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
+                }
+            });
+        });
+        
+        return { totalContratado, totalRecebido, saldo: totalContratado - totalRecebido };
+    }, [selectedEntryItem, suppliers]);
+
+    const availableLotsForExit = useMemo(() => {
+        if (!selectedExitItem) return [];
+        const lots: any[] = [];
+        suppliers.forEach(s => {
+            s.deliveries.forEach(d => {
+                if (d.item === selectedExitItem) {
+                    (d.lots || []).forEach(l => {
+                        if (l.remainingQuantity > 0) {
+                            lots.push({ ...l, entryDate: d.date, supplierName: s.name });
+                        }
+                    });
+                }
+            });
+        });
+        return lots.sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
+    }, [selectedExitItem, suppliers]);
+    
     const handleConfirmEntry = async () => {
-        if (!selectedSupplierCpf || !expandedInvoice) return;
-
         setIsProcessing(true);
         setFeedback(null);
+        const quantity = parseFloat(entryQty.replace(',', '.'));
 
-        const itemsWithLots = Object.entries(newLotEntries)
-            .map(([deliveryId, lots]) => {
-                const newLots = lots
-                    .map(lot => ({
-                        lotNumber: lot.lotNumber.trim(),
-                        quantity: parseFloat(lot.quantity.replace(',', '.'))
-                    }))
-                    .filter(lot => lot.lotNumber && !isNaN(lot.quantity) && lot.quantity > 0);
-                return { deliveryId, newLots };
-            })
-            .filter(item => item.newLots.length > 0);
-
-        if (itemsWithLots.length === 0) {
-            setFeedback({ type: 'error', message: 'Nenhum lote válido preenchido.' });
+        if (!selectedEntryItem || !entrySupplierCpf || !entryInvoice || !entryLot || isNaN(quantity) || quantity <= 0) {
+            setFeedback({ type: 'error', message: "Todos os campos de entrada são obrigatórios." });
             setIsProcessing(false);
-            clearFeedback();
+            return;
+        }
+        if (entryItemData && quantity > entryItemData.saldo) {
+            setFeedback({ type: 'error', message: `Quantidade excede o saldo a receber de ${entryItemData.saldo.toFixed(2)} Kg.` });
+            setIsProcessing(false);
             return;
         }
 
-        const success = await onRegisterLots({ supplierCpf: selectedSupplierCpf, itemsWithLots });
-        if (success) {
-            setFeedback({ type: 'success', message: 'Lotes registrados com sucesso!' });
-            setNewLotEntries({});
-            setExpandedInvoice(null);
-        } else {
-            setFeedback({ type: 'error', message: 'Falha ao registrar os lotes.' });
+        const result = await onRegisterEntry({ 
+            itemName: selectedEntryItem,
+            supplierCpf: entrySupplierCpf,
+            invoiceNumber: entryInvoice.trim(),
+            invoiceDate: entryDate,
+            lotNumber: entryLot.trim(),
+            quantity
+        });
+
+        setFeedback(result);
+        if (result.success) {
+            // Reset form
+            setSelectedEntryItem('');
+            setEntrySupplierCpf('');
+            setEntryInvoice('');
+            setEntryLot('');
+            setEntryQty('');
         }
         setIsProcessing(false);
-        clearFeedback();
     };
     
-    const handleConfirmExit = async () => {
+    const handleConfirmExit = async (barcode: string) => {
         setIsProcessing(true);
         setFeedback(null);
+        const quantity = parseFloat(exitQty.replace(',', '.'));
 
-        const quantity = parseFloat(exitQuantity.replace(',', '.'));
-        if (!exitBarcode.trim() || !exitInvoice.trim() || isNaN(quantity) || quantity <= 0) {
-            setFeedback({ type: 'error', message: 'Todos os campos de saída são obrigatórios e a quantidade deve ser válida.' });
+        if (!barcode || isNaN(quantity) || quantity <= 0 || !exitInvoice) {
+            setFeedback({ type: 'error', message: 'Quantidade e NF de saída são obrigatórios.' });
             setIsProcessing(false);
-            clearFeedback();
             return;
         }
 
-        const result = await onRegisterWithdrawal({ barcode: exitBarcode.trim(), quantity, outboundInvoice: exitInvoice.trim() });
-        setFeedback({ type: result.success ? 'success' : 'error', message: result.message });
-
+        const result = await onRegisterWithdrawal({ barcode, quantity, outboundInvoice: exitInvoice.trim() });
+        setFeedback(result);
         if (result.success) {
-            setExitBarcode('');
-            setExitQuantity('');
+            setExitQty('');
             setExitInvoice('');
+            setExitBarcode('');
         }
         setIsProcessing(false);
-        clearFeedback();
+    };
+
+    const handleBarcodeScan = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const barcode = exitBarcode.trim();
+            if(!barcode) return;
+
+            const oldestLot = availableLotsForExit.length > 0 ? availableLotsForExit[0] : null;
+
+            if (oldestLot && oldestLot.barcode === barcode) {
+                document.getElementById('exit-quantity-input')?.focus();
+            } else {
+                setFeedback({ type: 'error', message: 'Este não é o lote mais antigo. Por favor, dê saída no lote destacado.' });
+            }
+        }
     };
 
     return (
@@ -146,83 +184,41 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             <header className="bg-white shadow-md p-4 flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-700">Painel do Almoxarifado</h1>
-                    <p className="text-sm text-gray-500">Registro de Entradas e Saídas de Lotes</p>
+                    <p className="text-sm text-gray-500">Controle de Estoque por Contrato e Lógica PEPS</p>
                 </div>
-                <button
-                    onClick={onLogout}
-                    className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
-                >
-                    Sair
-                </button>
+                <button onClick={onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm">Sair</button>
             </header>
 
-            <main className="p-8">
-                 <div className="max-w-4xl mx-auto mb-8">
-                    <div className="flex border-b">
-                        <button onClick={() => setActiveTab('entrada')} className={`py-2 px-6 font-semibold transition-colors ${activeTab === 'entrada' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-blue-500'}`}>Registrar Entrada</button>
-                        <button onClick={() => setActiveTab('saída')} className={`py-2 px-6 font-semibold transition-colors ${activeTab === 'saída' ? 'border-b-2 border-red-500 text-red-600' : 'text-gray-500 hover:text-red-500'}`}>Registrar Saída</button>
-                    </div>
+            <main className="p-4 md:p-8">
+                <div className="max-w-5xl mx-auto mb-8">
+                    <div className="flex border-b"><button onClick={() => setActiveTab('entrada')} className={`py-2 px-6 font-semibold transition-colors ${activeTab === 'entrada' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-blue-500'}`}>Registrar Entrada</button><button onClick={() => setActiveTab('saída')} className={`py-2 px-6 font-semibold transition-colors ${activeTab === 'saída' ? 'border-b-2 border-red-500 text-red-600' : 'text-gray-500 hover:text-red-500'}`}>Registrar Saída</button></div>
                 </div>
 
+                {feedback && <div className={`max-w-5xl mx-auto mb-6 p-4 rounded-lg text-center font-semibold animate-fade-in ${feedback.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{feedback.message}</div>}
+
                 {activeTab === 'entrada' && (
-                    <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-500 animate-fade-in">
+                    <div className="max-w-5xl mx-auto bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-500 animate-fade-in">
                         <div className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">1. Selecione o Fornecedor</label>
-                                <select value={selectedSupplierCpf} onChange={e => { setSelectedSupplierCpf(e.target.value); setExpandedInvoice(null); }} className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <option value="">-- Fornecedores --</option>
-                                    {suppliers.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}
-                                </select>
-                            </div>
-                            {selectedSupplierCpf && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-600 mb-1">2. Selecione a Nota Fiscal para dar Entrada</label>
-                                    <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
-                                        {pendingInvoices.length > 0 ? pendingInvoices.map(invoice => {
-                                            const isExpanded = expandedInvoice === invoice.deliveries[0].invoiceNumber;
-                                            return (
-                                                <div key={invoice.deliveries[0].invoiceNumber} className="border rounded-lg">
-                                                    <div onClick={() => setExpandedInvoice(isExpanded ? null : invoice.deliveries[0].invoiceNumber!)} className="p-3 cursor-pointer hover:bg-gray-50 flex justify-between items-center">
-                                                        <p className="font-semibold">NF: <span className="font-mono">{invoice.deliveries[0].invoiceNumber}</span> <span className="text-gray-500 text-sm">({new Date(invoice.date + 'T00:00:00').toLocaleDateString('pt-BR')})</span></p>
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" /></svg>
-                                                    </div>
-                                                    {isExpanded && (
-                                                        <div className="p-4 border-t bg-gray-50 space-y-4">
-                                                            {invoice.deliveries.map(delivery => {
-                                                                const totalInLots = (delivery.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
-                                                                const pendingQty = (delivery.kg || 0) - totalInLots;
-                                                                const currentNewLotsTotal = (newLotEntries[delivery.id] || []).reduce((sum, lot) => sum + (parseFloat(lot.quantity.replace(',', '.')) || 0), 0);
-                                                                const remainingForEntry = pendingQty - currentNewLotsTotal;
+                            <div><label className="block text-sm font-medium text-gray-600 mb-1">1. Selecione o Item</label><select value={selectedEntryItem} onChange={e => setSelectedEntryItem(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="">-- Itens do Contrato --</option>{allContractItems.map(i => <option key={i.name} value={i.name}>{i.name}</option>)}</select></div>
+                            
+                            {entryItemData && (
+                                <div className="grid grid-cols-3 gap-4 text-center animate-fade-in">
+                                    <div className="bg-gray-100 p-2 rounded"><p className="text-xs text-gray-500">Total Contratado</p><p className="font-bold text-lg">{entryItemData.totalContratado.toFixed(2)} Kg</p></div>
+                                    <div className="bg-green-100 p-2 rounded"><p className="text-xs text-green-700">Total Recebido</p><p className="font-bold text-lg text-green-800">{entryItemData.totalRecebido.toFixed(2)} Kg</p></div>
+                                    <div className="bg-blue-100 p-2 rounded"><p className="text-xs text-blue-700">Saldo a Receber</p><p className="font-bold text-lg text-blue-800">{entryItemData.saldo.toFixed(2)} Kg</p></div>
+                                </div>
+                            )}
 
-                                                                if (pendingQty <= 0) return null;
-
-                                                                return (
-                                                                    <div key={delivery.id} className="p-3 bg-white rounded-md border">
-                                                                        <p className="font-bold">{delivery.item}</p>
-                                                                        <p className="text-xs text-gray-500">Pendente na NF: <span className="font-mono font-semibold">{pendingQty.toFixed(2).replace('.', ',')} Kg</span></p>
-                                                                        
-                                                                        {(newLotEntries[delivery.id] || []).map(lot => (
-                                                                            <div key={lot.id} className="grid grid-cols-2 gap-2 mt-2">
-                                                                                <input type="text" value={lot.lotNumber} onChange={e => handleLotInputChange(delivery.id, lot.id, 'lotNumber', e.target.value)} placeholder="Nº do Lote" className="px-2 py-1 border rounded text-xs"/>
-                                                                                <input type="text" value={lot.quantity} onChange={e => handleLotInputChange(delivery.id, lot.id, 'quantity', e.target.value)} placeholder="Qtd. (Kg)" className="px-2 py-1 border rounded text-xs font-mono"/>
-                                                                            </div>
-                                                                        ))}
-                                                                        
-                                                                        <p className={`text-xs mt-2 font-semibold ${remainingForEntry < 0 ? 'text-red-500' : 'text-gray-600'}`}>Restante para entrada: {remainingForEntry.toFixed(2).replace('.', ',')} Kg</p>
-
-                                                                        <button onClick={() => handleAddLotField(delivery.id)} className="text-xs text-blue-600 hover:underline mt-2">Adicionar Lote</button>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                            <button onClick={handleConfirmEntry} disabled={isProcessing} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg mt-4 disabled:bg-gray-400">
-                                                                {isProcessing ? 'Processando...' : 'Confirmar Entrada dos Lotes'}
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )
-                                        }) : <p className="text-sm text-gray-500 italic p-3">Nenhuma nota fiscal pendente para este fornecedor.</p>}
+                            {selectedEntryItem && (
+                                <div className="space-y-4 pt-4 border-t animate-fade-in">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div><label className="block text-xs font-medium text-gray-600">Fornecedor</label><select value={entrySupplierCpf} onChange={e => setEntrySupplierCpf(e.target.value)} className="w-full p-2 border rounded-md"><option value="">-- Selecione --</option>{suppliersForItem.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}</select></div>
+                                        <div><label className="block text-xs font-medium text-gray-600">Data da NF</label><input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} className="w-full p-2 border rounded-md"/></div>
+                                        <div><label className="block text-xs font-medium text-gray-600">Nº da Nota Fiscal</label><input type="text" value={entryInvoice} onChange={e => setEntryInvoice(e.target.value)} placeholder="Número da NF" className="w-full p-2 border rounded-md"/></div>
+                                        <div><label className="block text-xs font-medium text-gray-600">Nº do Lote / Cód. Barras</label><input type="text" value={entryLot} onChange={e => setEntryLot(e.target.value)} placeholder="Identificador do Lote" className="w-full p-2 border rounded-md"/></div>
+                                        <div className="md:col-span-2"><label className="block text-xs font-medium text-gray-600">Quantidade da Entrada (Kg)</label><input type="text" value={entryQty} onChange={e => setEntryQty(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="Ex: 150,5" className="w-full p-2 border rounded-md font-mono"/></div>
                                     </div>
+                                    <button onClick={handleConfirmEntry} disabled={isProcessing} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-400">{isProcessing ? 'Processando...' : 'Adicionar Entrada'}</button>
                                 </div>
                             )}
                         </div>
@@ -230,43 +226,44 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 )}
 
                 {activeTab === 'saída' && (
-                     <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-red-500 animate-fade-in">
-                        <h2 className="text-xl font-bold text-gray-700 mb-4">Registrar Saída</h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label htmlFor="exit-barcode" className="block text-sm font-medium text-gray-600 mb-1">Lote / Código de Barras</label>
-                                <input id="exit-barcode" type="text" value={exitBarcode} onChange={(e) => setExitBarcode(e.target.value)} placeholder="Leia ou digite o código" className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 font-mono" />
-                            </div>
-                             <div>
-                                <label htmlFor="exit-quantity" className="block text-sm font-medium text-gray-600 mb-1">Quantidade da Saída (Kg)</label>
-                                <input id="exit-quantity" type="text" value={exitQuantity} onChange={(e) => setExitQuantity(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="Ex: 15,5" className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 font-mono" />
-                            </div>
-                            <div>
-                                <label htmlFor="exit-invoice" className="block text-sm font-medium text-gray-600 mb-1">Nº da Nota Fiscal de Saída</label>
-                                <input id="exit-invoice" type="text" value={exitInvoice} onChange={(e) => setExitInvoice(e.target.value)} placeholder="Digite o número da NF" className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 font-mono" />
-                            </div>
-                            <button onClick={handleConfirmExit} disabled={isProcessing} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-400">
-                                {isProcessing ? 'Processando...' : 'Registrar Saída'}
-                            </button>
+                     <div className="max-w-5xl mx-auto bg-white p-6 rounded-xl shadow-lg border-t-4 border-red-500 animate-fade-in">
+                        <div className="space-y-6">
+                            <div><label className="block text-sm font-medium text-gray-600 mb-1">1. Selecione o Item para Saída</label><select value={selectedExitItem} onChange={e => setSelectedExitItem(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500"><option value="">-- Itens em Estoque --</option>{allContractItems.map(i => <option key={i.name} value={i.name}>{i.name}</option>)}</select></div>
+
+                            {selectedExitItem && (
+                                <div className="space-y-4 pt-4 border-t animate-fade-in">
+                                     <div><label className="block text-sm font-medium text-gray-600 mb-1">2. Leitor de Código de Barras (Opcional)</label><input type="text" value={exitBarcode} onChange={e => setExitBarcode(e.target.value)} onKeyDown={handleBarcodeScan} placeholder="Leia o código do lote mais antigo e pressione Enter" className="w-full px-4 py-2 border-2 border-dashed rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"/></div>
+                                     <h3 className="text-lg font-bold text-gray-700">3. Lotes Disponíveis (Ordem de Saída)</h3>
+                                     <div className="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                                         {availableLotsForExit.length > 0 ? availableLotsForExit.map((lot, index) => {
+                                             const isOldest = index === 0;
+                                             return (
+                                                 <div key={lot.id} className={`p-4 rounded-lg border-2 ${isOldest ? 'bg-green-50 border-green-400' : 'bg-gray-100 border-gray-200 opacity-60'}`}>
+                                                     {isOldest && <p className="text-xs font-bold text-green-700 mb-2">PRÓXIMO PARA SAÍDA (PEPS)</p>}
+                                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
+                                                         <div><p className="text-xs text-gray-500">Lote</p><p className="font-bold font-mono">{lot.lotNumber}</p></div>
+                                                         <div><p className="text-xs text-gray-500">Fornecedor</p><p className="font-semibold truncate">{lot.supplierName}</p></div>
+                                                         <div><p className="text-xs text-gray-500">Data Entrada</p><p className="font-mono">{new Date(lot.entryDate + 'T00:00:00').toLocaleDateString('pt-BR')}</p></div>
+                                                         <div><p className="text-xs text-gray-500">Qtd. Restante</p><p className="font-bold text-lg">{lot.remainingQuantity.toFixed(2)} Kg</p></div>
+                                                     </div>
+                                                     {isOldest && (
+                                                         <div className="mt-4 pt-4 border-t border-green-200 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                                              <div className="md:col-span-1"><label htmlFor="exit-quantity-input" className="block text-xs font-medium text-gray-600">Qtd. da Saída (Kg)</label><input id="exit-quantity-input" type="text" value={exitQty} onChange={e => setExitQty(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="Ex: 15,5" className="w-full p-2 border rounded-md font-mono"/></div>
+                                                              <div className="md:col-span-1"><label className="block text-xs font-medium text-gray-600">Nº da NF de Saída</label><input type="text" value={exitInvoice} onChange={e => setExitInvoice(e.target.value)} placeholder="NF de Saída" className="w-full p-2 border rounded-md"/></div>
+                                                             <button onClick={() => handleConfirmExit(lot.barcode)} disabled={isProcessing} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:bg-gray-400">{isProcessing ? '...' : 'Confirmar Saída'}</button>
+                                                         </div>
+                                                     )}
+                                                 </div>
+                                             );
+                                         }) : <p className="text-sm text-center text-gray-500 italic p-4">Nenhum lote com estoque para este item.</p>}
+                                     </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
-
-                {feedback && (
-                    <div className={`mt-8 max-w-4xl mx-auto p-4 rounded-lg text-center font-semibold animate-fade-in ${
-                        feedback.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                        {feedback.message}
-                    </div>
-                )}
             </main>
-            <style>{`
-                @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-                .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
-                .custom-scrollbar::-webkit-scrollbar { width: 6px; } 
-                .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
-            `}</style>
+            <style>{`.animate-fade-in { animation: fade-in 0.5s ease-out forwards; } @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } } .custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }`}</style>
         </div>
     );
 };

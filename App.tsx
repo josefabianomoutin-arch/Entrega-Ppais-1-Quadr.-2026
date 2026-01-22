@@ -548,62 +548,73 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRegisterLotsAndUpdateMovements = async (payload: {
+  const handleRegisterEntry = async (payload: {
     supplierCpf: string;
-    itemsWithLots: { deliveryId: string; newLots: { lotNumber: string; quantity: number }[] }[];
-  }): Promise<boolean> => {
-      const { supplierCpf, itemsWithLots } = payload;
+    itemName: string;
+    invoiceNumber: string;
+    invoiceDate: string;
+    lotNumber: string;
+    quantity: number;
+  }): Promise<{ success: boolean; message: string }> => {
+      const { supplierCpf, itemName, invoiceNumber, invoiceDate, lotNumber, quantity } = payload;
       
       const newSuppliers = JSON.parse(JSON.stringify(suppliers));
       const supplier = newSuppliers.find((s: Supplier) => s.cpf === supplierCpf);
-      if (!supplier) return false;
-
-      const newMovements: Omit<WarehouseMovement, 'id' | 'timestamp'>[] = [];
-
-      for (const item of itemsWithLots) {
-          const delivery = supplier.deliveries.find((d: Delivery) => d.id === item.deliveryId);
-          if (!delivery || item.newLots.length === 0) continue;
-
-          const newLots = item.newLots.map((lotData, i) => ({
-              id: `lot-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
-              lotNumber: lotData.lotNumber,
-              barcode: lotData.lotNumber,
-              initialQuantity: lotData.quantity,
-              remainingQuantity: lotData.quantity,
-          }));
-
-          delivery.lots = [...(delivery.lots || []), ...newLots];
-
-          newLots.forEach(lot => {
-              newMovements.push({
-                  type: 'entrada',
-                  lotId: lot.id,
-                  lotNumber: lot.lotNumber,
-                  itemName: delivery.item || 'N/A',
-                  supplierName: supplier.name,
-                  deliveryId: delivery.id,
-                  inboundInvoice: delivery.invoiceNumber,
-                  quantity: lot.initialQuantity
-              });
-          });
+      if (!supplier) return { success: false, message: "Fornecedor não encontrado." };
+  
+      let delivery = supplier.deliveries.find((d: Delivery) => d.invoiceNumber === invoiceNumber && d.item === itemName);
+      
+      const newLot = {
+        id: `lot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        lotNumber,
+        barcode: lotNumber,
+        initialQuantity: quantity,
+        remainingQuantity: quantity,
+      };
+  
+      if (delivery) {
+        delivery.lots = [...(delivery.lots || []), newLot];
+      } else {
+        delivery = {
+          id: `delivery-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          date: invoiceDate,
+          time: '00:00',
+          item: itemName,
+          kg: 0,
+          value: 0,
+          invoiceUploaded: true,
+          invoiceNumber: invoiceNumber,
+          lots: [newLot],
+          withdrawals: [],
+          remainingQuantity: 0,
+        };
+        supplier.deliveries.push(delivery);
       }
-
+      
+      delivery.kg = (delivery.lots || []).reduce((sum: number, lot: any) => sum + lot.initialQuantity, 0);
+      delivery.remainingQuantity = (delivery.lots || []).reduce((sum: number, lot: any) => sum + lot.remainingQuantity, 0);
+      
+      const newMovement: Omit<WarehouseMovement, 'id' | 'timestamp'> = {
+        type: 'entrada',
+        lotId: newLot.id,
+        lotNumber: newLot.lotNumber,
+        itemName: delivery.item || 'N/A',
+        supplierName: supplier.name,
+        deliveryId: delivery.id,
+        inboundInvoice: delivery.invoiceNumber,
+        quantity: newLot.initialQuantity,
+      };
+      
       try {
-          await handlePersistSuppliers(newSuppliers);
-          if (newMovements.length > 0) {
-              await runTransaction(warehouseLogRef, (currentLog: WarehouseMovement[] | null) => {
-                  const movementsWithIds = newMovements.map(m => ({
-                      ...m,
-                      id: `whm-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-                      timestamp: new Date().toISOString(),
-                  }));
-                  return [...(currentLog || []), ...movementsWithIds];
-              });
-          }
-          return true;
+        await handlePersistSuppliers(newSuppliers);
+        await runTransaction(warehouseLogRef, (currentLog: WarehouseMovement[] | null) => {
+          const movementWithId = { ...newMovement, id: `whm-${Date.now()}`, timestamp: new Date().toISOString() };
+          return [...(currentLog || []), movementWithId];
+        });
+        return { success: true, message: 'Entrada registrada com sucesso.' };
       } catch (error) {
-          console.error("Falha ao registrar lotes e movimentações:", error);
-          return false;
+        console.error("Falha ao registrar entrada:", error);
+        return { success: false, message: 'Erro ao salvar os dados.' };
       }
   };
 
@@ -634,6 +645,8 @@ const App: React.FC = () => {
       const lot = del.lots.find((l: any) => l.id === foundLot.id);
       
       lot.remainingQuantity -= quantity;
+      del.remainingQuantity = (del.lots || []).reduce((sum: number, l: any) => sum + l.remainingQuantity, 0);
+
 
       const newMovement: Omit<WarehouseMovement, 'id'|'timestamp'> = {
           type: 'saída',
@@ -726,7 +739,7 @@ const App: React.FC = () => {
             <AlmoxarifadoDashboard
                 suppliers={suppliers}
                 onLogout={handleLogout}
-                onRegisterLots={handleRegisterLotsAndUpdateMovements}
+                onRegisterEntry={handleRegisterEntry}
                 onRegisterWithdrawal={handleRegisterWithdrawal}
             />
         ) : (
