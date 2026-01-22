@@ -50,5 +50,6 @@ export interface WarehouseMovement {
   itemName: string;
   supplierName: string;
   deliveryId: string;
+  inboundInvoice?: string; // Optional, only for 'entrada'
   outboundInvoice?: string; // Optional, only for 'saída'
 }

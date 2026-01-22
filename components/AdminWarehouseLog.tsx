@@ -17,7 +17,8 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog }) =
                     log.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                     log.lotNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                     log.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    (log.outboundInvoice && log.outboundInvoice.includes(searchTerm));
+                    (log.outboundInvoice && log.outboundInvoice.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                    (log.inboundInvoice && log.inboundInvoice.toLowerCase().includes(searchTerm.toLowerCase()));
                 return typeMatch && searchMatch;
             })
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -59,7 +60,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog }) =
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Produto</th>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Lote</th>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Fornecedor</th>
-                            <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">NF Saída</th>
+                            <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Nota Fiscal</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -76,7 +77,9 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog }) =
                                 <td className="p-3 font-semibold text-gray-800">{log.itemName}</td>
                                 <td className="p-3 font-mono">{log.lotNumber}</td>
                                 <td className="p-3 text-gray-600 truncate max-w-xs">{log.supplierName}</td>
-                                <td className="p-3 font-mono text-gray-600">{log.outboundInvoice || 'N/A'}</td>
+                                <td className="p-3 font-mono text-gray-600">
+                                    {log.type === 'entrada' ? log.inboundInvoice || 'N/A' : log.outboundInvoice || 'N/A'}
+                                </td>
                             </tr>
                         )) : (
                             <tr>

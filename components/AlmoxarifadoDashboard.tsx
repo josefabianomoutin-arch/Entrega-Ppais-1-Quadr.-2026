@@ -110,6 +110,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             supplierName: foundSupplier.name,
             deliveryId: foundDelivery.id,
             ...(type === 'saída' && { outboundInvoice: exitInvoice }),
+            ...(type === 'entrada' && { inboundInvoice: foundDelivery.invoiceNumber }),
         };
 
         const success = await onRegisterMovement(movementData);

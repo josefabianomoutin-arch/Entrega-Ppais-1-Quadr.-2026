@@ -173,6 +173,24 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
         setActiveWithdrawalInputs(prev => ({ ...prev, [lotId]: '' }));
     };
 
+    const handleDeleteLot = (lotId: string, deliveryId: string, supplierCpf: string) => {
+        if (!window.confirm("Tem certeza que deseja excluir este lote? Esta ação é irreversível.")) {
+            return;
+        }
+
+        const newSuppliers = JSON.parse(JSON.stringify(suppliers));
+        const supplier = newSuppliers.find((s: Supplier) => s.cpf === supplierCpf);
+        if (!supplier) return;
+        
+        const delivery = supplier.deliveries.find((d: Delivery) => d.id === deliveryId);
+        if (!delivery || !delivery.lots) return;
+
+        delivery.lots = delivery.lots.filter((l: any) => l.id !== lotId);
+        delivery.remainingQuantity = (delivery.lots || []).reduce((sum: number, l: any) => sum + l.remainingQuantity, 0);
+
+        onUpdateSuppliers(newSuppliers);
+    };
+
     // Foca no lote correspondente ao código de barras lido
     const handleBarcodeScan = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
@@ -300,6 +318,9 @@ const AdminPeps: React.FC<AdminPepsProps> = ({ suppliers, onUpdateSuppliers }) =
                                                                     <div className="flex items-center gap-2">
                                                                         <input id={`withdraw-${lot.id}`} type="text" value={activeWithdrawalInputs[lot.id] || ''} onChange={e => setActiveWithdrawalInputs(p => ({ ...p, [lot.id]: e.target.value.replace(/[^0-9,.]/g, '') }))} placeholder="Saída (Kg)" className="flex-grow border rounded px-2 py-1 text-xs font-mono"/>
                                                                         <button onClick={() => handleRegisterWithdrawal(lot.id, del.id, del.supplierCpf)} className="bg-green-500 text-white rounded px-3 py-1 text-xs font-bold hover:bg-green-600 whitespace-nowrap">Dar Saída</button>
+                                                                        <button onClick={() => handleDeleteLot(lot.id, del.id, del.supplierCpf)} className="p-1 text-red-500 hover:text-red-700" title="Excluir Lote">
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                                        </button>
                                                                     </div>
                                                                 </div>
                                                             )
