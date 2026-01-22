@@ -118,8 +118,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(0);
   const [contractError, setContractError] = useState('');
   const [contractSuccess, setContractSuccess] = useState('');
-  const isInternalUpdate = useRef(false); // Ref para controlar o loop de renderização
-
+  
   // Estados para ZONA CRÍTICA (Backup/Restore)
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoreMessage, setRestoreMessage] = useState({ type: '', text: '' });
@@ -151,14 +150,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [updateStatus]);
 
 
-  // Sincroniza o estado da UI de contratos com os dados mais recentes dos fornecedores
+  // Sincroniza o estado da UI de contratos com os dados mais recentes dos fornecedores APENAS AO ENTRAR NA ABA
   useEffect(() => {
     if (activeTab !== 'contracts') return;
-
-    if (isInternalUpdate.current) {
-        isInternalUpdate.current = false;
-        return;
-    }
     
     const precisionFactor = 100000;
     const itemsMap = new Map<string, { totalQty: number; valuePerUnit: number; supplierCpfs: string[]; order: number, unit: string }>();
@@ -171,7 +165,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             }
             const existing = itemsMap.get(item.name)!;
 
-            // **FIX DEFINITIVO**: Usa matemática de inteiros para somar e evitar erros de ponto flutuante
             const currentTotalInUnits = Math.round(existing.totalQty * precisionFactor);
             const itemTotalInUnits = Math.round(item.totalKg * precisionFactor);
             existing.totalQty = (currentTotalInUnits + itemTotalInUnits) / precisionFactor;
@@ -219,87 +212,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setItemCentricContracts(newItemCentricContracts);
     setExpandedItemIndex(0);
 
+// eslint-disable-next-line react-hooks/exhaustive-deps
 }, [suppliers, activeTab]);
-
-// Efeito para atualizar o estado global em tempo real enquanto o admin edita os contratos
-useEffect(() => {
-    if (activeTab !== 'contracts') return;
-  
-    const newSuppliersState: Supplier[] = supplierIdentities.map(identity => ({
-      ...identity,
-      contractItems: [],
-      initialValue: 0,
-    }));
-  
-    try {
-      itemCentricContracts.forEach((item, itemIndex) => {
-        const totalNum = parseFloat(item.totalKg);
-        const valueNum = parseFloat(item.valuePerKg);
-  
-        if (!item.name.trim() || isNaN(totalNum) || isNaN(valueNum) || totalNum <= 0) {
-          return;
-        }
-  
-        const participatingSuppliers = item.suppliers.filter(s => s.supplierCpf);
-        const numSuppliers = participatingSuppliers.length;
-        if (numSuppliers === 0) {
-          return;
-        }
-  
-        // Lógica de distribuição de alta precisão para evitar erros de ponto flutuante
-        const precisionFactor = 100000; // 5 casas decimais
-        const totalInUnits = Math.round(totalNum * precisionFactor);
-        const basePortion = Math.floor(totalInUnits / numSuppliers);
-        let remainder = totalInUnits % numSuppliers;
-
-        const portions = new Array(numSuppliers).fill(basePortion);
-        for (let i = 0; i < remainder; i++) {
-            portions[i]++;
-        }
-  
-        participatingSuppliers.forEach((slot, index) => {
-          const supplier = newSuppliersState.find(p => p.cpf === slot.supplierCpf);
-          if (supplier) {
-            const supplierPortion = portions[index] / precisionFactor;
-            supplier.contractItems.push({
-              name: item.name.trim(),
-              totalKg: supplierPortion,
-              valuePerKg: valueNum,
-              unit: item.ui_compositeUnit,
-              order: itemIndex,
-            });
-          }
-        });
-      });
-  
-      newSuppliersState.forEach(p => {
-        p.initialValue = p.contractItems.reduce((sum, item) => {
-            const value = (item.totalKg || 0) * (item.valuePerKg || 0);
-            return sum + value;
-        }, 0);
-      });
-
-      const getContractSignature = (s: Supplier) => ({
-          cpf: s.cpf,
-          initialValue: (s.initialValue || 0).toFixed(2),
-          items: (s.contractItems || []).map(i => `${i.name}-${(i.totalKg || 0).toFixed(5)}-${(i.valuePerKg || 0).toFixed(2)}`).sort()
-      });
-
-      const currentSignature = JSON.stringify(suppliers.map(getContractSignature));
-      const newSignature = JSON.stringify(newSuppliersState.map(getContractSignature));
-
-      if (currentSignature === newSignature) {
-          return;
-      }
-  
-      isInternalUpdate.current = true;
-      onLiveUpdate(newSuppliersState);
-      setContractError('');
-    } catch (e: any) {
-      console.error("Erro ao processar atualização de contrato em tempo real:", e);
-      setContractError('Erro ao calcular totais. Verifique os dados dos itens.');
-    }
-}, [itemCentricContracts, onLiveUpdate, activeTab, suppliers, supplierIdentities]);
 
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
@@ -365,28 +279,70 @@ useEffect(() => {
   };
 
   const handleSaveContracts = () => {
-    // A lógica de cálculo já foi feita pelo useEffect. Aqui, apenas validamos e persistimos.
     setContractError('');
     setContractSuccess('');
 
-    // Validação final antes de salvar
-    const hasInvalidItems = itemCentricContracts.some(item => {
-        if (!item.name.trim()) return true;
+    const newSuppliersState: Supplier[] = supplierIdentities.map(identity => ({
+      ...identity,
+      contractItems: [],
+      initialValue: 0,
+    }));
+  
+    try {
+      itemCentricContracts.forEach((item, itemIndex) => {
         const totalNum = parseFloat(item.totalKg);
         const valueNum = parseFloat(item.valuePerKg);
-        if (isNaN(totalNum) || isNaN(valueNum) || totalNum <= 0) return true;
+  
+        if (!item.name.trim() || isNaN(totalNum) || isNaN(valueNum) || totalNum <= 0) {
+          return;
+        }
+  
         const participatingSuppliers = item.suppliers.filter(s => s.supplierCpf);
-        if (participatingSuppliers.length === 0) return true;
-        return false;
-    });
+        const numSuppliers = participatingSuppliers.length;
+        if (numSuppliers === 0) {
+          return;
+        }
+  
+        const precisionFactor = 100000;
+        const totalInUnits = Math.round(totalNum * precisionFactor);
+        const basePortion = Math.floor(totalInUnits / numSuppliers);
+        let remainder = totalInUnits % numSuppliers;
 
-    if (hasInvalidItems && itemCentricContracts.length > 1) { // Permite salvar se for apenas um item em branco
-         setContractError('Existem itens incompletos ou com valores inválidos que não serão salvos.');
+        const portions = new Array(numSuppliers).fill(basePortion);
+        for (let i = 0; i < remainder; i++) {
+            portions[i]++;
+        }
+  
+        participatingSuppliers.forEach((slot, index) => {
+          const supplier = newSuppliersState.find(p => p.cpf === slot.supplierCpf);
+          if (supplier) {
+            const supplierPortion = portions[index] / precisionFactor;
+            supplier.contractItems.push({
+              name: item.name.trim(),
+              totalKg: supplierPortion,
+              valuePerKg: valueNum,
+              unit: item.ui_compositeUnit,
+              order: itemIndex,
+            });
+          }
+        });
+      });
+  
+      newSuppliersState.forEach(p => {
+        p.initialValue = p.contractItems.reduce((sum, item) => {
+            const value = (item.totalKg || 0) * (item.valuePerKg || 0);
+            return sum + value;
+        }, 0);
+      });
+      
+      onPersistSuppliers(newSuppliersState);
+      setContractSuccess('Contratos salvos na nuvem com sucesso!');
+      setTimeout(() => setContractSuccess(''), 4000);
+
+    } catch (e: any) {
+      console.error("Erro ao salvar contratos:", e);
+      setContractError('Erro ao calcular totais para salvar. Verifique os dados dos itens.');
     }
-
-    onPersistSuppliers(suppliers);
-    setContractSuccess('Contratos salvos na nuvem com sucesso!');
-    setTimeout(() => setContractSuccess(''), 4000);
   };
 
   const handleBackup = () => {
@@ -434,7 +390,20 @@ useEffect(() => {
       reader.readAsText(restoreFile);
   };
   
-  const totalContractedValue = suppliers.reduce((sum, p) => sum + p.initialValue, 0);
+  const displayTotalValue = useMemo(() => {
+    if (activeTab === 'contracts') {
+      return itemCentricContracts.reduce((total, item) => {
+        const totalNum = parseFloat(item.totalKg);
+        const valueNum = parseFloat(item.valuePerKg);
+        if (!isNaN(totalNum) && !isNaN(valueNum)) {
+          return total + (totalNum * valueNum);
+        }
+        return total;
+      }, 0);
+    }
+    return suppliers.reduce((sum, p) => sum + p.initialValue, 0);
+  }, [activeTab, itemCentricContracts, suppliers]);
+
 
   const tabs: { id: AdminTab; name: string; icon: React.ReactElement }[] = [
     { id: 'register', name: 'Gestão de Fornecedores', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 11a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1z" /></svg> },
@@ -457,7 +426,7 @@ useEffect(() => {
         <div className="flex items-center gap-4">
             <div className="text-right">
                 <p className="text-xs text-gray-500">Valor Total Contratado</p>
-                <p className="font-bold text-green-700 text-lg">{formatCurrency(totalContractedValue)}</p>
+                <p className="font-bold text-green-700 text-lg">{formatCurrency(displayTotalValue)}</p>
             </div>
             <button
               onClick={onLogout}
