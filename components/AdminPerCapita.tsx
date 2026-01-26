@@ -223,9 +223,9 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     <th className="p-3 text-center">#</th>
                                     <th className="p-3 text-left">Item</th>
                                     <th className="p-3 text-left">Frequência</th>
-                                    <th className="p-3 text-right">Consumo Semanal</th>
-                                    <th className="p-3 text-right">Requerido (4 Meses)</th>
-                                    <th className="p-3 text-right">Contratado (4 Meses)</th>
+                                    <th className="p-3 text-right">Consumo Semanal por pessoa</th>
+                                    <th className="p-3 text-right">Requerido para 4 meses pelo Decreto (População total)</th>
+                                    <th className="p-3 text-right">Contratado para 4 meses (População total)</th>
                                     <th className="p-3 text-right">Diferença</th>
                                 </tr>
                             </thead>
