@@ -46,6 +46,28 @@ const getContractItemWeight = (item: { totalKg?: number, unit?: string }): numbe
     return quantity * unitWeight;
 };
 
+const hortifrutiKeywords = [
+    'abacate', 'abacaxi', 'abóbora', 'abobrinha', 'acelga', 'agrião', 'alface', 
+    'banana', 'batata', 'berinjela', 'beterraba', 'brócolis', 'caqui', 'cará', 
+    'cebola', 'cebolinha', 'cenoura', 'chuchu', 'couve', 'escarola', 'espinafre', 
+    'goiaba', 'inhame', 'jiló', 'laranja', 'limão', 'maçã', 'mamão', 'mandioca', 
+    'manga', 'maracujá', 'melancia', 'melão', 'milho', 'moranga', 'mostarda', 
+    'pepino', 'pêra', 'pimentão', 'quiabo', 'rabanete', 'repolho', 'rúcula', 
+    'salsa', 'tomate', 'uva', 'vagem'
+];
+
+const perishablesKeywords = [
+    'carne', 'frango', 'suína', 'peixe', 'bovina', 'almôndega', 'embutido', 
+    'linguiça', 'salsicha', 'fígado', 'dobradinha', 'charque', 'costela', 'pé', 
+    'toucinho', 'bisteca', 'lombo', 'pernil', 'hambúrguer', 'ovo', 'atum', 'sardinha'
+];
+
+const isHortifrutiOrPerishable = (itemName: string): boolean => {
+    const lowerItemName = itemName.toLowerCase();
+    const allKeywords = [...hortifrutiKeywords, ...perishablesKeywords];
+    return allKeywords.some(keyword => lowerItemName.includes(keyword));
+};
+
 const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
     const [staffCount, setStaffCount] = useState<number>(() => {
         const saved = localStorage.getItem('perCapitaStaffCount');
@@ -80,6 +102,10 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
         .map(([name, values]) => ({ name, ...values }))
         .sort((a, b) => a.name.localeCompare(b.name));
     }, [suppliers]);
+
+    const filteredItemData = useMemo(() => {
+        return itemData.filter(item => isHortifrutiOrPerishable(item.name));
+    }, [itemData]);
 
     const perCapitaDenominator = useMemo(() => {
         return inmateCount + (staffCount / 3);
@@ -201,22 +227,14 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     <th className="p-3 text-right">Requerido (4 Semanas)</th>
                                     <th className="p-3 text-right">Contratado (4 Semanas)</th>
                                     <th className="p-3 text-right">Diferença</th>
-                                    <th className="p-3 text-right">Entregue</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {itemData.length > 0 ? itemData.map((item, index) => {
+                                {filteredItemData.length > 0 ? filteredItemData.map((item, index) => {
                                     const reference = resolutionData[item.name.toUpperCase()];
                                     const contractedTotal = item.totalKg;
                                     const contractedUnitString = item.unit;
                                     
-                                    const totalDeliveredForItem = suppliers.reduce((total, supplier) => {
-                                        const deliveredBySupplier = (supplier.deliveries || [])
-                                            .filter(d => d.item === item.name && (d.kg || 0) > 0)
-                                            .reduce((sum, d) => sum + getContractItemWeight({ totalKg: d.kg, unit: item.unit }), 0);
-                                        return total + deliveredBySupplier;
-                                    }, 0);
-
                                     if (!reference) {
                                         return (
                                             <tr key={item.name} className="bg-blue-50 hover:bg-blue-100">
@@ -227,7 +245,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">-</td>
-                                                <td className="p-3 text-right font-mono font-bold text-green-700">{formatContractedTotal(totalDeliveredForItem, contractedUnitString)}</td>
                                             </tr>
                                         );
                                     }
@@ -293,13 +310,12 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                             <td className="p-3 text-right font-mono font-bold">{requiredDisplay}</td>
                                             <td className="p-3 text-right font-mono font-bold text-gray-800">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
                                             <td className={`p-3 text-right font-mono font-bold ${differenceColor}`}>{differenceDisplay}</td>
-                                            <td className="p-3 text-right font-mono font-bold text-green-700">{formatContractedTotal(totalDeliveredForItem, contractedUnitString)}</td>
                                         </tr>
                                     );
                                 }) : (
                                     <tr>
-                                        <td colSpan={8} className="p-8 text-center text-gray-400 italic">
-                                            Nenhum item de contrato cadastrado para comparar.
+                                        <td colSpan={7} className="p-8 text-center text-gray-400 italic">
+                                            Nenhum item de hortifruti ou perecível encontrado nos contratos.
                                         </td>
                                     </tr>
                                 )}
