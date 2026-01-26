@@ -11,6 +11,7 @@ interface AlmoxarifadoDashboardProps {
         invoiceDate: string;
         lotNumber: string;
         quantity: number;
+        expirationDate: string;
     }) => Promise<{ success: boolean; message: string }>;
     onRegisterWithdrawal: (payload: {
         barcode: string;
@@ -40,6 +41,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
     const [entryLot, setEntryLot] = useState('');
     const [entryQty, setEntryQty] = useState('');
+    const [entryExpiration, setEntryExpiration] = useState('');
 
     // --- SAÍDA STATE ---
     const [selectedExitItem, setSelectedExitItem] = useState('');
@@ -102,7 +104,18 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 }
             });
         });
-        return lots.sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
+        return lots.sort((a, b) => {
+            // FEFO: First Expired, First Out.
+            if (a.expirationDate && !b.expirationDate) return -1;
+            if (!a.expirationDate && b.expirationDate) return 1;
+            if (a.expirationDate && b.expirationDate) {
+                const expA = new Date(a.expirationDate).getTime();
+                const expB = new Date(b.expirationDate).getTime();
+                if (expA !== expB) return expA - expB;
+            }
+            // Fallback to PEPS if no expiration or expiration is the same.
+            return new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime();
+        });
     }, [selectedExitItem, suppliers]);
     
     const handleConfirmEntry = async () => {
@@ -110,8 +123,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         setFeedback(null);
         const quantity = parseFloat(entryQty.replace(',', '.'));
 
-        if (!selectedEntryItem || !entrySupplierCpf || !entryInvoice || !entryLot || isNaN(quantity) || quantity <= 0) {
-            setFeedback({ type: 'error', message: "Todos os campos de entrada são obrigatórios." });
+        if (!selectedEntryItem || !entrySupplierCpf || !entryInvoice || !entryLot || isNaN(quantity) || quantity <= 0 || !entryExpiration) {
+            setFeedback({ type: 'error', message: "Todos os campos de entrada são obrigatórios, incluindo o vencimento." });
             setIsProcessing(false);
             return;
         }
@@ -127,7 +140,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             invoiceNumber: entryInvoice.trim(),
             invoiceDate: entryDate,
             lotNumber: entryLot.trim(),
-            quantity
+            quantity,
+            expirationDate: entryExpiration
         });
 
         setFeedback(result);
@@ -138,6 +152,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             setEntryInvoice('');
             setEntryLot('');
             setEntryQty('');
+            setEntryExpiration('');
         }
         setIsProcessing(false);
     };
@@ -184,7 +199,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             <header className="bg-white shadow-md p-4 flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-700">Painel do Almoxarifado</h1>
-                    <p className="text-sm text-gray-500">Controle de Estoque por Contrato e Lógica PEPS</p>
+                    <p className="text-sm text-gray-500">Controle de Estoque por Contrato e Lógica PEPS/PVPS</p>
                 </div>
                 <button onClick={onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm">Sair</button>
             </header>
@@ -216,7 +231,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                         <div><label className="block text-xs font-medium text-gray-600">Data da NF</label><input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} className="w-full p-2 border rounded-md"/></div>
                                         <div><label className="block text-xs font-medium text-gray-600">Nº da Nota Fiscal</label><input type="text" value={entryInvoice} onChange={e => setEntryInvoice(e.target.value)} placeholder="Número da NF" className="w-full p-2 border rounded-md"/></div>
                                         <div><label className="block text-xs font-medium text-gray-600">Nº do Lote / Cód. Barras</label><input type="text" value={entryLot} onChange={e => setEntryLot(e.target.value)} placeholder="Identificador do Lote" className="w-full p-2 border rounded-md"/></div>
-                                        <div className="md:col-span-2"><label className="block text-xs font-medium text-gray-600">Quantidade da Entrada (Kg)</label><input type="text" value={entryQty} onChange={e => setEntryQty(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="Ex: 150,5" className="w-full p-2 border rounded-md font-mono"/></div>
+                                        <div><label className="block text-xs font-medium text-gray-600">Quantidade da Entrada (Kg)</label><input type="text" value={entryQty} onChange={e => setEntryQty(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="Ex: 150,5" className="w-full p-2 border rounded-md font-mono"/></div>
+                                        <div><label className="block text-xs font-medium text-gray-600">Vencimento do Produto</label><input type="date" value={entryExpiration} onChange={e => setEntryExpiration(e.target.value)} className="w-full p-2 border rounded-md"/></div>
                                     </div>
                                     <button onClick={handleConfirmEntry} disabled={isProcessing} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-400">{isProcessing ? 'Processando...' : 'Adicionar Entrada'}</button>
                                 </div>
@@ -237,13 +253,26 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                      <div className="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
                                          {availableLotsForExit.length > 0 ? availableLotsForExit.map((lot, index) => {
                                              const isOldest = index === 0;
+                                             const today = new Date();
+                                             today.setHours(0, 0, 0, 0);
+                                             const expiration = lot.expirationDate ? new Date(lot.expirationDate + 'T00:00:00') : null;
+                                             let expirationColor = 'text-gray-800';
+                                             if (expiration) {
+                                                 const diffDays = (expiration.getTime() - today.getTime()) / (1000 * 3600 * 24);
+                                                 if (diffDays < 7) {
+                                                     expirationColor = 'text-red-600 font-bold';
+                                                 } else if (diffDays < 30) {
+                                                     expirationColor = 'text-yellow-600 font-semibold';
+                                                 }
+                                             }
                                              return (
                                                  <div key={lot.id} className={`p-4 rounded-lg border-2 ${isOldest ? 'bg-green-50 border-green-400' : 'bg-gray-100 border-gray-200 opacity-60'}`}>
-                                                     {isOldest && <p className="text-xs font-bold text-green-700 mb-2">PRÓXIMO PARA SAÍDA (PEPS)</p>}
-                                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
+                                                     {isOldest && <p className="text-xs font-bold text-green-700 mb-2">PRÓXIMO PARA SAÍDA (PVPS/PEPS)</p>}
+                                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 items-center">
                                                          <div><p className="text-xs text-gray-500">Lote</p><p className="font-bold font-mono">{lot.lotNumber}</p></div>
                                                          <div><p className="text-xs text-gray-500">Fornecedor</p><p className="font-semibold truncate">{lot.supplierName}</p></div>
                                                          <div><p className="text-xs text-gray-500">Data Entrada</p><p className="font-mono">{new Date(lot.entryDate + 'T00:00:00').toLocaleDateString('pt-BR')}</p></div>
+                                                         <div><p className="text-xs text-gray-500">Vencimento</p><p className={`font-mono ${expirationColor}`}>{lot.expirationDate ? new Date(lot.expirationDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'}</p></div>
                                                          <div><p className="text-xs text-gray-500">Qtd. Restante</p><p className="font-bold text-lg">{lot.remainingQuantity.toFixed(2)} Kg</p></div>
                                                      </div>
                                                      {isOldest && (

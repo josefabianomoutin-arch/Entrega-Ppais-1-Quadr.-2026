@@ -15,6 +15,7 @@ export interface Delivery {
     initialQuantity: number;
     remainingQuantity: number;
     barcode?: string;
+    expirationDate?: string; // Data de validade do lote
   }[];
   withdrawals?: {
     lotId: string;
@@ -53,4 +54,5 @@ export interface WarehouseMovement {
   inboundInvoice?: string; // Optional, only for 'entrada'
   outboundInvoice?: string; // Optional, only for 'saída'
   quantity?: number; // How much was moved, especially for 'saída'
+  expirationDate?: string; // Data de validade do lote na entrada
 }

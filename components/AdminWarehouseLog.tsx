@@ -71,6 +71,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, onD
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Data e Hora</th>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Produto</th>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Lote</th>
+                            <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Vencimento</th>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Fornecedor</th>
                             <th className="p-3 text-right text-xs font-bold uppercase text-gray-600">Quantidade</th>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Nota Fiscal</th>
@@ -90,6 +91,9 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, onD
                                 <td className="p-3 font-mono text-gray-600">{new Date(log.timestamp).toLocaleString('pt-BR')}</td>
                                 <td className="p-3 font-semibold text-gray-800">{log.itemName}</td>
                                 <td className="p-3 font-mono">{log.lotNumber}</td>
+                                <td className="p-3 font-mono text-gray-600">
+                                    {log.expirationDate ? new Date(log.expirationDate + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+                                </td>
                                 <td className="p-3 text-gray-600 truncate max-w-xs">{log.supplierName}</td>
                                 <td className="p-3 text-right font-mono text-gray-800">
                                     {log.quantity !== undefined ? `${log.quantity.toFixed(2).replace('.', ',')} Kg` : '-'}
@@ -121,7 +125,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, onD
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={8} className="p-12 text-center text-gray-400 italic">
+                                <td colSpan={9} className="p-12 text-center text-gray-400 italic">
                                     Nenhuma movimentação encontrada para os filtros selecionados.
                                 </td>
                             </tr>

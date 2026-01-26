@@ -555,8 +555,9 @@ const App: React.FC = () => {
     invoiceDate: string;
     lotNumber: string;
     quantity: number;
+    expirationDate: string;
   }): Promise<{ success: boolean; message: string }> => {
-      const { supplierCpf, itemName, invoiceNumber, invoiceDate, lotNumber, quantity } = payload;
+      const { supplierCpf, itemName, invoiceNumber, invoiceDate, lotNumber, quantity, expirationDate } = payload;
       
       const newSuppliers = JSON.parse(JSON.stringify(suppliers));
       const supplier = newSuppliers.find((s: Supplier) => s.cpf === supplierCpf);
@@ -570,6 +571,7 @@ const App: React.FC = () => {
         barcode: lotNumber,
         initialQuantity: quantity,
         remainingQuantity: quantity,
+        expirationDate: expirationDate,
       };
   
       if (delivery) {
@@ -603,6 +605,7 @@ const App: React.FC = () => {
         deliveryId: delivery.id,
         inboundInvoice: delivery.invoiceNumber,
         quantity: newLot.initialQuantity,
+        expirationDate: newLot.expirationDate,
       };
       
       try {
