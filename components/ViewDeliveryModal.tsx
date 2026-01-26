@@ -13,10 +13,11 @@ interface ViewDeliveryModalProps {
 const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries, onClose, onAddNew, onCancel, simulatedToday }) => {
   
   const formattedDate = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-  const canCancel = new Date(date) >= simulatedToday;
   const invoiceNumber = deliveries.find(d => d.invoiceNumber)?.invoiceNumber;
+  
+  const placeholderDeliveries = deliveries.filter(d => d.item === 'AGENDAMENTO PENDENTE');
+  const canCancel = new Date(date) >= simulatedToday && placeholderDeliveries.length > 0;
 
-  const isPlaceholder = deliveries.length === 1 && deliveries[0].item === 'AGENDAMENTO PENDENTE';
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -38,21 +39,26 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
         </div>
         
         <div className="space-y-3 max-h-64 overflow-y-auto mb-4 border-t border-b py-2">
-            {isPlaceholder ? (
-                 <div className="p-3 bg-blue-50 rounded-lg text-center">
-                    <p className="font-bold text-blue-800">Agendamento Pendente</p>
-                    <p className="text-xs text-blue-600">Aguardando preenchimento dos dados da entrega.</p>
-                </div>
-            ) : deliveries.length > 0 ? (
-                deliveries.map(delivery => (
-                    <div key={delivery.id} className="p-3 bg-gray-50 rounded-lg flex justify-between items-start text-sm">
-                        <div>
-                            <p className="font-bold text-gray-800">{delivery.item}</p>
-                            <p className="text-xs text-gray-500">{(delivery.kg || 0).toFixed(2).replace('.', ',')} Kg</p>
+            {deliveries.length > 0 ? (
+                deliveries.map(delivery => {
+                    if (delivery.item === 'AGENDAMENTO PENDENTE') {
+                        return (
+                            <div key={delivery.id} className="p-3 bg-blue-50 rounded-lg text-center">
+                                <p className="font-bold text-blue-800">Agendamento Pendente</p>
+                                <p className="text-xs text-blue-600">Aguardando preenchimento dos dados da entrega.</p>
+                            </div>
+                        );
+                    }
+                    return (
+                        <div key={delivery.id} className="p-3 bg-gray-50 rounded-lg flex justify-between items-start text-sm">
+                            <div>
+                                <p className="font-bold text-gray-800">{delivery.item}</p>
+                                <p className="text-xs text-gray-500">{(delivery.kg || 0).toFixed(2).replace('.', ',')} Kg</p>
+                            </div>
+                            <span className="font-semibold text-green-600 whitespace-nowrap pl-4">{formatCurrency(delivery.value || 0)}</span>
                         </div>
-                        <span className="font-semibold text-green-600 whitespace-nowrap pl-4">{formatCurrency(delivery.value || 0)}</span>
-                    </div>
-                ))
+                    );
+                })
             ) : (
                 <p className="text-center text-gray-500">Nenhuma entrega para esta data.</p>
             )}
@@ -63,9 +69,17 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
             <span className="text-blue-600">{formatCurrency(totalValue)}</span>
         </div>
 
+        {canCancel && (
+            <div className="mt-4 text-center text-sm text-gray-500 bg-gray-100 p-3 rounded-md">
+                <p>Para alterar a data, cancele o agendamento pendente e selecione um novo dia disponível no calendário.</p>
+            </div>
+        )}
+
         <div className="pt-6 flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
           {canCancel && (
-            <button type="button" onClick={() => onCancel(deliveries.map(d => d.id))} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Cancelar Agendamentos</button>
+            <button type="button" onClick={() => onCancel(placeholderDeliveries.map(d => d.id))} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+              {placeholderDeliveries.length > 1 ? 'Cancelar Agendamentos Pendentes' : 'Cancelar Agendamento Pendente'}
+            </button>
           )}
           <button type="button" onClick={onAddNew} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Agendar Outro Horário</button>
           <button type="button" onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition-colors">Fechar</button>

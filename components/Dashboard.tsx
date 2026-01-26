@@ -96,7 +96,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const handleCancelDeliveries = (deliveryIds: string[]) => {
-    if(window.confirm('Tem certeza que deseja cancelar estes agendamentos? Esta ação não pode ser desfeita.')) {
+    if(window.confirm('Tem certeza que deseja cancelar este agendamento? Após cancelar, você poderá escolher uma nova data disponível no calendário.')) {
       onCancelDeliveries(supplier.cpf, deliveryIds);
       handleCloseViewModal();
     }
