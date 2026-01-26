@@ -214,7 +214,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
             {showComparison && (
                 <div className="mt-8 animate-fade-in">
                     <h3 className="text-2xl font-black text-gray-800 mb-6 text-center uppercase tracking-tighter">
-                        Comparativo Contratado vs. Requerido (Totais p/ 4 Semanas)
+                        Comparativo Contratado vs. Requerido (Totais para 4 Meses)
                     </h3>
                     <div className="overflow-x-auto border rounded-lg">
                         <table className="w-full text-sm">
@@ -224,8 +224,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     <th className="p-3 text-left">Item</th>
                                     <th className="p-3 text-left">Frequência</th>
                                     <th className="p-3 text-right">Consumo Semanal</th>
-                                    <th className="p-3 text-right">Requerido (4 Semanas)</th>
-                                    <th className="p-3 text-right">Contratado (4 Semanas)</th>
+                                    <th className="p-3 text-right">Requerido (4 Meses)</th>
+                                    <th className="p-3 text-right">Contratado (4 Meses)</th>
                                     <th className="p-3 text-right">Diferença</th>
                                 </tr>
                             </thead>
@@ -259,19 +259,19 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                         const value = perCapitaRequired.value;
 
                                         if (unit === 'g') {
-                                            totalRequiredValue = (value / 1000) * perCapitaDenominator;
+                                            totalRequiredValue = ((value / 1000) * perCapitaDenominator) * 4;
                                             requiredUnitType = 'kg';
                                             requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
                                         } else if (unit === 'ml') {
-                                            totalRequiredValue = (value / 1000) * perCapitaDenominator;
+                                            totalRequiredValue = ((value / 1000) * perCapitaDenominator) * 4;
                                             requiredUnitType = 'L';
                                             requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} L`;
                                         } else if (unit === 'l') {
-                                            totalRequiredValue = value * perCapitaDenominator;
+                                            totalRequiredValue = (value * perCapitaDenominator) * 4;
                                             requiredUnitType = 'L';
                                             requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`;
                                         } else if (unit === 'unid.') {
-                                            totalRequiredValue = value * perCapitaDenominator;
+                                            totalRequiredValue = (value * perCapitaDenominator) * 4;
                                             requiredUnitType = 'unid.';
                                             requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR')} unid.`;
                                         } else {
