@@ -476,7 +476,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <form onSubmit={handleRegisterSubmit} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-700">Nome do Fornecedor</label>
+                                <label className="block text-sm font-medium text-gray-700">Fornecedor</label>
                                 <input type="text" value={regName} onChange={(e) => setRegName(e.target.value.toUpperCase())} required placeholder="NOME EM MAIÚSCULO" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"/>
                             </div>
                             <div className="space-y-2">
