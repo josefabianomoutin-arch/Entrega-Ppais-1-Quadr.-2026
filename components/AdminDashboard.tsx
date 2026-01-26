@@ -501,7 +501,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                  <div className="bg-white p-6 rounded-2xl shadow-lg">
-                    <h2 className="text-2xl font-bold mb-1 text-gray-700">Fornecedores Cadastrados</h2>
+                    <h2 className="text-2xl font-bold mb-1 text-gray-700">Novos cadastros</h2>
                     <p className="text-sm text-gray-400 mb-4">Total: {suppliers.length}</p>
                      {updateStatus && (
                         <div className={`p-4 mb-4 rounded-md text-sm ${updateStatus.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
