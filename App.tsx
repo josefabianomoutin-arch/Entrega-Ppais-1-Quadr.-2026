@@ -639,17 +639,12 @@ const App: React.FC = () => {
           if (foundLot) break;
       }
 
-      if (!foundLot || !foundDelivery || !foundSupplier) return { success: false, message: 'Lote não encontrado.' };
-      if (quantity > foundLot.remainingQuantity) return { success: false, message: `Quantidade de saída excede o estoque do lote (${foundLot.remainingQuantity} Kg).` };
-
-      const newSuppliers = JSON.parse(JSON.stringify(suppliers));
-      const sup = newSuppliers.find((s: Supplier) => s.cpf === foundSupplier!.cpf);
-      const del = sup.deliveries.find((d: Delivery) => d.id === foundDelivery!.id);
-      const lot = del.lots.find((l: any) => l.id === foundLot.id);
-      
-      lot.remainingQuantity -= quantity;
-      del.remainingQuantity = (del.lots || []).reduce((sum: number, l: any) => sum + l.remainingQuantity, 0);
-
+      if (!foundLot || !foundDelivery || !foundSupplier) {
+          return { success: false, message: 'Lote não encontrado.' };
+      }
+      if (quantity > foundLot.remainingQuantity) {
+           return { success: false, message: `A quantidade de saída (${quantity} Kg) não pode exceder o estoque do lote (${foundLot.remainingQuantity} Kg).` };
+      }
 
       const newMovement: Omit<WarehouseMovement, 'id'|'timestamp'> = {
           type: 'saída',
@@ -663,7 +658,7 @@ const App: React.FC = () => {
       };
 
       try {
-          await handlePersistSuppliers(newSuppliers);
+          // A dedução do estoque foi removida conforme solicitado. Apenas o registro será criado.
           await runTransaction(warehouseLogRef, (currentLog: WarehouseMovement[] | null) => {
               const movementWithId = {
                   ...newMovement,
@@ -672,10 +667,10 @@ const App: React.FC = () => {
               };
               return [...(currentLog || []), movementWithId];
           });
-          return { success: true, message: 'Saída registrada com sucesso.' };
+          return { success: true, message: 'Saída registrada com sucesso no histórico. O estoque não foi alterado.' };
       } catch (error) {
           console.error("Falha ao registrar saída:", error);
-          return { success: false, message: 'Erro ao salvar os dados.' };
+          return { success: false, message: 'Erro ao salvar o registro de saída no histórico.' };
       }
   };
 
