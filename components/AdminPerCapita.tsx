@@ -111,7 +111,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
         return inmateCount + (staffCount / 3);
     }, [inmateCount, staffCount]);
 
-    const totalPerCaptaKg = useMemo(() => {
+    const totalPerCapitaKg = useMemo(() => {
         if (perCapitaDenominator === 0) return 0;
         const totalKgOfAllItems = itemData.reduce((sum, item) => {
             const [unitType] = (item.unit || 'kg-1').split('-');
@@ -123,7 +123,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
         return (totalKgOfAllItems / perCapitaDenominator) / 4;
     }, [itemData, perCapitaDenominator]);
     
-    const totalPerCaptaValue = useMemo(() => {
+    const totalPerCapitaValue = useMemo(() => {
         if (perCapitaDenominator === 0) return 0;
         const totalValueOfAllItems = itemData.reduce((sum, item) => sum + item.totalValue, 0);
         return (totalValueOfAllItems / perCapitaDenominator) / 4;
@@ -146,7 +146,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-green-500 animate-fade-in">
             <div className="text-center mb-10">
-                <h2 className="text-3xl font-black text-green-900 uppercase tracking-tighter">Cálculo de Consumo Per Capta</h2>
+                <h2 className="text-3xl font-black text-green-900 uppercase tracking-tighter">Cálculo de Consumo Per Capita</h2>
                 <p className="text-gray-400 font-medium">Estime o consumo mensal por pessoa com base nos totais contratados.</p>
                 <div className="mt-4 bg-gray-50 p-3 rounded-lg border border-gray-200 inline-block">
                     <p className="text-sm font-mono text-gray-600">
@@ -188,16 +188,16 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                     <p className="text-2xl font-black text-blue-700">{perCapitaDenominator.toLocaleString('pt-BR', {maximumFractionDigits: 2})}</p>
                 </div>
                 <div className="bg-green-50/50 p-4 rounded-xl text-center flex flex-col justify-center border border-green-200">
-                    <p className="text-[10px] text-green-600 uppercase font-black tracking-tighter mb-1">Total Per Capta (Kg)</p>
+                    <p className="text-[10px] text-green-600 uppercase font-black tracking-tighter mb-1">Total Per Capita (Kg)</p>
                     <p className="text-2xl font-black text-green-700">
-                        {totalPerCaptaKg.toFixed(4).replace('.', ',')}
+                        {totalPerCapitaKg.toFixed(4).replace('.', ',')}
                         <span className="text-base font-medium ml-1">Kg</span>
                     </p>
                 </div>
                  <div className="bg-blue-50/50 p-4 rounded-xl text-center flex flex-col justify-center border border-blue-200">
-                    <p className="text-[10px] text-blue-600 uppercase font-black tracking-tighter mb-1">Total Per Capta (R$)</p>
+                    <p className="text-[10px] text-blue-600 uppercase font-black tracking-tighter mb-1">Total Per Capita (R$)</p>
                     <p className="text-2xl font-black text-blue-700">
-                        {formatCurrency(totalPerCaptaValue)}
+                        {formatCurrency(totalPerCapitaValue)}
                     </p>
                 </div>
             </div>

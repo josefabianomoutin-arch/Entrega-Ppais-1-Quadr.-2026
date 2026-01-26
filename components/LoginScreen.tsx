@@ -53,7 +53,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         </div>
         
         <div className="mt-4 text-center text-sm text-yellow-800 bg-yellow-100 p-3 rounded-lg border border-yellow-300">
-            <p><strong>Atenção:</strong> O nome do fornecedor deve ser em <strong>MAIÚSCULA</strong> e a senha (CPF/CNPJ) apenas com <strong>números</strong>.</p>
+            <p><strong>Atenção:</strong> Nome de fornecedor em <strong>MAIÚSCULA</strong> e senha (CPF/CNPJ) com <strong>apenas números</strong>. O usuário 'Almoxarifado' possui senha específica.</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLoginSubmit}>
