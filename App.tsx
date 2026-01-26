@@ -621,57 +621,72 @@ const App: React.FC = () => {
       }
   };
 
+  // Fix: Replaced handleRegisterWithdrawal with the new logic that only logs the transaction
   const handleRegisterWithdrawal = async (payload: {
-      barcode: string;
-      quantity: number;
-      outboundInvoice: string;
+    supplierCpf: string;
+    itemName: string;
+    lotNumber: string;
+    quantity: number;
+    outboundInvoice: string;
+    expirationDate: string;
   }): Promise<{ success: boolean; message: string }> => {
-      const { barcode, quantity, outboundInvoice } = payload;
-      
-      let foundLot: any = null, foundDelivery: Delivery | null = null, foundSupplier: Supplier | null = null;
-      for (const s of suppliers) {
-          for (const d of s.deliveries) {
-              const lot = (d.lots || []).find(l => l.barcode === barcode);
-              if (lot) {
-                  foundLot = lot; foundDelivery = d; foundSupplier = s; break;
-              }
-          }
-          if (foundLot) break;
-      }
+    const { supplierCpf, itemName, lotNumber, quantity, outboundInvoice, expirationDate } = payload;
+    
+    // Find the lot based on the provided identifiers
+    let foundLot: any = null, foundDelivery: Delivery | null = null, foundSupplier: Supplier | null = null;
 
-      if (!foundLot || !foundDelivery || !foundSupplier) {
-          return { success: false, message: 'Lote não encontrado.' };
-      }
-      if (quantity > foundLot.remainingQuantity) {
-           return { success: false, message: `A quantidade de saída (${quantity} Kg) não pode exceder o estoque do lote (${foundLot.remainingQuantity} Kg).` };
-      }
+    const supplier = suppliers.find(s => s.cpf === supplierCpf);
+    if (supplier) {
+        for (const delivery of supplier.deliveries) {
+            // Match item name
+            if (delivery.item === itemName) {
+                // Find lot that matches lot number AND expiration date for more precision
+                const lot = (delivery.lots || []).find(l => l.lotNumber === lotNumber && l.expirationDate === expirationDate);
+                if (lot) {
+                    foundLot = lot;
+                    foundDelivery = delivery;
+                    foundSupplier = supplier;
+                    break;
+                }
+            }
+        }
+    }
 
-      const newMovement: Omit<WarehouseMovement, 'id'|'timestamp'> = {
-          type: 'saída',
-          lotId: foundLot.id,
-          lotNumber: foundLot.lotNumber,
-          itemName: foundDelivery.item || 'N/A',
-          supplierName: foundSupplier.name,
-          deliveryId: foundDelivery.id,
-          outboundInvoice,
-          quantity
-      };
+    if (!foundLot || !foundDelivery || !foundSupplier) {
+        return { success: false, message: 'Lote não encontrado com os dados fornecidos (Item, Fornecedor, Lote e Vencimento).' };
+    }
 
-      try {
-          // A dedução do estoque foi removida conforme solicitado. Apenas o registro será criado.
-          await runTransaction(warehouseLogRef, (currentLog: WarehouseMovement[] | null) => {
-              const movementWithId = {
-                  ...newMovement,
-                  id: `whm-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-                  timestamp: new Date().toISOString(),
-              };
-              return [...(currentLog || []), movementWithId];
-          });
-          return { success: true, message: 'Saída registrada com sucesso no histórico. O estoque não foi alterado.' };
-      } catch (error) {
-          console.error("Falha ao registrar saída:", error);
-          return { success: false, message: 'Erro ao salvar o registro de saída no histórico.' };
-      }
+    // This check was kept from the previous implementation. It prevents logging an exit larger than the available stock.
+    if (quantity > foundLot.remainingQuantity) {
+         return { success: false, message: `A quantidade de saída (${quantity} Kg) não pode exceder o estoque do lote (${foundLot.remainingQuantity} Kg).` };
+    }
+
+    const newMovement: Omit<WarehouseMovement, 'id'|'timestamp'> = {
+        type: 'saída',
+        lotId: foundLot.id,
+        lotNumber: foundLot.lotNumber,
+        itemName: foundDelivery.item || 'N/A',
+        supplierName: foundSupplier.name,
+        deliveryId: foundDelivery.id,
+        outboundInvoice,
+        quantity,
+        expirationDate: foundLot.expirationDate,
+    };
+
+    try {
+        await runTransaction(warehouseLogRef, (currentLog: WarehouseMovement[] | null) => {
+            const movementWithId = {
+                ...newMovement,
+                id: `whm-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                timestamp: new Date().toISOString(),
+            };
+            return [...(currentLog || []), movementWithId];
+        });
+        return { success: true, message: 'Saída registrada com sucesso no histórico. O estoque não foi alterado.' };
+    } catch (error) {
+        console.error("Falha ao registrar saída:", error);
+        return { success: false, message: 'Erro ao salvar o registro de saída no histórico.' };
+    }
   };
 
   const handleDeleteWarehouseEntry = async (logToDelete: WarehouseMovement): Promise<{ success: boolean; message: string }> => {
