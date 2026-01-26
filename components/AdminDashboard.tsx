@@ -586,7 +586,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       </div>
                                       
                                       <div>
-                                          <h4 className="font-semibold mb-2">Fornecedores ({item.suppliers.filter(s => s.supplierCpf).length} selecionados)</h4>
+                                          <label className="font-semibold mb-2 block">Fornecedor</label>
                                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                                               {item.suppliers.map((slot, sIndex) => (
                                                   <select key={sIndex} value={slot.supplierCpf} onChange={(e) => {
@@ -594,7 +594,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                                       newSuppliers[sIndex] = { supplierCpf: e.target.value };
                                                       handleItemCentricChange(item.id, 'suppliers', newSuppliers);
                                                   }} className="w-full p-2 border rounded-md bg-gray-50 text-xs">
-                                                      <option value="">-- Fornecedor {sIndex + 1} --</option>
+                                                      <option value="">-- Selecione --</option>
                                                       {suppliers.map(p => <option key={p.cpf} value={p.cpf}>{p.name}</option>)}
                                                   </select>
                                               ))}
