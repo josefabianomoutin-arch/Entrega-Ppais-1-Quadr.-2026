@@ -68,28 +68,6 @@ const isHortifrutiOrPerishable = (itemName: string): boolean => {
     return allKeywords.some(keyword => lowerItemName.includes(keyword));
 };
 
-// Helper para calcular o número de porções por mês (4 semanas) com base na frequência do decreto
-const getServingsPerMonth = (frequency: string): number => {
-    const freq = frequency.toLowerCase();
-    
-    if (freq.includes('x/dia')) {
-        const quantity = parseInt(freq, 10);
-        return quantity * 28; // 4 semanas * 7 dias
-    }
-    if (freq.includes('x/semana')) {
-        const quantity = parseInt(freq, 10);
-        return quantity * 4;
-    }
-    if (freq.includes('x/quinzena')) {
-        const quantity = parseInt(freq, 10);
-        return quantity * 2;
-    }
-    // Para frequências como 'Preparo', '-', onde o valor é um total para o período.
-    // Assumimos que o valor semanal é um total, então há 4 "eventos" (semanas) por mês.
-    return 4;
-};
-
-
 const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
     const [staffCount, setStaffCount] = useState<number>(() => {
         const saved = localStorage.getItem('perCapitaStaffCount');
@@ -276,19 +254,9 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                         );
                                     }
                                     
-                                    // Cálculo explícito usando frequência
-                                    const servingsPerMonth = getServingsPerMonth(reference.frequency);
-                                    const servingsPerWeek = servingsPerMonth / 4;
-                                    const weeklyConsumptionValue = reference.weeklyConsumption.value;
-                                    const consumptionUnit = reference.weeklyConsumption.unit;
-
-                                    const perServingValue = servingsPerWeek > 0 ? (weeklyConsumptionValue / servingsPerWeek) : weeklyConsumptionValue;
-                                    const calculatedMonthlyConsumptionValue = perServingValue * servingsPerMonth;
-
-                                    const perCapitaRequiredMonthly = {
-                                        value: calculatedMonthlyConsumptionValue,
-                                        unit: consumptionUnit
-                                    };
+                                    // Utiliza diretamente o consumo mensal por pessoa (Consumo em 4) definido nos dados de referência.
+                                    // Esta abordagem é mais direta e robusta do que recalcular a partir da frequência semanal.
+                                    const perCapitaRequiredMonthly = reference.monthlyConsumption;
                                     
                                     const perCapitaRequired4Months = perCapitaRequiredMonthly.value * 4;
 
