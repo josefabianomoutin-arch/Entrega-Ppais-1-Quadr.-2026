@@ -78,12 +78,19 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
         return saved ? parseInt(saved, 10) : 0;
     });
     const [showComparison, setShowComparison] = useState(false);
-    const [customPerCapita, setCustomPerCapita] = useState<Record<string, string>>({});
+    const [customPerCapita, setCustomPerCapita] = useState<Record<string, string>>(() => {
+        const saved = localStorage.getItem('perCapitaCustomValues');
+        return saved ? JSON.parse(saved) : {};
+    });
     
     useEffect(() => {
         localStorage.setItem('perCapitaStaffCount', String(staffCount));
         localStorage.setItem('perCapitaInmateCount', String(inmateCount));
     }, [staffCount, inmateCount]);
+
+    useEffect(() => {
+        localStorage.setItem('perCapitaCustomValues', JSON.stringify(customPerCapita));
+    }, [customPerCapita]);
 
     const itemData = useMemo(() => {
       const data = new Map<string, { totalKg: number; totalValue: number; unit?: string }>();
