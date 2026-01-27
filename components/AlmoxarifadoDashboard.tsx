@@ -154,7 +154,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             expirationDate: entryExpiration
         });
 
-        // FIX: The result from the parent component needs to be transformed to match the feedback state's type.
         setFeedback({ type: result.success ? 'success' : 'error', message: result.message });
         if (result.success) {
             // Reset form
@@ -188,7 +187,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             expirationDate: exitExpiration
         });
 
-        // FIX: The result from the parent component needs to be transformed to match the feedback state's type.
         setFeedback({ type: result.success ? 'success' : 'error', message: result.message });
         if (result.success) {
             setSelectedExitItem('');
