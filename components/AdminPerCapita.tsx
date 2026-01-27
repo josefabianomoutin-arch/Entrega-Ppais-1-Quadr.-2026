@@ -224,7 +224,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     <th className="p-3 text-left">Item</th>
                                     <th className="p-3 text-left">Frequência</th>
                                     <th className="p-3 text-right">Consumo Semanal por pessoa</th>
-                                    <th className="p-3 text-right">Requerido para 4 meses pelo Decreto (População total)</th>
                                     <th className="p-3 text-right">Contratado para 4 meses (População total)</th>
                                     <th className="p-3 text-right">Diferença</th>
                                 </tr>
@@ -242,7 +241,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                                 <td className="p-3 font-semibold text-blue-900">{item.name}</td>
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
-                                                <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">-</td>
                                             </tr>
@@ -252,8 +250,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     const perCapitaRequired = reference.monthlyConsumption;
                                     let totalRequiredValue = 0;
                                     let requiredUnitType = ''; // 'kg', 'L', 'unid.'
-                                    let requiredDisplay = 'N/A';
-
+                                    
                                     if (perCapitaDenominator > 0) {
                                         const unit = perCapitaRequired.unit.toLowerCase();
                                         const value = perCapitaRequired.value;
@@ -261,28 +258,16 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                         if (unit === 'g') {
                                             totalRequiredValue = ((value / 1000) * perCapitaDenominator) * 4;
                                             requiredUnitType = 'kg';
-                                            requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
                                         } else if (unit === 'ml') {
                                             totalRequiredValue = ((value / 1000) * perCapitaDenominator) * 4;
                                             requiredUnitType = 'L';
-                                            requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} L`;
                                         } else if (unit === 'l') {
                                             totalRequiredValue = (value * perCapitaDenominator) * 4;
                                             requiredUnitType = 'L';
-                                            requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`;
                                         } else if (unit === 'unid.') {
                                             totalRequiredValue = (value * perCapitaDenominator) * 4;
                                             requiredUnitType = 'unid.';
-                                            requiredDisplay = `${totalRequiredValue.toLocaleString('pt-BR')} unid.`;
-                                        } else {
-                                            requiredDisplay = formatConsumption(perCapitaRequired);
                                         }
-                                    } else {
-                                        const unit = perCapitaRequired.unit.toLowerCase();
-                                        if (unit === 'g' || unit === 'kg') requiredDisplay = '0,000 kg';
-                                        else if (unit === 'ml' || unit === 'l') requiredDisplay = '0,000 L';
-                                        else if (unit === 'unid.') requiredDisplay = '0 unid.';
-                                        else requiredDisplay = `0 ${perCapitaRequired.unit}`;
                                     }
                                     
                                     let differenceDisplay = 'N/A (unid. incomp.)';
@@ -307,14 +292,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                             <td className="p-3 font-semibold text-gray-800">{item.name}</td>
                                             <td className="p-3 text-left font-mono text-gray-500">{reference.frequency}</td>
                                             <td className="p-3 text-right font-mono text-gray-600">{formatConsumption(reference.weeklyConsumption)}</td>
-                                            <td className="p-3 text-right font-mono font-bold">{requiredDisplay}</td>
                                             <td className="p-3 text-right font-mono font-bold text-gray-800">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
                                             <td className={`p-3 text-right font-mono font-bold ${differenceColor}`}>{differenceDisplay}</td>
                                         </tr>
                                     );
                                 }) : (
                                     <tr>
-                                        <td colSpan={7} className="p-8 text-center text-gray-400 italic">
+                                        <td colSpan={6} className="p-8 text-center text-gray-400 italic">
                                             Nenhum item de hortifruti ou perecível encontrado nos contratos.
                                         </td>
                                     </tr>
