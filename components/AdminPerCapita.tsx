@@ -78,6 +78,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
         return saved ? parseInt(saved, 10) : 0;
     });
     const [showComparison, setShowComparison] = useState(false);
+    const [customPerCapita, setCustomPerCapita] = useState<Record<string, string>>({});
     
     useEffect(() => {
         localStorage.setItem('perCapitaStaffCount', String(staffCount));
@@ -132,6 +133,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
     const totalContractValue = useMemo(() => {
         return itemData.reduce((sum, item) => sum + item.totalValue, 0);
     }, [itemData]);
+
+    const handleCustomPerCapitaChange = (itemName: string, value: string) => {
+        setCustomPerCapita(prev => ({
+            ...prev,
+            [itemName]: value.replace(/[^0-9,]/g, '')
+        }));
+    };
 
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-green-500 animate-fade-in">
@@ -213,6 +221,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     <th className="p-3 text-center">#</th>
                                     <th className="p-3 text-left">Item</th>
                                     <th className="p-3 text-left">Frequência</th>
+                                    <th className="p-3 text-right">Qtd. p/ Pessoa (Editável)</th>
+                                    <th className="p-3 text-right">Requerido para 4 meses (População total)</th>
                                     <th className="p-3 text-right">Contratado para 4 meses (População total)</th>
                                 </tr>
                             </thead>
@@ -228,22 +238,85 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                                 <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
                                                 <td className="p-3 font-semibold text-blue-900">{item.name}</td>
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
+                                                <td className="p-3 text-right">-</td>
+                                                <td className="p-3 text-right font-mono font-bold">-</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
                                             </tr>
                                         );
                                     }
+
+                                    const perCapitaRequired = reference.monthlyConsumption;
+                                    const customValueStr = customPerCapita[item.name];
+                                    const hasCustomValue = customValueStr !== undefined && customValueStr.trim() !== '';
+
+                                    const effectiveValue = hasCustomValue
+                                        ? parseFloat(customValueStr.replace(',', '.')) || 0
+                                        : perCapitaRequired.value;
+                                    
+                                    const effectiveUnit = perCapitaRequired.unit;
+
+                                    let totalRequiredValue = 0;
+                                    let requiredUnitType = ''; // 'kg', 'L', 'unid.'
+
+                                    if (perCapitaDenominator > 0) {
+                                        const unit = effectiveUnit.toLowerCase();
+                                        const value = effectiveValue;
+
+                                        if (unit === 'g') {
+                                            totalRequiredValue = (value / 1000) * perCapitaDenominator * 4;
+                                            requiredUnitType = 'kg';
+                                        } else if (unit === 'ml') {
+                                            totalRequiredValue = (value / 1000) * perCapitaDenominator * 4;
+                                            requiredUnitType = 'L';
+                                        } else if (unit === 'l') {
+                                            totalRequiredValue = value * perCapitaDenominator * 4;
+                                            requiredUnitType = 'L';
+                                        } else if (unit === 'unid.') {
+                                            totalRequiredValue = value * perCapitaDenominator * 4;
+                                            requiredUnitType = 'unid.';
+                                        }
+                                    }
+
+                                    const formatRequiredTotal = (value: number, unit: string) => {
+                                        if (value === 0) return '-';
+                                        const numberFormatOptions: Intl.NumberFormatOptions = {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        };
+                                        if (unit === 'unid.') {
+                                            numberFormatOptions.minimumFractionDigits = 0;
+                                            numberFormatOptions.maximumFractionDigits = 0;
+                                        }
+                                        const formattedValue = value.toLocaleString('pt-BR', numberFormatOptions);
+                                        return `${formattedValue} ${unit}`;
+                                    };
 
                                     return (
                                          <tr key={item.name} className="hover:bg-gray-50">
                                             <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
                                             <td className="p-3 font-semibold text-gray-800">{item.name}</td>
                                             <td className="p-3 text-left font-mono text-gray-500">{reference.frequency}</td>
+                                            <td className="p-3 text-right">
+                                                <div className="inline-flex items-center justify-end">
+                                                    <input
+                                                        type="text"
+                                                        value={customPerCapita[item.name] ?? ''}
+                                                        onChange={(e) => handleCustomPerCapitaChange(item.name, e.target.value)}
+                                                        placeholder={(perCapitaRequired.value || 0).toString().replace('.', ',')}
+                                                        className="w-24 p-1 border rounded-md text-right font-mono text-sm bg-yellow-50 focus:bg-white focus:ring-2 focus:ring-indigo-400"
+                                                    />
+                                                    <span className="ml-2 text-xs text-gray-500 w-8">{perCapitaRequired.unit}</span>
+                                                </div>
+                                            </td>
+                                            <td className={`p-3 text-right font-mono ${hasCustomValue ? 'text-indigo-600 font-bold' : 'text-gray-600'}`}>
+                                                {formatRequiredTotal(totalRequiredValue, requiredUnitType)}
+                                            </td>
                                             <td className="p-3 text-right font-mono font-bold text-gray-800">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
                                         </tr>
                                     );
                                 }) : (
                                     <tr>
-                                        <td colSpan={4} className="p-8 text-center text-gray-400 italic">
+                                        <td colSpan={6} className="p-8 text-center text-gray-400 italic">
                                             Nenhum item de hortifruti ou perecível encontrado nos contratos.
                                         </td>
                                     </tr>
