@@ -228,7 +228,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     <th className="p-3 text-center">#</th>
                                     <th className="p-3 text-left">Item</th>
                                     <th className="p-3 text-left">Frequência</th>
-                                    <th className="p-3 text-right">Qtd. p/ Pessoa (Editável)</th>
+                                    <th className="p-3 text-right">Qtd. Mensal p/ Pessoa</th>
+                                    <th className="p-3 text-right">Citado por Pessoa (4 meses)</th>
                                     <th className="p-3 text-right">Requerido para 4 meses (População total)</th>
                                     <th className="p-3 text-right">Contratado para 4 meses (População total)</th>
                                 </tr>
@@ -246,43 +247,52 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                                 <td className="p-3 font-semibold text-blue-900">{item.name}</td>
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-right">-</td>
+                                                <td className="p-3 text-right">-</td>
                                                 <td className="p-3 text-right font-mono font-bold">-</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
                                             </tr>
                                         );
                                     }
 
-                                    const perCapitaRequired = reference.monthlyConsumption;
+                                    const perCapitaRequiredMonthly = reference.monthlyConsumption;
+                                    const perCapitaRequired4Months = perCapitaRequiredMonthly.value * 4;
+
                                     const customValueStr = customPerCapita[item.name];
                                     const hasCustomValue = customValueStr !== undefined && customValueStr.trim() !== '';
 
-                                    const effectiveValue = hasCustomValue
+                                    const effectiveValue4Months = hasCustomValue
                                         ? parseFloat(customValueStr.replace(',', '.')) || 0
-                                        : perCapitaRequired.value;
+                                        : perCapitaRequired4Months;
                                     
-                                    const effectiveUnit = perCapitaRequired.unit;
+                                    const effectiveValueMonthly = effectiveValue4Months / 4;
+                                    const effectiveUnit = perCapitaRequiredMonthly.unit;
 
                                     let totalRequiredValue = 0;
                                     let requiredUnitType = ''; // 'kg', 'L', 'unid.'
 
                                     if (perCapitaDenominator > 0) {
                                         const unit = effectiveUnit.toLowerCase();
-                                        const value = effectiveValue;
+                                        const value4Months = effectiveValue4Months;
 
                                         if (unit === 'g') {
-                                            totalRequiredValue = (value / 1000) * perCapitaDenominator * 4;
+                                            totalRequiredValue = (value4Months / 1000) * perCapitaDenominator;
                                             requiredUnitType = 'kg';
                                         } else if (unit === 'ml') {
-                                            totalRequiredValue = (value / 1000) * perCapitaDenominator * 4;
+                                            totalRequiredValue = (value4Months / 1000) * perCapitaDenominator;
                                             requiredUnitType = 'L';
                                         } else if (unit === 'l') {
-                                            totalRequiredValue = value * perCapitaDenominator * 4;
+                                            totalRequiredValue = value4Months * perCapitaDenominator;
                                             requiredUnitType = 'L';
                                         } else if (unit === 'unid.') {
-                                            totalRequiredValue = value * perCapitaDenominator * 4;
+                                            totalRequiredValue = value4Months * perCapitaDenominator;
                                             requiredUnitType = 'unid.';
                                         }
                                     }
+
+                                    const formatMonthlyPerCapita = (value: number, unit: string) => {
+                                        const formattedValue = value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                        return `${formattedValue} ${unit}`;
+                                    };
 
                                     const formatRequiredTotal = (value: number, unit: string) => {
                                         if (value === 0) return '-';
@@ -303,16 +313,19 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                             <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
                                             <td className="p-3 font-semibold text-gray-800">{item.name}</td>
                                             <td className="p-3 text-left font-mono text-gray-500">{reference.frequency}</td>
+                                            <td className="p-3 text-right font-mono text-gray-600">
+                                                {formatMonthlyPerCapita(effectiveValueMonthly, effectiveUnit)}
+                                            </td>
                                             <td className="p-3 text-right">
                                                 <div className="inline-flex items-center justify-end">
                                                     <input
                                                         type="text"
                                                         value={customPerCapita[item.name] ?? ''}
                                                         onChange={(e) => handleCustomPerCapitaChange(item.name, e.target.value)}
-                                                        placeholder={(perCapitaRequired.value || 0).toString().replace('.', ',')}
+                                                        placeholder={(perCapitaRequired4Months || 0).toString().replace('.', ',')}
                                                         className="w-24 p-1 border rounded-md text-right font-mono text-sm bg-yellow-50 focus:bg-white focus:ring-2 focus:ring-indigo-400"
                                                     />
-                                                    <span className="ml-2 text-xs text-gray-500 w-8">{perCapitaRequired.unit}</span>
+                                                    <span className="ml-2 text-xs text-gray-500 w-8">{perCapitaRequiredMonthly.unit}</span>
                                                 </div>
                                             </td>
                                             <td className={`p-3 text-right font-mono ${hasCustomValue ? 'text-indigo-600 font-bold' : 'text-gray-600'}`}>
@@ -323,7 +336,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     );
                                 }) : (
                                     <tr>
-                                        <td colSpan={6} className="p-8 text-center text-gray-400 italic">
+                                        <td colSpan={7} className="p-8 text-center text-gray-400 italic">
                                             Nenhum item de hortifruti ou perecível encontrado nos contratos.
                                         </td>
                                     </tr>
