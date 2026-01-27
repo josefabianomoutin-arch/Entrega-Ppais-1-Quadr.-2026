@@ -204,8 +204,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         <div className="min-h-screen bg-gray-50 text-gray-800">
             <header className="bg-white shadow-md p-4 flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-700">Painel do Almoxarifado</h1>
-                    <p className="text-sm text-gray-500">Gestão de Entradas e Saídas do Estoque</p>
+                    <h1 className="text-2xl font-bold text-gray-700">Controle de Estoque</h1>
+                    <p className="text-sm text-gray-500">Registre as entradas e saídas de produtos no estoque.</p>
                 </div>
                 <button onClick={onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm">Sair</button>
             </header>

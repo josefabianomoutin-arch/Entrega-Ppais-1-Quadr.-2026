@@ -40,8 +40,8 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, onD
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-gray-700 animate-fade-in">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 border-b pb-6">
                 <div>
-                    <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Controle de Almoxarifado</h2>
-                    <p className="text-gray-400 font-medium">Histórico de entradas e saídas de lotes.</p>
+                    <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Histórico de Estoque</h2>
+                    <p className="text-gray-400 font-medium">Visualize o histórico de movimentações de estoque.</p>
                 </div>
                 <div className="flex items-center gap-4 flex-wrap">
                     <input
