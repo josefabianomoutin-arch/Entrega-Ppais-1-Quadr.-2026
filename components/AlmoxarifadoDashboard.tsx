@@ -154,7 +154,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             expirationDate: entryExpiration
         });
 
-        setFeedback(result);
+        // FIX: The result from the parent component needs to be transformed to match the feedback state's type.
+        setFeedback({ type: result.success ? 'success' : 'error', message: result.message });
         if (result.success) {
             // Reset form
             setSelectedEntryItem('');
@@ -187,7 +188,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             expirationDate: exitExpiration
         });
 
-        setFeedback(result);
+        // FIX: The result from the parent component needs to be transformed to match the feedback state's type.
+        setFeedback({ type: result.success ? 'success' : 'error', message: result.message });
         if (result.success) {
             setSelectedExitItem('');
             setExitSupplierCpf('');
@@ -212,7 +214,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
             <main className="p-4 md:p-8">
                 <div className="max-w-5xl mx-auto mb-8">
-                    <div className="flex border-b"><button onClick={() => setActiveTab('entrada')} className={`py-2 px-6 font-semibold transition-colors ${activeTab === 'entrada' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-blue-500'}`}>Registrar Entrada</button><button onClick={() => setActiveTab('saída')} className={`py-2 px-6 font-semibold transition-colors ${activeTab === 'saída' ? 'border-b-2 border-red-500 text-red-600' : 'text-gray-500 hover:text-red-500'}`}>Registrar Saída</button></div>
+                    <div className="flex border-b"><button onClick={() => setActiveTab('entrada')} className={`py-2 px-6 font-semibold transition-colors ${activeTab === 'entrada' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-blue-500'}`}>Entrada de Produtos</button><button onClick={() => setActiveTab('saída')} className={`py-2 px-6 font-semibold transition-colors ${activeTab === 'saída' ? 'border-b-2 border-red-500 text-red-600' : 'text-gray-500 hover:text-red-500'}`}>Saída de Produtos</button></div>
                 </div>
 
                 {feedback && <div className={`max-w-5xl mx-auto mb-6 p-4 rounded-lg text-center font-semibold animate-fade-in ${feedback.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{feedback.message}</div>}
