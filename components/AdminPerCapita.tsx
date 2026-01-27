@@ -133,16 +133,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
         return itemData.reduce((sum, item) => sum + item.totalValue, 0);
     }, [itemData]);
 
-    const formatConsumption = (consumption: { value: number; unit: string }) => {
-        const value = consumption.value || 0;
-        const unit = consumption.unit || '';
-        const formattedValue = value.toLocaleString('pt-BR', {
-            minimumFractionDigits: unit === 'g' || unit === 'ml' ? 0 : 2,
-            maximumFractionDigits: 2,
-        });
-        return `${formattedValue} ${unit}`;
-    };
-
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-green-500 animate-fade-in">
             <div className="text-center mb-10">
@@ -223,9 +213,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                     <th className="p-3 text-center">#</th>
                                     <th className="p-3 text-left">Item</th>
                                     <th className="p-3 text-left">Frequência</th>
-                                    <th className="p-3 text-right">Consumo Semanal por pessoa</th>
                                     <th className="p-3 text-right">Contratado para 4 meses (População total)</th>
-                                    <th className="p-3 text-right">Diferença</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -240,50 +228,9 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                                 <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
                                                 <td className="p-3 font-semibold text-blue-900">{item.name}</td>
                                                 <td className="p-3 text-center text-blue-800 font-mono">-</td>
-                                                <td className="p-3 text-center text-blue-800 font-mono">-</td>
                                                 <td className="p-3 text-right font-mono font-bold text-blue-900">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
-                                                <td className="p-3 text-right font-mono font-bold text-blue-900">-</td>
                                             </tr>
                                         );
-                                    }
-                                    
-                                    const perCapitaRequired = reference.monthlyConsumption;
-                                    let totalRequiredValue = 0;
-                                    let requiredUnitType = ''; // 'kg', 'L', 'unid.'
-                                    
-                                    if (perCapitaDenominator > 0) {
-                                        const unit = perCapitaRequired.unit.toLowerCase();
-                                        const value = perCapitaRequired.value;
-
-                                        if (unit === 'g') {
-                                            totalRequiredValue = ((value / 1000) * perCapitaDenominator) * 4;
-                                            requiredUnitType = 'kg';
-                                        } else if (unit === 'ml') {
-                                            totalRequiredValue = ((value / 1000) * perCapitaDenominator) * 4;
-                                            requiredUnitType = 'L';
-                                        } else if (unit === 'l') {
-                                            totalRequiredValue = (value * perCapitaDenominator) * 4;
-                                            requiredUnitType = 'L';
-                                        } else if (unit === 'unid.') {
-                                            totalRequiredValue = (value * perCapitaDenominator) * 4;
-                                            requiredUnitType = 'unid.';
-                                        }
-                                    }
-                                    
-                                    let differenceDisplay = 'N/A (unid. incomp.)';
-                                    let differenceColor = 'text-gray-500';
-
-                                    const [contractedUnitType] = (contractedUnitString || 'kg-1').split('-');
-                                    const contractedIsVolume = ['litro', 'embalagem', 'caixa'].some(u => contractedUnitType.includes(u));
-
-                                    if (contractedIsVolume && requiredUnitType === 'L') {
-                                        const difference = contractedTotal - totalRequiredValue;
-                                        differenceDisplay = `${difference >= 0 ? '+' : ''}${difference.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} L`;
-                                        differenceColor = difference >= 0 ? 'text-blue-600' : 'text-red-600';
-                                    } else if (!contractedIsVolume && requiredUnitType === 'kg') {
-                                        const difference = contractedTotal - totalRequiredValue;
-                                        differenceDisplay = `${difference >= 0 ? '+' : ''}${difference.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
-                                        differenceColor = difference >= 0 ? 'text-blue-600' : 'text-red-600';
                                     }
 
                                     return (
@@ -291,14 +238,12 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                             <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
                                             <td className="p-3 font-semibold text-gray-800">{item.name}</td>
                                             <td className="p-3 text-left font-mono text-gray-500">{reference.frequency}</td>
-                                            <td className="p-3 text-right font-mono text-gray-600">{formatConsumption(reference.weeklyConsumption)}</td>
                                             <td className="p-3 text-right font-mono font-bold text-gray-800">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
-                                            <td className={`p-3 text-right font-mono font-bold ${differenceColor}`}>{differenceDisplay}</td>
                                         </tr>
                                     );
                                 }) : (
                                     <tr>
-                                        <td colSpan={6} className="p-8 text-center text-gray-400 italic">
+                                        <td colSpan={4} className="p-8 text-center text-gray-400 italic">
                                             Nenhum item de hortifruti ou perecível encontrado nos contratos.
                                         </td>
                                     </tr>
