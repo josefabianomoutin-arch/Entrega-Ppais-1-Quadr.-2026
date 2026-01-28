@@ -254,8 +254,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                                         );
                                     }
                                     
-                                    // Utiliza diretamente o consumo mensal por pessoa (Consumo em 4) definido nos dados de referência.
-                                    // Esta abordagem é mais direta e robusta do que recalcular a partir da frequência semanal.
+                                    // REVISED LOGIC: Directly use the pre-calculated monthly consumption from resolution data.
+                                    // This is the most reliable method and avoids complex, error-prone calculations based on frequency strings.
                                     const perCapitaRequiredMonthly = reference.monthlyConsumption;
                                     
                                     const perCapitaRequired4Months = perCapitaRequiredMonthly.value * 4;
