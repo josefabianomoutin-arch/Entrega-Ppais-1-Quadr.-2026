@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { Supplier, ContractItem, WarehouseMovement } from '../types';
+import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 import EditSupplierModal from './EditSupplierModal';
@@ -25,6 +26,8 @@ interface AdminDashboardProps {
   registrationStatus: { success: boolean; message: string } | null;
   onClearRegistrationStatus: () => void;
   onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => Promise<void>;
+  perCapitaConfig: PerCapitaConfig;
+  onUpdatePerCapitaConfig: (config: PerCapitaConfig) => Promise<void>;
   onDeleteWarehouseEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
 }
 
@@ -105,6 +108,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     registrationStatus,
     onClearRegistrationStatus,
     onReopenInvoice,
+    perCapitaConfig,
+    onUpdatePerCapitaConfig,
     onDeleteWarehouseEntry
 }) => {
   // Estados para aba de REGISTRO
@@ -622,7 +627,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {activeTab === 'warehouse' && <AdminWarehouseLog warehouseLog={warehouseLog} onDeleteEntry={onDeleteWarehouseEntry} />}
           {activeTab === 'analytics' && <AdminAnalytics suppliers={suppliers} />}
           {activeTab === 'graphs' && <AdminGraphs suppliers={suppliers} />}
-          {activeTab === 'perCapita' && <AdminPerCapita suppliers={suppliers} />}
+          {activeTab === 'perCapita' && <AdminPerCapita suppliers={suppliers} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={onUpdatePerCapitaConfig} />}
           
 
           {activeTab === 'info' && (

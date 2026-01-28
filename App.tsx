@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import type { Supplier, Delivery, WarehouseMovement } from './types';
+import type { Supplier, Delivery, WarehouseMovement, PerCapitaConfig } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -13,11 +14,13 @@ const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 const suppliersRef = ref(database, 'suppliers');
 const warehouseLogRef = ref(database, 'warehouseLog');
+const perCapitaConfigRef = ref(database, 'perCapitaConfig');
 
 
 const App: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [warehouseLog, setWarehouseLog] = useState<WarehouseMovement[]>([]);
+  const [perCapitaConfig, setPerCapitaConfig] = useState<PerCapitaConfig>({});
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<Supplier | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
@@ -129,10 +132,20 @@ const App: React.FC = () => {
         setWarehouseLog([]);
       }
     });
+    
+    const unsubscribePerCapitaConfig = onValue(perCapitaConfigRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setPerCapitaConfig(data);
+      } else {
+        setPerCapitaConfig({});
+      }
+    });
 
     return () => {
       unsubscribeSuppliers();
       unsubscribeWarehouseLog();
+      unsubscribePerCapitaConfig();
     };
   }, []);
 
@@ -407,6 +420,10 @@ const App: React.FC = () => {
         console.error('Erro ao restaurar dados:', error);
         return false;
      }
+  };
+  
+  const handleUpdatePerCapitaConfig = async (config: PerCapitaConfig) => {
+    await writeToDatabase(perCapitaConfigRef, config);
   };
 
   const scheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
@@ -779,6 +796,8 @@ const App: React.FC = () => {
             registrationStatus={registrationStatus}
             onClearRegistrationStatus={handleClearRegistrationStatus}
             onReopenInvoice={reopenInvoice}
+            perCapitaConfig={perCapitaConfig}
+            onUpdatePerCapitaConfig={handleUpdatePerCapitaConfig}
             onDeleteWarehouseEntry={handleDeleteWarehouseEntry}
           />
         ) : currentUser ? (

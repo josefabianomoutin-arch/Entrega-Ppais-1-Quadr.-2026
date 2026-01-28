@@ -1,9 +1,12 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Supplier } from '../types';
+import type { Supplier, PerCapitaConfig } from '../types';
 import { resolutionData } from './resolutionData';
 
 interface AdminPerCapitaProps {
   suppliers: Supplier[];
+  perCapitaConfig: PerCapitaConfig;
+  onUpdatePerCapitaConfig: (config: PerCapitaConfig) => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -68,29 +71,59 @@ const isHortifrutiOrPerishable = (itemName: string): boolean => {
     return allKeywords.some(keyword => lowerItemName.includes(keyword));
 };
 
-const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
-    const [staffCount, setStaffCount] = useState<number>(() => {
-        const saved = localStorage.getItem('perCapitaStaffCount');
-        return saved ? parseInt(saved, 10) : 0;
-    });
-    const [inmateCount, setInmateCount] = useState<number>(() => {
-        const saved = localStorage.getItem('perCapitaInmateCount');
-        return saved ? parseInt(saved, 10) : 0;
-    });
+const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaConfig, onUpdatePerCapitaConfig }) => {
+    const [staffCount, setStaffCount] = useState<number>(0);
+    const [inmateCount, setInmateCount] = useState<number>(0);
+    const [customPerCapita, setCustomPerCapita] = useState<Record<string, string>>({});
     const [showComparison, setShowComparison] = useState(false);
-    const [customPerCapita, setCustomPerCapita] = useState<Record<string, string>>(() => {
-        const saved = localStorage.getItem('perCapitaCustomValues');
-        return saved ? JSON.parse(saved) : {};
-    });
-    
-    useEffect(() => {
-        localStorage.setItem('perCapitaStaffCount', String(staffCount));
-        localStorage.setItem('perCapitaInmateCount', String(inmateCount));
-    }, [staffCount, inmateCount]);
+    const [isDirty, setIsDirty] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     useEffect(() => {
-        localStorage.setItem('perCapitaCustomValues', JSON.stringify(customPerCapita));
-    }, [customPerCapita]);
+        setStaffCount(perCapitaConfig.staffCount || 0);
+        setInmateCount(perCapitaConfig.inmateCount || 0);
+        setCustomPerCapita(perCapitaConfig.customValues || {});
+        setIsDirty(false);
+    }, [perCapitaConfig]);
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        setSaveSuccess(false);
+        const newConfig: PerCapitaConfig = {
+            staffCount,
+            inmateCount,
+            customValues: customPerCapita,
+        };
+        try {
+            await onUpdatePerCapitaConfig(newConfig);
+            setIsDirty(false);
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        } catch (error) {
+            console.error("Failed to save per capita config:", error);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleStaffCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setStaffCount(parseInt(e.target.value, 10) || 0);
+        setIsDirty(true);
+    };
+
+    const handleInmateCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInmateCount(parseInt(e.target.value, 10) || 0);
+        setIsDirty(true);
+    };
+
+    const handleCustomPerCapitaChange = (itemName: string, value: string) => {
+        setCustomPerCapita(prev => ({
+            ...prev,
+            [itemName]: value.replace(/[^0-9,]/g, '')
+        }));
+        setIsDirty(true);
+    };
 
     const itemData = useMemo(() => {
       const data = new Map<string, { totalKg: number; totalValue: number; unit?: string }>();
@@ -141,15 +174,32 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
         return itemData.reduce((sum, item) => sum + item.totalValue, 0);
     }, [itemData]);
 
-    const handleCustomPerCapitaChange = (itemName: string, value: string) => {
-        setCustomPerCapita(prev => ({
-            ...prev,
-            [itemName]: value.replace(/[^0-9,]/g, '')
-        }));
-    };
-
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-green-500 animate-fade-in">
+        <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-green-500 animate-fade-in relative">
+            
+            {(isDirty || saveSuccess) && (
+                <div className="sticky top-0 z-10 mb-6 -mx-6 -mt-6">
+                    {saveSuccess && (
+                        <div className="p-4 bg-green-100 border-b border-green-300 text-center font-semibold text-green-800 shadow-sm animate-fade-in">
+                            Dados salvos com sucesso na nuvem!
+                        </div>
+                    )}
+                    {isDirty && (
+                        <div className="p-4 bg-yellow-100 border-b border-yellow-300 rounded-t-2xl flex justify-between items-center shadow-sm animate-fade-in">
+                            <p className="font-semibold text-yellow-800">Você tem alterações não salvas.</p>
+                            <button 
+                                onClick={handleSave} 
+                                disabled={isSaving}
+                                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-400"
+                            >
+                                {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+
             <div className="text-center mb-10">
                 <h2 className="text-3xl font-black text-green-900 uppercase tracking-tighter">Cálculo de Consumo Per Capita</h2>
                 <p className="text-gray-400 font-medium">Estime o consumo mensal por pessoa com base nos totais contratados.</p>
@@ -166,7 +216,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                     <input 
                         type="number"
                         value={inmateCount || ''}
-                        onChange={(e) => setInmateCount(parseInt(e.target.value, 10) || 0)}
+                        onChange={handleInmateCountChange}
                         placeholder="0" 
                         className="input-field font-mono text-lg"
                     />
@@ -176,7 +226,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers }) => {
                      <input 
                         type="number"
                         value={staffCount || ''}
-                        onChange={(e) => setStaffCount(parseInt(e.target.value, 10) || 0)}
+                        onChange={handleStaffCountChange}
                         placeholder="0" 
                         className="input-field font-mono text-lg"
                     />

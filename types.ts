@@ -56,3 +56,9 @@ export interface WarehouseMovement {
   quantity?: number; // How much was moved, especially for 'saída'
   expirationDate?: string; // Data de validade do lote na entrada
 }
+
+export interface PerCapitaConfig {
+  staffCount?: number;
+  inmateCount?: number;
+  customValues?: Record<string, string>;
+}
