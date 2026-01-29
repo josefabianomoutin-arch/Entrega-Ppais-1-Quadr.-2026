@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Supplier, PerCapitaConfig } from '../types';
 import { resolutionData } from './resolutionData';
@@ -15,22 +16,28 @@ const formatCurrency = (value: number) => {
 };
 
 const formatContractedTotal = (quantity: number, unitString?: string): string => {
-    const [unitType] = (unitString || 'kg-1').split('-');
+    const [unitType, unitWeightStr] = (unitString || 'kg-1').split('-');
     
-    // Check for volume units
     if (['litro', 'embalagem', 'caixa'].some(u => unitType.includes(u))) {
-        // For volume, the stored quantity in `totalKg` is already in Liters
+        // For volume, quantity is total Liters
         return `${quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`;
     }
     
     if (unitType === 'dz') {
+        // For dozen, quantity is number of dozens
         return `${quantity.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} Dz`;
     }
 
-    // Default to Kg for everything else (saco, balde, kg, un) as they are weight-based.
-    return `${quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
-};
+    if (unitType === 'un') {
+        // For 'un', the quantity stored is already the total weight in kg.
+        return `${quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
+    }
 
+    // For everything else (saco, balde, kg, etc.), convert quantity of units to total weight.
+    const unitWeight = parseFloat(unitWeightStr) || 1;
+    const totalWeight = quantity * unitWeight;
+    return `${totalWeight.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
+};
 
 const getContractItemWeight = (item: { totalKg?: number, unit?: string }): number => {
     if (!item) return 0;
@@ -126,12 +133,12 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
     };
 
     const itemData = useMemo(() => {
-      const data = new Map<string, { totalKg: number; totalValue: number; unit?: string }>();
+      const data = new Map<string, { totalQuantity: number; totalValue: number; unit: string }>();
       suppliers.forEach(p => {
         (p.contractItems || []).forEach(item => {
-          const current = data.get(item.name) || { totalKg: 0, totalValue: 0, unit: item.unit };
+          const current = data.get(item.name) || { totalQuantity: 0, totalValue: 0, unit: item.unit || 'kg-1' };
           
-          current.totalKg += getContractItemWeight(item);
+          current.totalQuantity += item.totalKg;
 
           const itemTotalValue = (item.totalKg || 0) * (item.valuePerKg || 0);
           current.totalValue += itemTotalValue;
@@ -159,7 +166,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
              if (['litro', 'embalagem', 'caixa', 'dz'].some(u => unitType.includes(u))) {
                 return sum;
             }
-            return sum + item.totalKg;
+            const weight = getContractItemWeight({ totalKg: item.totalQuantity, unit: item.unit });
+            return sum + weight;
         }, 0);
         return (totalKgOfAllItems / perCapitaDenominator) / 4;
     }, [itemData, perCapitaDenominator]);
@@ -287,7 +295,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
                             <tbody className="divide-y divide-gray-100">
                                 {filteredItemData.length > 0 ? filteredItemData.map((item, index) => {
                                     const reference = resolutionData[item.name.toUpperCase()];
-                                    const contractedTotal = item.totalKg;
+                                    const contractedTotal = item.totalQuantity;
                                     const contractedUnitString = item.unit;
                                     
                                     if (!reference) {
