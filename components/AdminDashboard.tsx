@@ -50,8 +50,8 @@ interface ItemCentricInput {
   ui_valuePerUnit: string;
   ui_kgConversion: string;
   // Campos de dados reais (calculados)
-  totalKg: string; // Para 'un', é o peso total. Para outros, é a quantidade de unidades (dúzias, baldes, sacos, etc).
-  valuePerKg: string; // Para 'un', é o valor/kg. Para outros, é o valor por unidade.
+  totalKg: string; // GUARDA A QUANTIDADE DE UNIDADES, NÃO O PESO. O NOME É MANTIDO POR COMPATIBILIDADE.
+  valuePerKg: string; // GUARDA O VALOR POR UNIDADE. O NOME É MANTIDO POR COMPATIBILIDADE.
 }
 
 
@@ -201,20 +201,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             ui_unit: data.unit.split('-')[0] as ItemCentricInput['ui_unit'],
             ui_quantity: String(data.totalQty),
             ui_valuePerUnit: String(data.valuePerUnit),
-            ui_kgConversion: '', 
+            ui_kgConversion: '1', // Default value
             totalKg: String(data.totalQty),
             valuePerKg: String(data.valuePerUnit),
         };
         
-        if(data.unit === 'un-auto') {
-            const totalKg = data.totalQty;
-            const valuePerKg = data.valuePerUnit;
-            item.ui_quantity = '';
-            item.ui_valuePerUnit = '';
-            item.totalKg = String(totalKg);
-            item.valuePerKg = String(valuePerKg);
-        }
-
         return item;
     });
 
@@ -250,23 +241,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               const updatedItem = { ...item, [field]: value };
               
-              if (field === 'ui_compositeUnit' && value.endsWith('-auto')) {
-                  updatedItem.ui_kgConversion = ''; 
-              }
-
               if (field.startsWith('ui_')) {
-                  const [unit] = updatedItem.ui_compositeUnit.split('-');
                   const quantity = parseFloat(updatedItem.ui_quantity.replace(',', '.')) || 0;
                   const valuePerUnit = parseFloat(updatedItem.ui_valuePerUnit.replace(',', '.')) || 0;
 
-                  if (unit === 'un') { 
-                      const kgPerUnit = parseFloat(updatedItem.ui_kgConversion.replace(',', '.')) || 0;
-                      updatedItem.totalKg = (quantity * kgPerUnit).toFixed(3);
-                      updatedItem.valuePerKg = kgPerUnit > 0 ? (valuePerUnit / kgPerUnit).toFixed(3) : '0';
-                  } else {
-                      updatedItem.totalKg = String(quantity);
-                      updatedItem.valuePerKg = String(valuePerUnit);
-                  }
+                  // REMOVIDO: Nenhuma conversão é feita. O valor digitado é o valor final.
+                  updatedItem.totalKg = String(quantity);
+                  updatedItem.valuePerKg = String(valuePerUnit);
               }
 
               return updatedItem;
@@ -544,30 +525,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="space-y-4">
                       {itemCentricContracts.map((item, index) => {
                           const isExpanded = index === expandedItemIndex;
-                          const [unit] = item.ui_compositeUnit.split('-');
                           const quantity = parseFloat(item.totalKg || '0');
-                          const unitLabel = unitOptions.find(opt => opt.value === item.ui_compositeUnit)?.label.split(' (')[0] || unit;
-                          const isUnit = unit === 'un';
-                          const isKgOrLiter = unit === 'kg' || unit.includes('litro') || unit.includes('embalagem') || unit.includes('caixa');
-                          
-                          let displayAmount, displayUnit, headerLabel;
+                          const unitLabel = unitOptions.find(opt => opt.value === item.ui_compositeUnit)?.label.split(' (')[0] || 'Unidade';
+                          const isUnitType = item.ui_compositeUnit === 'un-auto';
 
-                          if (isUnit) {
-                              displayAmount = quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                              displayUnit = 'Kg';
-                              headerLabel = 'Peso Total (Kg)';
-                          } else if (isKgOrLiter) {
-                              displayAmount = quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                              displayUnit = unit === 'kg' ? 'Kg' : 'Litros';
-                              headerLabel = unit === 'kg' ? 'Peso Total (Kg)' : 'Volume Total (L)';
-                          } else {
-                              displayAmount = quantity.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-                              const isDozenLabel = unitLabel === 'Dúzia';
-                              displayUnit = isDozenLabel ? 'Dz' : unitLabel;
-                              headerLabel = `Qtd. Total (${isDozenLabel ? 'Dz' : unitLabel + 's'})`;
-                          }
+                          // Lógica de exibição simplificada: sempre mostra a quantidade e o nome da unidade.
+                          const displayAmount = quantity.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                          const displayUnit = unitLabel;
+                          const headerLabel = `Quantidade Total`;
                           
-                          const valuePerUnit = parseFloat(item.ui_valuePerUnit.replace(',', '.')) || 0;
+                          const valuePerUnit = parseFloat(item.valuePerKg || '0');
+                          const valueHeaderLabel = `Valor por ${unitLabel}`;
 
                           return (
                               <div key={item.id} className={`border rounded-xl transition-all ${isExpanded ? 'bg-white ring-2 ring-indigo-400' : 'bg-gray-50'}`}>
@@ -584,8 +552,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                             </p>
                                           </div>
                                           <div className="text-right">
-                                            <p className="text-xs text-gray-500">{isUnit ? 'Valor/Kg' : `Valor/${unitLabel}`}</p>
-                                            <p className="font-mono font-semibold text-green-700">{formatCurrency(isUnit ? (parseFloat(item.valuePerKg) || 0) : valuePerUnit)}</p>
+                                            <p className="text-xs text-gray-500">{valueHeaderLabel}</p>
+                                            <p className="font-mono font-semibold text-green-700">{formatCurrency(valuePerUnit)}</p>
                                           </div>
                                           <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" /></svg>
                                       </div>
@@ -598,9 +566,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         <select value={item.ui_compositeUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_compositeUnit', e.target.value)} className="w-full p-2 border rounded-md bg-gray-50">
                                             {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                         </select>
-                                        <input type="text" placeholder={`Qtd. de ${unitLabel}`} value={item.ui_quantity} onChange={(e) => handleItemCentricChange(item.id, 'ui_quantity', e.target.value)} className="w-full p-2 border rounded-md font-mono" />
-                                        <input type="text" placeholder={`Valor por ${unitLabel}`} value={item.ui_valuePerUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_valuePerUnit', e.target.value)} className="w-full p-2 border rounded-md font-mono" />
-                                        {isUnit && <input type="text" placeholder={`Peso da Unidade (Kg)`} value={item.ui_kgConversion} onChange={(e) => handleItemCentricChange(item.id, 'ui_kgConversion', e.target.value)} className="w-full p-2 border rounded-md font-mono" />}
+                                        <input type="text" placeholder={`Qtd. de ${unitLabel}`} value={item.ui_quantity} onChange={(e) => handleItemCentricChange(item.id, 'ui_quantity', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2 border rounded-md font-mono" />
+                                        <input type="text" placeholder={`Valor por ${unitLabel}`} value={item.ui_valuePerUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_valuePerUnit', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2 border rounded-md font-mono" />
+                                        {isUnitType && <input type="text" placeholder={`Peso da Unidade (Kg)`} value={item.ui_kgConversion} onChange={(e) => handleItemCentricChange(item.id, 'ui_kgConversion', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2 border rounded-md font-mono" title="Este campo é apenas informativo e não afeta o cálculo da quantidade."/>}
                                       </div>
                                       
                                       <div>
