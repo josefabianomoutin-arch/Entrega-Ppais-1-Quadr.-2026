@@ -83,11 +83,12 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     }, [suppliers]);
     
     // --- ENTRADA DERIVED STATE ---
+    // FIX: Defined entrySuppliersForItem to populate the supplier dropdown for product entry.
     const entrySuppliersForItem = useMemo(() => {
         if (!selectedEntryItem) return [];
         return suppliers
             .filter(s => s.contractItems.some(ci => ci.name === selectedEntryItem))
-            .sort((a,b) => a.name.localeCompare(b.name));
+            .sort((a, b) => a.name.localeCompare(b.name));
     }, [selectedEntryItem, suppliers]);
 
     const entryItemData = useMemo(() => {
@@ -95,28 +96,36 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
         let totalContratado = 0;
         let totalRecebidoHistorico = 0;
-        let unit = 'kg-1';
         let displayUnit = 'Kg';
         let isComparable = false;
 
         const allContractItemsForItem = suppliers.flatMap(s => s.contractItems.filter(ci => ci.name === selectedEntryItem));
         
         if (allContractItemsForItem.length > 0) {
-            unit = allContractItemsForItem[0].unit || 'kg-1';
+            const unit = allContractItemsForItem[0].unit || 'kg-1';
             const [unitType] = unit.split('-');
 
-            if (unitType === 'dz') {
-                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
-                displayUnit = 'Dz';
-                isComparable = false;
-            } else if (['litro', 'embalagem', 'caixa'].some(u => unitType.includes(u))) {
-                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
-                displayUnit = 'L';
-                isComparable = false;
-            } else {
+            if (unitType === 'un' || unitType === 'kg') {
+                // For 'un', totalKg is already total weight. For 'kg', it's the weight.
                 totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + getContractItemWeight(ci), 0);
                 displayUnit = 'Kg';
                 isComparable = true;
+            } else {
+                // For all other units, totalKg represents the quantity of packages/units.
+                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
+                
+                const unitLabelMap: { [key: string]: string } = {
+                    dz: 'Dz',
+                    litro: 'L',
+                    embalagem: 'L',
+                    caixa: 'L',
+                    saco: 'Sacos',
+                    balde: 'Baldes',
+                    pacote: 'Pacotes',
+                    pote: 'Potes',
+                };
+                displayUnit = unitLabelMap[unitType] || unitType;
+                isComparable = false; // Cannot reliably compare a unit count with a Kg received value
             }
         }
 
@@ -161,15 +170,22 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             const unit = allContractItemsForItem[0].unit || 'kg-1';
             const [unitType] = unit.split('-');
 
-            if (unitType === 'dz') {
-                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
-                displayUnit = 'Dz';
-            } else if (['litro', 'embalagem', 'caixa'].some(u => unitType.includes(u))) {
-                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
-                displayUnit = 'L';
-            } else { // Weight-based
+             if (unitType === 'un' || unitType === 'kg') {
                 totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + getContractItemWeight(ci), 0);
                 displayUnit = 'Kg';
+            } else {
+                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
+                const unitLabelMap: { [key: string]: string } = {
+                    dz: 'Dz',
+                    litro: 'L',
+                    embalagem: 'L',
+                    caixa: 'L',
+                    saco: 'Sacos',
+                    balde: 'Baldes',
+                    pacote: 'Pacotes',
+                    pote: 'Potes',
+                };
+                displayUnit = unitLabelMap[unitType] || unitType;
             }
         }
 

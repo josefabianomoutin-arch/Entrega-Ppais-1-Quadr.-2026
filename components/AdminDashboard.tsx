@@ -544,23 +544,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="space-y-4">
                       {itemCentricContracts.map((item, index) => {
                           const isExpanded = index === expandedItemIndex;
-                          const [unit, kgConversionFactorStr] = item.ui_compositeUnit.split('-');
-                          
-                          const isUnit = unit === 'un';
-                          const isDozen = unit === 'dz';
-
-                          const valuePerUnit = parseFloat(item.ui_valuePerUnit.replace(',', '.')) || 0;
-                          
-                          // Lógica para calcular e exibir o total de forma consistente com outras telas
-                          const quantityOrWeight = parseFloat(item.totalKg || '0');
-                          const conversionFactor = parseFloat(kgConversionFactorStr) || 1;
-                          const totalWeight = isUnit ? quantityOrWeight : quantityOrWeight * conversionFactor;
-                          
-                          const displayAmount = isDozen 
-                              ? quantityOrWeight.toLocaleString('pt-BR') 
-                              : totalWeight.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                          const displayUnit = isDozen ? 'Dz' : 'Kg';
+                          const [unit] = item.ui_compositeUnit.split('-');
+                          const quantity = parseFloat(item.totalKg || '0');
                           const unitLabel = unitOptions.find(opt => opt.value === item.ui_compositeUnit)?.label.split(' (')[0] || unit;
+                          const isUnit = unit === 'un';
+                          const isKgOrLiter = unit === 'kg' || unit.includes('litro') || unit.includes('embalagem') || unit.includes('caixa');
+                          
+                          let displayAmount, displayUnit, headerLabel;
+
+                          if (isUnit) {
+                              displayAmount = quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                              displayUnit = 'Kg';
+                              headerLabel = 'Peso Total (Kg)';
+                          } else if (isKgOrLiter) {
+                              displayAmount = quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                              displayUnit = unit === 'kg' ? 'Kg' : 'Litros';
+                              headerLabel = unit === 'kg' ? 'Peso Total (Kg)' : 'Volume Total (L)';
+                          } else {
+                              displayAmount = quantity.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                              const isDozenLabel = unitLabel === 'Dúzia';
+                              displayUnit = isDozenLabel ? 'Dz' : unitLabel;
+                              headerLabel = `Qtd. Total (${isDozenLabel ? 'Dz' : unitLabel + 's'})`;
+                          }
+                          
+                          const valuePerUnit = parseFloat(item.ui_valuePerUnit.replace(',', '.')) || 0;
 
                           return (
                               <div key={item.id} className={`border rounded-xl transition-all ${isExpanded ? 'bg-white ring-2 ring-indigo-400' : 'bg-gray-50'}`}>
@@ -571,7 +578,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       </div>
                                        <div className="flex items-center gap-4">
                                           <div className="text-right">
-                                            <p className="text-xs text-gray-500">{isDozen ? 'Qtd. Total' : 'Peso Total (Kg)'}</p>
+                                            <p className="text-xs text-gray-500">{headerLabel}</p>
                                             <p className="font-mono font-semibold text-indigo-700">
                                               {displayAmount} {displayUnit}
                                             </p>
