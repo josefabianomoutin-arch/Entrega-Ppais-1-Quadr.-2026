@@ -50,8 +50,8 @@ interface ItemCentricInput {
   ui_valuePerUnit: string;
   ui_kgConversion: string;
   // Campos de dados reais (calculados)
-  totalKg: string; // GUARDA A QUANTIDADE DE UNIDADES, NÃO O PESO. O NOME É MANTIDO POR COMPATIBILIDADE.
-  valuePerKg: string; // GUARDA O VALOR POR UNIDADE. O NOME É MANTIDO POR COMPATIBILIDADE.
+  totalKg: string; // GUARDA A QUANTIDADE DE UNIDADES, NÃO O PESO. O NOME É MANTIDO POR COMPATIBilidade.
+  valuePerKg: string; // GUARDA O VALOR POR UNIDADE. O NOME É MANTIDO POR COMPATIBilidade.
 }
 
 
@@ -191,17 +191,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const sortedItems = [...itemsMap.entries()].sort((a, b) => a[1].order - b[1].order);
 
     const newItemCentricContracts = sortedItems.map(([name, data]) => {
+        const [unitType, unitWeightStr] = data.unit.split('-');
+        const isUnitType = unitType === 'un';
+
         const item: ItemCentricInput = {
             id: `item-${name}-${Math.random()}`,
             name,
             suppliers: Array(15).fill(null).map((_, i) => ({
                 supplierCpf: data.supplierCpfs[i] || ''
             })),
-            ui_compositeUnit: data.unit,
-            ui_unit: data.unit.split('-')[0] as ItemCentricInput['ui_unit'],
+            ui_compositeUnit: isUnitType ? 'un-auto' : data.unit,
+            ui_unit: unitType as ItemCentricInput['ui_unit'],
             ui_quantity: String(data.totalQty),
             ui_valuePerUnit: String(data.valuePerUnit),
-            ui_kgConversion: '1', // Default value
+            ui_kgConversion: isUnitType ? unitWeightStr : '1',
             totalKg: String(data.totalQty),
             valuePerKg: String(data.valuePerUnit),
         };
@@ -307,11 +310,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           const supplier = newSuppliersState.find(p => p.cpf === slot.supplierCpf);
           if (supplier) {
             const supplierPortion = portions[index] / precisionFactor;
+            
+            let finalUnit = item.ui_compositeUnit;
+            if (item.ui_compositeUnit === 'un-auto') {
+                const kgConversion = parseFloat(item.ui_kgConversion.replace(',', '.')) || 1;
+                finalUnit = `un-${kgConversion}`;
+            }
+            
             supplier.contractItems.push({
               name: item.name.trim(),
               totalKg: supplierPortion,
               valuePerKg: valueNum,
-              unit: item.ui_compositeUnit,
+              unit: finalUnit,
               order: itemIndex,
             });
           }
@@ -568,7 +578,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         </select>
                                         <input type="text" placeholder={`Qtd. de ${unitLabel}`} value={item.ui_quantity} onChange={(e) => handleItemCentricChange(item.id, 'ui_quantity', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2 border rounded-md font-mono" />
                                         <input type="text" placeholder={`Valor por ${unitLabel}`} value={item.ui_valuePerUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_valuePerUnit', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2 border rounded-md font-mono" />
-                                        {isUnitType && <input type="text" placeholder={`Peso da Unidade (Kg)`} value={item.ui_kgConversion} onChange={(e) => handleItemCentricChange(item.id, 'ui_kgConversion', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2 border rounded-md font-mono" title="Este campo é apenas informativo e não afeta o cálculo da quantidade."/>}
+                                        {isUnitType && <input type="text" placeholder={`Peso da Unidade (Kg)`} value={item.ui_kgConversion} onChange={(e) => handleItemCentricChange(item.id, 'ui_kgConversion', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2 border rounded-md font-mono" />}
                                       </div>
                                       
                                       <div>

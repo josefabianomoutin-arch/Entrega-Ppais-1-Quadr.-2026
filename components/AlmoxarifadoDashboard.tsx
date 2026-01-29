@@ -25,21 +25,31 @@ interface AlmoxarifadoDashboardProps {
     }) => Promise<{ success: boolean; message: string }>;
 }
 
-// Helper idêntico ao do SummaryCard para garantir consistência total de valores
-const getContractItemWeight = (item: ContractItem): number => {
-    if (!item) return 0;
-    const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
-    const quantity = item.totalKg || 0;
 
-    // Se for 'un' (unidade manual), o totalKg já é o peso total.
-    if (unitType === 'un') return quantity;
-    // Se for 'dz' (dúzia), não soma peso no total geral (conforme regra de negócio)
-    if (unitType === 'dz') return 0;
+// Helper para obter informações da unidade a partir do item do contrato
+const getUnitInfo = (item: ContractItem | undefined): { name: string; factorToKg: number } => {
+    if (!item || !item.unit) return { name: 'Kg', factorToKg: 1 };
+    
+    const [type, weightStr] = item.unit.split('-');
+    
+    const nameMap: { [key: string]: string } = {
+        saco: 'Sacos', balde: 'Baldes', embalagem: 'Litros', kg: 'Kg',
+        litro: 'Litros', caixa: 'Litros', pacote: 'Pacotes', pote: 'Potes',
+        dz: 'Dúzias', un: 'Unidades'
+    };
+    
+    const name = nameMap[type] || 'Unidades';
+    let factorToKg = parseFloat(weightStr);
 
-    // Para outros (saco, balde, kg), multiplica a quantidade pelo peso da unidade.
-    const unitWeight = parseFloat(unitWeightStr) || 1;
-    return quantity * unitWeight;
+    if (type === 'dz') {
+        factorToKg = 0;
+    } else if (isNaN(factorToKg)) {
+        factorToKg = 1;
+    }
+
+    return { name, factorToKg };
 };
+
 
 const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers, onLogout, onRegisterEntry, onRegisterWithdrawal }) => {
     const [activeTab, setActiveTab] = useState<'entrada' | 'saída'>('entrada');
@@ -83,7 +93,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     }, [suppliers]);
     
     // --- ENTRADA DERIVED STATE ---
-    // FIX: Defined entrySuppliersForItem to populate the supplier dropdown for product entry.
     const entrySuppliersForItem = useMemo(() => {
         if (!selectedEntryItem) return [];
         return suppliers
@@ -93,58 +102,34 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
     const entryItemData = useMemo(() => {
         if (!selectedEntryItem) return null;
-
-        let totalContratado = 0;
-        let totalRecebidoHistorico = 0;
-        let displayUnit = 'Kg';
-        let isComparable = false;
-
-        const allContractItemsForItem = suppliers.flatMap(s => s.contractItems.filter(ci => ci.name === selectedEntryItem));
         
-        if (allContractItemsForItem.length > 0) {
-            const unit = allContractItemsForItem[0].unit || 'kg-1';
-            const [unitType] = unit.split('-');
+        const contractItems = suppliers.flatMap(s => s.contractItems.filter(ci => ci.name === selectedEntryItem));
+        if (contractItems.length === 0) return null;
 
-            if (unitType === 'un' || unitType === 'kg') {
-                // For 'un', totalKg is already total weight. For 'kg', it's the weight.
-                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + getContractItemWeight(ci), 0);
-                displayUnit = 'Kg';
-                isComparable = true;
-            } else {
-                // For all other units, totalKg represents the quantity of packages/units.
-                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
-                
-                const unitLabelMap: { [key: string]: string } = {
-                    dz: 'Dz',
-                    litro: 'L',
-                    embalagem: 'L',
-                    caixa: 'L',
-                    saco: 'Sacos',
-                    balde: 'Baldes',
-                    pacote: 'Pacotes',
-                    pote: 'Potes',
-                };
-                displayUnit = unitLabelMap[unitType] || unitType;
-                isComparable = false; // Cannot reliably compare a unit count with a Kg received value
-            }
-        }
+        const { name: displayUnit, factorToKg } = getUnitInfo(contractItems[0]);
 
+        const totalContratado = contractItems.reduce((sum, item) => sum + (item.totalKg || 0), 0);
+
+        let totalRecebidoHistoricoKg = 0;
         suppliers.forEach(s => {
             s.deliveries.forEach(d => {
                 if (d.item === selectedEntryItem) {
-                    totalRecebidoHistorico += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
+                    totalRecebidoHistoricoKg += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
                 }
             });
         });
-
-        const saldo = isComparable ? Math.max(0, totalContratado - totalRecebidoHistorico) : totalContratado;
+        
+        const canCompare = factorToKg > 0;
+        const totalRecebidoHistorico = canCompare ? totalRecebidoHistoricoKg / factorToKg : 0;
+        const saldo = canCompare ? Math.max(0, totalContratado - totalRecebidoHistorico) : totalContratado;
         
         return { 
             totalContratado, 
             totalRecebidoHistorico, 
             saldo,
             displayUnit,
-            isComparable
+            factorToKg,
+            canCompare
         };
     }, [selectedEntryItem, suppliers]);
 
@@ -159,52 +144,35 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
     const exitItemData = useMemo(() => {
         if (!selectedExitItem) return null;
-        let totalContratado = 0;
-        let totalRecebidoHistorico = 0;
-        let estoqueAtual = 0;
-        let displayUnit = 'Kg';
-
-        const allContractItemsForItem = suppliers.flatMap(s => s.contractItems.filter(ci => ci.name === selectedExitItem));
         
-        if (allContractItemsForItem.length > 0) {
-            const unit = allContractItemsForItem[0].unit || 'kg-1';
-            const [unitType] = unit.split('-');
+        const contractItems = suppliers.flatMap(s => s.contractItems.filter(ci => ci.name === selectedExitItem));
+        if (contractItems.length === 0) return null;
+        
+        const { name: displayUnit, factorToKg } = getUnitInfo(contractItems[0]);
+        const totalContratado = contractItems.reduce((sum, item) => sum + (item.totalKg || 0), 0);
 
-             if (unitType === 'un' || unitType === 'kg') {
-                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + getContractItemWeight(ci), 0);
-                displayUnit = 'Kg';
-            } else {
-                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
-                const unitLabelMap: { [key: string]: string } = {
-                    dz: 'Dz',
-                    litro: 'L',
-                    embalagem: 'L',
-                    caixa: 'L',
-                    saco: 'Sacos',
-                    balde: 'Baldes',
-                    pacote: 'Pacotes',
-                    pote: 'Potes',
-                };
-                displayUnit = unitLabelMap[unitType] || unitType;
-            }
-        }
-
+        let totalRecebidoHistoricoKg = 0;
+        let estoqueAtualKg = 0;
         suppliers.forEach(s => {
             s.deliveries.forEach(d => {
                 if (d.item === selectedExitItem) {
-                    totalRecebidoHistorico += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
-                    estoqueAtual += (d.lots || []).reduce((sum, lot) => sum + lot.remainingQuantity, 0);
+                    totalRecebidoHistoricoKg += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
+                    estoqueAtualKg += (d.lots || []).reduce((sum, lot) => sum + lot.remainingQuantity, 0);
                 }
             });
         });
         
-        const totalSaidas = Math.max(0, totalRecebidoHistorico - estoqueAtual);
+        const canCompare = factorToKg > 0;
+        const estoqueAtual = canCompare ? estoqueAtualKg / factorToKg : 0;
+        const totalSaidas = canCompare ? (totalRecebidoHistoricoKg - estoqueAtualKg) / factorToKg : 0;
         
         return { 
             totalContratado, 
             displayUnit,
             estoqueAtual, 
-            totalSaidas 
+            totalSaidas,
+            factorToKg,
+            canCompare
         };
     }, [selectedExitItem, suppliers]);
 
@@ -212,19 +180,21 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     const handleConfirmEntry = async () => {
         setIsProcessing(true);
         setFeedback(null);
-        const quantity = parseFloat(entryQty.replace(',', '.'));
+        const quantityInUnit = parseFloat(entryQty.replace(',', '.'));
 
-        if (!selectedEntryItem || !entrySupplierCpf || !entryInvoice || !entryLot || isNaN(quantity) || quantity <= 0 || !entryExpiration) {
+        if (!selectedEntryItem || !entrySupplierCpf || !entryInvoice || !entryLot || isNaN(quantityInUnit) || quantityInUnit <= 0 || !entryExpiration || !entryItemData) {
             setFeedback({ type: 'error', message: "Todos os campos de entrada são obrigatórios, incluindo o vencimento." });
             setIsProcessing(false);
             return;
         }
-        
-        if (entryItemData && entryItemData.isComparable && quantity > entryItemData.saldo + 0.001) { 
-            setFeedback({ type: 'error', message: `Quantidade excede o saldo a receber do contrato (${entryItemData.saldo.toFixed(2)} Kg).` });
+
+        if (entryItemData.canCompare && quantityInUnit > entryItemData.saldo + 0.001) { 
+            setFeedback({ type: 'error', message: `Quantidade excede o saldo a receber do contrato (${entryItemData.saldo.toFixed(2)} ${entryItemData.displayUnit}).` });
             setIsProcessing(false);
             return;
         }
+
+        const quantityInKg = quantityInUnit * entryItemData.factorToKg;
 
         const result = await onRegisterEntry({ 
             itemName: selectedEntryItem,
@@ -232,7 +202,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             invoiceNumber: entryInvoice.trim(),
             invoiceDate: entryDate,
             lotNumber: entryLot.trim(),
-            quantity,
+            quantity: quantityInKg,
             expirationDate: entryExpiration
         });
 
@@ -251,20 +221,22 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     const handleConfirmExit = async () => {
         setIsProcessing(true);
         setFeedback(null);
-        const quantity = parseFloat(exitQty.replace(',', '.'));
+        const quantityInUnit = parseFloat(exitQty.replace(',', '.'));
 
-        if (!selectedExitItem || !exitSupplierCpf || !exitOutboundInvoice || !exitLot || isNaN(quantity) || quantity <= 0 || !exitExpiration) {
+        if (!selectedExitItem || !exitSupplierCpf || !exitOutboundInvoice || !exitLot || isNaN(quantityInUnit) || quantityInUnit <= 0 || !exitExpiration || !exitItemData) {
             setFeedback({ type: 'error', message: "Todos os campos de saída são obrigatórios, incluindo o vencimento." });
             setIsProcessing(false);
             return;
         }
+
+        const quantityInKg = quantityInUnit * exitItemData.factorToKg;
 
         const result = await onRegisterWithdrawal({
             itemName: selectedExitItem,
             supplierCpf: exitSupplierCpf,
             outboundInvoice: exitOutboundInvoice.trim(),
             lotNumber: exitLot.trim(),
-            quantity,
+            quantity: quantityInKg,
             expirationDate: exitExpiration
         });
 
@@ -311,11 +283,11 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                     </div>
                                     <div className="bg-green-50 p-2 rounded border border-green-100">
                                         <p className="text-xs text-green-700">Histórico Recebido</p>
-                                        <p className="font-bold text-lg text-green-800">{entryItemData.totalRecebidoHistorico.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} Kg</p>
+                                        <p className="font-bold text-lg text-green-800">{entryItemData.totalRecebidoHistorico.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {entryItemData.displayUnit}</p>
                                     </div>
                                     <div className="bg-blue-50 p-2 rounded border border-blue-100">
                                         <p className="text-xs text-blue-700">Saldo a Receber</p>
-                                        {entryItemData.isComparable ? (
+                                        {entryItemData.canCompare ? (
                                             <p className="font-bold text-lg text-blue-800">{entryItemData.saldo.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {entryItemData.displayUnit}</p>
                                         ) : (
                                             <p className="font-bold text-lg text-blue-800" title="Cálculo indisponível (unidades de medida diferentes)">N/A</p>
@@ -324,17 +296,17 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                 </div>
                             )}
 
-                            {selectedEntryItem && (
+                            {selectedEntryItem && entryItemData && (
                                 <div className="space-y-4 pt-4 border-t animate-fade-in">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div><label className="block text-xs font-medium text-gray-600" translate="no">Fornecedor</label><select value={entrySupplierCpf} onChange={e => setEntrySupplierCpf(e.target.value)} className="w-full p-2 border rounded-md"><option value="">-- Selecione --</option>{entrySuppliersForItem.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}</select></div>
                                         <div><label className="block text-xs font-medium text-gray-600">Data da NF</label><input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} className="w-full p-2 border rounded-md"/></div>
                                         <div><label className="block text-xs font-medium text-gray-600">Nº da Nota Fiscal</label><input type="text" value={entryInvoice} onChange={e => setEntryInvoice(e.target.value)} placeholder="Número da NF de Entrada" className="w-full p-2 border rounded-md"/></div>
                                         <div><label className="block text-xs font-medium text-gray-600">Nº do Lote / Cód. Barras</label><input type="text" value={entryLot} onChange={e => setEntryLot(e.target.value)} placeholder="Identificador do Lote" className="w-full p-2 border rounded-md"/></div>
-                                        <div><label className="block text-xs font-medium text-gray-600">Quantidade da Entrada (Kg)</label><input type="text" value={entryQty} onChange={e => setEntryQty(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="Ex: 150,5" className="w-full p-2 border rounded-md font-mono"/></div>
+                                        <div><label className="block text-xs font-medium text-gray-600">Quantidade da Entrada ({entryItemData.displayUnit})</label><input type="text" value={entryQty} onChange={e => setEntryQty(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="Ex: 150,5" className="w-full p-2 border rounded-md font-mono" disabled={!entryItemData.canCompare} title={!entryItemData.canCompare ? 'Entrada desabilitada para itens medidos em Dúzias' : ''}/></div>
                                         <div><label className="block text-xs font-medium text-gray-600">Vencimento do Produto</label><input type="date" value={entryExpiration} onChange={e => setEntryExpiration(e.target.value)} className="w-full p-2 border rounded-md"/></div>
                                     </div>
-                                    <button onClick={handleConfirmEntry} disabled={isProcessing} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-400">{isProcessing ? 'Processando...' : 'Registrar Entrada'}</button>
+                                    <button onClick={handleConfirmEntry} disabled={isProcessing || !entryItemData.canCompare} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-400">{isProcessing ? 'Processando...' : 'Registrar Entrada'}</button>
                                 </div>
                             )}
                         </div>
@@ -350,11 +322,11 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                 <div className="grid grid-cols-3 gap-4 text-center animate-fade-in">
                                     <div className="bg-green-50 p-2 rounded border border-green-100">
                                         <p className="text-xs text-green-700">Estoque Atual</p>
-                                        <p className="font-bold text-lg text-green-800">{exitItemData.estoqueAtual.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} Kg</p>
+                                        <p className="font-bold text-lg text-green-800">{exitItemData.estoqueAtual.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {exitItemData.displayUnit}</p>
                                     </div>
                                     <div className="bg-gray-100 p-2 rounded">
                                         <p className="text-xs text-gray-500">Total de Saídas</p>
-                                        <p className="font-bold text-lg text-gray-800">{exitItemData.totalSaidas.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} Kg</p>
+                                        <p className="font-bold text-lg text-gray-800">{exitItemData.totalSaidas.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {exitItemData.displayUnit}</p>
                                     </div>
                                     <div className="bg-red-50 p-2 rounded border border-red-100">
                                         <p className="text-xs text-red-700">Total Contratado</p>
@@ -363,17 +335,17 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                 </div>
                             )}
 
-                            {selectedExitItem && (
+                            {selectedExitItem && exitItemData && (
                                 <div className="space-y-4 pt-4 border-t animate-fade-in">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div><label className="block text-xs font-medium text-gray-600" translate="no">Fornecedor</label><select value={exitSupplierCpf} onChange={e => setExitSupplierCpf(e.target.value)} className="w-full p-2 border rounded-md"><option value="">-- Selecione --</option>{exitSuppliersForItem.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}</select></div>
                                         <div><label className="block text-xs font-medium text-gray-600">Data da Saída</label><input type="date" value={exitDate} onChange={e => setExitDate(e.target.value)} className="w-full p-2 border rounded-md"/></div>
                                         <div><label className="block text-xs font-medium text-gray-600">Nº da NF de Saída</label><input type="text" value={exitOutboundInvoice} onChange={e => setExitOutboundInvoice(e.target.value)} placeholder="Número da NF de Saída" className="w-full p-2 border rounded-md"/></div>
                                         <div><label className="block text-xs font-medium text-gray-600">Nº do Lote / Cód. Barras</label><input type="text" value={exitLot} onChange={e => setExitLot(e.target.value)} placeholder="Identificador do Lote" className="w-full p-2 border rounded-md"/></div>
-                                        <div><label className="block text-xs font-medium text-gray-600">Quantidade da Saída (Kg)</label><input type="text" value={exitQty} onChange={e => setExitQty(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="Ex: 25,0" className="w-full p-2 border rounded-md font-mono"/></div>
+                                        <div><label className="block text-xs font-medium text-gray-600">Quantidade da Saída ({exitItemData.displayUnit})</label><input type="text" value={exitQty} onChange={e => setExitQty(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="Ex: 25,0" className="w-full p-2 border rounded-md font-mono" disabled={!exitItemData.canCompare} title={!exitItemData.canCompare ? 'Saída desabilitada para itens medidos em Dúzias' : ''}/></div>
                                         <div><label className="block text-xs font-medium text-gray-600">Vencimento do Produto</label><input type="date" value={exitExpiration} onChange={e => setExitExpiration(e.target.value)} className="w-full p-2 border rounded-md"/></div>
                                     </div>
-                                    <button onClick={handleConfirmExit} disabled={isProcessing} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-400">{isProcessing ? 'Processando...' : 'Registrar Saída'}</button>
+                                    <button onClick={handleConfirmExit} disabled={isProcessing || !exitItemData.canCompare} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-400">{isProcessing ? 'Processando...' : 'Registrar Saída'}</button>
                                 </div>
                             )}
                         </div>
