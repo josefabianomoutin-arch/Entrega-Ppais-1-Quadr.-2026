@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig } from '../types';
 import AdminAnalytics from './AdminAnalytics';
@@ -544,17 +545,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       {itemCentricContracts.map((item, index) => {
                           const isExpanded = index === expandedItemIndex;
                           const [unit, kgConversionFactorStr] = item.ui_compositeUnit.split('-');
-                          const isUnit = unit === 'un';
-
-                          const quantity = parseFloat(item.ui_quantity.replace(',', '.')) || 0;
-                          const valuePerUnit = parseFloat(item.ui_valuePerUnit.replace(',', '.')) || 0;
-                          const conversionFactor = isUnit ? (parseFloat(item.ui_kgConversion.replace(',', '.')) || 0) : (parseFloat(kgConversionFactorStr) || 1);
-
-                          const totalDisplayWeight = isUnit ? (quantity * conversionFactor) : (quantity * conversionFactor);
-                          const totalDisplayUnits = quantity;
                           
+                          const isUnit = unit === 'un';
+                          const isDozen = unit === 'dz';
+
+                          const valuePerUnit = parseFloat(item.ui_valuePerUnit.replace(',', '.')) || 0;
+                          
+                          // Lógica para calcular e exibir o total de forma consistente com outras telas
+                          const quantityOrWeight = parseFloat(item.totalKg || '0');
+                          const conversionFactor = parseFloat(kgConversionFactorStr) || 1;
+                          const totalWeight = isUnit ? quantityOrWeight : quantityOrWeight * conversionFactor;
+                          
+                          const displayAmount = isDozen 
+                              ? quantityOrWeight.toLocaleString('pt-BR') 
+                              : totalWeight.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                          const displayUnit = isDozen ? 'Dz' : 'Kg';
                           const unitLabel = unitOptions.find(opt => opt.value === item.ui_compositeUnit)?.label.split(' (')[0] || unit;
-                          const displayUnitAbbreviation = isUnit ? 'Kg' : (unit === 'dz' ? 'Dz' : (unit === 'kg' ? 'Kg' : (unit === 'litro' ? 'Lts' : 'Unid.')));
 
                           return (
                               <div key={item.id} className={`border rounded-xl transition-all ${isExpanded ? 'bg-white ring-2 ring-indigo-400' : 'bg-gray-50'}`}>
@@ -565,9 +571,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       </div>
                                        <div className="flex items-center gap-4">
                                           <div className="text-right">
-                                            <p className="text-xs text-gray-500">{isUnit ? 'Peso Total (Kg)' : 'Qtd. Total'}</p>
+                                            <p className="text-xs text-gray-500">{isDozen ? 'Qtd. Total' : 'Peso Total (Kg)'}</p>
                                             <p className="font-mono font-semibold text-indigo-700">
-                                              {isUnit ? totalDisplayWeight.toLocaleString('pt-BR') : totalDisplayUnits.toLocaleString('pt-BR')} {displayUnitAbbreviation}
+                                              {displayAmount} {displayUnit}
                                             </p>
                                           </div>
                                           <div className="text-right">

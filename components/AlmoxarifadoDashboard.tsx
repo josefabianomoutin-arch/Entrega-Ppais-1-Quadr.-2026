@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Supplier, Delivery, ContractItem } from '../types';
 
@@ -91,30 +92,53 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
     const entryItemData = useMemo(() => {
         if (!selectedEntryItem) return null;
-        let totalContratadoKg = 0;
-        let totalRecebidoHistoricoKg = 0;
+
+        let totalContratado = 0;
+        let totalRecebidoHistorico = 0;
+        let unit = 'kg-1';
+        let displayUnit = 'Kg';
+        let isComparable = false;
+
+        const allContractItemsForItem = suppliers.flatMap(s => s.contractItems.filter(ci => ci.name === selectedEntryItem));
+        
+        if (allContractItemsForItem.length > 0) {
+            unit = allContractItemsForItem[0].unit || 'kg-1';
+            const [unitType] = unit.split('-');
+
+            if (unitType === 'dz') {
+                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
+                displayUnit = 'Dz';
+                isComparable = false;
+            } else if (['litro', 'embalagem', 'caixa'].some(u => unitType.includes(u))) {
+                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
+                displayUnit = 'L';
+                isComparable = false;
+            } else {
+                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + getContractItemWeight(ci), 0);
+                displayUnit = 'Kg';
+                isComparable = true;
+            }
+        }
 
         suppliers.forEach(s => {
-            s.contractItems.forEach(ci => {
-                if (ci.name === selectedEntryItem) {
-                    // Calcula o peso real contratado (corrigido para bater com o cadastro)
-                    totalContratadoKg += getContractItemWeight(ci);
-                }
-            });
             s.deliveries.forEach(d => {
                 if (d.item === selectedEntryItem) {
-                    // As entregas já são registradas em Kg no Almoxarifado
-                    totalRecebidoHistoricoKg += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
+                    totalRecebidoHistorico += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
                 }
             });
         });
+
+        const saldo = isComparable ? Math.max(0, totalContratado - totalRecebidoHistorico) : totalContratado;
         
         return { 
-            totalContratado: totalContratadoKg, 
-            totalRecebidoHistorico: totalRecebidoHistoricoKg, 
-            saldo: Math.max(0, totalContratadoKg - totalRecebidoHistoricoKg) 
+            totalContratado, 
+            totalRecebidoHistorico, 
+            saldo,
+            displayUnit,
+            isComparable
         };
     }, [selectedEntryItem, suppliers]);
+
 
     // --- SAÍDA DERIVED STATE ---
      const exitSuppliersForItem = useMemo(() => {
@@ -126,29 +150,45 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
     const exitItemData = useMemo(() => {
         if (!selectedExitItem) return null;
-        let totalContratadoKg = 0;
-        let totalRecebidoHistoricoKg = 0;
-        let estoqueAtualKg = 0;
+        let totalContratado = 0;
+        let totalRecebidoHistorico = 0;
+        let estoqueAtual = 0;
+        let displayUnit = 'Kg';
+
+        const allContractItemsForItem = suppliers.flatMap(s => s.contractItems.filter(ci => ci.name === selectedExitItem));
+        
+        if (allContractItemsForItem.length > 0) {
+            const unit = allContractItemsForItem[0].unit || 'kg-1';
+            const [unitType] = unit.split('-');
+
+            if (unitType === 'dz') {
+                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
+                displayUnit = 'Dz';
+            } else if (['litro', 'embalagem', 'caixa'].some(u => unitType.includes(u))) {
+                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + (ci.totalKg || 0), 0);
+                displayUnit = 'L';
+            } else { // Weight-based
+                totalContratado = allContractItemsForItem.reduce((sum, ci) => sum + getContractItemWeight(ci), 0);
+                displayUnit = 'Kg';
+            }
+        }
 
         suppliers.forEach(s => {
-            s.contractItems.forEach(ci => {
-                if (ci.name === selectedExitItem) {
-                    totalContratadoKg += getContractItemWeight(ci);
-                }
-            });
             s.deliveries.forEach(d => {
                 if (d.item === selectedExitItem) {
-                    totalRecebidoHistoricoKg += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
-                    estoqueAtualKg += (d.lots || []).reduce((sum, lot) => sum + lot.remainingQuantity, 0);
+                    totalRecebidoHistorico += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
+                    estoqueAtual += (d.lots || []).reduce((sum, lot) => sum + lot.remainingQuantity, 0);
                 }
             });
         });
         
+        const totalSaidas = Math.max(0, totalRecebidoHistorico - estoqueAtual);
+        
         return { 
-            totalContratado: totalContratadoKg, 
-            totalRecebidoHistorico: totalRecebidoHistoricoKg, 
-            estoqueAtual: estoqueAtualKg, 
-            totalSaidas: Math.max(0, totalRecebidoHistoricoKg - estoqueAtualKg) 
+            totalContratado, 
+            displayUnit,
+            estoqueAtual, 
+            totalSaidas 
         };
     }, [selectedExitItem, suppliers]);
 
@@ -164,7 +204,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             return;
         }
         
-        if (entryItemData && quantity > entryItemData.saldo + 0.001) { 
+        if (entryItemData && entryItemData.isComparable && quantity > entryItemData.saldo + 0.001) { 
             setFeedback({ type: 'error', message: `Quantidade excede o saldo a receber do contrato (${entryItemData.saldo.toFixed(2)} Kg).` });
             setIsProcessing(false);
             return;
@@ -249,9 +289,22 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                             
                             {entryItemData && (
                                 <div className="grid grid-cols-3 gap-4 text-center animate-fade-in">
-                                    <div className="bg-gray-100 p-2 rounded"><p className="text-xs text-gray-500">Total Contratado</p><p className="font-bold text-lg">{entryItemData.totalContratado.toFixed(2)} Kg</p></div>
-                                    <div className="bg-green-50 p-2 rounded border border-green-100"><p className="text-xs text-green-700">Histórico Recebido</p><p className="font-bold text-lg text-green-800">{entryItemData.totalRecebidoHistorico.toFixed(2)} Kg</p></div>
-                                    <div className="bg-blue-50 p-2 rounded border border-blue-100"><p className="text-xs text-blue-700">Saldo a Receber</p><p className="font-bold text-lg text-blue-800">{entryItemData.saldo.toFixed(2)} Kg</p></div>
+                                    <div className="bg-gray-100 p-2 rounded">
+                                        <p className="text-xs text-gray-500">Total Contratado</p>
+                                        <p className="font-bold text-lg">{entryItemData.totalContratado.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {entryItemData.displayUnit}</p>
+                                    </div>
+                                    <div className="bg-green-50 p-2 rounded border border-green-100">
+                                        <p className="text-xs text-green-700">Histórico Recebido</p>
+                                        <p className="font-bold text-lg text-green-800">{entryItemData.totalRecebidoHistorico.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} Kg</p>
+                                    </div>
+                                    <div className="bg-blue-50 p-2 rounded border border-blue-100">
+                                        <p className="text-xs text-blue-700">Saldo a Receber</p>
+                                        {entryItemData.isComparable ? (
+                                            <p className="font-bold text-lg text-blue-800">{entryItemData.saldo.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {entryItemData.displayUnit}</p>
+                                        ) : (
+                                            <p className="font-bold text-lg text-blue-800" title="Cálculo indisponível (unidades de medida diferentes)">N/A</p>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
@@ -279,9 +332,18 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                            
                             {exitItemData && (
                                 <div className="grid grid-cols-3 gap-4 text-center animate-fade-in">
-                                    <div className="bg-green-50 p-2 rounded border border-green-100"><p className="text-xs text-green-700">Estoque Atual</p><p className="font-bold text-lg text-green-800">{exitItemData.estoqueAtual.toFixed(2)} Kg</p></div>
-                                    <div className="bg-gray-100 p-2 rounded"><p className="text-xs text-gray-500">Total de Saídas</p><p className="font-bold text-lg text-gray-800">{exitItemData.totalSaidas.toFixed(2)} Kg</p></div>
-                                    <div className="bg-red-50 p-2 rounded border border-red-100"><p className="text-xs text-red-700">Total Recebido (Hist.)</p><p className="font-bold text-lg text-red-800">{exitItemData.totalRecebidoHistorico.toFixed(2)} Kg</p></div>
+                                    <div className="bg-green-50 p-2 rounded border border-green-100">
+                                        <p className="text-xs text-green-700">Estoque Atual</p>
+                                        <p className="font-bold text-lg text-green-800">{exitItemData.estoqueAtual.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} Kg</p>
+                                    </div>
+                                    <div className="bg-gray-100 p-2 rounded">
+                                        <p className="text-xs text-gray-500">Total de Saídas</p>
+                                        <p className="font-bold text-lg text-gray-800">{exitItemData.totalSaidas.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} Kg</p>
+                                    </div>
+                                    <div className="bg-red-50 p-2 rounded border border-red-100">
+                                        <p className="text-xs text-red-700">Total Contratado</p>
+                                        <p className="font-bold text-lg text-red-800">{exitItemData.totalContratado.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {exitItemData.displayUnit}</p>
+                                    </div>
                                 </div>
                             )}
 
