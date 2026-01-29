@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Supplier, Delivery } from '../types';
+import type { Supplier, Delivery, ContractItem } from '../types';
 
 interface AlmoxarifadoDashboardProps {
     suppliers: Supplier[];
@@ -23,14 +24,21 @@ interface AlmoxarifadoDashboardProps {
     }) => Promise<{ success: boolean; message: string }>;
 }
 
-const getContractItemWeight = (item: { totalKg?: number, unit?: string }): number => {
-    if (!item || !item.totalKg) return 0;
+// Helper idêntico ao do SummaryCard para garantir consistência total de valores
+const getContractItemWeight = (item: ContractItem): number => {
+    if (!item) return 0;
     const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
-    if (unitType === 'un') return item.totalKg;
-    if (unitType === 'dz') return 0;
-    return item.totalKg * (parseFloat(unitWeightStr) || 1);
-};
+    const quantity = item.totalKg || 0;
 
+    // Se for 'un' (unidade manual), o totalKg já é o peso total.
+    if (unitType === 'un') return quantity;
+    // Se for 'dz' (dúzia), não soma peso no total geral (conforme regra de negócio)
+    if (unitType === 'dz') return 0;
+
+    // Para outros (saco, balde, kg), multiplica a quantidade pelo peso da unidade.
+    const unitWeight = parseFloat(unitWeightStr) || 1;
+    return quantity * unitWeight;
+};
 
 const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers, onLogout, onRegisterEntry, onRegisterWithdrawal }) => {
     const [activeTab, setActiveTab] = useState<'entrada' | 'saída'>('entrada');
@@ -65,7 +73,11 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
     const allContractItems = useMemo(() => {
         const items = new Map<string, { name: string }>();
-        suppliers.forEach(s => s.contractItems.forEach(ci => items.set(ci.name, { name: ci.name })));
+        suppliers.forEach(s => s.contractItems.forEach(ci => {
+            if (!items.has(ci.name)) {
+                items.set(ci.name, { name: ci.name });
+            }
+        }));
         return Array.from(items.values()).sort((a, b) => a.name.localeCompare(b.name));
     }, [suppliers]);
     
@@ -79,23 +91,29 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
     const entryItemData = useMemo(() => {
         if (!selectedEntryItem) return null;
-        let totalContratado = 0;
-        let totalRecebido = 0;
+        let totalContratadoKg = 0;
+        let totalRecebidoHistoricoKg = 0;
 
         suppliers.forEach(s => {
             s.contractItems.forEach(ci => {
                 if (ci.name === selectedEntryItem) {
-                    totalContratado += getContractItemWeight(ci);
+                    // Calcula o peso real contratado (corrigido para bater com o cadastro)
+                    totalContratadoKg += getContractItemWeight(ci);
                 }
             });
             s.deliveries.forEach(d => {
                 if (d.item === selectedEntryItem) {
-                    totalRecebido += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
+                    // As entregas já são registradas em Kg no Almoxarifado
+                    totalRecebidoHistoricoKg += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
                 }
             });
         });
         
-        return { totalContratado, totalRecebido, saldo: totalContratado - totalRecebido };
+        return { 
+            totalContratado: totalContratadoKg, 
+            totalRecebidoHistorico: totalRecebidoHistoricoKg, 
+            saldo: Math.max(0, totalContratadoKg - totalRecebidoHistoricoKg) 
+        };
     }, [selectedEntryItem, suppliers]);
 
     // --- SAÍDA DERIVED STATE ---
@@ -108,23 +126,30 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
     const exitItemData = useMemo(() => {
         if (!selectedExitItem) return null;
-        let totalContratado = 0;
-        let totalRecebido = 0;
+        let totalContratadoKg = 0;
+        let totalRecebidoHistoricoKg = 0;
+        let estoqueAtualKg = 0;
 
         suppliers.forEach(s => {
             s.contractItems.forEach(ci => {
                 if (ci.name === selectedExitItem) {
-                    totalContratado += getContractItemWeight(ci);
+                    totalContratadoKg += getContractItemWeight(ci);
                 }
             });
             s.deliveries.forEach(d => {
                 if (d.item === selectedExitItem) {
-                    totalRecebido += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
+                    totalRecebidoHistoricoKg += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
+                    estoqueAtualKg += (d.lots || []).reduce((sum, lot) => sum + lot.remainingQuantity, 0);
                 }
             });
         });
         
-        return { totalContratado, totalRecebido, saldo: totalRecebido }; // Para saída, saldo é o que está em estoque
+        return { 
+            totalContratado: totalContratadoKg, 
+            totalRecebidoHistorico: totalRecebidoHistoricoKg, 
+            estoqueAtual: estoqueAtualKg, 
+            totalSaidas: Math.max(0, totalRecebidoHistoricoKg - estoqueAtualKg) 
+        };
     }, [selectedExitItem, suppliers]);
 
 
@@ -138,8 +163,9 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             setIsProcessing(false);
             return;
         }
-        if (entryItemData && quantity > entryItemData.saldo) {
-            setFeedback({ type: 'error', message: `Quantidade excede o saldo a receber de ${entryItemData.saldo.toFixed(2)} Kg.` });
+        
+        if (entryItemData && quantity > entryItemData.saldo + 0.001) { 
+            setFeedback({ type: 'error', message: `Quantidade excede o saldo a receber do contrato (${entryItemData.saldo.toFixed(2)} Kg).` });
             setIsProcessing(false);
             return;
         }
@@ -156,7 +182,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
         setFeedback({ type: result.success ? 'success' : 'error', message: result.message });
         if (result.success) {
-            // Reset form
             setSelectedEntryItem('');
             setEntrySupplierCpf('');
             setEntryInvoice('');
@@ -225,8 +250,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                             {entryItemData && (
                                 <div className="grid grid-cols-3 gap-4 text-center animate-fade-in">
                                     <div className="bg-gray-100 p-2 rounded"><p className="text-xs text-gray-500">Total Contratado</p><p className="font-bold text-lg">{entryItemData.totalContratado.toFixed(2)} Kg</p></div>
-                                    <div className="bg-green-100 p-2 rounded"><p className="text-xs text-green-700">Total Recebido</p><p className="font-bold text-lg text-green-800">{entryItemData.totalRecebido.toFixed(2)} Kg</p></div>
-                                    <div className="bg-blue-100 p-2 rounded"><p className="text-xs text-blue-700">Saldo a Receber</p><p className="font-bold text-lg text-blue-800">{entryItemData.saldo.toFixed(2)} Kg</p></div>
+                                    <div className="bg-green-50 p-2 rounded border border-green-100"><p className="text-xs text-green-700">Histórico Recebido</p><p className="font-bold text-lg text-green-800">{entryItemData.totalRecebidoHistorico.toFixed(2)} Kg</p></div>
+                                    <div className="bg-blue-50 p-2 rounded border border-blue-100"><p className="text-xs text-blue-700">Saldo a Receber</p><p className="font-bold text-lg text-blue-800">{entryItemData.saldo.toFixed(2)} Kg</p></div>
                                 </div>
                             )}
 
@@ -254,9 +279,9 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                            
                             {exitItemData && (
                                 <div className="grid grid-cols-3 gap-4 text-center animate-fade-in">
-                                    <div className="bg-gray-100 p-2 rounded"><p className="text-xs text-gray-500">Total Contratado</p><p className="font-bold text-lg">{exitItemData.totalContratado.toFixed(2)} Kg</p></div>
-                                    <div className="bg-green-100 p-2 rounded"><p className="text-xs text-green-700">Total em Estoque</p><p className="font-bold text-lg text-green-800">{exitItemData.saldo.toFixed(2)} Kg</p></div>
-                                    <div className="bg-red-100 p-2 rounded"><p className="text-xs text-red-700">Balanço (Contratado - Estoque)</p><p className="font-bold text-lg text-red-800">{(exitItemData.totalContratado - exitItemData.saldo).toFixed(2)} Kg</p></div>
+                                    <div className="bg-green-50 p-2 rounded border border-green-100"><p className="text-xs text-green-700">Estoque Atual</p><p className="font-bold text-lg text-green-800">{exitItemData.estoqueAtual.toFixed(2)} Kg</p></div>
+                                    <div className="bg-gray-100 p-2 rounded"><p className="text-xs text-gray-500">Total de Saídas</p><p className="font-bold text-lg text-gray-800">{exitItemData.totalSaidas.toFixed(2)} Kg</p></div>
+                                    <div className="bg-red-50 p-2 rounded border border-red-100"><p className="text-xs text-red-700">Total Recebido (Hist.)</p><p className="font-bold text-lg text-red-800">{exitItemData.totalRecebidoHistorico.toFixed(2)} Kg</p></div>
                                 </div>
                             )}
 

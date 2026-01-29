@@ -384,15 +384,15 @@ const App: React.FC = () => {
     setRegistrationStatus(null);
   };
 
-  // Persiste o estado atual no banco de dados
-  const handlePersistSuppliers = (suppliersToPersist: Supplier[]) => {
+  // Persiste o estado atual no banco de dados (modificado para ser assíncrono)
+  const handlePersistSuppliers = async (suppliersToPersist: Supplier[]) => {
       const suppliersObject = suppliersToPersist.reduce((acc, supplier) => {
         if (supplier && supplier.cpf) {
           acc[supplier.cpf] = supplier;
         }
         return acc;
       }, {} as { [key: string]: Supplier });
-      writeToDatabase(suppliersRef, suppliersObject);
+      await writeToDatabase(suppliersRef, suppliersObject);
   };
 
   const handleLogout = () => {
@@ -605,7 +605,7 @@ const App: React.FC = () => {
           invoiceNumber: invoiceNumber,
           lots: [newLot],
           withdrawals: [],
-          remainingQuantity: 0,
+          remainingQuantity: quantity,
         };
         supplier.deliveries.push(delivery);
       }
@@ -638,7 +638,7 @@ const App: React.FC = () => {
       }
   };
 
-  // Fix: Replaced handleRegisterWithdrawal with the new logic that only logs the transaction
+  // Modificado: Agora atualiza efetivamente o saldo do lote
   const handleRegisterWithdrawal = async (payload: {
     supplierCpf: string;
     itemName: string;
@@ -649,41 +649,43 @@ const App: React.FC = () => {
   }): Promise<{ success: boolean; message: string }> => {
     const { supplierCpf, itemName, lotNumber, quantity, outboundInvoice, expirationDate } = payload;
     
-    // Find the lot based on the provided identifiers
-    let foundLot: any = null, foundDelivery: Delivery | null = null, foundSupplier: Supplier | null = null;
+    const newSuppliers = JSON.parse(JSON.stringify(suppliers));
+    const supplier = newSuppliers.find((s: Supplier) => s.cpf === supplierCpf);
+    
+    let foundLot: any = null;
+    let foundDelivery: Delivery | null = null;
 
-    const supplier = suppliers.find(s => s.cpf === supplierCpf);
     if (supplier) {
         for (const delivery of supplier.deliveries) {
-            // Match item name
             if (delivery.item === itemName) {
-                // Find lot that matches lot number AND expiration date for more precision
                 const lot = (delivery.lots || []).find(l => l.lotNumber === lotNumber && l.expirationDate === expirationDate);
                 if (lot) {
                     foundLot = lot;
                     foundDelivery = delivery;
-                    foundSupplier = supplier;
                     break;
                 }
             }
         }
     }
 
-    if (!foundLot || !foundDelivery || !foundSupplier) {
+    if (!foundLot || !foundDelivery || !supplier) {
         return { success: false, message: 'Lote não encontrado com os dados fornecidos (Item, Fornecedor, Lote e Vencimento).' };
     }
 
-    // This check was kept from the previous implementation. It prevents logging an exit larger than the available stock.
     if (quantity > foundLot.remainingQuantity) {
-         return { success: false, message: `A quantidade de saída (${quantity} Kg) não pode exceder o estoque do lote (${foundLot.remainingQuantity} Kg).` };
+         return { success: false, message: `A quantidade de saída (${quantity.toFixed(2)} Kg) não pode exceder o estoque do lote (${foundLot.remainingQuantity.toFixed(2)} Kg).` };
     }
+
+    // ATUALIZA O SALDO REAL
+    foundLot.remainingQuantity -= quantity;
+    foundDelivery.remainingQuantity = (foundDelivery.lots || []).reduce((sum: number, l: any) => sum + l.remainingQuantity, 0);
 
     const newMovement: Omit<WarehouseMovement, 'id'|'timestamp'> = {
         type: 'saída',
         lotId: foundLot.id,
         lotNumber: foundLot.lotNumber,
         itemName: foundDelivery.item || 'N/A',
-        supplierName: foundSupplier.name,
+        supplierName: supplier.name,
         deliveryId: foundDelivery.id,
         outboundInvoice,
         quantity,
@@ -691,6 +693,7 @@ const App: React.FC = () => {
     };
 
     try {
+        await handlePersistSuppliers(newSuppliers);
         await runTransaction(warehouseLogRef, (currentLog: WarehouseMovement[] | null) => {
             const movementWithId = {
                 ...newMovement,
@@ -699,10 +702,10 @@ const App: React.FC = () => {
             };
             return [...(currentLog || []), movementWithId];
         });
-        return { success: true, message: 'Saída registrada com sucesso no histórico. O estoque não foi alterado.' };
+        return { success: true, message: 'Saída registrada e estoque atualizado com sucesso.' };
     } catch (error) {
         console.error("Falha ao registrar saída:", error);
-        return { success: false, message: 'Erro ao salvar o registro de saída no histórico.' };
+        return { success: false, message: 'Erro ao salvar o registro no histórico ou atualizar estoque.' };
     }
   };
 
