@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Delivery, ContractItem } from '../types';
 
@@ -53,24 +54,17 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
   }, [invoiceInfo.deliveries]);
 
   const validateKg = (itemId: string, itemName: string, kgString: string): string => {
+    // Se o item não foi selecionado ou o peso não foi preenchido, não há erro a ser mostrado ainda.
+    // A validação de campos obrigatórios ocorre no momento do envio.
     if (!itemName || !kgString) return '';
 
-    const contractItem = contractItems.find(ci => ci.name === itemName);
-    if (!contractItem) return 'Item do contrato não encontrado.';
-
-    const totalContractedKg = getContractItemWeight(contractItem);
-    const monthlyQuotaKg = totalContractedKg / 4;
-
-    const minAllowed = monthlyQuotaKg * 0.90;
-    const maxAllowed = monthlyQuotaKg * 1.10;
-
     const kg = parseFloat(kgString.replace(',', '.'));
+    
+    // Valida se o valor inserido é um número válido e positivo.
     if (isNaN(kg)) return 'Valor de peso inválido.';
+    if (kg <= 0) return 'O peso deve ser um valor positivo.';
 
-    if (kg < minAllowed || kg > maxAllowed) {
-        return `O peso deve estar entre ${minAllowed.toFixed(2).replace('.', ',')} e ${maxAllowed.toFixed(2).replace('.', ',')} Kg.`;
-    }
-
+    // A validação anterior que limitava a entrega a +/- 10% da meta mensal foi removida.
     return '';
   };
 
