@@ -70,6 +70,7 @@ export interface CleaningLog {
   location: string;
   type: 'diaria' | 'semanal' | 'pesada';
   observations: string;
+  maintenanceDetails?: string;
 }
 
 export interface DirectorItem {
