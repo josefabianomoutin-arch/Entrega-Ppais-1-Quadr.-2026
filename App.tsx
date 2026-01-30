@@ -7,7 +7,7 @@ import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AlmoxarifadoDashboard from './components/AlmoxarifadoDashboard';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set, runTransaction } from 'firebase/database';
+import { getDatabase, ref, onValue, set, runTransaction, child } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
 
 const app = initializeApp(firebaseConfig);
@@ -158,8 +158,9 @@ const App: React.FC = () => {
       supplier.deliveries.push(newDelivery);
     }
 
+    const movementId = `mov-${Date.now()}`;
     const newLog: WarehouseMovement = {
-      id: `mov-${Date.now()}`,
+      id: movementId,
       type: 'entrada',
       timestamp: new Date().toISOString(),
       lotId: lotId,
@@ -172,8 +173,9 @@ const App: React.FC = () => {
       expirationDate: payload.expirationDate
     };
 
+    // Grava fornecedores e o log de movimentação de forma separada para evitar sobrescrever o histórico inteiro
     await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
-    await writeToDatabase(warehouseLogRef, [newLog, ...warehouseLog]);
+    await writeToDatabase(ref(database, `warehouseLog/${movementId}`), newLog);
 
     return { success: true, message: "Entrada registrada com sucesso!" };
   };
@@ -211,8 +213,9 @@ const App: React.FC = () => {
 
     if (!lotFound) return { success: false, message: "Lote não encontrado ou sem saldo." };
 
+    const movementId = `mov-out-${Date.now()}`;
     const newLog: WarehouseMovement = {
-      id: `mov-out-${Date.now()}`,
+      id: movementId,
       type: 'saída',
       timestamp: new Date().toISOString(),
       lotId: 'various',
@@ -226,14 +229,14 @@ const App: React.FC = () => {
     };
 
     await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
-    await writeToDatabase(warehouseLogRef, [newLog, ...warehouseLog]);
+    await writeToDatabase(ref(database, `warehouseLog/${movementId}`), newLog);
 
     return { success: true, message: "Saída registrada com sucesso!" };
   };
 
   const handleDeleteWarehouseEntry = async (logEntry: WarehouseMovement) => {
-    // Remove o movimento do log
-    const updatedLog = warehouseLog.filter(m => m.id !== logEntry.id);
+    // Remove o movimento do log especificamente pelo ID
+    setIsSaving(true);
     
     // Se for entrada, tenta remover o lote correspondente do fornecedor
     if (logEntry.type === 'entrada') {
@@ -245,11 +248,14 @@ const App: React.FC = () => {
             del.lots = del.lots.filter(l => l.id !== logEntry.lotId);
           }
         }
-        await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+        await set(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
       }
     }
 
-    await writeToDatabase(warehouseLogRef, updatedLog);
+    // Remove do histórico de movimentações
+    await set(ref(database, `warehouseLog/${logEntry.id}`), null);
+    
+    setIsSaving(false);
     return { success: true, message: "Registro removido do histórico." };
   };
 
@@ -331,6 +337,7 @@ const App: React.FC = () => {
     
     let tempSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
     let itemsShortage: string[] = [];
+    const timestamp = new Date().toISOString();
 
     for (const itemReq of log.items) {
       let needed = itemReq.quantity;
@@ -350,6 +357,23 @@ const App: React.FC = () => {
             const take = Math.min(lot.remainingQuantity, needed);
             lot.remainingQuantity -= take;
             needed -= take;
+            
+            // Registra log de movimentação de saída para cada item retirado
+            const movementId = `mov-dir-${Date.now()}-${Math.random()}`;
+            const warehouseLogEntry: WarehouseMovement = {
+                id: movementId,
+                type: 'saída',
+                timestamp: timestamp,
+                lotId: lot.id,
+                lotNumber: lot.lotNumber,
+                itemName: itemReq.name,
+                supplierName: entry.supplier.name,
+                deliveryId: entry.delivery.id,
+                outboundInvoice: `DIR-${log.recipient.substring(0,3).toUpperCase()}`,
+                quantity: take,
+                expirationDate: lot.expirationDate
+            };
+            await set(ref(database, `warehouseLog/${movementId}`), warehouseLogEntry);
           }
         }
       }
