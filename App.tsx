@@ -230,7 +230,7 @@ const App: React.FC = () => {
         return;
       }
 
-      const supplierToUpdate = suppliers.find(p => p.name.toUpperCase() === 'COOPCRESP');
+      const supplierToUpdate = suppliers.find(p => p.name.toUpperCase().includes('COOPCRESP'));
 
       if (supplierToUpdate) {
         const dateToDelete = '2026-01-30';
@@ -244,13 +244,13 @@ const App: React.FC = () => {
             
             set(supplierDeliveriesRef, updatedDeliveries)
             .then(() => {
-                const successMessage = `O agendamento do dia 30/01/2026 para a empresa COOPCRESP foi removido com sucesso.`;
+                const successMessage = `O agendamento do dia 30/01/2026 para a empresa ${supplierToUpdate.name} foi removido com sucesso.`;
                 console.log(successMessage);
                 alert(successMessage);
                 localStorage.setItem(operationFlag, 'true');
             })
             .catch((error) => {
-                const errorMessage = `Falha ao excluir o agendamento da COOPCRESP. Verifique o console para mais detalhes.`;
+                const errorMessage = `Falha ao excluir o agendamento da ${supplierToUpdate.name}. Verifique o console para mais detalhes.`;
                 console.error(errorMessage, error);
                 alert(errorMessage);
             });
