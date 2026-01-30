@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog } from './types';
+// Import types directly to ensure they are available for use in generic positions
+import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AlmoxarifadoDashboard from './components/AlmoxarifadoDashboard';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set, runTransaction, get } from 'firebase/database';
+import { getDatabase, ref, onValue, set, runTransaction } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
 
 const app = initializeApp(firebaseConfig);
@@ -16,6 +17,14 @@ const warehouseLogRef = ref(database, 'warehouseLog');
 const perCapitaConfigRef = ref(database, 'perCapitaConfig');
 const cleaningLogsRef = ref(database, 'cleaningLogs');
 const directorWithdrawalsRef = ref(database, 'directorWithdrawals');
+
+// Use function declaration for generics in .tsx to avoid ambiguity with JSX tags
+function normalizeArray<T>(data: any): T[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data.filter(i => i !== null) as T[];
+  if (typeof data === 'object') return Object.values(data).filter(i => i !== null) as T[];
+  return [];
+}
 
 const App: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -41,22 +50,22 @@ const App: React.FC = () => {
           return;
         }
 
-        // Converte o retorno do Firebase (Objeto ou Array) em um Array de Fornecedores
-        const rawValues = Array.isArray(data) ? data : Object.values(data);
+        // Normalização de alto nível: Converte o objeto de fornecedores em array
+        const rawSuppliers = normalizeArray<any>(data);
         
-        const suppliersArray: Supplier[] = rawValues
-          .filter((p): p is any => p !== null && typeof p === 'object')
+        const suppliersArray: Supplier[] = rawSuppliers
           .map(p => ({
             ...p,
             name: p.name || 'SEM NOME',
             cpf: p.cpf || String(Math.random()),
-            contractItems: p.contractItems || [],
-            deliveries: (p.deliveries || []).map((d: any) => ({ 
+            // Normalização profunda: Garante que propriedades aninhadas sejam arrays
+            contractItems: normalizeArray(p.contractItems),
+            deliveries: normalizeArray<any>(p.deliveries).map((d: any) => ({ 
                 ...d, 
-                lots: d.lots || [], 
-                withdrawals: d.withdrawals || [] 
+                lots: normalizeArray(d.lots), 
+                withdrawals: normalizeArray(d.withdrawals) 
             })),
-            allowedWeeks: p.allowedWeeks || [],
+            allowedWeeks: normalizeArray<number>(p.allowedWeeks),
             initialValue: p.initialValue || 0,
           }))
           .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -71,23 +80,19 @@ const App: React.FC = () => {
     });
 
     const unsubscribeWarehouseLog = onValue(warehouseLogRef, (snapshot) => {
-      const data = snapshot.val();
-      setWarehouseLog(data && Array.isArray(data) ? data : []);
+      setWarehouseLog(normalizeArray(snapshot.val()));
     });
 
     const unsubscribeCleaningLogs = onValue(cleaningLogsRef, (snapshot) => {
-      const data = snapshot.val();
-      setCleaningLogs(data && Array.isArray(data) ? data : []);
+      setCleaningLogs(normalizeArray(snapshot.val()));
     });
 
     const unsubscribeDirectorWithdrawals = onValue(directorWithdrawalsRef, (snapshot) => {
-      const data = snapshot.val();
-      setDirectorWithdrawals(data && Array.isArray(data) ? data : []);
+      setDirectorWithdrawals(normalizeArray(snapshot.val()));
     });
     
     const unsubscribePerCapitaConfig = onValue(perCapitaConfigRef, (snapshot) => {
-      const data = snapshot.val();
-      setPerCapitaConfig(data || {});
+      setPerCapitaConfig(snapshot.val() || {});
     });
 
     return () => {
@@ -132,7 +137,9 @@ const App: React.FC = () => {
 
   const handleLogin = (name: string, cpf: string): boolean => {
     const lowerCaseName = name.toLowerCase();
-    if (lowerCaseName === 'administrador' && cpf === '15210361870') {
+    const cleanCpf = cpf.replace(/[^\d]/g, '');
+    
+    if (lowerCaseName === 'administrador' && cleanCpf === '15210361870') {
       setIsAdminLoggedIn(true);
       setCurrentUser(null);
       setIsAlmoxarifadoLoggedIn(false);
@@ -145,7 +152,7 @@ const App: React.FC = () => {
         setCurrentUser(null);
         return true;
     }
-    const user = suppliers.find(p => p.name === name.toUpperCase() && p.cpf === cpf.replace(/[^\d]/g, ''));
+    const user = suppliers.find(p => p.name === name.toUpperCase() && p.cpf === cleanCpf);
     if (user) {
       setCurrentUser(user);
       setIsAdminLoggedIn(false);
