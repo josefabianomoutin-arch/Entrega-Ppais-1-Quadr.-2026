@@ -154,7 +154,6 @@ const App: React.FC = () => {
       targetSupplier.deliveries.push(newDelivery);
     }
 
-    // Criar o log de movimentação
     const newMovementRef = push(warehouseLogRef);
     const movementId = newMovementRef.key || `mov-${Date.now()}`;
     const newLog: WarehouseMovement = {
@@ -295,6 +294,52 @@ const App: React.FC = () => {
     await writeToDatabase(suppliersRef, map);
   };
 
+  const handleReopenInvoice = async (supplierCpf: string, invoiceNumber: string) => {
+    const supplier = suppliers.find(s => s.cpf === supplierCpf);
+    if (!supplier) return;
+
+    setIsSaving(true);
+    const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
+    const sIdx = newSuppliers.findIndex(s => s.cpf === supplierCpf);
+    const target = newSuppliers[sIdx];
+
+    // Pega as datas únicas envolvidas nesta nota fiscal para recriar agendamentos pendentes
+    const dates = [...new Set(target.deliveries.filter(d => d.invoiceNumber === invoiceNumber).map(d => d.date))];
+    
+    // Remove os itens faturados
+    target.deliveries = target.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+    
+    // Para cada data que ficou "órfã", cria um agendamento pendente novo
+    dates.forEach(date => {
+        const hasOtherOnDate = target.deliveries.some(d => d.date === date);
+        if (!hasOtherOnDate) {
+            target.deliveries.push({
+                id: `del-reopen-${Date.now()}-${Math.random()}`,
+                date,
+                time: '08:00',
+                item: 'AGENDAMENTO PENDENTE',
+                invoiceUploaded: false
+            });
+        }
+    });
+
+    await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+  };
+
+  const handleDeleteInvoice = async (supplierCpf: string, invoiceNumber: string) => {
+    const supplier = suppliers.find(s => s.cpf === supplierCpf);
+    if (!supplier) return;
+
+    setIsSaving(true);
+    const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
+    const sIdx = newSuppliers.findIndex(s => s.cpf === supplierCpf);
+    const target = newSuppliers[sIdx];
+
+    target.deliveries = target.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+
+    await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+  };
+
   const handleRegisterDirectorWithdrawal = async (log: Omit<DirectorPerCapitaLog, 'id'>) => {
     const newLog: DirectorPerCapitaLog = { ...log, id: `dir-${Date.now()}` };
     let tempSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
@@ -397,7 +442,10 @@ const App: React.FC = () => {
             onResetData={() => { if(window.confirm('Apagar tudo?')) writeToDatabase(suppliersRef, {}); }}
             onRestoreData={async (s) => { try { await writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {})); return true; } catch { return false; } }}
             activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={registrationStatus}
-            onClearRegistrationStatus={() => setRegistrationStatus(null)} onReopenInvoice={async () => {}} perCapitaConfig={perCapitaConfig}
+            onClearRegistrationStatus={() => setRegistrationStatus(null)} 
+            onReopenInvoice={handleReopenInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+            perCapitaConfig={perCapitaConfig}
             onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={handleDeleteWarehouseEntry}
             onRegisterCleaningLog={async (l) => { const r = await set(ref(database, `cleaningLogs/${Date.now()}`), { ...l, id: String(Date.now()) }); return {success: true, message: 'OK'}; }}
             onDeleteCleaningLog={async (id) => set(ref(database, `cleaningLogs/${id}`), null)} onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal}

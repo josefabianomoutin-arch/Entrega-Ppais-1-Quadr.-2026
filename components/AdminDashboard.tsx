@@ -30,6 +30,7 @@ interface AdminDashboardProps {
   registrationStatus: { success: boolean; message: string } | null;
   onClearRegistrationStatus: () => void;
   onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => Promise<void>;
+  onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => Promise<void>;
   perCapitaConfig: PerCapitaConfig;
   onUpdatePerCapitaConfig: (config: PerCapitaConfig) => Promise<void>;
   onDeleteWarehouseEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
@@ -65,7 +66,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     onUpdatePerCapitaConfig,
     warehouseLog,
     onDeleteWarehouseEntry,
-    onReopenInvoice
+    onReopenInvoice,
+    onDeleteInvoice
   } = props;
 
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -327,7 +329,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             </div>
           </div>
         );
-      case 'invoices': return <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} />;
+      case 'invoices': return <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} onDeleteInvoice={onDeleteInvoice} />;
       case 'schedule': return <AdminScheduleView suppliers={suppliers} />;
       case 'directorPerCapita': return <AdminDirectorPerCapita suppliers={suppliers} logs={directorWithdrawals} onRegister={onRegisterDirectorWithdrawal} onDelete={onDeleteDirectorWithdrawal} />;
       case 'cleaning': return <AdminCleaningLog logs={cleaningLogs} onRegister={onRegisterCleaningLog} onDelete={onDeleteCleaningLog} />;

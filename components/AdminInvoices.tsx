@@ -15,6 +15,7 @@ interface InvoiceInfo {
 interface AdminInvoicesProps {
     suppliers: Supplier[];
     onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => void;
+    onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -27,7 +28,7 @@ const formatDate = (dateString: string) => {
     return date.toLocaleDateString('pt-BR');
 };
 
-const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoice }) => {
+const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoice, onDeleteInvoice }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortKey, setSortKey] = useState<'supplierName' | 'date' | 'totalValue'>('date');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -112,9 +113,16 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
     };
 
     const handleReopenClick = (supplierCpf: string, invoiceNumber: string) => {
-        const confirmationMessage = `Tem certeza que deseja reabrir esta nota fiscal (NF: ${invoiceNumber})?\n\nAs entregas associadas voltarão ao estado pendente para correção.\n\nEsta ação não pode ser desfeita.`;
+        const confirmationMessage = `Tem certeza que deseja REABRIR esta nota fiscal (NF: ${invoiceNumber})?\n\nAs entregas associadas voltarão ao estado de agendamento pendente para nova digitação.\n\nEsta ação não pode ser desfeita.`;
         if (window.confirm(confirmationMessage)) {
             onReopenInvoice(supplierCpf, invoiceNumber);
+        }
+    };
+
+    const handleDeleteClick = (supplierCpf: string, invoiceNumber: string) => {
+        const confirmationMessage = `ATENÇÃO: Deseja EXCLUIR permanentemente o faturamento desta NF (${invoiceNumber})?\n\nIsso removerá os registros de entrega e liberará o saldo no contrato. Os agendamentos não serão mantidos.\n\nEsta ação é irreversível.`;
+        if (window.confirm(confirmationMessage)) {
+            onDeleteInvoice(supplierCpf, invoiceNumber);
         }
     };
 
@@ -157,18 +165,27 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                         <td className="p-3 font-mono">{invoice.invoiceNumber}</td>
                                         <td className="p-3 text-right font-mono font-bold text-green-700">{formatCurrency(invoice.totalValue)}</td>
                                         <td className="p-3 text-center">
-                                            <button onClick={() => toggleExpand(invoice.id)} className="p-2 rounded-full hover:bg-gray-200">
+                                            <button onClick={() => toggleExpand(invoice.id)} className="p-2 rounded-full hover:bg-gray-200" title="Ver itens">
                                                 <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                                             </button>
                                         </td>
                                         <td className="p-3 text-center">
-                                             <button 
-                                                onClick={() => handleReopenClick(invoice.supplierCpf, invoice.invoiceNumber)}
-                                                className="bg-orange-100 text-orange-700 hover:bg-orange-200 text-xs font-bold px-3 py-1 rounded-full transition-colors"
-                                                title="Reverter para agendamento pendente"
-                                             >
-                                                Reabrir
-                                             </button>
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button 
+                                                    onClick={() => handleReopenClick(invoice.supplierCpf, invoice.invoiceNumber)}
+                                                    className="bg-orange-100 text-orange-700 hover:bg-orange-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors"
+                                                    title="Reverter para agendamento pendente"
+                                                >
+                                                    Reabrir
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteClick(invoice.supplierCpf, invoice.invoiceNumber)}
+                                                    className="bg-red-100 text-red-700 hover:bg-red-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors"
+                                                    title="Excluir faturamento permanentemente"
+                                                >
+                                                    Excluir
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     {isExpanded && (
