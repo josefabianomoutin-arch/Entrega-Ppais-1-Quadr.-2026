@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog } from '../types';
 import AdminAnalytics from './AdminAnalytics';
@@ -87,10 +88,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   }, [suppliers]);
 
   const filteredSuppliers = useMemo(() => {
-    if (!suppliers) return [];
-    return suppliers.filter(s => 
-      s.name && s.name.toLowerCase().includes(supplierSearch.toLowerCase())
-    );
+    if (!suppliers || !Array.isArray(suppliers)) return [];
+    return suppliers.filter(s => {
+      const name = s.name || '';
+      return name.toLowerCase().includes(supplierSearch.toLowerCase());
+    });
   }, [suppliers, supplierSearch]);
 
   const handleAddItem = (e: React.FormEvent) => {
@@ -185,7 +187,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
           {activeTab === 'register' && (
             <div className="space-y-8 max-w-5xl mx-auto">
-              {/* Formulário de Cadastro */}
               <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-500">
                 <h2 className="text-xl font-black text-gray-800 mb-6 uppercase tracking-tight">Cadastro de Novo Fornecedor</h2>
                 <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={async (e) => {
@@ -215,10 +216,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 )}
               </div>
 
-              {/* Lista de Fornecedores */}
               <div className="bg-white p-6 rounded-2xl shadow-lg">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                  <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight">Fornecedores Habilitados</h2>
+                  <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight">Fornecedores Habilitados ({filteredSuppliers.length})</h2>
                   <div className="relative w-full md:w-64">
                     <input type="text" placeholder="Pesquisar por nome..." value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} className="w-full border p-2 pl-8 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-2 top-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -259,7 +259,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
           {activeTab === 'contracts' && (
             <div className="space-y-8 max-w-6xl mx-auto">
-              {/* Formulário para Vincular Item */}
               <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-indigo-500">
                 <h2 className="text-xl font-black text-gray-800 mb-6 uppercase tracking-tight">Vincular Item ao Fornecedor</h2>
                 <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
@@ -288,11 +287,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 </form>
               </div>
 
-              {/* Lista de Itens por Fornecedor */}
               <div className="grid grid-cols-1 gap-6">
-                <h3 className="text-lg font-black text-gray-600 uppercase tracking-wider px-2">Itens de Contrato por Fornecedor</h3>
-                {suppliers.filter(s => (s.contractItems || []).length > 0).length > 0 ? (
-                    suppliers.filter(s => (s.contractItems || []).length > 0).map(s => (
+                <h3 className="text-lg font-black text-gray-600 uppercase tracking-wider px-2">Detalhamento dos Contratos</h3>
+                {suppliers.length > 0 ? (
+                    suppliers.map(s => (
                         <div key={s.cpf} className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100">
                             <div className="bg-gray-50 p-4 md:p-6 flex flex-col md:flex-row justify-between items-start md:items-center border-b gap-4">
                             <div>
@@ -305,43 +303,48 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                             </div>
                             </div>
                             <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                                <thead className="bg-gray-50 text-gray-400 font-black uppercase tracking-widest">
-                                <tr>
-                                    <th className="p-4 text-left">Descrição do Item</th>
-                                    <th className="p-4 text-right">Peso Total</th>
-                                    <th className="p-4 text-right">Preço p/ Kg</th>
-                                    <th className="p-4 text-right">Subtotal</th>
-                                    <th className="p-4 text-center">Ações</th>
-                                </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                {(s.contractItems || []).map((item, idx) => (
-                                    <tr key={`${s.cpf}-${item.name}-${idx}`} className="hover:bg-gray-50 transition-colors">
-                                    <td className="p-4 font-bold text-gray-700 uppercase">{item.name}</td>
-                                    <td className="p-4 text-right font-mono">{(item.totalKg || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})} Kg</td>
-                                    <td className="p-4 text-right font-mono text-gray-500">{formatCurrency(item.valuePerKg)}</td>
-                                    <td className="p-4 text-right font-black text-gray-800">{formatCurrency((item.totalKg || 0) * (item.valuePerKg || 0))}</td>
-                                    <td className="p-4 text-center">
-                                        <button 
-                                            onClick={() => handleRemoveItem(s.cpf, item.name)} 
-                                            className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
-                                            title="Remover item do contrato"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        </button>
-                                    </td>
+                            {(s.contractItems || []).length > 0 ? (
+                                <table className="w-full text-xs">
+                                    <thead className="bg-gray-50 text-gray-400 font-black uppercase tracking-widest">
+                                    <tr>
+                                        <th className="p-4 text-left">Descrição do Item</th>
+                                        <th className="p-4 text-right">Peso Total</th>
+                                        <th className="p-4 text-right">Preço p/ Kg</th>
+                                        <th className="p-4 text-right">Subtotal</th>
+                                        <th className="p-4 text-center">Ações</th>
                                     </tr>
-                                ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                    {s.contractItems.map((item, idx) => (
+                                        <tr key={`${s.cpf}-${item.name}-${idx}`} className="hover:bg-gray-50 transition-colors">
+                                        <td className="p-4 font-bold text-gray-700 uppercase">{item.name}</td>
+                                        <td className="p-4 text-right font-mono">{(item.totalKg || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})} Kg</td>
+                                        <td className="p-4 text-right font-mono text-gray-500">{formatCurrency(item.valuePerKg)}</td>
+                                        <td className="p-4 text-right font-black text-gray-800">{formatCurrency((item.totalKg || 0) * (item.valuePerKg || 0))}</td>
+                                        <td className="p-4 text-center">
+                                            <button 
+                                                onClick={() => handleRemoveItem(s.cpf, item.name)} 
+                                                className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
+                                                title="Remover item do contrato"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </td>
+                                        </tr>
+                                    ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <div className="p-10 text-center bg-gray-50/50">
+                                    <p className="text-gray-400 text-xs italic">Este fornecedor ainda não possui itens vinculados ao contrato.</p>
+                                </div>
+                            )}
                             </div>
                         </div>
                     ))
                 ) : (
                     <div className="p-20 text-center bg-gray-50 rounded-2xl border-2 border-dashed">
-                        <p className="text-gray-400 font-bold uppercase tracking-widest italic">Nenhum item vinculado a contratos.</p>
-                        <p className="text-xs text-gray-400 mt-2">Utilize o formulário acima para começar a adicionar itens aos fornecedores.</p>
+                        <p className="text-gray-400 font-bold uppercase tracking-widest italic">Nenhum fornecedor cadastrado.</p>
                     </div>
                 )}
               </div>
