@@ -50,7 +50,6 @@ const App: React.FC = () => {
           return;
         }
 
-        // Normalização de alto nível: Converte o objeto de fornecedores em array
         const rawSuppliers = normalizeArray<any>(data);
         
         const suppliersArray: Supplier[] = rawSuppliers
@@ -58,7 +57,6 @@ const App: React.FC = () => {
             ...p,
             name: p.name || 'SEM NOME',
             cpf: p.cpf || String(Math.random()),
-            // Normalização profunda: Garante que propriedades aninhadas sejam arrays
             contractItems: normalizeArray(p.contractItems),
             deliveries: normalizeArray<any>(p.deliveries).map((d: any) => ({ 
                 ...d, 
@@ -71,6 +69,13 @@ const App: React.FC = () => {
           .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         
         setSuppliers(suppliersArray);
+
+        // Atualiza o usuário logado se ele estiver na lista
+        if (currentUser) {
+            const updatedUser = suppliersArray.find(s => s.cpf === currentUser.cpf);
+            if (updatedUser) setCurrentUser(updatedUser);
+        }
+
       } catch (error) { 
         console.error("Erro ao processar fornecedores:", error); 
         setSuppliers([]); 
@@ -102,7 +107,7 @@ const App: React.FC = () => {
       unsubscribeDirectorWithdrawals();
       unsubscribePerCapitaConfig();
     };
-  }, []);
+  }, [currentUser?.cpf]);
 
   const writeToDatabase = async (dbRef: any, data: any) => {
       setIsSaving(true);
@@ -111,11 +116,130 @@ const App: React.FC = () => {
       finally { setTimeout(() => setIsSaving(false), 500); }
   };
 
+  const handleScheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
+    const supplier = suppliers.find(s => s.cpf === supplierCpf);
+    if (!supplier) return;
+
+    const newDelivery: Delivery = {
+      id: `del-${Date.now()}`,
+      date,
+      time,
+      item: 'AGENDAMENTO PENDENTE',
+      invoiceUploaded: false,
+    };
+
+    const updatedDeliveries = [...(supplier.deliveries || []), newDelivery];
+    const updatedSupplier = { ...supplier, deliveries: updatedDeliveries };
+    
+    const updatedSuppliersMap = suppliers.reduce((acc, p) => {
+        acc[p.cpf] = p.cpf === supplierCpf ? updatedSupplier : p;
+        return acc;
+    }, {} as Record<string, Supplier>);
+
+    await writeToDatabase(suppliersRef, updatedSuppliersMap);
+  };
+
+  const handleFulfillAndInvoice = async (
+    supplierCpf: string, 
+    placeholderDeliveryIds: string[], 
+    invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }
+  ) => {
+    const supplier = suppliers.find(s => s.cpf === supplierCpf);
+    if (!supplier) return;
+
+    // Filtra as entregas existentes removendo os placeholders que estão sendo faturados
+    let updatedDeliveries = (supplier.deliveries || []).filter(d => !placeholderDeliveryIds.includes(d.id));
+    
+    // Pega a data e hora do primeiro placeholder para manter a referência no histórico
+    const originalDelivery = (supplier.deliveries || []).find(d => placeholderDeliveryIds.includes(d.id));
+    const date = originalDelivery?.date || new Date().toISOString().split('T')[0];
+    const time = originalDelivery?.time || '08:00';
+
+    // Cria as novas entradas de entrega baseadas nos itens faturados
+    const newDeliveries: Delivery[] = invoiceData.fulfilledItems.map((item, idx) => ({
+        id: `del-${Date.now()}-${idx}`,
+        date,
+        time,
+        item: item.name,
+        kg: item.kg,
+        value: item.value,
+        invoiceUploaded: true,
+        invoiceNumber: invoiceData.invoiceNumber,
+    }));
+
+    updatedDeliveries = [...updatedDeliveries, ...newDeliveries];
+    const updatedSupplier = { ...supplier, deliveries: updatedDeliveries };
+
+    const updatedSuppliersMap = suppliers.reduce((acc, p) => {
+        acc[p.cpf] = p.cpf === supplierCpf ? updatedSupplier : p;
+        return acc;
+    }, {} as Record<string, Supplier>);
+
+    await writeToDatabase(suppliersRef, updatedSuppliersMap);
+  };
+
+  const handleCancelDeliveries = async (supplierCpf: string, deliveryIds: string[]) => {
+    const supplier = suppliers.find(s => s.cpf === supplierCpf);
+    if (!supplier) return;
+
+    const updatedDeliveries = (supplier.deliveries || []).filter(d => !deliveryIds.includes(d.id));
+    const updatedSupplier = { ...supplier, deliveries: updatedDeliveries };
+
+    const updatedSuppliersMap = suppliers.reduce((acc, p) => {
+        acc[p.cpf] = p.cpf === supplierCpf ? updatedSupplier : p;
+        return acc;
+    }, {} as Record<string, Supplier>);
+
+    await writeToDatabase(suppliersRef, updatedSuppliersMap);
+  };
+
   const handleRegisterDirectorWithdrawal = async (log: Omit<DirectorPerCapitaLog, 'id'>) => {
     const newLog: DirectorPerCapitaLog = { ...log, id: `dir-${Date.now()}` };
-    const updatedLogs = [newLog, ...directorWithdrawals];
-    await writeToDatabase(directorWithdrawalsRef, updatedLogs);
-    return { success: true, message: 'Envio para diretoria registrado com sucesso.' };
+    
+    // Lógica para deduzir do estoque total (PEPS)
+    let tempSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
+    let itemsShortage: string[] = [];
+
+    for (const itemReq of log.items) {
+      let needed = itemReq.quantity;
+      
+      // Ordenar lotes por data de entrega (mais antigos primeiro) para PEPS
+      const allLotsForItem = tempSuppliers.flatMap(s => 
+        s.deliveries
+          .filter(d => d.item === itemReq.name && d.lots && d.lots.length > 0)
+          .map(d => ({ supplier: s, delivery: d }))
+      ).sort((a, b) => a.delivery.date.localeCompare(b.delivery.date));
+
+      for (const entry of allLotsForItem) {
+        if (needed <= 0) break;
+        if (!entry.delivery.lots) continue;
+
+        for (const lot of entry.delivery.lots) {
+          if (needed <= 0) break;
+          if (lot.remainingQuantity > 0) {
+            const take = Math.min(lot.remainingQuantity, needed);
+            lot.remainingQuantity -= take;
+            needed -= take;
+          }
+        }
+      }
+
+      if (needed > 0.001) {
+        itemsShortage.push(`${itemReq.name} (faltou ${needed.toFixed(2)})`);
+      }
+    }
+
+    if (itemsShortage.length > 0) {
+      if (!window.confirm(`Atenção: Os seguintes itens não possuem estoque suficiente: ${itemsShortage.join(', ')}. Deseja continuar mesmo assim (o saldo ficará zerado nos lotes existentes)?`)) {
+        return { success: false, message: 'Operação cancelada por falta de estoque.' };
+      }
+    }
+
+    // Salva o log e atualiza os fornecedores (baixando o estoque)
+    await writeToDatabase(directorWithdrawalsRef, [newLog, ...directorWithdrawals]);
+    await writeToDatabase(suppliersRef, tempSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+    
+    return { success: true, message: 'Envio para diretoria registrado e estoque baixado com sucesso.' };
   };
 
   const handleDeleteDirectorWithdrawal = async (id: string) => {
@@ -244,7 +368,15 @@ const App: React.FC = () => {
             onDeleteDirectorWithdrawal={handleDeleteDirectorWithdrawal}
           />
         ) : currentUser ? (
-          <Dashboard supplier={currentUser} onLogout={() => setCurrentUser(null)} onScheduleDelivery={async () => {}} onFulfillAndInvoice={async () => {}} onCancelDeliveries={async () => {}} emailModalData={null} onCloseEmailModal={() => {}} />
+          <Dashboard 
+            supplier={currentUser} 
+            onLogout={() => setCurrentUser(null)} 
+            onScheduleDelivery={handleScheduleDelivery} 
+            onFulfillAndInvoice={handleFulfillAndInvoice} 
+            onCancelDeliveries={handleCancelDeliveries} 
+            emailModalData={null} 
+            onCloseEmailModal={() => {}} 
+          />
         ) : isAlmoxarifadoLoggedIn ? (
           <AlmoxarifadoDashboard suppliers={suppliers} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={async (p) => ({success:true, message:''})} onRegisterWithdrawal={async (p) => ({success:true, message:''})} />
         ) : (

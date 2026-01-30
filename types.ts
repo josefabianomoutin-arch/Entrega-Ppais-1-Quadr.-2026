@@ -78,6 +78,7 @@ export interface DirectorItem {
   quantity: number;
   unitPrice: number;
   totalValue: number;
+  expirationDate?: string;
 }
 
 export interface DirectorPerCapitaLog {

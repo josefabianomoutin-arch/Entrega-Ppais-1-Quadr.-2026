@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import type { Supplier, DirectorPerCapitaLog, DirectorItem } from '../types';
 
@@ -13,6 +12,11 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+const formatDateBr = (dateString?: string) => {
+    if (!dateString) return '-';
+    return new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR');
+};
+
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
@@ -25,7 +29,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
   const [month, setMonth] = useState(MONTHS[new Date().getMonth()]);
   const [week, setWeek] = useState('1');
   const [recipient, setRecipient] = useState<'Chefe de Departamento' | 'Diretor de Disciplina'>('Chefe de Departamento');
-  const [formItems, setFormItems] = useState<{ name: string; quantity: string }[]>([{ name: '', quantity: '' }]);
+  const [formItems, setFormItems] = useState<{ name: string; quantity: string; expirationDate: string }[]>([{ name: '', quantity: '', expirationDate: '' }]);
   const [isSaving, setIsSaving] = useState(false);
 
   const availableItems = useMemo(() => {
@@ -40,9 +44,9 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
     return Array.from(itemMap.entries()).map(([name, info]) => ({ name, ...info })).sort((a,b) => a.name.localeCompare(b.name));
   }, [suppliers]);
 
-  const handleAddItem = () => setFormItems([...formItems, { name: '', quantity: '' }]);
+  const handleAddItem = () => setFormItems([...formItems, { name: '', quantity: '', expirationDate: '' }]);
   const handleRemoveItem = (index: number) => setFormItems(formItems.filter((_, i) => i !== index));
-  const handleItemChange = (index: number, field: 'name' | 'quantity', value: string) => {
+  const handleItemChange = (index: number, field: 'name' | 'quantity' | 'expirationDate', value: string) => {
     const updated = [...formItems];
     updated[index] = { ...updated[index], [field]: value };
     setFormItems(updated);
@@ -59,12 +63,19 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Fix: Explicitly defining the return type as DirectorItem | null to satisfy the type predicate in filter.
     const validItems: DirectorItem[] = formItems
-      .map(fi => {
+      .map((fi): DirectorItem | null => {
         const info = availableItems.find(ai => ai.name === fi.name);
         const qty = parseFloat(fi.quantity.replace(',', '.'));
         if (info && !isNaN(qty) && qty > 0) {
-          return { name: fi.name, quantity: qty, unitPrice: info.price, totalValue: qty * info.price };
+          return { 
+            name: fi.name, 
+            quantity: qty, 
+            unitPrice: info.price, 
+            totalValue: qty * info.price,
+            expirationDate: fi.expirationDate 
+          };
         }
         return null;
       })
@@ -85,8 +96,10 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
         totalValue: calculateTotal 
     });
     if (result.success) {
-      setFormItems([{ name: '', quantity: '' }]);
+      setFormItems([{ name: '', quantity: '', expirationDate: '' }]);
       setDate(new Date().toISOString().split('T')[0]);
+    } else {
+      alert(result.message);
     }
     setIsSaving(false);
   };
@@ -128,6 +141,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
                 <th>Mês/Semana</th>
                 <th>Destinatário</th>
                 <th>Descrição do Item</th>
+                <th>Validade</th>
                 <th>Qtd.</th>
                 <th>V. Unit.</th>
                 <th>V. Total</th>
@@ -140,6 +154,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
                   <td>${l.month} / S${l.week}</td>
                   <td>${l.recipient}</td>
                   <td>${item.name}</td>
+                  <td>${formatDateBr(item.expirationDate)}</td>
                   <td>${item.quantity.toLocaleString('pt-BR')}</td>
                   <td>${formatCurrency(item.unitPrice)}</td>
                   <td>${formatCurrency(item.totalValue)}</td>
@@ -148,7 +163,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
             </tbody>
             <tfoot>
                <tr style="font-weight: bold; background-color: #eee;">
-                  <td colspan="6" style="text-align: right">TOTAL GERAL DO RELATÓRIO:</td>
+                  <td colspan="7" style="text-align: right">TOTAL GERAL DO RELATÓRIO:</td>
                   <td>${formatCurrency(logs.reduce((acc, curr) => acc + curr.totalValue, 0))}</td>
                </tr>
             </tfoot>
@@ -174,11 +189,11 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
   return (
     <div className="space-y-8 pb-12">
       <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-indigo-500">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 uppercase">Novo Envio para Diretoria</h2>
+        <h2 className="text-2xl font-bold text-gray-800 mb-6 uppercase">Novo Envio para Diretoria (Saída de Estoque)</h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase">Data</label>
+              <label className="text-xs font-bold text-gray-500 uppercase">Data do Envio</label>
               <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border rounded-lg" />
             </div>
             <div className="space-y-1">
@@ -202,36 +217,51 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
             </div>
           </div>
 
-          <div className="space-y-3 pt-2">
-            <label className="text-xs font-bold text-gray-500 uppercase">Itens a Enviar</label>
+          <div className="space-y-3 pt-2 border-t">
+            <label className="text-xs font-bold text-gray-500 uppercase">Itens a Retirar do Estoque</label>
             {formItems.map((item, index) => (
-              <div key={index} className="flex gap-2 items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
-                <select 
-                  value={item.name} 
-                  onChange={e => handleItemChange(index, 'name', e.target.value)} 
-                  className="flex-1 p-2 border rounded-lg text-sm"
-                >
-                  <option value="">-- Selecionar Item do Contrato --</option>
-                  {availableItems.map(ai => <option key={ai.name} value={ai.name}>{ai.name}</option>)}
-                </select>
-                <input 
-                  type="text" 
-                  value={item.quantity} 
-                  onChange={e => handleItemChange(index, 'quantity', e.target.value.replace(/[^0-9,]/g, ''))} 
-                  placeholder="Qtd." 
-                  className="w-24 p-2 border rounded-lg text-sm font-mono text-center" 
-                />
+              <div key={index} className="flex flex-col md:flex-row gap-2 items-end bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div className="flex-1 w-full">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">Item</label>
+                  <select 
+                    value={item.name} 
+                    onChange={e => handleItemChange(index, 'name', e.target.value)} 
+                    className="w-full p-2 border rounded-lg text-sm bg-white"
+                  >
+                    <option value="">-- Selecionar Item do Contrato --</option>
+                    {availableItems.map(ai => <option key={ai.name} value={ai.name}>{ai.name}</option>)}
+                  </select>
+                </div>
+                <div className="w-full md:w-32">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">Quantidade</label>
+                  <input 
+                    type="text" 
+                    value={item.quantity} 
+                    onChange={e => handleItemChange(index, 'quantity', e.target.value.replace(/[^0-9,]/g, ''))} 
+                    placeholder="Qtd." 
+                    className="w-full p-2 border rounded-lg text-sm font-mono text-center bg-white" 
+                  />
+                </div>
+                <div className="w-full md:w-44">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">Validade</label>
+                  <input 
+                    type="date" 
+                    value={item.expirationDate} 
+                    onChange={e => handleItemChange(index, 'expirationDate', e.target.value)} 
+                    className="w-full p-2 border rounded-lg text-sm bg-white" 
+                  />
+                </div>
                 <button 
                   type="button" 
                   onClick={() => handleRemoveItem(index)} 
-                  className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                  className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors border border-transparent"
                   disabled={formItems.length === 1}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                 </button>
               </div>
             ))}
-            <button type="button" onClick={handleAddItem} className="text-indigo-600 hover:text-indigo-800 font-bold text-sm flex items-center gap-1 transition-colors">
+            <button type="button" onClick={handleAddItem} className="text-indigo-600 hover:text-indigo-800 font-bold text-sm flex items-center gap-1 transition-colors mt-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" /></svg>
               Adicionar outro item
             </button>
@@ -247,7 +277,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
               disabled={isSaving} 
               className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-3 rounded-xl font-black transition-all shadow-lg active:scale-95 uppercase tracking-wider disabled:bg-gray-400"
             >
-              {isSaving ? 'Registrando...' : 'Registrar Envio'}
+              {isSaving ? 'Registrando e baixando estoque...' : 'Registrar e Baixar Estoque'}
             </button>
           </div>
         </form>
@@ -275,7 +305,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
                 <th className="p-4 text-left">Data</th>
                 <th className="p-4 text-left">Referência</th>
                 <th className="p-4 text-left">Destinatário</th>
-                <th className="p-4 text-left">Descrição dos Itens</th>
+                <th className="p-4 text-left">Descrição / Validade</th>
                 <th className="p-4 text-right">Valor Total</th>
                 <th className="p-4 text-center">Ações</th>
               </tr>
@@ -290,13 +320,17 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
                     </span>
                   </td>
                   <td className="p-4 font-semibold text-gray-600">{log.recipient}</td>
-                  <td className="p-4 text-xs text-gray-500 italic max-w-xs truncate" title={log.items.map(i => i.name).join(', ')}>
-                    {log.items.map(i => i.name).join(', ')}
+                  <td className="p-4 text-xs text-gray-500 italic max-w-xs">
+                    <ul className="list-disc list-inside">
+                        {log.items.map((item, i) => (
+                            <li key={i}>{item.name} ({item.quantity}) - Val: {formatDateBr(item.expirationDate)}</li>
+                        ))}
+                    </ul>
                   </td>
                   <td className="p-4 text-right font-black text-indigo-700">{formatCurrency(log.totalValue)}</td>
                   <td className="p-4 text-center">
                     <button 
-                      onClick={() => { if(window.confirm('Deseja excluir este registro permanentemente?')) onDelete(log.id); }} 
+                      onClick={() => { if(window.confirm('Deseja excluir este registro permanentemente? Atenção: O estoque NÃO será devolvido automaticamente ao excluir o log.')) onDelete(log.id); }} 
                       className="text-red-400 hover:text-red-600 p-2 rounded-full transition-colors"
                       title="Excluir Registro"
                     >
