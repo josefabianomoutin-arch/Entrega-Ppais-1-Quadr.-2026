@@ -91,7 +91,6 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
   };
 
   const handlePrintReport = () => {
-    const logoSAP = "https://www.sap.sp.gov.br/images/logo-sap-header.png";
     const printContent = `
       <html>
         <head>
@@ -100,18 +99,15 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
             body { font-family: Arial, sans-serif; padding: 20px; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 12px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 10px; }
+            .header { border-bottom: 2px solid #000; padding-bottom: 10px; text-align: center; }
             .footer { margin-top: 50px; display: flex; justify-content: space-around; }
             .sig { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; font-size: 10px; }
           </style>
         </head>
         <body>
           <div class="header">
-            <img src="${logoSAP}" height="50">
-            <div style="text-align: right">
-              <strong>SÃO PAULO - GOVERNO DO ESTADO</strong><br>
-              Secretaria da Administração Penitenciária
-            </div>
+            <strong>SÃO PAULO - GOVERNO DO ESTADO</strong><br>
+            Secretaria da Administração Penitenciária
           </div>
           <h2 style="text-align: center">Controle de Saída - Diretoria</h2>
           <table>
@@ -216,21 +212,4 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
                 <tr key={log.id}>
                   <td className="p-3">{new Date(log.date + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
                   <td className="p-3">{log.recipient}</td>
-                  <td className="p-3 text-xs">{log.items.map(i => i.name).join(', ')}</td>
-                  <td className="p-3 text-right font-bold">{formatCurrency(log.totalValue)}</td>
-                  <td className="p-3 text-center">
-                    <button onClick={() => onDelete(log.id)} className="text-red-500">Excluir</button>
-                  </td>
-                </tr>
-              )) : (
-                <tr><td colSpan={5} className="p-8 text-center text-gray-400">Nenhum registro.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default AdminDirectorPerCapita;
+                  <td className="p-3 text-xs">{log.items.map(i => i.name).join(', ')}
