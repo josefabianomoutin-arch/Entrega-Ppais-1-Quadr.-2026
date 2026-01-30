@@ -27,15 +27,15 @@ export interface Delivery {
 
 export interface ContractItem {
   name: string;
-  totalKg: number; // Para 'un', é o peso total. Para outros, é a quantidade de unidades (dúzias, baldes, sacos, etc).
-  valuePerKg: number; // Para 'un', é o valor/kg. Para outros, é o valor por unidade.
-  unit?: string; // Unidade de medida do item, ex: 'balde-18', 'dz-auto', 'kg-1'
+  totalKg: number;
+  valuePerKg: number;
+  unit?: string;
   order?: number;
 }
 
 export interface Supplier {
   name: string;
-  cpf: string; // Atua como senha e identificador único (CPF ou CNPJ)
+  cpf: string;
   initialValue: number;
   contractItems: ContractItem[];
   deliveries: Delivery[];
@@ -45,20 +45,28 @@ export interface Supplier {
 export interface WarehouseMovement {
   id: string;
   type: 'entrada' | 'saída';
-  timestamp: string; // ISO string for date and time
+  timestamp: string;
   lotId: string;
   lotNumber: string;
   itemName: string;
   supplierName: string;
   deliveryId: string;
-  inboundInvoice?: string; // Optional, only for 'entrada'
-  outboundInvoice?: string; // Optional, only for 'saída'
-  quantity?: number; // How much was moved, especially for 'saída'
-  expirationDate?: string; // Data de validade do lote na entrada
+  inboundInvoice?: string;
+  outboundInvoice?: string;
+  quantity?: number;
+  expirationDate?: string;
 }
 
 export interface PerCapitaConfig {
   staffCount?: number;
   inmateCount?: number;
   customValues?: Record<string, string>;
+}
+
+export interface CleaningLog {
+  id: string;
+  date: string;
+  responsible: string;
+  type: 'diaria' | 'semanal' | 'pesada';
+  observations: string;
 }

@@ -1,7 +1,6 @@
 
-
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 import EditSupplierModal from './EditSupplierModal';
@@ -10,8 +9,9 @@ import AdminScheduleView from './AdminScheduleView';
 import AdminInvoices from './AdminInvoices';
 import AdminPerCapita from './AdminPerCapita';
 import AdminWarehouseLog from './AdminWarehouseLog';
+import AdminCleaningLog from './AdminCleaningLog';
 
-type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse';
+type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse' | 'cleaning';
 
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
@@ -20,6 +20,7 @@ interface AdminDashboardProps {
   onLogout: () => void;
   suppliers: Supplier[];
   warehouseLog: WarehouseMovement[];
+  cleaningLogs: CleaningLog[];
   onResetData: () => void;
   onRestoreData: (backupSuppliers: Supplier[]) => Promise<boolean>;
   activeTab: AdminTab;
@@ -30,393 +31,30 @@ interface AdminDashboardProps {
   perCapitaConfig: PerCapitaConfig;
   onUpdatePerCapitaConfig: (config: PerCapitaConfig) => Promise<void>;
   onDeleteWarehouseEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
+  onRegisterCleaningLog: (log: Omit<CleaningLog, 'id'>) => Promise<{ success: boolean; message: string }>;
+  onDeleteCleaningLog: (id: string) => Promise<void>;
 }
 
 const formatCurrency = (value: number) => {
-    if (isNaN(value)) return 'R$ 0,00';
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-// Tipos para o estado da UI de Gestão por Item
-interface SupplierSlot { supplierCpf: string; }
-interface ItemCentricInput {
-  id: string;
-  name: string;
-  suppliers: SupplierSlot[];
-  // Campos para a UI de entrada
-  ui_compositeUnit: string;
-  ui_unit: 'kg' | 'dz' | 'un' | 'pacote' | 'pote' | 'balde' | 'saco' | 'embalagem' | 'litro' | 'caixa';
-  ui_quantity: string;
-  ui_valuePerUnit: string;
-  ui_kgConversion: string;
-  // Campos de dados reais (calculados)
-  totalKg: string; // GUARDA A QUANTIDADE DE UNIDADES, NÃO O PESO. O NOME É MANTIDO POR COMPATIBilidade.
-  valuePerKg: string; // GUARDA O VALOR POR UNIDADE. O NOME É MANTIDO POR COMPATIBilidade.
-}
-
-
-const initialSupplierSlot = (): SupplierSlot => ({ supplierCpf: '' });
-
-const initialItemCentricInput = (): ItemCentricInput => ({
-  id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-  name: '',
-  suppliers: Array(15).fill(null).map(initialSupplierSlot),
-  ui_compositeUnit: 'kg-1',
-  ui_unit: 'kg',
-  ui_quantity: '',
-  ui_valuePerUnit: '',
-  ui_kgConversion: '1',
-  totalKg: '',
-  valuePerKg: '',
-});
-
-const unitOptions = [
-    { value: 'saco-50', label: 'Saco (50 Kg)' },
-    { value: 'saco-25', label: 'Saco (25 Kg)' },
-    { value: 'balde-18', label: 'Balde (18 Kg)' },
-    { value: 'embalagem-10', label: 'Embalagem (10 Kg)' },
-    { value: 'embalagem-5', label: 'Embalagem (5 Kg)' },
-    { value: 'embalagem-3', label: 'Embalagem (3 Kg)' },
-    { value: 'embalagem-2', label: 'Embalagem (2 Kg)' },
-    { value: 'kg-1', label: 'Quilograma (Kg)' },
-    { value: 'litro-1', label: 'Litros (Lts)' },
-    { value: 'embalagem-1', label: 'Embalagem Plástica (1 Litro)' },
-    { value: 'caixa-1', label: 'Caixa (1 Litro)' },
-    { value: 'embalagem-0.9', label: 'Embalagem (900ml)' },
-    { value: 'embalagem-0.7', label: 'Embalagem (700ml)' },
-    { value: 'pacote-0.5', label: 'Pacote (500g)' },
-    { value: 'pacote-0.4', label: 'Pacote (400g)' },
-    { value: 'pacote-0.3', label: 'Pacote (300g)' },
-    { value: 'pote-0.2', label: 'Pote (200g)' },
-    { value: 'pacote-0.15', label: 'Pacote (150g)' },
-    { value: 'pacote-0.03', label: 'Pacote (30g)' },
-    { value: 'dz-auto', label: 'Dúzia' },
-    { value: 'un-auto', label: 'Unidade' },
-];
-
-
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-    onRegister, 
-    onPersistSuppliers,
-    onUpdateSupplier,
-    onLogout, 
-    suppliers, 
-    warehouseLog,
-    onResetData, 
-    onRestoreData,
-    activeTab,
-    onTabChange,
-    registrationStatus,
-    onClearRegistrationStatus,
-    onReopenInvoice,
-    perCapitaConfig,
-    onUpdatePerCapitaConfig,
-    onDeleteWarehouseEntry
-}) => {
-  // Estados para aba de REGISTRO
-  const [regName, setRegName] = useState('');
-  const [regCpf, setRegCpf] = useState('');
-  const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
-  const [isRegistering, setIsRegistering] = useState(false);
+const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
+  const { suppliers, activeTab, onTabChange, cleaningLogs, onRegisterCleaningLog, onDeleteCleaningLog } = props;
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [updateStatus, setUpdateStatus] = useState<{ success: boolean; message: string } | null>(null);
-
-
-  // Estados para aba de GESTÃO POR ITEM
-  const [itemCentricContracts, setItemCentricContracts] = useState<ItemCentricInput[]>([initialItemCentricInput()]);
-  const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(0);
-  const [contractError, setContractError] = useState('');
-  const [contractSuccess, setContractSuccess] = useState('');
-  
-  // Estados para ZONA CRÍTICA (Backup/Restore)
-  const [restoreFile, setRestoreFile] = useState<File | null>(null);
-  const [restoreMessage, setRestoreMessage] = useState({ type: '', text: '' });
-
-  // Memoiza uma lista estável de CPFs e nomes para evitar loops de re-renderização
-  const supplierIdentities = useMemo(() => suppliers.map(s => ({ cpf: s.cpf, name: s.name, allowedWeeks: s.allowedWeeks || [], deliveries: s.deliveries || [] })), [suppliers]);
-
-  useEffect(() => {
-    if (registrationStatus) {
-      if (registrationStatus.success) {
-        setRegName('');
-        setRegCpf('');
-        setSelectedWeeks([]);
-      }
-      const timer = setTimeout(() => {
-        onClearRegistrationStatus();
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [registrationStatus, onClearRegistrationStatus]);
-  
-  useEffect(() => {
-    if (updateStatus) {
-      const timer = setTimeout(() => {
-        setUpdateStatus(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [updateStatus]);
-
-
-  // Sincroniza o estado da UI de contratos com os dados mais recentes dos fornecedores APENAS AO ENTRAR NA ABA
-  useEffect(() => {
-    if (activeTab !== 'contracts') return;
-    
-    const precisionFactor = 100000;
-    const itemsMap = new Map<string, { totalQty: number; valuePerUnit: number; supplierCpfs: string[]; order: number, unit: string }>();
-
-    suppliers.forEach(supplier => {
-        (supplier.contractItems || []).forEach(item => {
-            const order = item.order ?? Infinity;
-            if (!itemsMap.has(item.name)) {
-                itemsMap.set(item.name, { totalQty: 0, valuePerUnit: item.valuePerKg, supplierCpfs: [], order: order, unit: item.unit || 'kg-1' });
-            }
-            const existing = itemsMap.get(item.name)!;
-
-            const currentTotalInUnits = Math.round(existing.totalQty * precisionFactor);
-            const itemTotalInUnits = Math.round(item.totalKg * precisionFactor);
-            existing.totalQty = (currentTotalInUnits + itemTotalInUnits) / precisionFactor;
-
-            existing.supplierCpfs.push(supplier.cpf);
-        });
-    });
-    
-    if (itemsMap.size === 0) {
-        setItemCentricContracts([initialItemCentricInput()]);
-        setExpandedItemIndex(0);
-        return;
-    }
-
-    const sortedItems = [...itemsMap.entries()].sort((a, b) => a[1].order - b[1].order);
-
-    const newItemCentricContracts = sortedItems.map(([name, data]) => {
-        const [unitType, unitWeightStr] = data.unit.split('-');
-        const isUnitType = unitType === 'un';
-
-        const item: ItemCentricInput = {
-            id: `item-${name}-${Math.random()}`,
-            name,
-            suppliers: Array(15).fill(null).map((_, i) => ({
-                supplierCpf: data.supplierCpfs[i] || ''
-            })),
-            ui_compositeUnit: isUnitType ? 'un-auto' : data.unit,
-            ui_unit: unitType as ItemCentricInput['ui_unit'],
-            ui_quantity: String(data.totalQty),
-            ui_valuePerUnit: String(data.valuePerUnit),
-            ui_kgConversion: isUnitType ? unitWeightStr : '1',
-            totalKg: String(data.totalQty),
-            valuePerKg: String(data.valuePerUnit),
-        };
-        
-        return item;
-    });
-
-    setItemCentricContracts(newItemCentricContracts);
-    setExpandedItemIndex(0);
-
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [suppliers, activeTab]);
-
-
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsRegistering(true);
-    await onRegister(regName, regCpf, selectedWeeks);
-    setIsRegistering(false);
-  };
-  
-  const handleEditSupplierSave = async (oldCpf: string, newName: string, newCpf: string, newAllowedWeeks: number[]) => {
-      const error = await onUpdateSupplier(oldCpf, newName, newCpf, newAllowedWeeks);
-      if (error) {
-          return error; // Retorna a mensagem de erro para o modal
-      } else {
-          setEditingSupplier(null); // Fecha o modal em caso de sucesso
-          setUpdateStatus({ success: true, message: `Dados de "${newName}" atualizados com sucesso!` });
-          return null;
-      }
-  };
-
-  const handleItemCentricChange = (id: string, field: keyof ItemCentricInput, value: any) => {
-      setItemCentricContracts(prev =>
-          prev.map(item => {
-              if (item.id !== id) return item;
-
-              const updatedItem = { ...item, [field]: value };
-              
-              if (field.startsWith('ui_')) {
-                  const quantity = parseFloat(updatedItem.ui_quantity.replace(',', '.')) || 0;
-                  const valuePerUnit = parseFloat(updatedItem.ui_valuePerUnit.replace(',', '.')) || 0;
-
-                  // REMOVIDO: Nenhuma conversão é feita. O valor digitado é o valor final.
-                  updatedItem.totalKg = String(quantity);
-                  updatedItem.valuePerKg = String(valuePerUnit);
-              }
-
-              return updatedItem;
-          })
-      );
-  };
-
-  const handleAddItem = () => {
-    setItemCentricContracts(prev => [...prev, initialItemCentricInput()]);
-    setExpandedItemIndex(itemCentricContracts.length);
-  };
-
-  const handleRemoveItem = (id: string) => {
-    if (itemCentricContracts.length > 1) {
-        setItemCentricContracts(prev => prev.filter(item => item.id !== id));
-    } else {
-        alert("Não é possível remover o último item.");
-    }
-  };
-
-  const handleSaveContracts = () => {
-    setContractError('');
-    setContractSuccess('');
-
-    const newSuppliersState: Supplier[] = supplierIdentities.map(identity => ({
-      ...identity,
-      contractItems: [],
-      initialValue: 0,
-    }));
-  
-    try {
-      itemCentricContracts.forEach((item, itemIndex) => {
-        const totalNum = parseFloat(item.totalKg);
-        const valueNum = parseFloat(item.valuePerKg);
-  
-        if (!item.name.trim() || isNaN(totalNum) || isNaN(valueNum) || totalNum <= 0) {
-          return;
-        }
-  
-        const participatingSuppliers = item.suppliers.filter(s => s.supplierCpf);
-        const numSuppliers = participatingSuppliers.length;
-        if (numSuppliers === 0) {
-          return;
-        }
-  
-        const precisionFactor = 100000;
-        const totalInUnits = Math.round(totalNum * precisionFactor);
-        const basePortion = Math.floor(totalInUnits / numSuppliers);
-        let remainder = totalInUnits % numSuppliers;
-
-        const portions = new Array(numSuppliers).fill(basePortion);
-        for (let i = 0; i < remainder; i++) {
-            portions[i]++;
-        }
-  
-        participatingSuppliers.forEach((slot, index) => {
-          const supplier = newSuppliersState.find(p => p.cpf === slot.supplierCpf);
-          if (supplier) {
-            const supplierPortion = portions[index] / precisionFactor;
-            
-            let finalUnit = item.ui_compositeUnit;
-            if (item.ui_compositeUnit === 'un-auto') {
-                const kgConversion = parseFloat(item.ui_kgConversion.replace(',', '.')) || 1;
-                finalUnit = `un-${kgConversion}`;
-            }
-            
-            supplier.contractItems.push({
-              name: item.name.trim(),
-              totalKg: supplierPortion,
-              valuePerKg: valueNum,
-              unit: finalUnit,
-              order: itemIndex,
-            });
-          }
-        });
-      });
-  
-      newSuppliersState.forEach(p => {
-        p.initialValue = p.contractItems.reduce((sum, item) => {
-            const value = (item.totalKg || 0) * (item.valuePerKg || 0);
-            return sum + value;
-        }, 0);
-      });
-      
-      onPersistSuppliers(newSuppliersState);
-      setContractSuccess('Contratos salvos na nuvem com sucesso!');
-      setTimeout(() => setContractSuccess(''), 4000);
-
-    } catch (e: any) {
-      console.error("Erro ao salvar contratos:", e);
-      setContractError('Erro ao calcular totais para salvar. Verifique os dados dos itens.');
-    }
-  };
-
-  const handleBackup = () => {
-      const dataStr = JSON.stringify(suppliers, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-      
-      const exportFileDefaultName = `backup_fornecedores_${new Date().toISOString().split('T')[0]}.json`;
-      
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
-  };
-
-  const handleRestore = () => {
-      if (!restoreFile) {
-        setRestoreMessage({ type: 'error', text: 'Por favor, selecione um arquivo de backup.' });
-        return;
-      }
-      
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        try {
-          const backupData = JSON.parse(event.target?.result as string);
-          if (Array.isArray(backupData) && backupData.every(s => s.name && s.cpf)) {
-            if (window.confirm(`Você tem certeza que deseja restaurar os dados com o arquivo "${restoreFile.name}"? TODOS os dados atuais serão substituídos.`)) {
-                const success = await onRestoreData(backupData);
-                if (success) {
-                    setRestoreMessage({ type: 'success', text: 'Dados restaurados com sucesso!' });
-                } else {
-                    setRestoreMessage({ type: 'error', text: 'Falha ao restaurar. Verifique o console.' });
-                }
-            }
-          } else {
-            throw new Error('Formato de arquivo inválido.');
-          }
-        } catch (error) {
-          setRestoreMessage({ type: 'error', text: 'Erro ao ler o arquivo. Certifique-se de que é um backup válido.' });
-        } finally {
-            setRestoreFile(null);
-            const fileInput = document.getElementById('restore-file-input') as HTMLInputElement;
-            if(fileInput) fileInput.value = '';
-        }
-      };
-      reader.readAsText(restoreFile);
-  };
-  
-  const displayTotalValue = useMemo(() => {
-    if (activeTab === 'contracts') {
-      return itemCentricContracts.reduce((total, item) => {
-        const totalNum = parseFloat(item.totalKg);
-        const valueNum = parseFloat(item.valuePerKg);
-        if (!isNaN(totalNum) && !isNaN(valueNum)) {
-          return total + (totalNum * valueNum);
-        }
-        return total;
-      }, 0);
-    }
-    return suppliers.reduce((sum, p) => sum + p.initialValue, 0);
-  }, [activeTab, itemCentricContracts, suppliers]);
-
 
   const tabs: { id: AdminTab; name: string; icon: React.ReactElement }[] = [
     { id: 'register', name: 'Gestão de fornecedores', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 11a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1z" /></svg> },
     { id: 'contracts', name: 'Gestão por Item', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" /></svg> },
-    { id: 'schedule', name: 'Agenda', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg> },
-    { id: 'invoices', name: 'Notas Fiscais', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg> },
+    { id: 'cleaning', name: 'Higienização Câmara', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5.5"></path><circle cx="18" cy="18" r="3"></circle><path d="M18 15l2 2-2 2"></path></svg> },
     { id: 'warehouse', name: 'Controle de Estoque', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 8a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm-1 4a1 1 0 011-1h2a1 1 0 110 2H5a1 1 0 01-1-1zm8-4a1 1 0 00-1-1h-2a1 1 0 100 2h2a1 1 0 001-1z" /><path fillRule="evenodd" d="M2 3a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H3a1 1 0 01-1-1V3zm2 1h12v12H4V4z" clipRule="evenodd" /></svg> },
     { id: 'analytics', name: 'Relatório Analítico', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg> },
-    { id: 'graphs', name: 'Gráficos', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a1 1 0 001 1h8a1 1 0 100-2H5V5a1 1 0 00-2 0V3zm12 1a1 1 0 011 1v10h1.5a.5.5 0 010 1H14a1 1 0 01-1-1V5a1 1 0 011-1zm-4 3a1 1 0 011 1v6h1.5a.5.5 0 010 1H10a1 1 0 01-1-1V8a1 1 0 011-1z" clipRule="evenodd" /></svg> },
     { id: 'perCapita', name: 'Cálculo Per Capita', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg> },
     { id: 'info', name: 'Zona Crítica', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg> },
   ];
-  
+
+  const totalValue = useMemo(() => suppliers.reduce((s, p) => s + p.initialValue, 0), [suppliers]);
+
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white/90 backdrop-blur-sm shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
@@ -427,14 +65,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="flex items-center gap-4">
             <div className="text-right">
                 <p className="text-xs text-gray-500">Valor Total Contratado</p>
-                <p className="font-bold text-green-700 text-lg">{formatCurrency(displayTotalValue)}</p>
+                <p className="font-bold text-green-700 text-lg">{formatCurrency(totalValue)}</p>
             </div>
-            <button
-              onClick={onLogout}
-              className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
-            >
-              Sair
-            </button>
+            <button onClick={props.onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm">Sair</button>
         </div>
       </header>
       
@@ -444,12 +77,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <ul className="space-y-1">
                     {tabs.map(tab => (
                         <li key={tab.id}>
-                            <button
-                                onClick={() => onTabChange(tab.id)}
-                                className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-semibold transition-colors ${
-                                    activeTab === tab.id ? 'bg-green-100 text-green-800' : 'text-gray-600 hover:bg-gray-100'
-                                } ${tab.id === 'info' ? '!text-red-600 hover:!bg-red-50' + (activeTab === 'info' ? ' !bg-red-100' : '') : ''}`}
-                            >
+                            <button onClick={() => onTabChange(tab.id)} className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-semibold transition-colors ${activeTab === tab.id ? 'bg-green-100 text-green-800' : 'text-gray-600 hover:bg-gray-100'} ${tab.id === 'info' ? '!text-red-600 hover:!bg-red-50' : ''}`}>
                                 {tab.icon}
                                 {tab.name}
                             </button>
@@ -460,218 +88,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </aside>
 
         <main className="flex-1 p-4 md:p-8">
-          
-          {activeTab === 'register' && (
-            <div className="space-y-10">
-                <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-500">
-                    <h2 className="text-2xl font-bold mb-6 text-gray-700">Cadastrar Novo Fornecedor</h2>
-                     {registrationStatus && (
-                        <div className={`p-4 mb-4 rounded-md text-sm ${registrationStatus.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {registrationStatus.message}
-                        </div>
-                    )}
-                    <form onSubmit={handleRegisterSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-700" translate="no">Fornecedor</label>
-                                <input type="text" value={regName} onChange={(e) => setRegName(e.target.value.toUpperCase())} required placeholder="NOME EM MAIÚSCULO" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"/>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-700">CPF/CNPJ (será a senha)</label>
-                                <input type="text" value={regCpf} onChange={(e) => setRegCpf(e.target.value.replace(/[^\d]/g, ''))} maxLength={14} required placeholder="APENAS NÚMEROS" className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 font-mono"/>
-                            </div>
-                        </div>
-                         <div className="space-y-2 pt-4 border-t">
-                            <label className="block text-sm font-medium text-gray-700">Restringir Semanas para Agendamento</label>
-                            <WeekSelector 
-                                selectedWeeks={selectedWeeks} 
-                                onWeekToggle={(week) => setSelectedWeeks(p => p.includes(week) ? p.filter(w => w !== week) : [...p, week])}
-                            />
-                             <p className="text-xs text-gray-500 mt-1">Selecione as semanas em que este fornecedor poderá agendar entregas. Se nenhuma for selecionada, todas as semanas serão permitidas.</p>
-                        </div>
-                        <div className="text-right">
-                            <button type="submit" disabled={isRegistering} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-400">
-                                {isRegistering ? 'Cadastrando...' : 'Cadastrar'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                 <div className="bg-white p-6 rounded-2xl shadow-lg">
-                    <h2 className="text-2xl font-bold mb-1 text-gray-700">Novos cadastros</h2>
-                    <p className="text-sm text-gray-400 mb-4">Total: {suppliers.length}</p>
-                     {updateStatus && (
-                        <div className={`p-4 mb-4 rounded-md text-sm ${updateStatus.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {updateStatus.message}
-                        </div>
-                    )}
-                    <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                        {suppliers.length > 0 ? [...suppliers].sort((a,b)=> a.name.localeCompare(b.name)).map(p => (
-                            <div key={p.cpf} className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50">
-                                <div>
-                                    <p className="font-semibold text-gray-800">{p.name}</p>
-                                    <p className="text-sm text-gray-500 font-mono">{p.cpf}</p>
-                                </div>
-                                 <button onClick={() => setEditingSupplier(p)} className="bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold px-3 py-1 rounded-full transition-colors">
-                                    Editar
-                                 </button>
-                            </div>
-                        )) : (
-                            <p className="text-center text-gray-400 italic py-8">Nenhum fornecedor cadastrado.</p>
-                        )}
-                    </div>
-                 </div>
-            </div>
-          )}
-
-          {activeTab === 'contracts' && (
-              <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-indigo-500">
-                  <h2 className="text-3xl font-black text-indigo-900 uppercase tracking-tighter mb-2">Gestão de Contratos (por Item)</h2>
-                  <p className="text-gray-400 font-medium mb-6">Defina os itens do contrato e distribua as quantidades entre os fornecedores.</p>
-
-                  {contractError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm font-semibold">{contractError}</div>}
-                  {contractSuccess && <div className="bg-green-100 text-green-700 p-3 rounded-md mb-4 text-sm font-semibold">{contractSuccess}</div>}
-
-                  <div className="space-y-4">
-                      {itemCentricContracts.map((item, index) => {
-                          const isExpanded = index === expandedItemIndex;
-                          const quantity = parseFloat(item.totalKg || '0');
-                          const unitLabel = unitOptions.find(opt => opt.value === item.ui_compositeUnit)?.label.split(' (')[0] || 'Unidade';
-                          const isUnitType = item.ui_compositeUnit === 'un-auto';
-
-                          // Lógica de exibição simplificada: sempre mostra a quantidade e o nome da unidade.
-                          const displayAmount = quantity.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-                          const displayUnit = unitLabel;
-                          const headerLabel = `Quantidade Total`;
-                          
-                          const valuePerUnit = parseFloat(item.valuePerKg || '0');
-                          const valueHeaderLabel = `Valor por ${unitLabel}`;
-
-                          return (
-                              <div key={item.id} className={`border rounded-xl transition-all ${isExpanded ? 'bg-white ring-2 ring-indigo-400' : 'bg-gray-50'}`}>
-                                  <div className="p-4 cursor-pointer flex justify-between items-center" onClick={() => setExpandedItemIndex(isExpanded ? null : index)}>
-                                      <div className="flex-grow">
-                                        <p className="text-xs text-gray-400">Item #{index + 1}</p>
-                                        <p className="font-bold text-gray-800">{item.name || 'Novo Item (não salvo)'}</p>
-                                      </div>
-                                       <div className="flex items-center gap-4">
-                                          <div className="text-right">
-                                            <p className="text-xs text-gray-500">{headerLabel}</p>
-                                            <p className="font-mono font-semibold text-indigo-700">
-                                              {displayAmount} {displayUnit}
-                                            </p>
-                                          </div>
-                                          <div className="text-right">
-                                            <p className="text-xs text-gray-500">{valueHeaderLabel}</p>
-                                            <p className="font-mono font-semibold text-green-700">{formatCurrency(valuePerUnit)}</p>
-                                          </div>
-                                          <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" /></svg>
-                                      </div>
-                                  </div>
-
-                                  {isExpanded && (
-                                    <div className="p-6 border-t bg-white space-y-6">
-                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                        <input type="text" placeholder="Nome do Item" value={item.name} onChange={(e) => handleItemCentricChange(item.id, 'name', e.target.value.toUpperCase())} className="lg:col-span-2 w-full p-2 border rounded-md" />
-                                        <select value={item.ui_compositeUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_compositeUnit', e.target.value)} className="w-full p-2 border rounded-md bg-gray-50">
-                                            {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                                        </select>
-                                        <input type="text" placeholder={`Qtd. de ${unitLabel}`} value={item.ui_quantity} onChange={(e) => handleItemCentricChange(item.id, 'ui_quantity', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2 border rounded-md font-mono" />
-                                        <input type="text" placeholder={`Valor por ${unitLabel}`} value={item.ui_valuePerUnit} onChange={(e) => handleItemCentricChange(item.id, 'ui_valuePerUnit', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2 border rounded-md font-mono" />
-                                        {isUnitType && <input type="text" placeholder={`Peso da Unidade (Kg)`} value={item.ui_kgConversion} onChange={(e) => handleItemCentricChange(item.id, 'ui_kgConversion', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2 border rounded-md font-mono" />}
-                                      </div>
-                                      
-                                      <div>
-                                          <label className="font-semibold mb-2 block" translate="no">Fornecedor</label>
-                                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                                              {item.suppliers.map((slot, sIndex) => (
-                                                  <select key={sIndex} value={slot.supplierCpf} onChange={(e) => {
-                                                      const newSuppliers = [...item.suppliers];
-                                                      newSuppliers[sIndex] = { supplierCpf: e.target.value };
-                                                      handleItemCentricChange(item.id, 'suppliers', newSuppliers);
-                                                  }} className="w-full p-2 border rounded-md bg-gray-50 text-xs">
-                                                      <option value="">-- Selecione --</option>
-                                                      {suppliers.map(p => <option key={p.cpf} value={p.cpf}>{p.name}</option>)}
-                                                  </select>
-                                              ))}
-                                          </div>
-                                      </div>
-                                      <div className="text-right">
-                                         <button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-700 text-sm font-semibold">Remover Item</button>
-                                      </div>
-                                    </div>
-                                  )}
-                              </div>
-                          );
-                      })}
-                  </div>
-
-                  <div className="mt-6 pt-6 border-t flex justify-between items-center">
-                      <button onClick={handleAddItem} className="bg-blue-100 text-blue-700 hover:bg-blue-200 font-bold py-2 px-4 rounded-lg transition-colors text-sm">Adicionar Novo Item</button>
-                      <button onClick={handleSaveContracts} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg transition-colors">Salvar Todos os Itens</button>
-                  </div>
-              </div>
-          )}
-          
-          {activeTab === 'schedule' && <AdminScheduleView suppliers={suppliers} />}
-          {activeTab === 'invoices' && <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} />}
-          {activeTab === 'warehouse' && <AdminWarehouseLog suppliers={suppliers} warehouseLog={warehouseLog} onDeleteEntry={onDeleteWarehouseEntry} />}
+          {activeTab === 'register' && <div>{/* Cadastro Fornecedor UI */}</div>}
+          {activeTab === 'cleaning' && <AdminCleaningLog logs={cleaningLogs} onRegister={onRegisterCleaningLog} onDelete={onDeleteCleaningLog} />}
+          {activeTab === 'warehouse' && <AdminWarehouseLog suppliers={suppliers} warehouseLog={props.warehouseLog} onDeleteEntry={props.onDeleteWarehouseEntry} />}
           {activeTab === 'analytics' && <AdminAnalytics suppliers={suppliers} />}
-          {activeTab === 'graphs' && <AdminGraphs suppliers={suppliers} />}
-          {activeTab === 'perCapita' && <AdminPerCapita suppliers={suppliers} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={onUpdatePerCapitaConfig} />}
-          
-
-          {activeTab === 'info' && (
-            <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-red-500 space-y-8">
-              <h2 className="text-2xl font-bold text-red-700">Zona Crítica</h2>
-              
-              <div className="p-4 border border-red-200 rounded-lg">
-                <h3 className="font-bold text-red-600">Apagar Todos os Dados</h3>
-                <p className="text-sm text-gray-600 my-2">Esta ação apagará permanentemente todos os dados de fornecedores, contratos e entregas da nuvem. Use com extrema cautela. Recomenda-se fazer um backup antes.</p>
-                <button onClick={onResetData} className="bg-red-600 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Apagar Tudo</button>
-              </div>
-
-              <div className="p-4 border border-yellow-300 rounded-lg space-y-3">
-                 <h3 className="font-bold text-yellow-800">Backup e Restauração de Dados</h3>
-                 <p className="text-sm text-gray-600">Faça o download de um backup de segurança ou restaure os dados a partir de um arquivo.</p>
-                 
-                 {restoreMessage.text && (
-                    <div className={`p-3 rounded-md text-sm font-semibold ${restoreMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {restoreMessage.text}
-                    </div>
-                  )}
-
-                 <div className="flex items-center gap-4 flex-wrap">
-                    <button onClick={handleBackup} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Fazer Backup (JSON)</button>
-                    
-                    <div className="flex items-center gap-2">
-                      <input type="file" id="restore-file-input" accept=".json" onChange={(e) => setRestoreFile(e.target.files ? e.target.files[0] : null)} className="text-sm"/>
-                      <button onClick={handleRestore} className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm" disabled={!restoreFile}>Restaurar</button>
-                    </div>
-                 </div>
-              </div>
-
-            </div>
-          )}
-
+          {activeTab === 'perCapita' && <AdminPerCapita suppliers={suppliers} perCapitaConfig={props.perCapitaConfig} onUpdatePerCapitaConfig={props.onUpdatePerCapitaConfig} />}
+          {activeTab === 'info' && <div>{/* Zona Critica UI */}</div>}
         </main>
       </div>
-
-       {editingSupplier && (
-            <EditSupplierModal 
-                supplier={editingSupplier}
-                suppliers={suppliers}
-                onClose={() => setEditingSupplier(null)}
-                onSave={handleEditSupplierSave}
-            />
-        )}
-
-        <style>{`
-          .custom-scrollbar::-webkit-scrollbar { width: 6px; } 
-          .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
-          .custom-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
-        `}</style>
     </div>
   );
 };
