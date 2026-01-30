@@ -6,70 +6,110 @@ interface SummaryCardProps {
     supplier: Supplier;
 }
 
-// Helper para calcular o peso total real de um item de contrato
-const getContractItemWeight = (item: Supplier['contractItems'][0]): number => {
-    if (!item) return 0;
+const getContractItemDisplayInfo = (item: Supplier['contractItems'][0]): { quantity: number; unit: string } => {
+    if (!item) return { quantity: 0, unit: 'N/A' };
+    
     const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
-    
-    const quantity = item.totalKg || 0;
+    const contractQuantity = item.totalKg || 0;
+    const unitWeight = parseFloat(unitWeightStr) || 1;
 
-    // Para 'unidade', totalKg já é o peso total.
-    if (unitType === 'un') {
-        return quantity;
-    }
-    
-    // Para 'dúzia', não temos um peso definido, então retornamos 0 para o total de Kg.
-    if (unitType === 'dz') {
-        return 0;
-    }
+    let displayQuantity = contractQuantity;
+    let displayUnit = 'Un';
 
-    // Para outros (kg, balde, saco), totalKg armazena a quantidade. Multiplicamos pelo peso da unidade.
-    const unitWeight = parseFloat(unitWeightStr) || 1; // Padrão de 1 para 'kg-1'
-    return quantity * unitWeight;
+    switch (unitType) {
+        case 'kg':
+        case 'un':
+            displayQuantity = contractQuantity;
+            displayUnit = 'Kg';
+            break;
+        case 'saco':
+        case 'balde':
+        case 'pacote':
+        case 'pote':
+            displayQuantity = contractQuantity * unitWeight;
+            displayUnit = 'Kg';
+            break;
+        case 'litro':
+        case 'l':
+        case 'caixa':
+        case 'embalagem':
+            displayQuantity = contractQuantity * unitWeight;
+            displayUnit = 'L';
+            break;
+        case 'dz':
+            displayQuantity = contractQuantity;
+            displayUnit = 'Dz';
+            break;
+        default:
+            displayQuantity = contractQuantity;
+            displayUnit = 'Un';
+    }
+    return { quantity: displayQuantity, unit: displayUnit };
 };
 
+const formatQuantity = (quantity: number, unit: string): string => {
+    const options: Intl.NumberFormatOptions = {
+        minimumFractionDigits: (unit === 'Dz' || unit === 'Un') ? 0 : 2,
+        maximumFractionDigits: (unit === 'Dz' || unit === 'Un') ? 0 : 2,
+    };
+    return `${quantity.toLocaleString('pt-BR', options)} ${unit}`;
+};
 
 const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
-    // Value calculations
     const totalDeliveredValue = supplier.deliveries.reduce((sum, delivery) => sum + (delivery.value || 0), 0);
-    const remainingValue = supplier.initialValue - totalDeliveredValue;
     const valueProgress = supplier.initialValue > 0 ? (totalDeliveredValue / supplier.initialValue) * 100 : 0;
 
-    // Weight (Kg) calculations
-    const totalContractedKg = useMemo(() => {
-        return supplier.contractItems.reduce((sum, item) => sum + getContractItemWeight(item), 0);
-    }, [supplier.contractItems]);
+    const aggregatedTotals = useMemo(() => {
+        const contracted = new Map<string, number>();
+        const delivered = new Map<string, number>();
 
-    const totalDeliveredKg = supplier.deliveries.reduce((sum, delivery) => sum + (delivery.kg || 0), 0);
-    const remainingKg = totalContractedKg - totalDeliveredKg;
-    const kgProgress = totalContractedKg > 0 ? (totalDeliveredKg / totalContractedKg) * 100 : 0;
+        supplier.contractItems.forEach(item => {
+            const { quantity, unit } = getContractItemDisplayInfo(item);
+            contracted.set(unit, (contracted.get(unit) || 0) + quantity);
+        });
+
+        supplier.deliveries.forEach(delivery => {
+            if (!delivery.item || (delivery.kg || 0) === 0) return;
+            const contractItem = supplier.contractItems.find(ci => ci.name === delivery.item);
+            if (contractItem) {
+                const { unit } = getContractItemDisplayInfo(contractItem);
+                delivered.set(unit, (delivered.get(unit) || 0) + (delivery.kg || 0));
+            }
+        });
+        return { contracted, delivered };
+    }, [supplier]);
+
+    const totalContractedKgForProgress = aggregatedTotals.contracted.get('Kg') || 0;
+    const totalDeliveredKgForProgress = aggregatedTotals.delivered.get('Kg') || 0;
+    const kgProgress = totalContractedKgForProgress > 0 ? (totalDeliveredKgForProgress / totalContractedKgForProgress) * 100 : 0;
 
     const monthlyDataByItem = useMemo(() => {
         const data = new Map<string, any[]>();
         
         supplier.contractItems.forEach(item => {
             const itemMonthlyData = [];
+            const { quantity: itemTotalQuantity, unit: itemUnit } = getContractItemDisplayInfo(item);
             const itemTotalValue = (item.totalKg || 0) * (item.valuePerKg || 0);
-            const itemTotalKg = getContractItemWeight(item);
-
+            
             const monthlyValueQuota = itemTotalValue / 4;
-            const monthlyKgQuota = itemTotalKg / 4;
+            const monthlyQuantityQuota = itemTotalQuantity / 4;
 
             for (const month of MONTHS_2026) {
                 const deliveredInMonth = supplier.deliveries
                     .filter(d => d.item === item.name && new Date(d.date + 'T00:00:00').getMonth() === month.number);
                 
                 const deliveredValue = deliveredInMonth.reduce((sum, d) => sum + (d.value || 0), 0);
-                const deliveredKg = deliveredInMonth.reduce((sum, d) => sum + (d.kg || 0), 0);
+                const deliveredQuantity = deliveredInMonth.reduce((sum, d) => sum + (d.kg || 0), 0);
 
                 itemMonthlyData.push({
                     monthName: month.name,
                     contractedValue: monthlyValueQuota,
-                    contractedKg: monthlyKgQuota,
+                    contractedQuantity: monthlyQuantityQuota,
                     deliveredValue,
-                    deliveredKg,
+                    deliveredQuantity,
                     remainingValue: monthlyValueQuota - deliveredValue,
-                    remainingKg: monthlyKgQuota - deliveredKg,
+                    remainingQuantity: monthlyQuantityQuota - deliveredQuantity,
+                    unit: itemUnit,
                 });
             }
             data.set(item.name, itemMonthlyData);
@@ -79,35 +119,38 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
     }, [supplier.contractItems, supplier.deliveries]);
 
 
-    // Formatting helpers
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-    };
-
-    const formatKg = (value: number) => {
-        return `${value.toFixed(2).replace('.', ',')} Kg`;
     };
 
     return (
         <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
             <h2 className="text-xl font-semibold mb-4 text-gray-700">Resumo do Contrato</h2>
             
-            {/* General Summary */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 pb-4 border-b text-sm">
                 <span className="text-gray-500">Valor Total do Contrato:</span>
                 <span className="font-bold text-gray-800 text-right">{formatCurrency(supplier.initialValue)}</span>
+
+                {Array.from(aggregatedTotals.contracted.entries()).sort().map(([unit, quantity]) => (
+                    <React.Fragment key={`contracted-${unit}`}>
+                        <span className="text-gray-500">Total Contratado ({unit}):</span>
+                        <span className="font-bold text-gray-800 text-right">{formatQuantity(quantity, unit)}</span>
+                    </React.Fragment>
+                ))}
                 
-                <span className="text-gray-500">Peso Total do Contrato:</span>
-                <span className="font-bold text-gray-800 text-right">{formatKg(totalContractedKg)}</span>
+                <span className="text-gray-500 col-span-2 my-1"></span>
 
                 <span className="text-gray-500">Valor Total Entregue:</span>
                 <span className="font-bold text-green-600 text-right">{formatCurrency(totalDeliveredValue)}</span>
-
-                <span className="text-gray-500">Peso Total Entregue:</span>
-                <span className="font-bold text-green-600 text-right">{formatKg(totalDeliveredKg)}</span>
+                
+                {Array.from(aggregatedTotals.delivered.entries()).sort().map(([unit, quantity]) => (
+                    <React.Fragment key={`delivered-${unit}`}>
+                        <span className="text-gray-500">Total Entregue ({unit}):</span>
+                        <span className="font-bold text-green-600 text-right">{formatQuantity(quantity, unit)}</span>
+                    </React.Fragment>
+                ))}
             </div>
 
-            {/* Item Breakdown */}
             <div className="py-4 space-y-4">
                 <h3 className="font-semibold text-gray-600">Detalhes por Produto</h3>
                 <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
@@ -132,15 +175,15 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
                                                     <td className="p-2 font-semibold">{data.monthName}</td>
                                                     <td className="p-2 text-right">
                                                         <div>{formatCurrency(data.contractedValue)}</div>
-                                                        <div className="text-gray-500">{formatKg(data.contractedKg)}</div>
+                                                        <div className="text-gray-500">{formatQuantity(data.contractedQuantity, data.unit)}</div>
                                                     </td>
                                                     <td className="p-2 text-right text-green-600">
                                                         <div>{formatCurrency(data.deliveredValue)}</div>
-                                                        <div className="text-gray-500">{formatKg(data.deliveredKg)}</div>
+                                                        <div className="text-gray-500">{formatQuantity(data.deliveredQuantity, data.unit)}</div>
                                                     </td>
                                                     <td className="p-2 text-right font-bold text-blue-600">
                                                          <div>{formatCurrency(data.remainingValue)}</div>
-                                                        <div className="text-gray-500">{formatKg(data.remainingKg)}</div>
+                                                        <div className="text-gray-500">{formatQuantity(data.remainingQuantity, data.unit)}</div>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -153,11 +196,9 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
                 </div>
             </div>
             
-             {/* NEW CHART SECTION */}
             <div className="py-4 space-y-4 border-t">
                 <h3 className="font-semibold text-gray-600">Progresso Geral</h3>
                 <div className="space-y-4">
-                    {/* Value Chart */}
                     <div>
                         <div className="flex justify-between items-baseline text-sm mb-1">
                             <span className="font-bold text-gray-700">Progresso Financeiro (R$)</span>
@@ -172,7 +213,6 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
                         </div>
                     </div>
 
-                    {/* KG Chart */}
                     <div>
                         <div className="flex justify-between items-baseline text-sm mb-1">
                             <span className="font-bold text-gray-700">Progresso de Entrega (Kg)</span>
@@ -183,19 +223,16 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
                                 className="bg-blue-500 h-5 rounded-full transition-all duration-500" 
                                 style={{ width: `${kgProgress}%` }}
                             />
-                             <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white mix-blend-lighten">{formatKg(totalDeliveredKg)}</span>
+                             <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white mix-blend-lighten">{formatQuantity(totalDeliveredKgForProgress, 'Kg')}</span>
                         </div>
                     </div>
                 </div>
             </div>
-
-            {/* Total Remaining */}
+            
             <hr className="my-2"/>
             <div className="grid grid-cols-2 gap-x-4 pt-2">
                 <span className="text-gray-500 font-semibold">Valor Total Restante:</span>
-                <span className="font-bold text-xl text-blue-600 text-right">{formatCurrency(remainingValue)}</span>
-                <span className="text-gray-500 font-semibold">Peso Total Restante:</span>
-                <span className="font-bold text-xl text-blue-600 text-right">{formatKg(remainingKg)}</span>
+                <span className="font-bold text-xl text-blue-600 text-right">{formatCurrency(supplier.initialValue - totalDeliveredValue)}</span>
             </div>
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar { width: 4px; }

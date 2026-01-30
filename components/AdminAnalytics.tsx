@@ -22,10 +22,11 @@ const getContractItemWeight = (item: Supplier['contractItems'][0]): number => {
     const quantity = item.totalKg || 0;
 
     if (unitType === 'un') {
-        return quantity;
+        const unitWeight = parseFloat(unitWeightStr) || 1;
+        return quantity * unitWeight;
     }
     if (unitType === 'dz') {
-        return 0;
+        return 0; // Dúzias não têm peso associado no contrato para este cálculo
     }
 
     const unitWeight = parseFloat(unitWeightStr) || 1;
@@ -124,7 +125,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                         month,
                         String(adjustedMonthlyKg.toFixed(2)).replace('.', ','),
                         String(deliveredInMonth.toFixed(2)).replace('.', ','),
-                        String(remainingInMonth.toFixed(2)).replace('.', ','),
+                        String(Math.max(0, remainingInMonth).toFixed(2)).replace('.', ','),
                         String(monthlyValue.toFixed(2)).replace('.', ','),
                         `"${observation}"`
                     ];

@@ -28,16 +28,6 @@ interface DashboardProps {
   onCloseEmailModal: () => void;
 }
 
-const getContractItemWeight = (item: ContractItem): number => {
-    const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
-    if (unitType === 'un') return item.totalKg;
-    if (unitType === 'dz') return 0;
-    const quantity = item.totalKg;
-    const unitWeight = parseFloat(unitWeightStr) || 1;
-    return quantity * unitWeight;
-};
-
-
 const Dashboard: React.FC<DashboardProps> = ({ 
   supplier, 
   onLogout, 
@@ -145,24 +135,61 @@ const Dashboard: React.FC<DashboardProps> = ({
     
     const currentMonth = selectedDate.getMonth();
 
-    return supplier.contractItems.map(item => {
-        const totalContractedKg = getContractItemWeight(item);
-        const monthlyQuotaKg = totalContractedKg / 4;
+    const getDisplayInfoForItem = (item: ContractItem) => {
+        const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
+        const unitWeight = parseFloat(unitWeightStr) || 1;
+        const quantity = item.totalKg || 0;
 
-        const deliveredThisMonthKg = supplier.deliveries
+        let displayQuantity = quantity;
+        let displayUnit = 'un';
+
+        switch (unitType) {
+            case 'kg':
+            case 'un':
+            case 'saco':
+            case 'balde':
+            case 'pacote':
+            case 'pote':
+                displayQuantity = quantity * unitWeight;
+                displayUnit = 'Kg';
+                break;
+            case 'litro':
+            case 'l':
+            case 'caixa':
+            case 'embalagem':
+                displayQuantity = quantity * unitWeight;
+                displayUnit = 'L';
+                break;
+            case 'dz':
+                displayQuantity = quantity;
+                displayUnit = 'Dz';
+                break;
+            default:
+                displayQuantity = quantity;
+                displayUnit = 'Un';
+        }
+        return { totalContracted: displayQuantity, unit: displayUnit };
+    };
+
+    return supplier.contractItems.map(item => {
+        const { totalContracted, unit } = getDisplayInfoForItem(item);
+        const monthlyQuota = totalContracted / 4;
+
+        const deliveredThisMonth = supplier.deliveries
             .filter(d => 
                 d.item === item.name && 
                 new Date(d.date + 'T00:00:00').getMonth() === currentMonth
             )
             .reduce((sum, d) => sum + (d.kg || 0), 0);
 
-        const remainingThisMonthKg = monthlyQuotaKg - deliveredThisMonthKg;
+        const remainingThisMonth = monthlyQuota - deliveredThisMonth;
 
         return {
             name: item.name,
-            monthlyQuotaKg,
-            deliveredThisMonthKg,
-            remainingThisMonthKg,
+            monthlyQuota,
+            deliveredThisMonth,
+            remainingThisMonth,
+            unit,
         };
     }).sort((a, b) => a.name.localeCompare(b.name));
 

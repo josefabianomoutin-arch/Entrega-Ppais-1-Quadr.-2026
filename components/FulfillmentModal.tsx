@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import type { Delivery, ContractItem } from '../types';
 
@@ -24,21 +25,15 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-const getContractItemWeight = (item: ContractItem): number => {
-    if (!item) return 0;
-    const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
-    
-    const quantity = item.totalKg || 0;
-
-    if (unitType === 'un') {
-        return quantity;
-    }
-    if (unitType === 'dz') {
-        return 0;
-    }
-
-    const unitWeight = parseFloat(unitWeightStr) || 1;
-    return quantity * unitWeight;
+const getDisplayUnit = (item: ContractItem | undefined): string => {
+    if (!item || !item.unit) return 'Kg';
+    const [unitType] = item.unit.split('-');
+    const unitMap: { [key: string]: string } = {
+        kg: 'Kg', un: 'Kg', saco: 'Kg', balde: 'Kg', pacote: 'Kg', pote: 'Kg',
+        litro: 'L', l: 'L', caixa: 'L', embalagem: 'L',
+        dz: 'Dz'
+    };
+    return unitMap[unitType] || 'Un';
 };
 
 const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contractItems, onClose, onSave }) => {
@@ -54,17 +49,13 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
   }, [invoiceInfo.deliveries]);
 
   const validateKg = (itemId: string, itemName: string, kgString: string): string => {
-    // Se o item não foi selecionado ou o peso não foi preenchido, não há erro a ser mostrado ainda.
-    // A validação de campos obrigatórios ocorre no momento do envio.
     if (!itemName || !kgString) return '';
 
     const kg = parseFloat(kgString.replace(',', '.'));
     
-    // Valida se o valor inserido é um número válido e positivo.
-    if (isNaN(kg)) return 'Valor de peso inválido.';
-    if (kg <= 0) return 'O peso deve ser um valor positivo.';
+    if (isNaN(kg)) return 'Valor inválido.';
+    if (kg <= 0) return 'A quantidade deve ser um valor positivo.';
 
-    // A validação anterior que limitava a entrega a +/- 10% da meta mensal foi removida.
     return '';
   };
 
@@ -74,7 +65,6 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
     setItems(currentItems => {
         const updatedItems = currentItems.map(item => item.id === id ? { ...item, [field]: field === 'kg' ? newKg : value } : item);
         
-        // Find the specific item that was changed to get its name for validation
         const changedItem = updatedItems.find(item => item.id === id);
         if (changedItem) {
             const kgToValidate = field === 'kg' ? newKg : changedItem.kg;
@@ -106,12 +96,12 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
       
       if (contractItem && !isNaN(kg)) {
         const [unitType, unitWeightStr] = (contractItem.unit || 'kg-1').split('-');
-        let valuePerKg = contractItem.valuePerKg || 0; // Para 'kg' e 'un', este já é o valor/kg
+        let valuePerKg = contractItem.valuePerKg || 0;
         
         if (unitType !== 'kg' && unitType !== 'un' && unitType !== 'dz') {
             const unitWeight = parseFloat(unitWeightStr);
             if (unitWeight > 0) {
-                valuePerKg = (contractItem.valuePerKg || 0) / unitWeight; // value_per_unit / weight_of_unit
+                valuePerKg = (contractItem.valuePerKg || 0) / unitWeight;
             }
         }
         
@@ -132,7 +122,6 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
       return;
     }
 
-    // Final validation check
     const finalErrors: ValidationErrors = {};
     items.forEach(item => {
         const error = validateKg(item.id, item.name, item.kg);
@@ -140,7 +129,7 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
     });
     setErrors(finalErrors);
     if(Object.values(finalErrors).some(e => e)) {
-        alert('Existem erros nos itens. Por favor, corrija os valores de peso antes de salvar.');
+        alert('Existem erros nos itens. Por favor, corrija os valores antes de salvar.');
         return;
     }
 
@@ -164,7 +153,7 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
     }).filter((item): item is { name: string; kg: number; value: number } => item !== null);
 
     if (fulfilledItems.length === 0) {
-      alert('Adicione pelo menos um item válido com peso maior que zero. Itens medidos em Dúzia não podem ser faturados por peso.');
+      alert('Adicione pelo menos um item válido com quantidade maior que zero. Itens medidos em Dúzia não podem ser faturados por peso.');
       return;
     }
 
@@ -174,7 +163,7 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
   const availableContractItems = useMemo(() => {
       return contractItems.filter(ci => {
           const [unitType] = (ci.unit || 'kg-1').split('-');
-          return unitType !== 'dz'; // Filtra itens em dúzia que não podem ser faturados por kg
+          return unitType !== 'dz';
       }).sort((a,b) => a.name.localeCompare(b.name));
   }, [contractItems]);
 
@@ -199,10 +188,11 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
             </div>
 
             <div className="space-y-4 pt-2 border-t">
-                <label className="block text-sm font-medium text-gray-700">Itens Entregues (em Kg)</label>
+                <label className="block text-sm font-medium text-gray-700">Itens Entregues</label>
                 <div className="space-y-4 max-h-64 overflow-y-auto p-2 border rounded-md bg-gray-50">
                     {items.map((item, index) => {
                         const contractItem = contractItems.find(ci => ci.name === item.name);
+                        const displayUnit = getDisplayUnit(contractItem);
                         let itemValue = 0;
                         if(contractItem) {
                             const kg = parseFloat(item.kg.replace(',','.'));
@@ -233,7 +223,7 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
                                     type="text"
                                     value={item.kg}
                                     onChange={e => handleItemChange(item.id, 'kg', e.target.value)}
-                                    placeholder="Peso (Kg)"
+                                    placeholder={`Qtd. (${displayUnit})`}
                                     className={`w-full sm:w-1/4 px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm font-mono`}
                                 />
                                 <div className="w-full sm:w-1/4 text-center sm:text-right">

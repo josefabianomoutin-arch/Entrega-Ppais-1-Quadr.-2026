@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 
 interface MonthlyQuota {
   name: string;
-  monthlyQuotaKg: number;
-  deliveredThisMonthKg: number;
-  remainingThisMonthKg: number;
+  monthlyQuota: number;
+  deliveredThisMonth: number;
+  remainingThisMonth: number;
+  unit: string;
 }
 
 interface DeliveryModalProps {
@@ -43,7 +44,7 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, mo
             <h3 className="text-lg font-semibold text-gray-700 mb-3">Meta de Entrega para {date.toLocaleString('pt-BR', { month: 'long' })}</h3>
             <div className="space-y-4 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                 {monthlyQuotas.length > 0 ? monthlyQuotas.map(quota => {
-                    const progress = quota.monthlyQuotaKg > 0 ? (quota.deliveredThisMonthKg / quota.monthlyQuotaKg) * 100 : 0;
+                    const progress = quota.monthlyQuota > 0 ? (quota.deliveredThisMonth / quota.monthlyQuota) * 100 : 0;
                     return (
                         <div key={quota.name} className="text-sm">
                             <p className="font-bold text-gray-800">{quota.name}</p>
@@ -55,8 +56,8 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, mo
                                  <span className="absolute inset-0 text-white text-[10px] font-bold flex items-center justify-center mix-blend-lighten">{progress.toFixed(0)}%</span>
                             </div>
                             <div className="flex justify-between text-xs text-gray-500">
-                                <span>Entregue: {quota.deliveredThisMonthKg.toFixed(2).replace('.', ',')} Kg</span>
-                                <span>Meta: {quota.monthlyQuotaKg.toFixed(2).replace('.', ',')} Kg</span>
+                                <span>Entregue: {quota.deliveredThisMonth.toFixed(2).replace('.', ',')} {quota.unit}</span>
+                                <span>Meta: {quota.monthlyQuota.toFixed(2).replace('.', ',')} {quota.unit}</span>
                             </div>
                         </div>
                     )
