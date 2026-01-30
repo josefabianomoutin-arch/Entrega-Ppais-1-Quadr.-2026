@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog } from '../types';
 import AdminAnalytics from './AdminAnalytics';
@@ -42,7 +43,23 @@ const formatCurrency = (value: number) => {
 };
 
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
-  const { suppliers = [], activeTab, onTabChange, cleaningLogs = [], onRegisterCleaningLog, onDeleteCleaningLog, directorWithdrawals = [], onRegisterDirectorWithdrawal, onDeleteDirectorWithdrawal, onRegister, onPersistSuppliers, onUpdateSupplier, registrationStatus, onClearRegistrationStatus } = props;
+  // Fix: Added missing callback props to destructuring to resolve 'Cannot find name' errors
+  const { 
+    suppliers = [], 
+    activeTab, 
+    onTabChange, 
+    onRegister, 
+    onPersistSuppliers, 
+    onUpdateSupplier, 
+    registrationStatus, 
+    onClearRegistrationStatus,
+    cleaningLogs = [],
+    directorWithdrawals = [],
+    onRegisterCleaningLog,
+    onDeleteCleaningLog,
+    onRegisterDirectorWithdrawal,
+    onDeleteDirectorWithdrawal
+  } = props;
 
   const [supplierSearch, setSupplierSearch] = useState('');
   const [regName, setRegName] = useState('');
@@ -79,7 +96,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
     const kg = parseFloat(newItemKg.replace(',', '.'));
     const val = parseFloat(newItemValue.replace(',', '.'));
-    if (isNaN(kg) || isNaN(val)) return;
+    if (isNaN(kg) || isNaN(val)) {
+        alert("Por favor, insira valores válidos para peso e preço.");
+        return;
+    }
 
     const newItem: ContractItem = {
       name: newItemName.toUpperCase(),
@@ -119,34 +139,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   };
 
   const handleDeleteSupplier = (cpf: string) => {
-    if (!window.confirm('Excluir este fornecedor permanentemente?')) return;
+    if (!window.confirm('Excluir este fornecedor permanentemente? Todos os itens de contrato associados serão removidos.')) return;
     const updated = suppliers.filter(s => s.cpf !== cpf);
     onPersistSuppliers(updated);
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 pb-20">
       <header className="bg-white/90 backdrop-blur-sm shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-green-800">Gestão de Fornecedores 1º Quadr. 2026</h1>
           <p className="text-sm text-gray-500">Painel do Administrador</p>
         </div>
         <div className="flex items-center gap-4">
-            <div className="text-right">
-                <p className="text-xs text-gray-500">Valor Total Contratado</p>
-                <p className="font-bold text-green-700 text-lg">{formatCurrency(totalValue)}</p>
+            <div className="hidden md:block text-right">
+                <p className="text-[10px] font-bold text-gray-400 uppercase">Total Geral Contratado</p>
+                <p className="font-black text-green-700 text-lg leading-none">{formatCurrency(totalValue)}</p>
             </div>
-            <button onClick={props.onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm">Sair</button>
+            <button onClick={props.onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">Sair</button>
         </div>
       </header>
       
       <div className="flex flex-col md:flex-row">
         <aside className="w-full md:w-64 bg-white md:min-h-[calc(100vh-73px)] border-r">
-            <nav className="p-4">
+            <nav className="p-4 overflow-y-auto">
                 <ul className="space-y-1">
                     {tabs.map(tab => (
                         <li key={tab.id}>
-                            <button onClick={() => onTabChange(tab.id)} className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-semibold transition-colors ${activeTab === tab.id ? 'bg-green-100 text-green-800' : 'text-gray-600 hover:bg-gray-100'} ${tab.id === 'info' ? '!text-red-600 hover:!bg-red-50' : ''}`}>
+                            <button 
+                                onClick={() => onTabChange(tab.id)} 
+                                className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-semibold transition-colors ${activeTab === tab.id ? 'bg-green-100 text-green-800' : 'text-gray-600 hover:bg-gray-100'} ${tab.id === 'info' ? '!text-red-600 hover:!bg-red-50' : ''}`}
+                            >
                                 {tab.icon}
                                 {tab.name}
                             </button>
@@ -156,59 +179,72 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             </nav>
         </aside>
 
-        <main className="flex-1 p-4 md:p-8">
+        <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
           {activeTab === 'register' && (
-            <div className="space-y-8 animate-fade-in">
-              <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-green-500">
-                <h2 className="text-xl font-bold mb-4">Novo Fornecedor</h2>
+            <div className="space-y-8 animate-fade-in max-w-5xl mx-auto">
+              <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-500">
+                <h2 className="text-xl font-black text-gray-800 mb-6 uppercase tracking-tight">Cadastro de Novo Fornecedor</h2>
                 <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={async (e) => {
                   e.preventDefault();
                   await onRegister(regName, regCpf, regWeeks);
                   setRegName(''); setRegCpf(''); setRegWeeks([]);
                 }}>
-                  <input type="text" placeholder="NOME DO FORNECEDOR" value={regName} onChange={e => setRegName(e.target.value.toUpperCase())} className="p-2 border rounded-lg" required />
-                  <input type="text" placeholder="CPF/CNPJ (APENAS NÚMEROS)" value={regCpf} onChange={e => setRegCpf(e.target.value.replace(/\D/g, ''))} className="p-2 border rounded-lg font-mono" required />
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Nome Fantasia / Razão Social</label>
+                    <input type="text" placeholder="NOME DO FORNECEDOR" value={regName} onChange={e => setRegName(e.target.value.toUpperCase())} className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-400 outline-none" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Documento (CPF ou CNPJ)</label>
+                    <input type="text" placeholder="APENAS NÚMEROS" value={regCpf} onChange={e => setRegCpf(e.target.value.replace(/\D/g, ''))} className="w-full p-2 border rounded-lg font-mono focus:ring-2 focus:ring-green-400 outline-none" required />
+                  </div>
                   <div className="md:col-span-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">Semanas Permitidas (Opcional)</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block ml-1">Restrição de Semanas (Opcional)</label>
                     <WeekSelector selectedWeeks={regWeeks} onWeekToggle={(w) => setRegWeeks(prev => prev.includes(w) ? prev.filter(x => x !== w) : [...prev, w])} />
                   </div>
-                  <button type="submit" className="md:col-span-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg transition-colors">Cadastrar Fornecedor</button>
+                  <button type="submit" className="md:col-span-2 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-sm">Registrar Fornecedor</button>
                 </form>
                 {registrationStatus && (
-                  <div className={`mt-4 p-3 rounded-lg text-sm font-bold text-center ${registrationStatus.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  <div className={`mt-4 p-3 rounded-lg text-sm font-bold text-center animate-fade-in ${registrationStatus.success ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
                     {registrationStatus.message}
                     <button onClick={onClearRegistrationStatus} className="ml-2 underline text-xs">Fechar</button>
                   </div>
                 )}
               </div>
 
-              <div className="bg-white p-6 rounded-xl shadow-lg">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold">Fornecedores Cadastrados</h2>
-                  <input type="text" placeholder="Pesquisar..." value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} className="border p-2 rounded-lg text-sm" />
+              <div className="bg-white p-6 rounded-2xl shadow-lg">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                  <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight">Fornecedores Habilitados</h2>
+                  <div className="relative w-full md:w-64">
+                    <input type="text" placeholder="Pesquisar por nome..." value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} className="w-full border p-2 pl-8 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-2 top-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-xl border border-gray-100">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                        <th className="p-3 text-left">Fornecedor</th>
-                        <th className="p-3 text-left">Documento</th>
-                        <th className="p-3 text-right">Valor Total</th>
-                        <th className="p-3 text-center">Ações</th>
+                      <tr className="bg-gray-50 text-gray-400 uppercase text-[10px] font-black tracking-widest">
+                        <th className="p-4 text-left">Fornecedor</th>
+                        <th className="p-4 text-left">CPF/CNPJ</th>
+                        <th className="p-4 text-right">Contratado</th>
+                        <th className="p-4 text-center">Ações</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
-                      {filteredSuppliers.map(s => (
-                        <tr key={s.cpf} className="hover:bg-gray-50">
-                          <td className="p-3 font-bold">{s.name}</td>
-                          <td className="p-3 font-mono text-gray-500">{s.cpf}</td>
-                          <td className="p-3 text-right font-bold text-green-600">{formatCurrency(s.initialValue)}</td>
-                          <td className="p-3 text-center space-x-2">
-                            <button onClick={() => setEditingSupplier(s)} className="text-blue-500 hover:text-blue-700 p-1">Editar</button>
-                            <button onClick={() => handleDeleteSupplier(s.cpf)} className="text-red-500 hover:text-red-700 p-1">Excluir</button>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredSuppliers.length > 0 ? filteredSuppliers.map(s => (
+                        <tr key={s.cpf} className="hover:bg-gray-50 transition-colors">
+                          <td className="p-4 font-bold text-gray-800 uppercase">{s.name}</td>
+                          <td className="p-4 font-mono text-gray-500 text-xs">{s.cpf}</td>
+                          <td className="p-4 text-right font-black text-green-600">{formatCurrency(s.initialValue)}</td>
+                          <td className="p-4 text-center space-x-3">
+                            <button onClick={() => setEditingSupplier(s)} className="text-blue-500 hover:text-blue-700 font-bold text-xs uppercase underline">Editar</button>
+                            <button onClick={() => handleDeleteSupplier(s.cpf)} className="text-red-500 hover:text-red-700 font-bold text-xs uppercase underline">Excluir</button>
                           </td>
                         </tr>
-                      ))}
+                      )) : (
+                        <tr>
+                            <td colSpan={4} className="p-10 text-center text-gray-400 italic">Nenhum fornecedor encontrado.</td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -217,76 +253,90 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           )}
 
           {activeTab === 'contracts' && (
-            <div className="space-y-8 animate-fade-in">
-              <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-indigo-500">
-                <h2 className="text-xl font-bold mb-4">Adicionar Item ao Fornecedor</h2>
+            <div className="space-y-8 animate-fade-in max-w-6xl mx-auto">
+              <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-indigo-500">
+                <h2 className="text-xl font-black text-gray-800 mb-6 uppercase tracking-tight">Vincular Item ao Fornecedor</h2>
                 <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-                  <div className="lg:col-span-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">Fornecedor</label>
-                    <select value={selectedSupplierCpf} onChange={e => setSelectedSupplierCpf(e.target.value)} className="w-full p-2 border rounded-lg bg-white" required>
-                      <option value="">-- Selecionar --</option>
+                  <div className="lg:col-span-2 space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Selecione o Fornecedor</label>
+                    <select value={selectedSupplierCpf} onChange={e => setSelectedSupplierCpf(e.target.value)} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-400" required>
+                      <option value="">-- SELECIONE --</option>
                       {suppliers.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">Nome do Item</label>
-                    <input type="text" placeholder="Ex: ARROZ" value={newItemName} onChange={e => setNewItemName(e.target.value)} className="w-full p-2 border rounded-lg" required />
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Descrição do Item</label>
+                    <input type="text" placeholder="EX: FEIJÃO CARIOCA" value={newItemName} onChange={e => setNewItemName(e.target.value)} className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-400" required />
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">Peso Total</label>
-                    <input type="text" placeholder="Kg" value={newItemKg} onChange={e => setNewItemKg(e.target.value)} className="w-full p-2 border rounded-lg font-mono" required />
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Qtd Total (Kg)</label>
+                    <input type="text" placeholder="0.00" value={newItemKg} onChange={e => setNewItemKg(e.target.value)} className="w-full p-2 border rounded-lg font-mono outline-none focus:ring-2 focus:ring-indigo-400" required />
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">Valor p/ Kg (R$)</label>
-                    <input type="text" placeholder="0.00" value={newItemValue} onChange={e => setNewItemValue(e.target.value)} className="w-full p-2 border rounded-lg font-mono" required />
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Preço Unitário (R$)</label>
+                    <input type="text" placeholder="0.00" value={newItemValue} onChange={e => setNewItemValue(e.target.value)} className="w-full p-2 border rounded-lg font-mono outline-none focus:ring-2 focus:ring-indigo-400" required />
                   </div>
                   <div className="lg:col-span-5 flex justify-end">
-                    <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-8 rounded-lg transition-colors">Vincular Item ao Contrato</button>
+                    <button type="submit" className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-10 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-sm">Adicionar ao Contrato</button>
                   </div>
                 </form>
               </div>
 
               <div className="grid grid-cols-1 gap-6">
-                {suppliers.filter(s => (s.contractItems || []).length > 0).map(s => (
-                  <div key={s.cpf} className="bg-white rounded-xl shadow-md overflow-hidden border">
-                    <div className="bg-gray-50 p-4 flex justify-between items-center border-b">
-                      <div>
-                        <h3 className="font-bold text-gray-800">{s.name}</h3>
-                        <p className="text-xs text-gray-500 font-mono">{s.cpf}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-gray-400 uppercase font-bold">Total do Fornecedor</p>
-                        <p className="font-black text-indigo-600">{formatCurrency(s.initialValue)}</p>
-                      </div>
+                <h3 className="text-lg font-black text-gray-600 uppercase tracking-wider px-2">Itens de Contrato por Fornecedor</h3>
+                {suppliers.filter(s => (s.contractItems || []).length > 0).length > 0 ? (
+                    suppliers.filter(s => (s.contractItems || []).length > 0).map(s => (
+                        <div key={s.cpf} className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100 animate-fade-in">
+                            <div className="bg-gray-50 p-4 md:p-6 flex flex-col md:flex-row justify-between items-start md:items-center border-b gap-4">
+                            <div>
+                                <h3 className="font-black text-gray-800 uppercase text-lg">{s.name}</h3>
+                                <p className="text-xs text-gray-500 font-mono tracking-widest">{s.cpf}</p>
+                            </div>
+                            <div className="text-left md:text-right bg-indigo-50 px-4 py-2 rounded-xl">
+                                <p className="text-[10px] text-indigo-400 uppercase font-black">Valor do Contrato</p>
+                                <p className="font-black text-indigo-700 text-xl leading-none">{formatCurrency(s.initialValue)}</p>
+                            </div>
+                            </div>
+                            <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                                <thead className="bg-gray-50 text-gray-400 font-black uppercase tracking-widest">
+                                <tr>
+                                    <th className="p-4 text-left">Descrição do Item</th>
+                                    <th className="p-4 text-right">Peso Total</th>
+                                    <th className="p-4 text-right">Preço p/ Kg</th>
+                                    <th className="p-4 text-right">Subtotal</th>
+                                    <th className="p-4 text-center">Ações</th>
+                                </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                {(s.contractItems || []).map((item, idx) => (
+                                    <tr key={`${s.cpf}-${item.name}-${idx}`} className="hover:bg-gray-50 transition-colors">
+                                    <td className="p-4 font-bold text-gray-700 uppercase">{item.name}</td>
+                                    <td className="p-4 text-right font-mono">{(item.totalKg || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})} Kg</td>
+                                    <td className="p-4 text-right font-mono text-gray-500">{formatCurrency(item.valuePerKg)}</td>
+                                    <td className="p-4 text-right font-black text-gray-800">{formatCurrency((item.totalKg || 0) * (item.valuePerKg || 0))}</td>
+                                    <td className="p-4 text-center">
+                                        <button 
+                                            onClick={() => handleRemoveItem(s.cpf, item.name)} 
+                                            className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
+                                            title="Remover item do contrato"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        </button>
+                                    </td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="p-20 text-center bg-gray-50 rounded-2xl border-2 border-dashed">
+                        <p className="text-gray-400 font-bold uppercase tracking-widest">Nenhum item cadastrado ainda.</p>
+                        <p className="text-xs text-gray-400 mt-2">Selecione um fornecedor acima para começar a vincular itens.</p>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 text-gray-400 font-black uppercase tracking-wider">
-                          <tr>
-                            <th className="p-3 text-left">Item</th>
-                            <th className="p-3 text-right">Peso Total</th>
-                            <th className="p-3 text-right">Vlr p/ Kg</th>
-                            <th className="p-3 text-right">Subtotal</th>
-                            <th className="p-3 text-center">Ações</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {(s.contractItems || []).map(item => (
-                            <tr key={item.name} className="hover:bg-gray-50">
-                              <td className="p-3 font-bold text-gray-700">{item.name}</td>
-                              <td className="p-3 text-right font-mono">{(item.totalKg || 0).toLocaleString('pt-BR')} Kg</td>
-                              <td className="p-3 text-right font-mono">{formatCurrency(item.valuePerKg)}</td>
-                              <td className="p-3 text-right font-bold">{formatCurrency((item.totalKg || 0) * (item.valuePerKg || 0))}</td>
-                              <td className="p-3 text-center">
-                                <button onClick={() => handleRemoveItem(s.cpf, item.name)} className="text-red-500 hover:bg-red-50 p-1 rounded">Remover</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))}
+                )}
               </div>
             </div>
           )}
@@ -297,11 +347,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           {activeTab === 'analytics' && <AdminAnalytics suppliers={suppliers} />}
           {activeTab === 'perCapita' && <AdminPerCapita suppliers={suppliers} perCapitaConfig={props.perCapitaConfig} onUpdatePerCapitaConfig={props.onUpdatePerCapitaConfig} />}
           {activeTab === 'info' && (
-            <div className="bg-red-50 p-8 rounded-2xl border-2 border-red-200 text-center space-y-4">
-              <h2 className="text-2xl font-black text-red-800 uppercase">Zona Crítica de Dados</h2>
-              <p className="text-red-600 max-w-md mx-auto">Estas ações são irreversíveis e afetam permanentemente o banco de dados na nuvem.</p>
+            <div className="bg-red-50 p-8 md:p-12 rounded-3xl border-2 border-red-200 text-center space-y-6 max-w-2xl mx-auto shadow-xl">
+              <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-red-600">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              </div>
+              <h2 className="text-3xl font-black text-red-800 uppercase tracking-tighter">Zona Crítica de Dados</h2>
+              <p className="text-red-600 font-medium">Estas ações são irreversíveis e apagarão permanentemente todo o histórico de entregas, fornecedores e notas fiscais do banco de dados na nuvem.</p>
               <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
-                <button onClick={props.onResetData} className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-transform hover:scale-105">Apagar Todos os Dados</button>
+                <button onClick={props.onResetData} className="bg-red-600 hover:bg-red-700 text-white font-black py-4 px-10 rounded-2xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-sm">Apagar Todos os Dados</button>
               </div>
             </div>
           )}
@@ -324,6 +377,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       <style>{`
         @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
       `}</style>
     </div>
   );

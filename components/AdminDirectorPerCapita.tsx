@@ -212,4 +212,21 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
                 <tr key={log.id}>
                   <td className="p-3">{new Date(log.date + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
                   <td className="p-3">{log.recipient}</td>
-                  <td className="p-3 text-xs">{log.items.map(i => i.name).join(', ')}
+                  <td className="p-3 text-xs">{log.items.map(i => i.name).join(', ')}</td>
+                  <td className="p-3 text-right font-bold">{formatCurrency(log.totalValue)}</td>
+                  <td className="p-3 text-center">
+                    <button onClick={() => onDelete(log.id)} className="text-red-500">Excluir</button>
+                  </td>
+                </tr>
+              )) : (
+                <tr><td colSpan={5} className="p-8 text-center text-gray-400">Nenhum registro.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDirectorPerCapita;
