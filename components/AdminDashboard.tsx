@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu } from '../types';
+import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 import EditSupplierModal from './EditSupplierModal';
@@ -40,7 +40,9 @@ interface AdminDashboardProps {
   onRegisterDirectorWithdrawal: (log: Omit<DirectorPerCapitaLog, 'id'>) => Promise<{ success: boolean; message: string }>;
   onDeleteDirectorWithdrawal: (id: string) => Promise<void>;
   standardMenu: StandardMenu;
+  dailyMenus: DailyMenus;
   onUpdateStandardMenu: (menu: StandardMenu) => Promise<void>;
+  onUpdateDailyMenu: (menus: DailyMenus) => Promise<void>;
 }
 
 const formatCurrency = (value: number) => {
@@ -72,7 +74,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     onReopenInvoice,
     onDeleteInvoice,
     standardMenu,
-    onUpdateStandardMenu
+    dailyMenus,
+    onUpdateStandardMenu,
+    onUpdateDailyMenu
   } = props;
 
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -260,11 +264,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Qtd Total (Kg)</label>
-                  <input type="text" placeholder="0.00" value={newItemKg} onChange={e => setNewItemKg(e.target.value)} className="w-full p-2 border rounded-lg font-mono outline-none focus:ring-2 focus:ring-indigo-400" required />
+                  <input type="text" placeholder="0.00" value={newItemKg} onChange={e => setNewItemKg(e.target.value)} className="w-full p-2 border rounded-lg font-mono focus:ring-2 focus:ring-indigo-400" required />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Preço Unitário (R$)</label>
-                  <input type="text" placeholder="0.00" value={newItemValue} onChange={e => setNewItemValue(e.target.value)} className="w-full p-2 border rounded-lg font-mono outline-none focus:ring-2 focus:ring-indigo-400" required />
+                  <input type="text" placeholder="0.00" value={newItemValue} onChange={e => setNewItemValue(e.target.value)} className="w-full p-2 border rounded-lg font-mono focus:ring-2 focus:ring-indigo-400" required />
                 </div>
                 <div className="lg:col-span-5 flex justify-end">
                   <button type="submit" className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-10 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-sm">Adicionar ao Contrato</button>
@@ -343,7 +347,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'analytics': return <AdminAnalytics suppliers={suppliers} />;
       case 'graphs': return <AdminGraphs suppliers={suppliers} />;
       case 'perCapita': return <AdminPerCapita suppliers={suppliers} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={onUpdatePerCapitaConfig} />;
-      case 'menu': return <AdminStandardMenu menu={standardMenu} onUpdateMenu={onUpdateStandardMenu} inmateCount={perCapitaConfig.inmateCount || 0} />;
+      case 'menu': return <AdminStandardMenu template={standardMenu} dailyMenus={dailyMenus} onUpdateTemplate={onUpdateStandardMenu} onUpdateDailyMenus={onUpdateDailyMenu} inmateCount={perCapitaConfig.inmateCount || 0} />;
       case 'info':
         return (
           <div className="bg-red-50 p-8 md:p-12 rounded-3xl border-2 border-red-200 text-center space-y-6 max-w-2xl mx-auto shadow-xl mt-10">

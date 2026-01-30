@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 // Import types directly to ensure they are available for use in generic positions
-import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu } from './types';
+import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -18,6 +18,7 @@ const perCapitaConfigRef = ref(database, 'perCapitaConfig');
 const cleaningLogsRef = ref(database, 'cleaningLogs');
 const directorWithdrawalsRef = ref(database, 'directorWithdrawals');
 const standardMenuRef = ref(database, 'standardMenu');
+const dailyMenusRef = ref(database, 'dailyMenus');
 
 // Use function declaration for generics in .tsx to avoid ambiguity with JSX tags
 function normalizeArray<T>(data: any): T[] {
@@ -36,6 +37,7 @@ const App: React.FC = () => {
   const [directorWithdrawals, setDirectorWithdrawals] = useState<DirectorPerCapitaLog[]>([]);
   const [perCapitaConfig, setPerCapitaConfig] = useState<PerCapitaConfig>({});
   const [standardMenu, setStandardMenu] = useState<StandardMenu>({});
+  const [dailyMenus, setDailyMenus] = useState<DailyMenus>({});
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<Supplier | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
@@ -90,6 +92,10 @@ const App: React.FC = () => {
       setStandardMenu(snapshot.val() || {});
     });
 
+    const unsubDailyMenus = onValue(dailyMenusRef, (snapshot) => {
+      setDailyMenus(snapshot.val() || {});
+    });
+
     return () => {
       unsubSuppliers();
       unsubLog();
@@ -97,6 +103,7 @@ const App: React.FC = () => {
       unsubDir();
       unsubConfig();
       unsubMenu();
+      unsubDailyMenus();
     };
   }, []);
 
@@ -310,13 +317,10 @@ const App: React.FC = () => {
     const sIdx = newSuppliers.findIndex(s => s.cpf === supplierCpf);
     const target = newSuppliers[sIdx];
 
-    // Pega as datas únicas envolvidas nesta nota fiscal para recriar agendamentos pendentes
     const dates = [...new Set(target.deliveries.filter(d => d.invoiceNumber === invoiceNumber).map(d => d.date))];
     
-    // Remove os itens faturados
     target.deliveries = target.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
     
-    // Para cada data que ficou "órfã", cria um agendamento pendente novo
     dates.forEach(date => {
         const hasOtherOnDate = target.deliveries.some(d => d.date === date);
         if (!hasOtherOnDate) {
@@ -458,7 +462,9 @@ const App: React.FC = () => {
             onDeleteCleaningLog={async (id) => set(ref(database, `cleaningLogs/${id}`), null)} onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal}
             onDeleteDirectorWithdrawal={async (id) => set(ref(database, `directorWithdrawals/${id}`), null)}
             standardMenu={standardMenu}
+            dailyMenus={dailyMenus}
             onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)}
+            onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)}
           />
         ) : currentUser ? (
           <Dashboard 

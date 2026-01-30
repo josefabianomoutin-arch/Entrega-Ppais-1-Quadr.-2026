@@ -8,21 +8,20 @@ export interface Delivery {
   value?: number;
   invoiceUploaded: boolean;
   invoiceNumber?: string;
-  // PEPS fields
   lots?: {
     id: string;
     lotNumber: string;
     initialQuantity: number;
     remainingQuantity: number;
     barcode?: string;
-    expirationDate?: string; // Data de validade do lote
+    expirationDate?: string;
   }[];
   withdrawals?: {
     lotId: string;
     date: string;
     quantity: number;
   }[];
-  remainingQuantity?: number; // Total remaining for this delivery item
+  remainingQuantity?: number;
 }
 
 export interface ContractItem {
@@ -99,5 +98,10 @@ export interface MenuRow {
 }
 
 export interface StandardMenu {
-  [day: string]: MenuRow[];
+  [dayOrDate: string]: MenuRow[];
+}
+
+// Representa os cardápios salvos por data específica
+export interface DailyMenus {
+  [date: string]: MenuRow[];
 }
