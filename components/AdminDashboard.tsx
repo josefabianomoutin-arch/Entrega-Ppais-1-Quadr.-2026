@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog } from '../types';
 import AdminAnalytics from './AdminAnalytics';
@@ -39,11 +38,10 @@ interface AdminDashboardProps {
 }
 
 const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 };
 
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
-  // Fix: Added missing callback props to destructuring to resolve 'Cannot find name' errors
   const { 
     suppliers = [], 
     activeTab, 
@@ -84,11 +82,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     { id: 'info', name: 'Zona Crítica', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg> },
   ];
 
-  const totalValue = useMemo(() => suppliers.reduce((s, p) => s + (p.initialValue || 0), 0), [suppliers]);
+  const totalValue = useMemo(() => {
+    return (suppliers || []).reduce((s, p) => s + (p.initialValue || 0), 0);
+  }, [suppliers]);
 
-  const filteredSuppliers = useMemo(() => 
-    suppliers.filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase())), 
-  [suppliers, supplierSearch]);
+  const filteredSuppliers = useMemo(() => {
+    if (!suppliers) return [];
+    return suppliers.filter(s => 
+      s.name && s.name.toLowerCase().includes(supplierSearch.toLowerCase())
+    );
+  }, [suppliers, supplierSearch]);
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +111,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       unit: newItemUnit
     };
 
-    const updatedSuppliers = suppliers.map(s => {
+    const updatedSuppliers = (suppliers || []).map(s => {
       if (s.cpf === selectedSupplierCpf) {
         const items = [...(s.contractItems || []), newItem];
         const initialValue = items.reduce((acc, i) => acc + (i.totalKg * i.valuePerKg), 0);
@@ -126,9 +129,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   const handleRemoveItem = (supplierCpf: string, itemName: string) => {
     if (!window.confirm(`Excluir item "${itemName}"?`)) return;
 
-    const updatedSuppliers = suppliers.map(s => {
+    const updatedSuppliers = (suppliers || []).map(s => {
       if (s.cpf === supplierCpf) {
-        const items = s.contractItems.filter(i => i.name !== itemName);
+        const items = (s.contractItems || []).filter(i => i.name !== itemName);
         const initialValue = items.reduce((acc, i) => acc + (i.totalKg * i.valuePerKg), 0);
         return { ...s, contractItems: items, initialValue };
       }
@@ -140,7 +143,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
   const handleDeleteSupplier = (cpf: string) => {
     if (!window.confirm('Excluir este fornecedor permanentemente? Todos os itens de contrato associados serão removidos.')) return;
-    const updated = suppliers.filter(s => s.cpf !== cpf);
+    const updated = (suppliers || []).filter(s => s.cpf !== cpf);
     onPersistSuppliers(updated);
   };
 
@@ -148,12 +151,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     <div className="min-h-screen bg-gray-100 pb-20">
       <header className="bg-white/90 backdrop-blur-sm shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-green-800">Gestão de Fornecedores 1º Quadr. 2026</h1>
-          <p className="text-sm text-gray-500">Painel do Administrador</p>
+          <h1 className="text-xl md:text-2xl font-bold text-green-800">Painel Administrativo</h1>
+          <p className="text-sm text-gray-500">Gestão 1º Quadr. 2026</p>
         </div>
         <div className="flex items-center gap-4">
             <div className="hidden md:block text-right">
-                <p className="text-[10px] font-bold text-gray-400 uppercase">Total Geral Contratado</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase">Total Contratado</p>
                 <p className="font-black text-green-700 text-lg leading-none">{formatCurrency(totalValue)}</p>
             </div>
             <button onClick={props.onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">Sair</button>
@@ -162,7 +165,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       
       <div className="flex flex-col md:flex-row">
         <aside className="w-full md:w-64 bg-white md:min-h-[calc(100vh-73px)] border-r">
-            <nav className="p-4 overflow-y-auto">
+            <nav className="p-4">
                 <ul className="space-y-1">
                     {tabs.map(tab => (
                         <li key={tab.id}>
@@ -181,7 +184,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
         <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
           {activeTab === 'register' && (
-            <div className="space-y-8 animate-fade-in max-w-5xl mx-auto">
+            <div className="space-y-8 max-w-5xl mx-auto">
+              {/* Formulário de Cadastro */}
               <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-500">
                 <h2 className="text-xl font-black text-gray-800 mb-6 uppercase tracking-tight">Cadastro de Novo Fornecedor</h2>
                 <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={async (e) => {
@@ -204,13 +208,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                   <button type="submit" className="md:col-span-2 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-sm">Registrar Fornecedor</button>
                 </form>
                 {registrationStatus && (
-                  <div className={`mt-4 p-3 rounded-lg text-sm font-bold text-center animate-fade-in ${registrationStatus.success ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
+                  <div className={`mt-4 p-3 rounded-lg text-sm font-bold text-center ${registrationStatus.success ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
                     {registrationStatus.message}
                     <button onClick={onClearRegistrationStatus} className="ml-2 underline text-xs">Fechar</button>
                   </div>
                 )}
               </div>
 
+              {/* Lista de Fornecedores */}
               <div className="bg-white p-6 rounded-2xl shadow-lg">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                   <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight">Fornecedores Habilitados</h2>
@@ -242,7 +247,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                         </tr>
                       )) : (
                         <tr>
-                            <td colSpan={4} className="p-10 text-center text-gray-400 italic">Nenhum fornecedor encontrado.</td>
+                            <td colSpan={4} className="p-10 text-center text-gray-400 italic font-medium">Nenhum fornecedor cadastrado.</td>
                         </tr>
                       )}
                     </tbody>
@@ -253,7 +258,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           )}
 
           {activeTab === 'contracts' && (
-            <div className="space-y-8 animate-fade-in max-w-6xl mx-auto">
+            <div className="space-y-8 max-w-6xl mx-auto">
+              {/* Formulário para Vincular Item */}
               <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-indigo-500">
                 <h2 className="text-xl font-black text-gray-800 mb-6 uppercase tracking-tight">Vincular Item ao Fornecedor</h2>
                 <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
@@ -266,7 +272,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Descrição do Item</label>
-                    <input type="text" placeholder="EX: FEIJÃO CARIOCA" value={newItemName} onChange={e => setNewItemName(e.target.value)} className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-400" required />
+                    <input type="text" placeholder="EX: ARROZ" value={newItemName} onChange={e => setNewItemName(e.target.value)} className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-400" required />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Qtd Total (Kg)</label>
@@ -282,11 +288,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 </form>
               </div>
 
+              {/* Lista de Itens por Fornecedor */}
               <div className="grid grid-cols-1 gap-6">
                 <h3 className="text-lg font-black text-gray-600 uppercase tracking-wider px-2">Itens de Contrato por Fornecedor</h3>
                 {suppliers.filter(s => (s.contractItems || []).length > 0).length > 0 ? (
                     suppliers.filter(s => (s.contractItems || []).length > 0).map(s => (
-                        <div key={s.cpf} className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100 animate-fade-in">
+                        <div key={s.cpf} className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100">
                             <div className="bg-gray-50 p-4 md:p-6 flex flex-col md:flex-row justify-between items-start md:items-center border-b gap-4">
                             <div>
                                 <h3 className="font-black text-gray-800 uppercase text-lg">{s.name}</h3>
@@ -333,8 +340,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                     ))
                 ) : (
                     <div className="p-20 text-center bg-gray-50 rounded-2xl border-2 border-dashed">
-                        <p className="text-gray-400 font-bold uppercase tracking-widest">Nenhum item cadastrado ainda.</p>
-                        <p className="text-xs text-gray-400 mt-2">Selecione um fornecedor acima para começar a vincular itens.</p>
+                        <p className="text-gray-400 font-bold uppercase tracking-widest italic">Nenhum item vinculado a contratos.</p>
+                        <p className="text-xs text-gray-400 mt-2">Utilize o formulário acima para começar a adicionar itens aos fornecedores.</p>
                     </div>
                 )}
               </div>
@@ -352,7 +359,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
               <h2 className="text-3xl font-black text-red-800 uppercase tracking-tighter">Zona Crítica de Dados</h2>
-              <p className="text-red-600 font-medium">Estas ações são irreversíveis e apagarão permanentemente todo o histórico de entregas, fornecedores e notas fiscais do banco de dados na nuvem.</p>
+              <p className="text-red-600 font-medium">Estas ações são irreversíveis e apagarão permanentemente todo o histórico do banco de dados.</p>
               <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
                 <button onClick={props.onResetData} className="bg-red-600 hover:bg-red-700 text-white font-black py-4 px-10 rounded-2xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-sm">Apagar Todos os Dados</button>
               </div>
@@ -373,13 +380,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           }} 
         />
       )}
-
-      <style>{`
-        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
-      `}</style>
     </div>
   );
 };
