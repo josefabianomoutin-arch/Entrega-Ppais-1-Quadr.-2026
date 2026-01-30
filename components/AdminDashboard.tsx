@@ -615,7 +615,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           
           {activeTab === 'schedule' && <AdminScheduleView suppliers={suppliers} />}
           {activeTab === 'invoices' && <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} />}
-          {activeTab === 'warehouse' && <AdminWarehouseLog warehouseLog={warehouseLog} onDeleteEntry={onDeleteWarehouseEntry} />}
+          {activeTab === 'warehouse' && <AdminWarehouseLog suppliers={suppliers} warehouseLog={warehouseLog} onDeleteEntry={onDeleteWarehouseEntry} />}
           {activeTab === 'analytics' && <AdminAnalytics suppliers={suppliers} />}
           {activeTab === 'graphs' && <AdminGraphs suppliers={suppliers} />}
           {activeTab === 'perCapita' && <AdminPerCapita suppliers={suppliers} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={onUpdatePerCapitaConfig} />}

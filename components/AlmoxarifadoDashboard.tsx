@@ -149,7 +149,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         if (contractItems.length === 0) return null;
         
         const { name: displayUnit, factorToKg } = getUnitInfo(contractItems[0]);
-        const totalContratado = contractItems.reduce((sum, item) => sum + (item.totalKg || 0), 0);
 
         let totalRecebidoHistoricoKg = 0;
         let estoqueAtualKg = 0;
@@ -163,14 +162,15 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         });
         
         const canCompare = factorToKg > 0;
+        const totalRecebidoHistorico = canCompare ? totalRecebidoHistoricoKg / factorToKg : 0;
         const estoqueAtual = canCompare ? estoqueAtualKg / factorToKg : 0;
         const totalSaidas = canCompare ? (totalRecebidoHistoricoKg - estoqueAtualKg) / factorToKg : 0;
         
         return { 
-            totalContratado, 
             displayUnit,
             estoqueAtual, 
             totalSaidas,
+            totalRecebidoHistorico,
             factorToKg,
             canCompare
         };
@@ -320,17 +320,17 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                            
                             {exitItemData && (
                                 <div className="grid grid-cols-3 gap-4 text-center animate-fade-in">
-                                    <div className="bg-green-50 p-2 rounded border border-green-100">
-                                        <p className="text-xs text-green-700">Estoque Atual</p>
-                                        <p className="font-bold text-lg text-green-800">{exitItemData.estoqueAtual.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {exitItemData.displayUnit}</p>
+                                    <div className="bg-blue-50 p-2 rounded border border-blue-100">
+                                        <p className="text-xs text-blue-700">Histórico Recebido</p>
+                                        <p className="font-bold text-lg text-blue-800">{exitItemData.totalRecebidoHistorico.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {exitItemData.displayUnit}</p>
                                     </div>
                                     <div className="bg-gray-100 p-2 rounded">
                                         <p className="text-xs text-gray-500">Total de Saídas</p>
                                         <p className="font-bold text-lg text-gray-800">{exitItemData.totalSaidas.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {exitItemData.displayUnit}</p>
                                     </div>
-                                    <div className="bg-red-50 p-2 rounded border border-red-100">
-                                        <p className="text-xs text-red-700">Total Contratado</p>
-                                        <p className="font-bold text-lg text-red-800">{exitItemData.totalContratado.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {exitItemData.displayUnit}</p>
+                                     <div className="bg-green-50 p-2 rounded border border-green-200">
+                                        <p className="text-xs text-green-700">Estoque Atual</p>
+                                        <p className="font-bold text-lg text-green-800">{exitItemData.estoqueAtual.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {exitItemData.displayUnit}</p>
                                     </div>
                                 </div>
                             )}

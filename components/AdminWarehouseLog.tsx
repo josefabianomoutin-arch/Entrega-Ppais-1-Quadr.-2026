@@ -1,15 +1,39 @@
+
 import React, { useState, useMemo } from 'react';
-import type { WarehouseMovement } from '../types';
+import type { WarehouseMovement, Supplier } from '../types';
 
 interface AdminWarehouseLogProps {
     warehouseLog: WarehouseMovement[];
+    suppliers: Supplier[];
     onDeleteEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
 }
 
-const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, onDeleteEntry }) => {
+const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, suppliers, onDeleteEntry }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'entrada' | 'saída'>('all');
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+    const itemUnitInfoMap = useMemo(() => {
+        const map = new Map<string, { name: string; factorToKg: number }>();
+        suppliers.forEach(s => {
+            (s.contractItems || []).forEach(ci => {
+                if (!map.has(ci.name)) {
+                    if (!ci.unit) {
+                        map.set(ci.name, { name: 'Kg', factorToKg: 1 });
+                    } else {
+                        const [type, weightStr] = ci.unit.split('-');
+                        const nameMap: { [key: string]: string } = { saco: 'Sacos', balde: 'Baldes', embalagem: 'Litros', kg: 'Kg', litro: 'Litros', caixa: 'Litros', pacote: 'Pacotes', pote: 'Potes', dz: 'Dúzias', un: 'Unidades' };
+                        const name = nameMap[type] || 'Unidades';
+                        let factorToKg = parseFloat(weightStr);
+                        if (type === 'dz') factorToKg = 0;
+                        else if (isNaN(factorToKg)) factorToKg = 1;
+                        map.set(ci.name, { name, factorToKg });
+                    }
+                }
+            });
+        });
+        return map;
+    }, [suppliers]);
 
     const filteredLog = useMemo(() => {
         return warehouseLog
@@ -26,8 +50,20 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, onD
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }, [warehouseLog, searchTerm, filterType]);
 
+    const getDisplayQuantity = (log: WarehouseMovement): string => {
+        const unitInfo = itemUnitInfoMap.get(log.itemName);
+        const quantityKg = log.quantity || 0;
+
+        if (unitInfo && unitInfo.factorToKg > 0) {
+            const quantityInUnit = quantityKg / unitInfo.factorToKg;
+            return `${quantityInUnit.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${unitInfo.name}`;
+        }
+        return `${quantityKg.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} Kg`;
+    };
+
     const handleDelete = async (log: WarehouseMovement) => {
-        const confirmationMessage = `Tem certeza que deseja excluir esta entrada?\n\nItem: ${log.itemName}\nLote: ${log.lotNumber}\nQuantidade: ${(log.quantity || 0).toFixed(2).replace('.', ',')} Kg\nFornecedor: ${log.supplierName}\n\nEsta ação irá remover o lote do estoque e devolver o saldo ao contrato. A ação não pode ser desfeita.`;
+        const displayQuantity = getDisplayQuantity(log);
+        const confirmationMessage = `Tem certeza que deseja excluir esta entrada?\n\nItem: ${log.itemName}\nLote: ${log.lotNumber}\nQuantidade: ${displayQuantity}\nFornecedor: ${log.supplierName}\n\nEsta ação irá remover o lote do estoque e devolver o saldo ao contrato. A ação não pode ser desfeita.`;
         if (window.confirm(confirmationMessage)) {
             setIsDeleting(log.id);
             const result = await onDeleteEntry(log);
@@ -96,7 +132,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, onD
                                 </td>
                                 <td className="p-3 text-gray-600 truncate max-w-xs">{log.supplierName}</td>
                                 <td className="p-3 text-right font-mono text-gray-800">
-                                    {log.quantity !== undefined ? `${log.quantity.toFixed(2).replace('.', ',')} Kg` : '-'}
+                                    {getDisplayQuantity(log)}
                                 </td>
                                 <td className="p-3 font-mono text-gray-600">
                                     {log.type === 'entrada' ? log.inboundInvoice || 'N/A' : log.outboundInvoice || 'N/A'}
