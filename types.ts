@@ -67,6 +67,7 @@ export interface CleaningLog {
   id: string;
   date: string;
   responsible: string;
+  location: string;
   type: 'diaria' | 'semanal' | 'pesada';
   observations: string;
 }

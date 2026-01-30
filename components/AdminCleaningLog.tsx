@@ -11,6 +11,7 @@ interface AdminCleaningLogProps {
 const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, onDelete }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [responsible, setResponsible] = useState('');
+  const [location, setLocation] = useState('Câmara fria de Resfriada');
   const [type, setType] = useState<'diaria' | 'semanal' | 'pesada'>('diaria');
   const [observations, setObservations] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -20,6 +21,7 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
     return logs
       .filter(l => 
         l.responsible.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        l.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
         l.observations.toLowerCase().includes(searchTerm.toLowerCase())
       )
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -32,7 +34,7 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
         return;
     }
     setIsSaving(true);
-    const result = await onRegister({ date, responsible, type, observations });
+    const result = await onRegister({ date, responsible, location, type, observations });
     if (result.success) {
       setResponsible('');
       setObservations('');
@@ -42,12 +44,13 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
   };
 
   const handleExportCSV = () => {
-    const headers = ["Data", "Responsável", "Tipo", "Observações"];
+    const headers = ["Data", "Responsável", "Local", "Tipo", "Observações"];
     const csvContent = [
       headers.join(";"),
       ...logs.map(l => [
         new Date(l.date + 'T00:00:00').toLocaleDateString('pt-BR'),
         l.responsible,
+        l.location,
         l.type.toUpperCase(),
         `"${l.observations.replace(/"/g, '""')}"`
       ].join(";"))
@@ -75,6 +78,13 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
             <input type="text" value={responsible} onChange={e => setResponsible(e.target.value)} placeholder="Nome do funcionário" className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-cyan-500" />
           </div>
           <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500 uppercase">Local</label>
+            <select value={location} onChange={e => setLocation(e.target.value)} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-cyan-500">
+              <option value="Câmara fria de Resfriada">Câmara fria de Resfriada</option>
+              <option value="Câmara Fria de Congelados">Câmara Fria de Congelados</option>
+            </select>
+          </div>
+          <div className="space-y-1">
             <label className="text-xs font-bold text-gray-500 uppercase">Tipo de Limpeza</label>
             <select value={type} onChange={e => setType(e.target.value as any)} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-cyan-500">
               <option value="diaria">Diária (Superficial)</option>
@@ -96,7 +106,7 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
         <div className="flex justify-between items-center mb-6 gap-4">
           <h3 className="text-lg font-bold text-gray-800">Histórico de Higienização</h3>
           <div className="flex items-center gap-2">
-            <input type="text" placeholder="Filtrar responsável..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="border rounded-lg px-3 py-2 text-sm" />
+            <input type="text" placeholder="Filtrar responsável, local..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="border rounded-lg px-3 py-2 text-sm" />
             <button onClick={handleExportCSV} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
               Exportar
@@ -110,6 +120,7 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
               <tr>
                 <th className="p-3 text-left">Data</th>
                 <th className="p-3 text-left">Tipo</th>
+                <th className="p-3 text-left">Local</th>
                 <th className="p-3 text-left">Responsável</th>
                 <th className="p-3 text-left">Observações</th>
                 <th className="p-3 text-center">Ações</th>
@@ -128,6 +139,7 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
                       {log.type}
                     </span>
                   </td>
+                  <td className="p-3 text-gray-700 font-medium">{log.location}</td>
                   <td className="p-3 font-semibold text-gray-700">{log.responsible}</td>
                   <td className="p-3 text-gray-500 italic max-w-xs truncate" title={log.observations}>{log.observations || '-'}</td>
                   <td className="p-3 text-center">
@@ -137,7 +149,7 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan={5} className="p-8 text-center text-gray-400 italic">Nenhum registro encontrado.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-gray-400 italic">Nenhum registro encontrado.</td></tr>
               )}
             </tbody>
           </table>
