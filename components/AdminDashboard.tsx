@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog } from '../types';
+import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import WeekSelector from './WeekSelector';
 import EditSupplierModal from './EditSupplierModal';
@@ -10,8 +10,9 @@ import AdminInvoices from './AdminInvoices';
 import AdminPerCapita from './AdminPerCapita';
 import AdminWarehouseLog from './AdminWarehouseLog';
 import AdminCleaningLog from './AdminCleaningLog';
+import AdminDirectorPerCapita from './AdminDirectorPerCapita';
 
-type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse' | 'cleaning';
+type AdminTab = 'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse' | 'cleaning' | 'directorPerCapita';
 
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
@@ -21,6 +22,7 @@ interface AdminDashboardProps {
   suppliers: Supplier[];
   warehouseLog: WarehouseMovement[];
   cleaningLogs: CleaningLog[];
+  directorWithdrawals: DirectorPerCapitaLog[];
   onResetData: () => void;
   onRestoreData: (backupSuppliers: Supplier[]) => Promise<boolean>;
   activeTab: AdminTab;
@@ -33,6 +35,8 @@ interface AdminDashboardProps {
   onDeleteWarehouseEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
   onRegisterCleaningLog: (log: Omit<CleaningLog, 'id'>) => Promise<{ success: boolean; message: string }>;
   onDeleteCleaningLog: (id: string) => Promise<void>;
+  onRegisterDirectorWithdrawal: (log: Omit<DirectorPerCapitaLog, 'id'>) => Promise<{ success: boolean; message: string }>;
+  onDeleteDirectorWithdrawal: (id: string) => Promise<void>;
 }
 
 const formatCurrency = (value: number) => {
@@ -40,12 +44,12 @@ const formatCurrency = (value: number) => {
 };
 
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
-  const { suppliers, activeTab, onTabChange, cleaningLogs, onRegisterCleaningLog, onDeleteCleaningLog } = props;
-  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const { suppliers, activeTab, onTabChange, cleaningLogs, onRegisterCleaningLog, onDeleteCleaningLog, directorWithdrawals, onRegisterDirectorWithdrawal, onDeleteDirectorWithdrawal } = props;
 
   const tabs: { id: AdminTab; name: string; icon: React.ReactElement }[] = [
     { id: 'register', name: 'Gestão de fornecedores', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 11a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1z" /></svg> },
     { id: 'contracts', name: 'Gestão por Item', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" /></svg> },
+    { id: 'directorPerCapita', name: 'Cota Diretores', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg> },
     { id: 'cleaning', name: 'Higienização Câmara', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5.5"></path><circle cx="18" cy="18" r="3"></circle><path d="M18 15l2 2-2 2"></path></svg> },
     { id: 'warehouse', name: 'Controle de Estoque', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 8a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm-1 4a1 1 0 011-1h2a1 1 0 110 2H5a1 1 0 01-1-1zm8-4a1 1 0 00-1-1h-2a1 1 0 100 2h2a1 1 0 001-1z" /><path fillRule="evenodd" d="M2 3a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H3a1 1 0 01-1-1V3zm2 1h12v12H4V4z" clipRule="evenodd" /></svg> },
     { id: 'analytics', name: 'Relatório Analítico', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg> },
@@ -89,6 +93,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
         <main className="flex-1 p-4 md:p-8">
           {activeTab === 'register' && <div>{/* Cadastro Fornecedor UI */}</div>}
+          {activeTab === 'directorPerCapita' && <AdminDirectorPerCapita suppliers={suppliers} logs={directorWithdrawals} onRegister={onRegisterDirectorWithdrawal} onDelete={onDeleteDirectorWithdrawal} />}
           {activeTab === 'cleaning' && <AdminCleaningLog logs={cleaningLogs} onRegister={onRegisterCleaningLog} onDelete={onDeleteCleaningLog} />}
           {activeTab === 'warehouse' && <AdminWarehouseLog suppliers={suppliers} warehouseLog={props.warehouseLog} onDeleteEntry={props.onDeleteWarehouseEntry} />}
           {activeTab === 'analytics' && <AdminAnalytics suppliers={suppliers} />}

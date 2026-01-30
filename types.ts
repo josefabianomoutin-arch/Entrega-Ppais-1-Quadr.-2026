@@ -71,3 +71,18 @@ export interface CleaningLog {
   type: 'diaria' | 'semanal' | 'pesada';
   observations: string;
 }
+
+export interface DirectorItem {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  totalValue: number;
+}
+
+export interface DirectorPerCapitaLog {
+  id: string;
+  date: string;
+  recipient: 'Chefe de Departamento' | 'Diretor de Disciplina';
+  items: DirectorItem[];
+  totalValue: number;
+}

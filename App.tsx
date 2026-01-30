@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog } from './types';
+import type { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -15,26 +15,21 @@ const suppliersRef = ref(database, 'suppliers');
 const warehouseLogRef = ref(database, 'warehouseLog');
 const perCapitaConfigRef = ref(database, 'perCapitaConfig');
 const cleaningLogsRef = ref(database, 'cleaningLogs');
+const directorWithdrawalsRef = ref(database, 'directorWithdrawals');
 
 const App: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [warehouseLog, setWarehouseLog] = useState<WarehouseMovement[]>([]);
   const [cleaningLogs, setCleaningLogs] = useState<CleaningLog[]>([]);
+  const [directorWithdrawals, setDirectorWithdrawals] = useState<DirectorPerCapitaLog[]>([]);
   const [perCapitaConfig, setPerCapitaConfig] = useState<PerCapitaConfig>({});
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<Supplier | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isAlmoxarifadoLoggedIn, setIsAlmoxarifadoLoggedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse' | 'cleaning'>('register');
+  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse' | 'cleaning' | 'directorPerCapita'>('register');
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
-  const [emailModalData, setEmailModalData] = useState<{
-    recipient: string;
-    cc: string;
-    subject: string;
-    body: string;
-    mailtoLink: string;
-  } | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -68,6 +63,11 @@ const App: React.FC = () => {
       const data = snapshot.val();
       setCleaningLogs(data && Array.isArray(data) ? data : []);
     });
+
+    const unsubscribeDirectorWithdrawals = onValue(directorWithdrawalsRef, (snapshot) => {
+      const data = snapshot.val();
+      setDirectorWithdrawals(data && Array.isArray(data) ? data : []);
+    });
     
     const unsubscribePerCapitaConfig = onValue(perCapitaConfigRef, (snapshot) => {
       const data = snapshot.val();
@@ -78,6 +78,7 @@ const App: React.FC = () => {
       unsubscribeSuppliers();
       unsubscribeWarehouseLog();
       unsubscribeCleaningLogs();
+      unsubscribeDirectorWithdrawals();
       unsubscribePerCapitaConfig();
     };
   }, []);
@@ -89,13 +90,27 @@ const App: React.FC = () => {
       finally { setTimeout(() => setIsSaving(false), 500); }
   };
 
+  const handleRegisterDirectorWithdrawal = async (log: Omit<DirectorPerCapitaLog, 'id'>) => {
+    const newLog: DirectorPerCapitaLog = { ...log, id: `dir-${Date.now()}` };
+    const updatedLogs = [newLog, ...directorWithdrawals];
+    await writeToDatabase(directorWithdrawalsRef, updatedLogs);
+    return { success: true, message: 'Envio para diretoria registrado com sucesso.' };
+  };
+
+  const handleDeleteDirectorWithdrawal = async (id: string) => {
+    const updatedLogs = directorWithdrawals.filter(l => l.id !== id);
+    await writeToDatabase(directorWithdrawalsRef, updatedLogs);
+  };
+
+  // Fix: Added missing handleRegisterCleaningLog function
   const handleRegisterCleaningLog = async (log: Omit<CleaningLog, 'id'>) => {
-    const newLog: CleaningLog = { ...log, id: `log-${Date.now()}` };
+    const newLog: CleaningLog = { ...log, id: `clean-${Date.now()}` };
     const updatedLogs = [newLog, ...cleaningLogs];
     await writeToDatabase(cleaningLogsRef, updatedLogs);
     return { success: true, message: 'Registro de higienização salvo com sucesso.' };
   };
 
+  // Fix: Added missing handleDeleteCleaningLog function
   const handleDeleteCleaningLog = async (id: string) => {
     const updatedLogs = cleaningLogs.filter(l => l.id !== id);
     await writeToDatabase(cleaningLogsRef, updatedLogs);
@@ -175,6 +190,7 @@ const App: React.FC = () => {
             suppliers={suppliers}
             warehouseLog={warehouseLog}
             cleaningLogs={cleaningLogs}
+            directorWithdrawals={directorWithdrawals}
             onRegister={handleRegister} 
             onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))}
             onUpdateSupplier={handleUpdateSupplierData}
@@ -189,8 +205,10 @@ const App: React.FC = () => {
             perCapitaConfig={perCapitaConfig}
             onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)}
             onDeleteWarehouseEntry={async (l) => ({ success: true, message: '' })}
-            onRegisterCleaningLog={handleRegisterCleaningLog}
+            onRegisterCleaningLog={async (l) => { const r = await handleRegisterCleaningLog(l); return r; }}
             onDeleteCleaningLog={handleDeleteCleaningLog}
+            onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal}
+            onDeleteDirectorWithdrawal={handleDeleteDirectorWithdrawal}
           />
         ) : currentUser ? (
           <Dashboard supplier={currentUser} onLogout={() => setCurrentUser(null)} onScheduleDelivery={async () => {}} onFulfillAndInvoice={async () => {}} onCancelDeliveries={async () => {}} emailModalData={null} onCloseEmailModal={() => {}} />
