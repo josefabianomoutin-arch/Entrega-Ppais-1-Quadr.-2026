@@ -109,9 +109,6 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
             .report-title { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0; text-transform: uppercase; }
             .footer { margin-top: 60px; display: flex; justify-content: space-around; }
             .sig { border-top: 1px solid #000; width: 220px; text-align: center; padding-top: 5px; font-size: 11px; font-weight: bold; }
-            @media print {
-              .no-print { display: none; }
-            }
           </style>
         </head>
         <body>
@@ -175,7 +172,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-12">
+    <div className="space-y-8 pb-12">
       <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-indigo-500">
         <h2 className="text-2xl font-bold text-gray-800 mb-6 uppercase">Novo Envio para Diretoria</h2>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -314,10 +311,6 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
           </table>
         </div>
       </div>
-      <style>{`
-        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
-      `}</style>
     </div>
   );
 };

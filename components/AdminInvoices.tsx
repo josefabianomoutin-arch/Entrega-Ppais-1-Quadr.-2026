@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo } from 'react';
-import type { Supplier } from '../types';
+import type { Supplier, Delivery } from '../types';
 
 interface InvoiceInfo {
     id: string;
@@ -35,12 +36,12 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
     const allInvoices = useMemo((): InvoiceInfo[] => {
         const invoicesMap = new Map<string, InvoiceInfo>();
 
-        suppliers.forEach(supplier => {
-            const deliveriesByInvoice = new Map<string, any[]>();
+        (suppliers || []).forEach(supplier => {
+            const deliveriesByInvoice = new Map<string, Delivery[]>();
             
             // Group deliveries by invoice number for this supplier
             (supplier.deliveries || []).forEach(delivery => {
-                if (delivery.invoiceNumber) {
+                if (delivery.invoiceNumber && delivery.invoiceNumber.trim() !== "") {
                     const existing = deliveriesByInvoice.get(delivery.invoiceNumber) || [];
                     deliveriesByInvoice.set(delivery.invoiceNumber, [...existing, delivery]);
                 }
@@ -49,11 +50,19 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
             deliveriesByInvoice.forEach((deliveries, invoiceNumber) => {
                 const invoiceId = `${supplier.cpf}-${invoiceNumber}`;
                 const totalValue = deliveries.reduce((sum, d) => sum + (d.value || 0), 0);
-                const items = deliveries.map(d => ({ name: d.item || 'N/A', kg: d.kg || 0, value: d.value || 0 })).filter(d => d.name !== 'AGENDAMENTO PENDENTE');
                 
-                if(items.length === 0) return;
+                // Extraímos os itens reais, ignorando apenas o placeholder "AGENDAMENTO PENDENTE"
+                const items = deliveries
+                    .filter(d => d.item && d.item !== 'AGENDAMENTO PENDENTE')
+                    .map(d => ({ 
+                        name: d.item || 'Item não especificado', 
+                        kg: d.kg || 0, 
+                        value: d.value || 0 
+                    }));
+                
+                if(items.length === 0 && totalValue === 0) return;
 
-                const earliestDate = deliveries.reduce((earliest, d) => d.date < earliest ? d.date : earliest, deliveries[0].date);
+                const earliestDate = deliveries.reduce((earliest, d) => (d.date < earliest ? d.date : earliest), deliveries[0].date);
 
                 invoicesMap.set(invoiceId, {
                     id: invoiceId,
@@ -73,7 +82,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
     const filteredAndSortedInvoices = useMemo(() => {
         const filtered = allInvoices.filter(invoice => 
             invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            invoice.invoiceNumber.includes(searchTerm)
+            invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase())
         );
 
         return filtered.sort((a, b) => {
@@ -91,7 +100,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
 
     const handleSort = (key: 'supplierName' | 'date' | 'totalValue') => {
         if (key === sortKey) {
-            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+            setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
         } else {
             setSortKey(key);
             setSortDirection('desc');
@@ -99,18 +108,18 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
     };
     
     const toggleExpand = (invoiceId: string) => {
-        setExpandedInvoiceId(prev => prev === invoiceId ? null : invoiceId);
+        setExpandedInvoiceId(prev => (prev === invoiceId ? null : invoiceId));
     };
 
     const handleReopenClick = (supplierCpf: string, invoiceNumber: string) => {
-        const confirmationMessage = `Tem certeza que deseja reabrir esta nota fiscal (NF: ${invoiceNumber})?\n\nTodas as entregas associadas serão revertidas para UM ÚNICO 'AGENDAMENTO PENDENTE' e o fornecedor precisará faturá-las novamente.\n\nEsta ação não pode ser desfeita.`;
+        const confirmationMessage = `Tem certeza que deseja reabrir esta nota fiscal (NF: ${invoiceNumber})?\n\nAs entregas associadas voltarão ao estado pendente para correção.\n\nEsta ação não pode ser desfeita.`;
         if (window.confirm(confirmationMessage)) {
             onReopenInvoice(supplierCpf, invoiceNumber);
         }
     };
 
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-teal-500 animate-fade-in">
+        <div className="bg-white p-6 rounded-2xl shadow-xl max-w-7xl mx-auto border-t-8 border-teal-500">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 border-b pb-6">
                  <div>
                     <h2 className="text-3xl font-black text-teal-900 uppercase tracking-tighter">Consulta de Notas Fiscais</h2>
@@ -143,7 +152,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                             return (
                                 <React.Fragment key={invoice.id}>
                                     <tr className="border-b hover:bg-gray-50 transition-colors">
-                                        <td className="p-3 font-bold text-gray-800">{invoice.supplierName}</td>
+                                        <td className="p-3 font-bold text-gray-800 uppercase">{invoice.supplierName}</td>
                                         <td className="p-3 font-mono">{formatDate(invoice.date)}</td>
                                         <td className="p-3 font-mono">{invoice.invoiceNumber}</td>
                                         <td className="p-3 text-right font-mono font-bold text-green-700">{formatCurrency(invoice.totalValue)}</td>
@@ -165,13 +174,13 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                     {isExpanded && (
                                         <tr className="bg-gray-100">
                                             <td colSpan={6} className="p-4">
-                                                <div className="animate-slide-down">
+                                                <div className="bg-white p-4 rounded-lg shadow-inner">
                                                     <h4 className="text-xs font-bold uppercase text-gray-600 mb-2">Itens na Nota Fiscal {invoice.invoiceNumber}</h4>
                                                     <ul className="space-y-1 text-xs">
                                                         {invoice.items.map((item, index) => (
-                                                            <li key={index} className="flex justify-between items-center p-2 bg-white rounded">
-                                                                <span>{item.name} <span className="text-gray-500">({(item.kg || 0).toFixed(2).replace('.',',')} Kg)</span></span>
-                                                                <span className="font-mono">{formatCurrency(item.value)}</span>
+                                                            <li key={index} className="flex justify-between items-center p-2 border-b last:border-b-0">
+                                                                <span className="font-semibold text-gray-700 uppercase">{item.name} <span className="text-gray-400 font-normal">({(item.kg || 0).toFixed(2).replace('.',',')} Kg)</span></span>
+                                                                <span className="font-mono text-gray-600">{formatCurrency(item.value)}</span>
                                                             </li>
                                                         ))}
                                                     </ul>
@@ -182,15 +191,11 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                 </React.Fragment>
                             )
                         }) : (
-                            <tr><td colSpan={6} className="p-8 text-center text-gray-400 italic">Nenhuma nota fiscal encontrada.</td></tr>
+                            <tr><td colSpan={6} className="p-8 text-center text-gray-400 italic">Nenhuma nota fiscal encontrada para exibir.</td></tr>
                         )}
                     </tbody>
                 </table>
             </div>
-            <style>{`
-                @keyframes slide-down { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-                .animate-slide-down { animation: slide-down 0.3s ease-out forwards; }
-             `}</style>
         </div>
     )
 };
