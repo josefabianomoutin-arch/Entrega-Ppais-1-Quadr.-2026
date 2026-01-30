@@ -70,7 +70,6 @@ const App: React.FC = () => {
         
         setSuppliers(suppliersArray);
 
-        // Atualiza o usuário logado se ele estiver na lista
         if (currentUser) {
             const updatedUser = suppliersArray.find(s => s.cpf === currentUser.cpf);
             if (updatedUser) setCurrentUser(updatedUser);
@@ -116,6 +115,144 @@ const App: React.FC = () => {
       finally { setTimeout(() => setIsSaving(false), 500); }
   };
 
+  const handleRegisterWarehouseEntry = async (payload: {
+    supplierCpf: string;
+    itemName: string;
+    invoiceNumber: string;
+    invoiceDate: string;
+    lotNumber: string;
+    quantity: number;
+    expirationDate: string;
+  }) => {
+    const supplierIndex = suppliers.findIndex(s => s.cpf === payload.supplierCpf);
+    if (supplierIndex === -1) return { success: false, message: "Fornecedor não encontrado." };
+
+    const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
+    const supplier = newSuppliers[supplierIndex];
+    
+    // Tenta achar uma entrega com essa nota fiscal ou cria uma nova
+    let delivery = supplier.deliveries.find(d => d.invoiceNumber === payload.invoiceNumber && d.item === payload.itemName);
+    
+    const lotId = `lot-${Date.now()}`;
+    const newLot = {
+      id: lotId,
+      lotNumber: payload.lotNumber,
+      initialQuantity: payload.quantity,
+      remainingQuantity: payload.quantity,
+      expirationDate: payload.expirationDate
+    };
+
+    if (delivery) {
+      delivery.lots = [...(delivery.lots || []), newLot];
+    } else {
+      const newDelivery: Delivery = {
+        id: `del-entry-${Date.now()}`,
+        date: payload.invoiceDate,
+        time: '08:00',
+        item: payload.itemName,
+        kg: payload.quantity,
+        invoiceUploaded: true,
+        invoiceNumber: payload.invoiceNumber,
+        lots: [newLot]
+      };
+      supplier.deliveries.push(newDelivery);
+    }
+
+    const newLog: WarehouseMovement = {
+      id: `mov-${Date.now()}`,
+      type: 'entrada',
+      timestamp: new Date().toISOString(),
+      lotId: lotId,
+      lotNumber: payload.lotNumber,
+      itemName: payload.itemName,
+      supplierName: supplier.name,
+      deliveryId: delivery?.id || `del-entry-${Date.now()}`,
+      inboundInvoice: payload.invoiceNumber,
+      quantity: payload.quantity,
+      expirationDate: payload.expirationDate
+    };
+
+    await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+    await writeToDatabase(warehouseLogRef, [newLog, ...warehouseLog]);
+
+    return { success: true, message: "Entrada registrada com sucesso!" };
+  };
+
+  const handleRegisterWarehouseWithdrawal = async (payload: {
+    supplierCpf: string;
+    itemName: string;
+    lotNumber: string;
+    quantity: number;
+    outboundInvoice: string;
+    expirationDate: string;
+  }) => {
+    const supplierIndex = suppliers.findIndex(s => s.cpf === payload.supplierCpf);
+    if (supplierIndex === -1) return { success: false, message: "Fornecedor não encontrado." };
+
+    const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
+    const supplier = newSuppliers[supplierIndex];
+    
+    let quantityToDeduct = payload.quantity;
+    let lotFound = false;
+
+    // Localiza o lote para deduzir
+    for (const delivery of supplier.deliveries) {
+      if (delivery.item !== payload.itemName || !delivery.lots) continue;
+      
+      const lot = delivery.lots.find(l => l.lotNumber === payload.lotNumber);
+      if (lot && lot.remainingQuantity > 0) {
+        const deduct = Math.min(lot.remainingQuantity, quantityToDeduct);
+        lot.remainingQuantity -= deduct;
+        quantityToDeduct -= deduct;
+        lotFound = true;
+        if (quantityToDeduct <= 0) break;
+      }
+    }
+
+    if (!lotFound) return { success: false, message: "Lote não encontrado ou sem saldo." };
+
+    const newLog: WarehouseMovement = {
+      id: `mov-out-${Date.now()}`,
+      type: 'saída',
+      timestamp: new Date().toISOString(),
+      lotId: 'various',
+      lotNumber: payload.lotNumber,
+      itemName: payload.itemName,
+      supplierName: supplier.name,
+      deliveryId: 'various',
+      outboundInvoice: payload.outboundInvoice,
+      quantity: payload.quantity,
+      expirationDate: payload.expirationDate
+    };
+
+    await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+    await writeToDatabase(warehouseLogRef, [newLog, ...warehouseLog]);
+
+    return { success: true, message: "Saída registrada com sucesso!" };
+  };
+
+  const handleDeleteWarehouseEntry = async (logEntry: WarehouseMovement) => {
+    // Remove o movimento do log
+    const updatedLog = warehouseLog.filter(m => m.id !== logEntry.id);
+    
+    // Se for entrada, tenta remover o lote correspondente do fornecedor
+    if (logEntry.type === 'entrada') {
+      const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
+      const supplier = newSuppliers.find(s => s.name === logEntry.supplierName);
+      if (supplier) {
+        for (const del of supplier.deliveries) {
+          if (del.lots) {
+            del.lots = del.lots.filter(l => l.id !== logEntry.lotId);
+          }
+        }
+        await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+      }
+    }
+
+    await writeToDatabase(warehouseLogRef, updatedLog);
+    return { success: true, message: "Registro removido do histórico." };
+  };
+
   const handleScheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
     const supplier = suppliers.find(s => s.cpf === supplierCpf);
     if (!supplier) return;
@@ -147,15 +284,11 @@ const App: React.FC = () => {
     const supplier = suppliers.find(s => s.cpf === supplierCpf);
     if (!supplier) return;
 
-    // Filtra as entregas existentes removendo os placeholders que estão sendo faturados
     let updatedDeliveries = (supplier.deliveries || []).filter(d => !placeholderDeliveryIds.includes(d.id));
-    
-    // Pega a data e hora do primeiro placeholder para manter a referência no histórico
     const originalDelivery = (supplier.deliveries || []).find(d => placeholderDeliveryIds.includes(d.id));
     const date = originalDelivery?.date || new Date().toISOString().split('T')[0];
     const time = originalDelivery?.time || '08:00';
 
-    // Cria as novas entradas de entrega baseadas nos itens faturados
     const newDeliveries: Delivery[] = invoiceData.fulfilledItems.map((item, idx) => ({
         id: `del-${Date.now()}-${idx}`,
         date,
@@ -196,14 +329,11 @@ const App: React.FC = () => {
   const handleRegisterDirectorWithdrawal = async (log: Omit<DirectorPerCapitaLog, 'id'>) => {
     const newLog: DirectorPerCapitaLog = { ...log, id: `dir-${Date.now()}` };
     
-    // Lógica para deduzir do estoque total (PEPS)
     let tempSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
     let itemsShortage: string[] = [];
 
     for (const itemReq of log.items) {
       let needed = itemReq.quantity;
-      
-      // Ordenar lotes por data de entrega (mais antigos primeiro) para PEPS
       const allLotsForItem = tempSuppliers.flatMap(s => 
         s.deliveries
           .filter(d => d.item === itemReq.name && d.lots && d.lots.length > 0)
@@ -230,12 +360,11 @@ const App: React.FC = () => {
     }
 
     if (itemsShortage.length > 0) {
-      if (!window.confirm(`Atenção: Os seguintes itens não possuem estoque suficiente: ${itemsShortage.join(', ')}. Deseja continuar mesmo assim (o saldo ficará zerado nos lotes existentes)?`)) {
+      if (!window.confirm(`Atenção: Os seguintes itens não possuem estoque suficiente: ${itemsShortage.join(', ')}. Deseja continuar mesmo assim?`)) {
         return { success: false, message: 'Operação cancelada por falta de estoque.' };
       }
     }
 
-    // Salva o log e atualiza os fornecedores (baixando o estoque)
     await writeToDatabase(directorWithdrawalsRef, [newLog, ...directorWithdrawals]);
     await writeToDatabase(suppliersRef, tempSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
     
@@ -361,7 +490,7 @@ const App: React.FC = () => {
             onReopenInvoice={async (cpf, num) => {}}
             perCapitaConfig={perCapitaConfig}
             onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)}
-            onDeleteWarehouseEntry={async (l) => ({ success: true, message: '' })}
+            onDeleteWarehouseEntry={handleDeleteWarehouseEntry}
             onRegisterCleaningLog={async (l) => { const r = await handleRegisterCleaningLog(l); return r; }}
             onDeleteCleaningLog={handleDeleteCleaningLog}
             onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal}
@@ -378,7 +507,12 @@ const App: React.FC = () => {
             onCloseEmailModal={() => {}} 
           />
         ) : isAlmoxarifadoLoggedIn ? (
-          <AlmoxarifadoDashboard suppliers={suppliers} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={async (p) => ({success:true, message:''})} onRegisterWithdrawal={async (p) => ({success:true, message:''})} />
+          <AlmoxarifadoDashboard 
+            suppliers={suppliers} 
+            onLogout={() => setIsAlmoxarifadoLoggedIn(false)} 
+            onRegisterEntry={handleRegisterWarehouseEntry} 
+            onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} 
+          />
         ) : (
           <LoginScreen onLogin={handleLogin} />
         )}
