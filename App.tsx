@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 // Import types directly to ensure they are available for use in generic positions
-import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog } from './types';
+import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -17,6 +17,7 @@ const warehouseLogRef = ref(database, 'warehouseLog');
 const perCapitaConfigRef = ref(database, 'perCapitaConfig');
 const cleaningLogsRef = ref(database, 'cleaningLogs');
 const directorWithdrawalsRef = ref(database, 'directorWithdrawals');
+const standardMenuRef = ref(database, 'standardMenu');
 
 // Use function declaration for generics in .tsx to avoid ambiguity with JSX tags
 function normalizeArray<T>(data: any): T[] {
@@ -34,12 +35,13 @@ const App: React.FC = () => {
   const [cleaningLogs, setCleaningLogs] = useState<CleaningLog[]>([]);
   const [directorWithdrawals, setDirectorWithdrawals] = useState<DirectorPerCapitaLog[]>([]);
   const [perCapitaConfig, setPerCapitaConfig] = useState<PerCapitaConfig>({});
+  const [standardMenu, setStandardMenu] = useState<StandardMenu>({});
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<Supplier | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isAlmoxarifadoLoggedIn, setIsAlmoxarifadoLoggedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse' | 'cleaning' | 'directorPerCapita'>('register');
+  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse' | 'cleaning' | 'directorPerCapita' | 'menu'>('register');
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
 
   // Global Sync Effect - Runs only once on mount to keep listeners active
@@ -84,12 +86,17 @@ const App: React.FC = () => {
       setPerCapitaConfig(snapshot.val() || {});
     });
 
+    const unsubMenu = onValue(standardMenuRef, (snapshot) => {
+      setStandardMenu(snapshot.val() || {});
+    });
+
     return () => {
       unsubSuppliers();
       unsubLog();
       unsubClean();
       unsubDir();
       unsubConfig();
+      unsubMenu();
     };
   }, []);
 
@@ -450,6 +457,8 @@ const App: React.FC = () => {
             onRegisterCleaningLog={async (l) => { const r = await set(ref(database, `cleaningLogs/${Date.now()}`), { ...l, id: String(Date.now()) }); return {success: true, message: 'OK'}; }}
             onDeleteCleaningLog={async (id) => set(ref(database, `cleaningLogs/${id}`), null)} onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal}
             onDeleteDirectorWithdrawal={async (id) => set(ref(database, `directorWithdrawals/${id}`), null)}
+            standardMenu={standardMenu}
+            onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)}
           />
         ) : currentUser ? (
           <Dashboard 

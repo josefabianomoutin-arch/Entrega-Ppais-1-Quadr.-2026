@@ -90,3 +90,14 @@ export interface DirectorPerCapitaLog {
   items: DirectorItem[];
   totalValue: number;
 }
+
+export interface MenuRow {
+  id: string;
+  description: string;
+  unitWeight: string;
+  totalWeight: string;
+}
+
+export interface StandardMenu {
+  [day: string]: MenuRow[];
+}
