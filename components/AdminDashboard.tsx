@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog } from '../types';
 import AdminAnalytics from './AdminAnalytics';
@@ -43,16 +42,14 @@ const formatCurrency = (value: number) => {
 };
 
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
-  const { suppliers, activeTab, onTabChange, cleaningLogs, onRegisterCleaningLog, onDeleteCleaningLog, directorWithdrawals, onRegisterDirectorWithdrawal, onDeleteDirectorWithdrawal, onRegister, onPersistSuppliers, onUpdateSupplier, registrationStatus, onClearRegistrationStatus } = props;
+  const { suppliers = [], activeTab, onTabChange, cleaningLogs = [], onRegisterCleaningLog, onDeleteCleaningLog, directorWithdrawals = [], onRegisterDirectorWithdrawal, onDeleteDirectorWithdrawal, onRegister, onPersistSuppliers, onUpdateSupplier, registrationStatus, onClearRegistrationStatus } = props;
 
-  // Estados locais para abas de gestão
   const [supplierSearch, setSupplierSearch] = useState('');
   const [regName, setRegName] = useState('');
   const [regCpf, setRegCpf] = useState('');
   const [regWeeks, setRegWeeks] = useState<number[]>([]);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   
-  // Estados para Gestão de Itens
   const [selectedSupplierCpf, setSelectedSupplierCpf] = useState('');
   const [newItemName, setNewItemName] = useState('');
   const [newItemKg, setNewItemKg] = useState('');
@@ -250,7 +247,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
               </div>
 
               <div className="grid grid-cols-1 gap-6">
-                {suppliers.filter(s => s.contractItems?.length > 0).map(s => (
+                {suppliers.filter(s => (s.contractItems || []).length > 0).map(s => (
                   <div key={s.cpf} className="bg-white rounded-xl shadow-md overflow-hidden border">
                     <div className="bg-gray-50 p-4 flex justify-between items-center border-b">
                       <div>
@@ -274,12 +271,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                           </tr>
                         </thead>
                         <tbody className="divide-y">
-                          {s.contractItems.map(item => (
+                          {(s.contractItems || []).map(item => (
                             <tr key={item.name} className="hover:bg-gray-50">
                               <td className="p-3 font-bold text-gray-700">{item.name}</td>
-                              <td className="p-3 text-right font-mono">{item.totalKg.toLocaleString('pt-BR')} Kg</td>
+                              <td className="p-3 text-right font-mono">{(item.totalKg || 0).toLocaleString('pt-BR')} Kg</td>
                               <td className="p-3 text-right font-mono">{formatCurrency(item.valuePerKg)}</td>
-                              <td className="p-3 text-right font-bold">{formatCurrency(item.totalKg * item.valuePerKg)}</td>
+                              <td className="p-3 text-right font-bold">{formatCurrency((item.totalKg || 0) * (item.valuePerKg || 0))}</td>
                               <td className="p-3 text-center">
                                 <button onClick={() => handleRemoveItem(s.cpf, item.name)} className="text-red-500 hover:bg-red-50 p-1 rounded">Remover</button>
                               </td>
