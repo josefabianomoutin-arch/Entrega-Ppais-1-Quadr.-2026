@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import type { Supplier, Delivery, WarehouseMovement, PerCapitaConfig } from './types';
 import LoginScreen from './components/LoginScreen';
@@ -216,6 +217,95 @@ const App: React.FC = () => {
           });
       } else {
         console.log('[OP_v2] Nenhum fornecedor com "ITEM FRACASSADO" encontrado para limpeza de agendamentos.');
+        localStorage.setItem(operationFlag, 'true');
+      }
+    }
+  }, [loading, isAdminLoggedIn, suppliers]);
+
+  // Efeito para excluir agendamento específico da COOPCRESP (operação única)
+  useEffect(() => {
+    if (!loading && isAdminLoggedIn && suppliers.length > 0) {
+      const operationFlag = 'deletedSchedule_COOPCRESP_20260130_v1';
+      if (localStorage.getItem(operationFlag)) {
+        return;
+      }
+
+      const supplierToUpdate = suppliers.find(p => p.name.toUpperCase() === 'COOPCRESP');
+
+      if (supplierToUpdate) {
+        const dateToDelete = '2026-01-30';
+        const hasDeliveryOnDate = supplierToUpdate.deliveries.some(d => d.date === dateToDelete);
+
+        if (hasDeliveryOnDate) {
+            console.log(`Iniciando exclusão de agendamento de ${dateToDelete} para ${supplierToUpdate.name}...`);
+            
+            const updatedDeliveries = supplierToUpdate.deliveries.filter(d => d.date !== dateToDelete);
+            const supplierDeliveriesRef = ref(database, `suppliers/${supplierToUpdate.cpf}/deliveries`);
+            
+            set(supplierDeliveriesRef, updatedDeliveries)
+            .then(() => {
+                const successMessage = `O agendamento do dia 30/01/2026 para a empresa COOPCRESP foi removido com sucesso.`;
+                console.log(successMessage);
+                alert(successMessage);
+                localStorage.setItem(operationFlag, 'true');
+            })
+            .catch((error) => {
+                const errorMessage = `Falha ao excluir o agendamento da COOPCRESP. Verifique o console para mais detalhes.`;
+                console.error(errorMessage, error);
+                alert(errorMessage);
+            });
+        } else {
+             // Se não houver entrega na data, apenas marca a operação como concluída para não rodar novamente.
+            localStorage.setItem(operationFlag, 'true');
+        }
+
+      } else {
+        // Se o fornecedor não for encontrado, marca a operação como concluída.
+        localStorage.setItem(operationFlag, 'true');
+      }
+    }
+  }, [loading, isAdminLoggedIn, suppliers]);
+
+  // Efeito para excluir agendamento específico da PREVIATO (operação única)
+  useEffect(() => {
+    if (!loading && isAdminLoggedIn && suppliers.length > 0) {
+      const operationFlag = 'deletedSchedule_PREVIATO_20260129_v1';
+      if (localStorage.getItem(operationFlag)) {
+        return;
+      }
+
+      const supplierNameToFind = 'PREVIATO COMÉRCIO ATACADISTA GERAL LTDA';
+      const supplierToUpdate = suppliers.find(p => p.name.toUpperCase() === supplierNameToFind);
+
+      if (supplierToUpdate) {
+        const dateToDelete = '2026-01-29';
+        const hasDeliveryOnDate = supplierToUpdate.deliveries.some(d => d.date === dateToDelete);
+
+        if (hasDeliveryOnDate) {
+            console.log(`Iniciando exclusão de agendamento de ${dateToDelete} para ${supplierToUpdate.name}...`);
+            
+            const updatedDeliveries = supplierToUpdate.deliveries.filter(d => d.date !== dateToDelete);
+            const supplierDeliveriesRef = ref(database, `suppliers/${supplierToUpdate.cpf}/deliveries`);
+            
+            set(supplierDeliveriesRef, updatedDeliveries)
+            .then(() => {
+                const successMessage = `O agendamento do dia 29/01/2026 para a empresa ${supplierNameToFind} foi removido com sucesso.`;
+                console.log(successMessage);
+                alert(successMessage);
+                localStorage.setItem(operationFlag, 'true');
+            })
+            .catch((error) => {
+                const errorMessage = `Falha ao excluir o agendamento da ${supplierNameToFind}. Verifique o console para mais detalhes.`;
+                console.error(errorMessage, error);
+                alert(errorMessage);
+            });
+        } else {
+             // Se não houver entrega na data, apenas marca a operação como concluída para não rodar novamente.
+            localStorage.setItem(operationFlag, 'true');
+        }
+
+      } else {
+        // Se o fornecedor não for encontrado, marca a operação como concluída.
         localStorage.setItem(operationFlag, 'true');
       }
     }
