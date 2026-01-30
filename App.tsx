@@ -7,7 +7,7 @@ import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AlmoxarifadoDashboard from './components/AlmoxarifadoDashboard';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set, runTransaction } from 'firebase/database';
+import { getDatabase, ref, onValue, set, runTransaction, push, child } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
 
 const app = initializeApp(firebaseConfig);
@@ -122,6 +122,7 @@ const App: React.FC = () => {
     const supplier = suppliers.find(s => s.cpf === payload.supplierCpf);
     if (!supplier) return { success: false, message: "Fornecedor não encontrado." };
 
+    setIsSaving(true);
     const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
     const sIdx = newSuppliers.findIndex(s => s.cpf === payload.supplierCpf);
     const targetSupplier = newSuppliers[sIdx];
@@ -153,7 +154,9 @@ const App: React.FC = () => {
       targetSupplier.deliveries.push(newDelivery);
     }
 
-    const movementId = `mov-${Date.now()}`;
+    // Criar o log de movimentação
+    const newMovementRef = push(warehouseLogRef);
+    const movementId = newMovementRef.key || `mov-${Date.now()}`;
     const newLog: WarehouseMovement = {
       id: movementId,
       type: 'entrada',
@@ -168,10 +171,15 @@ const App: React.FC = () => {
       expirationDate: payload.expirationDate
     };
 
-    await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
-    await writeToDatabase(ref(database, `warehouseLog/${movementId}`), newLog);
-
-    return { success: true, message: "Entrada registrada e histórico atualizado!" };
+    try {
+        await set(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+        await set(newMovementRef, newLog);
+        setIsSaving(false);
+        return { success: true, message: "Entrada registrada e histórico atualizado!" };
+    } catch (e) {
+        setIsSaving(false);
+        return { success: false, message: "Erro ao salvar no banco de dados." };
+    }
   };
 
   const handleRegisterWarehouseWithdrawal = async (payload: {
@@ -185,6 +193,7 @@ const App: React.FC = () => {
     const supplier = suppliers.find(s => s.cpf === payload.supplierCpf);
     if (!supplier) return { success: false, message: "Fornecedor não encontrado." };
 
+    setIsSaving(true);
     const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
     const sIdx = newSuppliers.findIndex(s => s.cpf === payload.supplierCpf);
     const targetSupplier = newSuppliers[sIdx];
@@ -204,9 +213,13 @@ const App: React.FC = () => {
       }
     }
 
-    if (!lotFound) return { success: false, message: "Lote não encontrado ou sem saldo." };
+    if (!lotFound) {
+        setIsSaving(false);
+        return { success: false, message: "Lote não encontrado ou sem saldo." };
+    }
 
-    const movementId = `mov-out-${Date.now()}`;
+    const newMovementRef = push(warehouseLogRef);
+    const movementId = newMovementRef.key || `mov-out-${Date.now()}`;
     const newLog: WarehouseMovement = {
       id: movementId,
       type: 'saída',
@@ -221,10 +234,15 @@ const App: React.FC = () => {
       expirationDate: payload.expirationDate
     };
 
-    await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
-    await writeToDatabase(ref(database, `warehouseLog/${movementId}`), newLog);
-
-    return { success: true, message: "Saída registrada e histórico atualizado!" };
+    try {
+        await set(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+        await set(newMovementRef, newLog);
+        setIsSaving(false);
+        return { success: true, message: "Saída registrada e histórico atualizado!" };
+    } catch (e) {
+        setIsSaving(false);
+        return { success: false, message: "Erro ao salvar saída." };
+    }
   };
 
   const handleDeleteWarehouseEntry = async (logEntry: WarehouseMovement) => {
@@ -296,8 +314,9 @@ const App: React.FC = () => {
             const take = Math.min(lot.remainingQuantity, needed);
             lot.remainingQuantity -= take;
             needed -= take;
-            const movId = `mov-dir-${Date.now()}-${Math.random()}`;
-            await set(ref(database, `warehouseLog/${movId}`), {
+            const newMovementRef = push(warehouseLogRef);
+            const movId = newMovementRef.key || `mov-dir-${Date.now()}-${Math.random()}`;
+            await set(newMovementRef, {
                 id: movId, type: 'saída', timestamp: ts, lotId: lot.id, lotNumber: lot.lotNumber, itemName: itemReq.name, supplierName: entry.s.name, deliveryId: entry.d.id, outboundInvoice: `DIR-${log.recipient.substring(0,3).toUpperCase()}`, quantity: take, expirationDate: lot.expirationDate
             });
           }
@@ -391,7 +410,7 @@ const App: React.FC = () => {
           />
         ) : isAlmoxarifadoLoggedIn ? (
           <AlmoxarifadoDashboard 
-            suppliers={suppliers} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} 
+            suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} 
             onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} 
           />
         ) : (
