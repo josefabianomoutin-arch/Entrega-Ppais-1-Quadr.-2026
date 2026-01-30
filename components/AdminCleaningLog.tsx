@@ -12,7 +12,7 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [responsible, setResponsible] = useState('');
   const [location, setLocation] = useState('Câmara fria de Resfriada');
-  const [type, setType] = useState<'diaria' | 'semanal' | 'pesada'>('diaria');
+  const [type, setType] = useState<'diaria' | 'semanal' | 'pesada' | 'preventiva' | 'corretiva'>('diaria');
   const [observations, setObservations] = useState('');
   const [maintenanceDetails, setMaintenanceDetails] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -54,7 +54,7 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
   };
 
   const handleExportCSV = () => {
-    const headers = ["Data", "Responsável", "Local", "Tipo", "Observações", "Manutenção"];
+    const headers = ["Data", "Responsável", "Local", "Tipo de Serviço", "Observações", "Manutenção"];
     const csvContent = [
       headers.join(";"),
       ...logs.map(l => [
@@ -70,7 +70,7 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
     const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `controle_higienizacao_e_manutencao_camara_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `controle_atividades_camara_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
   };
 
@@ -97,11 +97,13 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Tipo de Limpeza</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Tipo de Serviço</label>
               <select value={type} onChange={e => setType(e.target.value as any)} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-cyan-500">
                 <option value="diaria">Diária (Superficial)</option>
                 <option value="semanal">Semanal (Média)</option>
                 <option value="pesada">Pesada (Completa)</option>
+                <option value="preventiva">Manutenção Preventiva</option>
+                <option value="corretiva">Manutenção Corretiva</option>
               </select>
             </div>
           </div>
@@ -145,7 +147,7 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
             <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b">
               <tr>
                 <th className="p-4 text-left">Data</th>
-                <th className="p-4 text-left">Tipo</th>
+                <th className="p-4 text-left">Tipo de Serviço</th>
                 <th className="p-4 text-left">Local</th>
                 <th className="p-4 text-left">Responsável</th>
                 <th className="p-4 text-left">Observações</th>
@@ -161,9 +163,11 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
                       log.type === 'diaria' ? 'bg-blue-100 text-blue-700' :
                       log.type === 'semanal' ? 'bg-orange-100 text-orange-700' :
-                      'bg-purple-100 text-purple-700'
+                      log.type === 'pesada' ? 'bg-purple-100 text-purple-700' :
+                      log.type === 'preventiva' ? 'bg-green-100 text-green-700' :
+                      'bg-red-100 text-red-700'
                     }`}>
-                      {log.type}
+                      {log.type === 'preventiva' ? 'Preventiva' : log.type === 'corretiva' ? 'Corretiva' : log.type}
                     </span>
                   </td>
                   <td className="p-4 text-gray-700 font-medium">{log.location}</td>

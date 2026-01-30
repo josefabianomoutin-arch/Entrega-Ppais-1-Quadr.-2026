@@ -68,7 +68,7 @@ export interface CleaningLog {
   date: string;
   responsible: string;
   location: string;
-  type: 'diaria' | 'semanal' | 'pesada';
+  type: 'diaria' | 'semanal' | 'pesada' | 'preventiva' | 'corretiva';
   observations: string;
   maintenanceDetails?: string;
 }
