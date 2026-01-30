@@ -5,13 +5,13 @@ import type { StandardMenu, MenuRow } from '../types';
 interface AdminStandardMenuProps {
   menu: StandardMenu;
   onUpdateMenu: (menu: StandardMenu) => Promise<void>;
+  inmateCount: number;
 }
 
 const DAYS = ['SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO', 'DOMINGO'];
-const MEALS = ['DESJEJUM', 'ALMOÇO', 'LANCHE', 'JANTAR', 'CEIA'];
 const ROWS_PER_DAY = 15;
 
-const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ menu, onUpdateMenu }) => {
+const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ menu, onUpdateMenu, inmateCount }) => {
   const [localMenu, setLocalMenu] = useState<StandardMenu>(menu);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -35,7 +35,19 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ menu, onUpdateMen
   const handleInputChange = (day: string, index: number, field: keyof MenuRow, value: string) => {
     const updated = { ...localMenu };
     const dayRows = [...updated[day]];
-    dayRows[index] = { ...dayRows[index], [field]: value };
+    
+    let newRow = { ...dayRows[index], [field]: value };
+
+    // Lógica de Cálculo Automático: se o Peso Unit. mudou, calcula o Peso Total
+    if (field === 'unitWeight') {
+        const unitVal = parseFloat(value.replace(',', '.')) || 0;
+        if (unitVal > 0 && inmateCount > 0) {
+            const calculatedTotal = unitVal * inmateCount;
+            newRow.totalWeight = calculatedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+    }
+
+    dayRows[index] = newRow;
     updated[day] = dayRows;
     setLocalMenu(updated);
     setHasChanges(true);
@@ -60,6 +72,10 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ menu, onUpdateMen
         <div>
           <h2 className="text-3xl font-black text-amber-900 uppercase tracking-tighter">Cardápio Padrão</h2>
           <p className="text-gray-400 font-medium">Gerencie as descrições e pesos do cardápio semanal institucional.</p>
+          <div className="mt-2 inline-flex items-center gap-2 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+             <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Cálculo Base:</span>
+             <span className="text-sm font-bold text-amber-800">{inmateCount} Ingressos (População Carcerária)</span>
+          </div>
         </div>
         <div className="flex gap-4">
           <button
@@ -83,8 +99,8 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ menu, onUpdateMen
                 <thead className="bg-gray-100 text-gray-500 font-black uppercase text-[10px] tracking-widest">
                   <tr>
                     <th className="p-3 border text-left w-1/2">Descrição do Item / Preparação</th>
-                    <th className="p-3 border text-center w-40">Peso Unit.</th>
-                    <th className="p-3 border text-center w-40">Peso Total</th>
+                    <th className="p-3 border text-center w-40">Peso Unit. (g/ml)</th>
+                    <th className="p-3 border text-center w-40">Peso Total (Calculado)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -113,7 +129,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ menu, onUpdateMen
                           type="text"
                           value={row.totalWeight}
                           onChange={(e) => handleInputChange(day, idx, 'totalWeight', e.target.value)}
-                          placeholder="0,00"
+                          placeholder="Calculado"
                           className="w-full p-2 bg-transparent outline-none focus:bg-amber-50 border-none rounded text-center font-mono font-bold text-amber-700"
                         />
                       </td>
