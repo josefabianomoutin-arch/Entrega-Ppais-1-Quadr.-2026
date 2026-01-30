@@ -13,14 +13,21 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+const MONTHS = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
+
+const WEEKS = ['1', '2', '3', '4', '5'];
+
 const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ suppliers, logs, onRegister, onDelete }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [month, setMonth] = useState(MONTHS[new Date().getMonth()]);
+  const [week, setWeek] = useState('1');
   const [recipient, setRecipient] = useState<'Chefe de Departamento' | 'Diretor de Disciplina'>('Chefe de Departamento');
   const [formItems, setFormItems] = useState<{ name: string; quantity: string }[]>([{ name: '', quantity: '' }]);
   const [isSaving, setIsSaving] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
 
-  // Mapeia todos os itens disponíveis e seus preços (média por nome)
   const availableItems = useMemo(() => {
     const itemMap = new Map<string, { price: number; unit: string }>();
     suppliers.forEach(s => {
@@ -69,7 +76,14 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
     }
 
     setIsSaving(true);
-    const result = await onRegister({ date, recipient, items: validItems, totalValue: calculateTotal });
+    const result = await onRegister({ 
+        date, 
+        month, 
+        week, 
+        recipient, 
+        items: validItems, 
+        totalValue: calculateTotal 
+    });
     if (result.success) {
       setFormItems([{ name: '', quantity: '' }]);
       setDate(new Date().toISOString().split('T')[0]);
@@ -78,11 +92,13 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
   };
 
   const handleExportExcel = () => {
-    const headers = ["Data", "Destinatário", "Item", "Quantidade", "Vlr. Unitário", "Vlr. Total"];
+    const headers = ["Data", "Mês", "Semana", "Destinatário", "Item", "Quantidade", "Vlr. Unitário", "Vlr. Total"];
     const csvContent = [
       headers.join(";"),
       ...logs.flatMap(l => l.items.map(item => [
         new Date(l.date + 'T00:00:00').toLocaleDateString('pt-BR'),
+        l.month || '-',
+        l.week || '-',
         l.recipient,
         item.name,
         item.quantity.toString().replace('.', ','),
@@ -99,105 +115,91 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
   };
 
   const handlePrintReport = () => {
+    const logoSAP = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Bras%C3%A3o_do_estado_de_S%C3%A3o_Paulo.svg/1200px-Bras%C3%A3o_do_estado_de_S%C3%A3o_Paulo.svg.png";
+
     const printContent = `
       <html>
         <head>
           <title>Relatório de Entrega - Diretoria</title>
           <style>
-            @page { size: A4; margin: 20mm; }
-            body { font-family: 'Arial', sans-serif; padding: 0; color: #333; line-height: 1.4; }
-            
-            .official-header { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 40px; }
-            .official-header .logos { display: flex; align-items: center; gap: 20px; }
-            .official-header .logo-text { font-weight: bold; font-size: 14px; text-align: right; line-height: 1.2; }
-            
-            .report-title { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-            .report-title h1 { font-size: 18px; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
-            .report-title p { font-size: 12px; margin: 5px 0 0 0; font-weight: bold; }
-
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th, td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 11px; }
-            th { background-color: #f0f0f0; text-transform: uppercase; font-weight: bold; }
-            
-            .summary { margin-top: 15px; text-align: right; font-weight: bold; font-size: 12px; }
-
-            .signatures { margin-top: 80px; display: flex; justify-content: space-between; padding: 0 40px; }
-            .signature-box { border-top: 1px solid #000; width: 220px; text-align: center; padding-top: 5px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
-
-            .official-footer { position: fixed; bottom: 0; right: 0; text-align: right; font-size: 10px; color: #333; line-height: 1.4; padding-bottom: 20px; }
-            .official-footer div { margin-top: 2px; }
-            .bold { font-weight: bold; }
-
-            @media print {
-              .official-footer { position: fixed; bottom: 0; }
-            }
+            @page { size: A4; margin: 15mm; }
+            body { font-family: 'Arial', sans-serif; padding: 0; color: #000; line-height: 1.3; margin: 0; }
+            .official-header { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 30px; padding-top: 10px; }
+            .official-header .logos-container { display: flex; align-items: center; gap: 15px; }
+            .official-header img.brasao { height: 50px; width: auto; }
+            .official-header .divider { width: 2px; height: 40px; background-color: #000; margin: 0 10px; }
+            .official-header .sp-logo-text { font-weight: bold; font-size: 16px; line-height: 1; text-align: left; }
+            .official-header .sp-logo-sub { font-size: 9px; font-weight: normal; display: block; margin-top: 2px; }
+            .report-title { text-align: center; margin-bottom: 25px; border-bottom: 1px solid #000; padding-bottom: 10px; }
+            .report-title h1 { font-size: 16px; margin: 0; text-transform: uppercase; }
+            .report-title p { font-size: 11px; margin: 3px 0 0 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+            th, td { border: 1px solid #000; padding: 6px 8px; text-align: left; font-size: 10px; }
+            th { background-color: #f2f2f2; font-weight: bold; text-transform: uppercase; }
+            .total-row { font-weight: bold; background-color: #f9f9f9; }
+            .signatures { margin-top: 60px; display: flex; justify-content: space-around; }
+            .signature-box { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; font-size: 9px; font-weight: bold; text-transform: uppercase; }
+            .official-footer { position: fixed; bottom: 15mm; right: 15mm; text-align: right; font-size: 9px; color: #000; }
+            .official-footer .dept { font-weight: normal; margin-bottom: 2px; }
+            .official-footer .unit { font-weight: bold; font-size: 10px; }
+            .official-footer .address { margin-top: 2px; }
+            @media print { .official-footer { position: fixed; bottom: 15mm; } body { -webkit-print-color-adjust: exact; } }
           </style>
         </head>
         <body>
           <div class="official-header">
-            <div class="logos">
-               <!-- Espaço para Brasão Polícia Penal / SAP -->
-               <div style="font-size: 10px; border: 1px dashed #ccc; padding: 5px;">[Brasão Polícia Penal]</div>
-               <div class="logo-text">
-                  SÃO PAULO<br/>
-                  <span style="font-size: 10px; font-weight: normal;">GOVERNO DO ESTADO</span>
+            <div class="logos-container">
+               <img src="${logoSAP}" class="brasao" alt="Brasão SAP">
+               <div class="divider"></div>
+               <div class="sp-logo-text">
+                  SÃO PAULO
+                  <span class="sp-logo-sub">GOVERNO DO ESTADO</span>
                </div>
             </div>
           </div>
-
           <div class="report-title">
-            <h1>Controle de Saída Per Capita - Diretoria</h1>
-            <p>Emissão: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
+            <h1>Controle de Entrega de Materiais - Diretoria</h1>
+            <p>Data de Emissão: ${new Date().toLocaleDateString('pt-BR')} | Controle Mensal/Semanal</p>
           </div>
-
           <table>
             <thead>
               <tr>
-                <th style="width: 80px;">Data</th>
-                <th>Destinatário</th>
-                <th>Item / Produto</th>
-                <th style="width: 70px; text-align: center;">Qtd.</th>
-                <th style="width: 100px; text-align: right;">Vlr. Total</th>
+                <th style="width: 70px;">Data</th>
+                <th style="width: 60px; text-align: center;">Mês/Sem</th>
+                <th style="width: 120px;">Destinatário</th>
+                <th>Descrição do Item</th>
+                <th style="width: 50px; text-align: center;">Qtd.</th>
+                <th style="width: 80px; text-align: right;">Valor (R$)</th>
               </tr>
             </thead>
             <tbody>
               ${logs.flatMap(l => l.items.map(item => `
                 <tr>
                   <td>${new Date(l.date + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                  <td style="text-align: center;">${l.month?.substring(0,3)}/S${l.week}</td>
                   <td>${l.recipient}</td>
                   <td>${item.name}</td>
                   <td style="text-align: center;">${item.quantity.toString().replace('.', ',')}</td>
                   <td style="text-align: right;">${formatCurrency(item.totalValue)}</td>
                 </tr>
               `)).join('')}
+              <tr class="total-row">
+                <td colspan="5" style="text-align: right; text-transform: uppercase;">Valor Total Acumulado:</td>
+                <td style="text-align: right;">${formatCurrency(logs.reduce((acc, l) => acc + l.totalValue, 0))}</td>
+              </tr>
             </tbody>
           </table>
-
-          <div class="summary">
-            VALOR TOTAL DAS REMESSAS: ${formatCurrency(logs.reduce((acc, l) => acc + l.totalValue, 0))}
-          </div>
-
           <div class="signatures">
-            <div class="signature-box">Responsável Almoxarifado</div>
+            <div class="signature-box">Responsável pela Entrega</div>
             <div class="signature-box">Assinatura do Recebedor</div>
           </div>
-
           <div class="official-footer">
-            <div>Secretaria da Administração Penitenciária</div>
-            <div class="bold">Polícia Penal - Penitenciária de Taiúva</div>
-            <div>Rodovia Brigadeiro Faria Lima, SP 326, KM 359,6 Taiúva/SP – CEP: 14.720-000</div>
-            <div>Fone: (16) 3247-6261 – E-mail: dg@ptaiuva.sap.gov.br</div>
+            <div class="dept">Secretaria da Administração Penitenciária</div>
+            <div class="unit">Polícia Penal - Penitenciária de Taiúva</div>
+            <div class="address">Rodovia Brigadeiro Faria Lima, SP 326, KM 359,6 Taiúva/SP – CEP: 14.720-000</div>
+            <div class="contact">Fone: (16) 3247-6261 – E-mail: dg@ptaiuva.sap.gov.br</div>
           </div>
-
-          <script>
-            // Pequeno delay para garantir renderização antes do diálogo de impressão
-            window.onload = () => {
-              setTimeout(() => {
-                window.print();
-                // window.close(); // Opcional: fechar aba após imprimir
-              }, 500);
-            };
-          </script>
+          <script>window.onload = () => { setTimeout(() => { window.print(); }, 800); };</script>
         </body>
       </html>
     `;
@@ -214,21 +216,33 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
         <h2 className="text-2xl font-bold text-gray-800 mb-6 uppercase tracking-tighter">Novo Envio para Diretoria</h2>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase">Data do Envio</label>
+              <label className="text-xs font-bold text-gray-500 uppercase">Data</label>
               <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border rounded-lg" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase">Mensal</label>
+              <select value={month} onChange={e => setMonth(e.target.value)} className="w-full p-2 border rounded-lg bg-white">
+                {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase">Semanal</label>
+              <select value={week} onChange={e => setWeek(e.target.value)} className="w-full p-2 border rounded-lg bg-white text-center">
+                {WEEKS.map(w => <option key={w} value={w}>Semana {w}</option>)}
+              </select>
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-500 uppercase">Destinatário</label>
               <div className="flex bg-gray-100 p-1 rounded-lg">
-                <button type="button" onClick={() => setRecipient('Chefe de Departamento')} className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${recipient === 'Chefe de Departamento' ? 'bg-white shadow text-indigo-600' : 'text-gray-400'}`}>Chefe Depto.</button>
-                <button type="button" onClick={() => setRecipient('Diretor de Disciplina')} className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${recipient === 'Diretor de Disciplina' ? 'bg-white shadow text-indigo-600' : 'text-gray-400'}`}>Dir. Disciplina</button>
+                <button type="button" onClick={() => setRecipient('Chefe de Departamento')} className={`flex-1 py-1 text-[10px] font-bold rounded-md transition-all ${recipient === 'Chefe de Departamento' ? 'bg-white shadow text-indigo-600' : 'text-gray-400'}`}>Chefe Depto.</button>
+                <button type="button" onClick={() => setRecipient('Diretor de Disciplina')} className={`flex-1 py-1 text-[10px] font-bold rounded-md transition-all ${recipient === 'Diretor de Disciplina' ? 'bg-white shadow text-indigo-600' : 'text-gray-400'}`}>Dir. Disciplina</button>
               </div>
             </div>
-             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase">Valor Total do Envio</label>
-              <div className="text-2xl font-black text-indigo-600">{formatCurrency(calculateTotal)}</div>
+             <div className="space-y-1 text-right">
+              <label className="text-xs font-bold text-gray-500 uppercase">Vlr. Total</label>
+              <div className="text-xl font-black text-indigo-600 truncate">{formatCurrency(calculateTotal)}</div>
             </div>
           </div>
 
@@ -285,6 +299,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
             <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
               <tr>
                 <th className="p-3 text-left">Data</th>
+                <th className="p-3 text-center">Ref. Período</th>
                 <th className="p-3 text-left">Destinatário</th>
                 <th className="p-3 text-left">Resumo de Itens</th>
                 <th className="p-3 text-right">Vlr. Total</th>
@@ -295,6 +310,10 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
               {logs.length > 0 ? logs.map(log => (
                 <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                   <td className="p-3 font-mono">{new Date(log.date + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                  <td className="p-3 text-center">
+                    <div className="text-[10px] font-bold text-gray-600">{log.month}</div>
+                    <div className="text-[10px] text-gray-400">Semana {log.week}</div>
+                  </td>
                   <td className="p-3">
                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${log.recipient === 'Chefe de Departamento' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                       {log.recipient}
@@ -311,7 +330,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan={5} className="p-8 text-center text-gray-400 italic">Nenhum envio registrado.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-gray-400 italic">Nenhum envio registrado.</td></tr>
               )}
             </tbody>
           </table>

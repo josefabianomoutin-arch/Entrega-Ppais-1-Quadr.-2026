@@ -82,6 +82,8 @@ export interface DirectorItem {
 export interface DirectorPerCapitaLog {
   id: string;
   date: string;
+  month?: string;
+  week?: string;
   recipient: 'Chefe de Departamento' | 'Diretor de Disciplina';
   items: DirectorItem[];
   totalValue: number;
