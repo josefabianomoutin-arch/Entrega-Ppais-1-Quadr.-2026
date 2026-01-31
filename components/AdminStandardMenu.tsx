@@ -65,7 +65,6 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
             const paddedTemplateRows = Array.from({ length: ROWS_PER_DAY }, (_, i) => baseTemplateRows[i] || {});
             
             // Create copies without IDs to force new ones based on the selectedDate
-            // FIX: Cast to Partial<MenuRow>[] to handle empty objects in the array, allowing safe destructuring of the optional 'id' property.
             const copiesWithoutIds = (paddedTemplateRows as Partial<MenuRow>[]).map(({ id, ...rest }) => rest);
 
             rowsToSet = normalize(copiesWithoutIds, selectedDate);
@@ -122,20 +121,36 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   }, [dailyMenus]);
   
   const supplierAnalysis = useMemo(() => {
-    const contractedItems = [...new Set(currentMenu.map(row => row.contractedItem).filter(Boolean) as string[])];
+    const contractedItemsInMenu = [...new Set(currentMenu.map(row => row.contractedItem).filter(Boolean) as string[])];
 
-    if (contractedItems.length === 0 || !suppliers || suppliers.length === 0) {
+    if (contractedItemsInMenu.length === 0 || !suppliers || suppliers.length === 0) {
         return [];
     }
 
-    return contractedItems.map(item => {
+    return contractedItemsInMenu.map(itemName => {
         const foundSuppliers = suppliers
-            .filter(supplier => supplier.contractItems.some(ci => ci.name === item))
-            .map(supplier => supplier.name);
+            .filter(supplier => (supplier.contractItems || []).some(ci => ci.name === itemName))
+            .map(supplier => {
+                // Calcula o saldo disponível deste item para este fornecedor
+                const contractItem = supplier.contractItems.find(ci => ci.name === itemName);
+                const totalContracted = contractItem?.totalKg || 0;
+                
+                const totalDelivered = (supplier.deliveries || [])
+                    .filter(d => d.item === itemName)
+                    .reduce((sum, d) => sum + (d.kg || 0), 0);
+                
+                const remainingBalance = Math.max(0, totalContracted - totalDelivered);
+
+                return {
+                    name: supplier.name,
+                    remainingBalance,
+                    unit: contractItem?.unit || 'Kg'
+                };
+            });
 
         return {
-            contractedItem: item,
-            suppliers: foundSuppliers.sort(),
+            contractedItem: itemName,
+            suppliers: foundSuppliers.sort((a, b) => b.remainingBalance - a.remainingBalance), // Ordena por quem tem mais saldo
         };
     });
   }, [currentMenu, suppliers]);
@@ -314,19 +329,33 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
       
       <div className="mt-12 pt-8 border-t-2 border-dashed">
           <h3 className="text-2xl font-black text-gray-800 tracking-tight text-center mb-6 uppercase">
-              Análise de Fornecedores para o Cardápio Selecionado
+              Análise de Fornecedores Disponíveis
           </h3>
           {supplierAnalysis.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {supplierAnalysis.map(({ contractedItem, suppliers: foundSuppliers }) => (
                       <div key={contractedItem} className="bg-gray-50 border border-gray-200 rounded-lg p-4 transition-shadow hover:shadow-md">
-                          <h4 className="font-bold text-gray-800 truncate" title={contractedItem}>{contractedItem}</h4>
+                          <h4 className="font-bold text-gray-800 border-b pb-2 mb-3 truncate" title={contractedItem}>{contractedItem}</h4>
                           {foundSuppliers.length > 0 ? (
-                              <ul className="mt-2 text-sm space-y-1">
-                                  {foundSuppliers.map(name => (
-                                      <li key={name} className="flex items-center gap-2 text-green-700">
-                                          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                          <span>{name}</span>
+                              <ul className="mt-2 text-sm space-y-3">
+                                  {foundSuppliers.map(s => (
+                                      <li key={s.name} className="flex flex-col gap-1 border-b border-gray-100 last:border-none pb-2">
+                                          <div className="flex items-center gap-2 text-gray-800 font-semibold">
+                                              <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                              <span>{s.name}</span>
+                                          </div>
+                                          <div className="pl-6 flex justify-between items-center">
+                                              <span className="text-[10px] text-gray-400 uppercase font-black">Saldo Restante:</span>
+                                              {s.remainingBalance > 0 ? (
+                                                  <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                                                      {s.remainingBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} {s.unit.includes('dz') ? 'Dz' : 'Kg'}
+                                                  </span>
+                                              ) : (
+                                                  <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded uppercase">
+                                                      Saldo Esgotado
+                                                  </span>
+                                              )}
+                                          </div>
                                       </li>
                                   ))}
                               </ul>
@@ -340,7 +369,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                   ))}
               </div>
           ) : (
-              <p className="text-center text-gray-400 italic py-4">Selecione um 'Item Contratado' no cardápio para ver a análise de fornecedores.</p>
+              <p className="text-center text-gray-400 italic py-4">Selecione um 'Item Contratado' no cardápio acima para ver a disponibilidade dos fornecedores.</p>
           )}
       </div>
 
