@@ -11,6 +11,7 @@ interface AdminStandardMenuProps {
 }
 
 const WEEK_DAYS_BR = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
+const MEAL_PERIODS = ['CAFÉ DA MANHÃ', 'ALMOÇO', 'JANTA', 'LANCHE NOITE'];
 const ROWS_PER_DAY = 15;
 
 const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMenus, onUpdateTemplate, onUpdateDailyMenus, inmateCount }) => {
@@ -22,30 +23,35 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
 
   // Carrega o cardápio para a data selecionada
   useEffect(() => {
+    const normalize = (rows: any[], baseId: string): MenuRow[] => {
+      const defaultRow = { period: '', foodItem: '', siafemCode: '', comprasCode: '', unitWeight: '', totalWeight: '' };
+      return (rows || []).map((row, i) => ({
+        ...defaultRow,
+        ...row,
+        id: row.id || `${baseId}-${i}`,
+        foodItem: row.foodItem || row.description || '', // Compatibility with old data
+      }));
+    };
+
     if (isEditingTemplate) {
-        const rows = template[templateDay] || Array.from({ length: ROWS_PER_DAY }, (_, i) => ({
-            id: `${templateDay}-${i}`, description: '', unitWeight: '', totalWeight: ''
-        }));
-        setCurrentMenu(rows);
+        const rows = template[templateDay] || Array.from({ length: ROWS_PER_DAY }, () => ({}));
+        setCurrentMenu(normalize(rows, templateDay));
     } else {
-        // Se já existe um cardápio para esta data, carrega ele
+        let rowsToSet: MenuRow[];
         if (dailyMenus[selectedDate]) {
-            setCurrentMenu(dailyMenus[selectedDate]);
+            rowsToSet = normalize(dailyMenus[selectedDate], selectedDate);
         } else {
-            // Caso contrário, tenta carregar o template correspondente ao dia da semana da data selecionada
             const dateObj = new Date(selectedDate + 'T00:00:00');
             const dayName = WEEK_DAYS_BR[dateObj.getDay()];
-            const templateRows = template[dayName] || Array.from({ length: ROWS_PER_DAY }, (_, i) => ({
-                id: `${selectedDate}-${i}`, description: '', unitWeight: '', totalWeight: ''
-            }));
-            
-            // Atribui IDs baseados na data para os itens vindos do template
-            setCurrentMenu(templateRows.map((row, i) => ({
-                ...row,
-                id: `${selectedDate}-${i}`,
-                totalWeight: calculateTotalWeight(row.unitWeight)
-            })));
+            const templateRows = template[dayName] || Array.from({ length: ROWS_PER_DAY }, () => ({}));
+            rowsToSet = normalize(templateRows, selectedDate);
         }
+        
+        // Recalculate total weights for daily menus on load
+        rowsToSet.forEach(row => {
+            row.totalWeight = calculateTotalWeight(row.unitWeight);
+        });
+        setCurrentMenu(rowsToSet);
     }
   }, [selectedDate, dailyMenus, template, isEditingTemplate, templateDay, inmateCount]);
 
@@ -190,21 +196,52 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                     <table className="w-full text-sm border-collapse">
                         <thead className="bg-gray-100 text-gray-500 font-black uppercase text-[10px] tracking-widest">
                             <tr>
-                                <th className="p-3 border text-left w-1/2">Descrição / Preparação</th>
-                                <th className="p-3 border text-center w-40">Peso Unit. (g/ml)</th>
-                                <th className="p-3 border text-center w-40">Peso Total (Calculado)</th>
+                                <th className="p-3 border text-left w-40">Período</th>
+                                <th className="p-3 border text-left w-2/5">Alimento / Preparação</th>
+                                <th className="p-3 border text-center w-28">Cód. SIAFEM</th>
+                                <th className="p-3 border text-center w-28">Cód. COMPRAS</th>
+                                <th className="p-3 border text-center w-28">Peso Unit. (g/ml)</th>
+                                <th className="p-3 border text-center w-28">Peso Total (Calculado)</th>
                             </tr>
                         </thead>
                         <tbody>
                             {currentMenu.map((row, idx) => (
                                 <tr key={row.id || idx} className="hover:bg-gray-50 transition-colors">
                                     <td className="p-1 border">
+                                        <select
+                                            value={row.period || ''}
+                                            onChange={(e) => handleInputChange(idx, 'period', e.target.value as MenuRow['period'])}
+                                            className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-medium text-xs"
+                                        >
+                                            <option value="">-- Selecione --</option>
+                                            {MEAL_PERIODS.map(p => <option key={p} value={p}>{p}</option>)}
+                                        </select>
+                                    </td>
+                                    <td className="p-1 border">
                                         <input
                                             type="text"
-                                            value={row.description}
-                                            onChange={(e) => handleInputChange(idx, 'description', e.target.value)}
+                                            value={row.foodItem}
+                                            onChange={(e) => handleInputChange(idx, 'foodItem', e.target.value)}
                                             placeholder="..."
                                             className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-medium"
+                                        />
+                                    </td>
+                                    <td className="p-1 border">
+                                        <input
+                                            type="text"
+                                            value={row.siafemCode || ''}
+                                            onChange={(e) => handleInputChange(idx, 'siafemCode', e.target.value)}
+                                            placeholder="000000"
+                                            className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-center font-mono text-gray-600"
+                                        />
+                                    </td>
+                                    <td className="p-1 border">
+                                        <input
+                                            type="text"
+                                            value={row.comprasCode || ''}
+                                            onChange={(e) => handleInputChange(idx, 'comprasCode', e.target.value)}
+                                            placeholder="000000"
+                                            className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-center font-mono text-gray-600"
                                         />
                                     </td>
                                     <td className="p-1 border">

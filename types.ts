@@ -92,7 +92,10 @@ export interface DirectorPerCapitaLog {
 
 export interface MenuRow {
   id: string;
-  description: string;
+  period?: 'CAFÉ DA MANHÃ' | 'ALMOÇO' | 'JANTA' | 'LANCHE NOITE' | '';
+  foodItem: string;
+  siafemCode?: string;
+  comprasCode?: string;
   unitWeight: string;
   totalWeight: string;
 }
