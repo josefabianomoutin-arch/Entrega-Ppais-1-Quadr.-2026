@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 // Import types directly to ensure they are available for use in generic positions
-import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus } from './types';
+import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -89,7 +89,15 @@ const App: React.FC = () => {
     });
 
     const unsubMenu = onValue(standardMenuRef, (snapshot) => {
-      setStandardMenu(snapshot.val() || {});
+      const menuData = snapshot.val() || {};
+      // Firebase can return arrays as objects if keys are numerical but sparse.
+      // We need to ensure each day's menu is a proper array.
+      for (const day in menuData) {
+        if (Object.prototype.hasOwnProperty.call(menuData, day)) {
+            menuData[day] = normalizeArray<MenuRow>(menuData[day]);
+        }
+      }
+      setStandardMenu(menuData);
     });
 
     const unsubDailyMenus = onValue(dailyMenusRef, (snapshot) => {

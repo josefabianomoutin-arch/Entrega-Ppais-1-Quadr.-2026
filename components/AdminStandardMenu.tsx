@@ -47,19 +47,28 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
 
     if (isEditingTemplate) {
         setIsLoadedFromSaved(false);
-        const rows = template[templateDay] || Array.from({ length: ROWS_PER_DAY }, () => ({}));
-        setCurrentMenu(normalize(rows, templateDay));
+        const baseRows = template[templateDay] || [];
+        const paddedRows = Array.from({ length: ROWS_PER_DAY }, (_, i) => baseRows[i] || {});
+        setCurrentMenu(normalize(paddedRows, templateDay));
     } else {
         let rowsToSet: MenuRow[];
         if (dailyMenus[selectedDate]) {
             setIsLoadedFromSaved(true);
-            rowsToSet = normalize(dailyMenus[selectedDate], selectedDate);
+            const baseRows = dailyMenus[selectedDate] || [];
+            const paddedRows = Array.from({ length: ROWS_PER_DAY }, (_, i) => baseRows[i] || {});
+            rowsToSet = normalize(paddedRows, selectedDate);
         } else {
             setIsLoadedFromSaved(false);
             const dateObj = new Date(selectedDate + 'T00:00:00');
             const dayName = WEEK_DAYS_BR[dateObj.getDay()];
-            const templateRows = template[dayName] || Array.from({ length: ROWS_PER_DAY }, () => ({}));
-            rowsToSet = normalize(templateRows, selectedDate);
+            const baseTemplateRows = template[dayName] || [];
+            const paddedTemplateRows = Array.from({ length: ROWS_PER_DAY }, (_, i) => baseTemplateRows[i] || {});
+            
+            // Create copies without IDs to force new ones based on the selectedDate
+            // FIX: Cast to Partial<MenuRow>[] to handle empty objects in the array, allowing safe destructuring of the optional 'id' property.
+            const copiesWithoutIds = (paddedTemplateRows as Partial<MenuRow>[]).map(({ id, ...rest }) => rest);
+
+            rowsToSet = normalize(copiesWithoutIds, selectedDate);
         }
         
         // Recalculate total weights for daily menus on load
@@ -95,10 +104,10 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     setIsSaving(true);
     try {
       if (isEditingTemplate) {
-        await onUpdateTemplate({ ...template, [templateDay]: currentMenu });
+        await onUpdateTemplate({ ...template, [templateDay]: currentMenu.filter(r => r.foodItem || r.contractedItem || r.unitWeight) });
         alert('Template atualizado com sucesso!');
       } else {
-        await onUpdateDailyMenus({ ...dailyMenus, [selectedDate]: currentMenu });
+        await onUpdateDailyMenus({ ...dailyMenus, [selectedDate]: currentMenu.filter(r => r.foodItem || r.contractedItem || r.unitWeight) });
         alert(isLoadedFromSaved ? 'Cardápio atualizado com sucesso!' : 'Cardápio do dia salvo com sucesso!');
       }
     } catch (e) {
