@@ -11,7 +11,7 @@ interface AdminStandardMenuProps {
   suppliers: Supplier[];
 }
 
-const WEEK_DAYS_BR = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
+const WEEK_DAYS_BR = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SÁBADO'];
 const MEAL_PERIODS = ['CAFÉ DA MANHÃ', 'ALMOÇO', 'JANTA', 'LANCHE NOITE'];
 const ROWS_PER_DAY = 15;
 
@@ -32,6 +32,44 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     });
     return Array.from(itemSet).sort();
   }, [suppliers]);
+  
+  const contractItemUnitMap = useMemo(() => {
+    const map = new Map<string, string>();
+    (suppliers || []).forEach(s => {
+        (s.contractItems || []).forEach(ci => {
+            if (!map.has(ci.name)) {
+                map.set(ci.name, ci.unit || 'kg-1');
+            }
+        });
+    });
+    return map;
+  }, [suppliers]);
+
+  const getUnitLabel = (unitString: string | undefined): string => {
+    if (!unitString) return 'g/ml';
+    const [type] = unitString.split('-');
+    if (type === 'dz') return 'Dz';
+    if (type === 'un') return 'Un';
+    return 'g/ml';
+  };
+
+  const calculateTotalWeight = (unitWeightStr: string, contractedItemName: string | undefined): string => {
+    const unitVal = parseFloat(unitWeightStr.replace(',', '.')) || 0;
+    if (unitVal <= 0 || inmateCount <= 0) {
+        return '';
+    }
+
+    const unitString = contractItemUnitMap.get(contractedItemName || '');
+    const unitLabel = getUnitLabel(unitString);
+    const calculatedTotal = unitVal * inmateCount;
+
+    if (unitLabel === 'Dz' || unitLabel === 'Un') {
+        return `${calculatedTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} ${unitLabel}`;
+    }
+    
+    const suffix = (unitString || 'kg').includes('litro') ? 'L' : 'Kg';
+    return `${(calculatedTotal / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} ${suffix}`;
+  }
 
   // Carrega o cardápio para a data selecionada
   useEffect(() => {
@@ -64,35 +102,27 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
             const baseTemplateRows = template[dayName] || [];
             const paddedTemplateRows = Array.from({ length: ROWS_PER_DAY }, (_, i) => baseTemplateRows[i] || {});
             
-            // Create copies without IDs to force new ones based on the selectedDate
             const copiesWithoutIds = (paddedTemplateRows as Partial<MenuRow>[]).map(({ id, ...rest }) => rest);
 
             rowsToSet = normalize(copiesWithoutIds, selectedDate);
         }
         
-        // Recalculate total weights for daily menus on load
         rowsToSet.forEach(row => {
-            row.totalWeight = calculateTotalWeight(row.unitWeight);
+            row.totalWeight = calculateTotalWeight(row.unitWeight, row.contractedItem);
         });
         setCurrentMenu(rowsToSet);
     }
   }, [selectedDate, dailyMenus, template, isEditingTemplate, templateDay, inmateCount]);
 
-  function calculateTotalWeight(unitWeightStr: string): string {
-    const unitVal = parseFloat(unitWeightStr.replace(',', '.')) || 0;
-    if (unitVal > 0 && inmateCount > 0) {
-        const calculatedTotal = unitVal * inmateCount;
-        return calculatedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-    return '';
-  }
 
   const handleInputChange = (index: number, field: keyof MenuRow, value: string) => {
     const updated = [...currentMenu];
     let newRow = { ...updated[index], [field]: value };
 
     if (field === 'unitWeight') {
-        newRow.totalWeight = calculateTotalWeight(value);
+        newRow.totalWeight = calculateTotalWeight(value, newRow.contractedItem);
+    } else if (field === 'contractedItem') {
+        newRow.totalWeight = calculateTotalWeight(newRow.unitWeight, value);
     }
 
     updated[index] = newRow;
@@ -131,7 +161,6 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
         const foundSuppliers = suppliers
             .filter(supplier => (supplier.contractItems || []).some(ci => ci.name === itemName))
             .map(supplier => {
-                // Calcula o saldo disponível deste item para este fornecedor
                 const contractItem = supplier.contractItems.find(ci => ci.name === itemName);
                 const totalContracted = contractItem?.totalKg || 0;
                 
@@ -150,7 +179,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
 
         return {
             contractedItem: itemName,
-            suppliers: foundSuppliers.sort((a, b) => b.remainingBalance - a.remainingBalance), // Ordena por quem tem mais saldo
+            suppliers: foundSuppliers.sort((a, b) => b.remainingBalance - a.remainingBalance),
         };
     });
   }, [currentMenu, suppliers]);
@@ -185,7 +214,6 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Lado Esquerdo: Controles */}
         <div className="lg:col-span-1 space-y-6">
             {!isEditingTemplate ? (
                 <div className="bg-gray-50 p-4 rounded-xl border">
@@ -242,7 +270,6 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
             )}
         </div>
 
-        {/* Lado Direito: Tabela */}
         <div className="lg:col-span-3">
             <div className="border rounded-2xl overflow-hidden shadow-sm bg-white">
                 <div className={`${isEditingTemplate ? 'bg-indigo-50' : 'bg-amber-50'} p-4 border-b flex justify-between items-center gap-4`}>
@@ -262,12 +289,15 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                 <th className="p-3 border text-left w-32">Período</th>
                                 <th className="p-3 border text-left">Alimento / Preparação</th>
                                 <th className="p-3 border text-left">Item Contratado (p/ Análise)</th>
-                                <th className="p-3 border text-center w-28">Peso Unit. (g/ml)</th>
-                                <th className="p-3 border text-center w-28">Peso Total (Calculado)</th>
+                                <th className="p-3 border text-center w-28">Peso/Qtd. Unit.</th>
+                                <th className="p-3 border text-center w-32">Peso/Qtd. Total</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {currentMenu.map((row, idx) => (
+                            {currentMenu.map((row, idx) => {
+                                const unitString = contractItemUnitMap.get(row.contractedItem || '');
+                                const unitLabel = getUnitLabel(unitString);
+                                return (
                                 <tr key={row.id || idx} className="hover:bg-gray-50 transition-colors">
                                     <td className="p-1 border">
                                         <select
@@ -305,7 +335,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                             type="text"
                                             value={row.unitWeight}
                                             onChange={(e) => handleInputChange(idx, 'unitWeight', e.target.value)}
-                                            placeholder="0,00"
+                                            placeholder={`(${unitLabel})`}
                                             className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-center font-mono text-gray-600"
                                         />
                                     </td>
@@ -319,7 +349,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                         />
                                     </td>
                                 </tr>
-                            ))}
+                            )})}
                         </tbody>
                     </table>
                 </div>
