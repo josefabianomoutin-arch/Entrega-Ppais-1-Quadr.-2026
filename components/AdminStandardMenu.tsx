@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useMemo } from 'react';
 import type { StandardMenu, DailyMenus, MenuRow, Supplier } from '../types';
 
@@ -196,22 +195,97 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     });
   }, [currentMenu, suppliers]);
 
-  const weeklyMenuOverviewData = useMemo(() => {
-    const overview: Record<string, Record<string, { foodItem: string, contractedItem?: string }[]>> = {};
-
-    MEAL_PERIODS.forEach(period => {
-        overview[period] = {};
-        WEEK_DAYS_BR.forEach(day => {
-            const menuForDay = template[day] || [];
-            const itemsForPeriod = menuForDay
-                .filter(row => row.period === period && row.foodItem)
-                .map(row => ({ foodItem: row.foodItem, contractedItem: row.contractedItem }));
-            overview[period][day] = itemsForPeriod;
-        });
+  const weeklyTemplateAnalysis = useMemo(() => {
+    if (!template || inmateCount <= 0) return [];
+  
+    const analysisMap = new Map<string, {
+        totalRequiredBaseUnit: number; // Store in grams for weight/volume, or units for Dz/Un
+        unitType: 'weight' | 'volume' | 'dozen' | 'unit';
+        suppliers: { name: string; remainingBalance: number; unit: string; }[];
+    }>();
+  
+    // 1. Aggregate total weekly requirement for each item
+    WEEK_DAYS_BR.forEach(day => {
+      (template[day] || []).forEach(row => {
+        if (row.contractedItem && row.unitWeight) {
+          const unitVal = parseFloat(row.unitWeight.replace(',', '.')) || 0;
+          const requiredForThisRow = unitVal * inmateCount;
+  
+          if (requiredForThisRow > 0) {
+            const itemInfo = analysisMap.get(row.contractedItem) || {
+              totalRequiredBaseUnit: 0,
+              unitType: 'weight', // default
+              suppliers: []
+            };
+  
+            const unitString = contractItemUnitMap.get(row.contractedItem);
+            const [type] = (unitString || 'kg-1').split('-');
+  
+            if (type === 'dz') itemInfo.unitType = 'dozen';
+            else if (type === 'un') itemInfo.unitType = 'unit';
+            else if (['litro', 'l', 'embalagem', 'caixa'].some(u => type.includes(u))) itemInfo.unitType = 'volume';
+            else itemInfo.unitType = 'weight';
+  
+            itemInfo.totalRequiredBaseUnit += requiredForThisRow;
+            analysisMap.set(row.contractedItem, itemInfo);
+          }
+        }
+      });
     });
+  
+    // 2. Find suppliers and their balances for each required item
+    analysisMap.forEach((itemData, itemName) => {
+        const foundSuppliers = suppliers
+            .filter(s => (s.contractItems || []).some(ci => ci.name === itemName))
+            .map(s => {
+                const contractItem = s.contractItems.find(ci => ci.name === itemName);
+                const totalContracted = contractItem?.totalKg || 0;
+                
+                const totalDelivered = (s.deliveries || [])
+                    .filter(d => d.item === itemName)
+                    .reduce((sum, d) => sum + (d.kg || 0), 0);
+                
+                const remainingBalance = Math.max(0, totalContracted - totalDelivered);
 
-    return overview;
-  }, [template]);
+                const unitString = contractItem?.unit || 'kg-1';
+                const [unitType] = unitString.split('-');
+                
+                let displayUnit = 'Kg';
+                if (unitType === 'dz') displayUnit = 'Dz';
+                else if (unitType === 'un') displayUnit = 'Un';
+                else if (['litro', 'l', 'embalagem', 'caixa'].includes(unitType)) displayUnit = 'L';
+                
+                return { name: s.name, remainingBalance, unit: displayUnit };
+            });
+      
+        itemData.suppliers = foundSuppliers.sort((a, b) => b.remainingBalance - a.remainingBalance);
+    });
+  
+    // 3. Format for display
+    return Array.from(analysisMap.entries()).map(([itemName, data]) => {
+      let displayRequirement = '';
+      let requirementInKg = 0; // For comparison with supplier balance
+
+      if (data.unitType === 'dozen' || data.unitType === 'unit') {
+        const unitLabel = data.unitType === 'dozen' ? 'Dz' : 'Un';
+        displayRequirement = `${data.totalRequiredBaseUnit.toLocaleString('pt-BR')} ${unitLabel}`;
+        requirementInKg = data.totalRequiredBaseUnit; // Here it's units/dozens, not Kg
+      } else {
+        const unitLabel = data.unitType === 'volume' ? 'L' : 'Kg';
+        const totalInKgOrL = data.totalRequiredBaseUnit / 1000;
+        displayRequirement = `${totalInKgOrL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${unitLabel}`;
+        requirementInKg = totalInKgOrL;
+      }
+      
+      return {
+        itemName,
+        weeklyRequirement: displayRequirement,
+        requirementInKg, // Standardized for comparison
+        unitType: data.unitType,
+        suppliers: data.suppliers,
+      };
+    }).sort((a,b) => a.itemName.localeCompare(b.itemName));
+  }, [template, inmateCount, suppliers, contractItemUnitMap]);
 
   return (
     <div className="bg-white p-6 rounded-2xl shadow-xl max-w-full mx-auto border-t-8 border-amber-500 animate-fade-in">
@@ -308,46 +382,63 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
         </div>
 
         <div className="lg:col-span-3">
-            {isEditingTemplate && templateView === 'week' && (
-                 <div className="border rounded-2xl overflow-hidden shadow-sm bg-white animate-fade-in">
-                    <div className="bg-indigo-50 p-4 border-b">
-                        <h3 className="text-xl font-black text-gray-800 tracking-tight">Visão Geral do Cardápio Semanal (Templates)</h3>
+             {isEditingTemplate && templateView === 'week' ? (
+                <div className="space-y-6 animate-fade-in">
+                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                        <h3 className="text-xl font-black text-gray-800 tracking-tight">Análise Semanal do Template</h3>
+                        <p className="text-sm text-indigo-800/60">Previsão de consumo e disponibilidade de fornecedores com base no cardápio padrão.</p>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs border-collapse">
-                            <thead className="bg-gray-100 text-gray-500 font-black uppercase text-[10px] tracking-widest">
-                                <tr>
-                                    <th className="p-2 border text-left sticky left-0 bg-gray-100 z-10 w-32">Período</th>
-                                    {WEEK_DAYS_BR.map(day => <th key={day} className="p-2 border text-center min-w-[180px]">{day}</th>)}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {MEAL_PERIODS.map(period => (
-                                    <tr key={period} className="hover:bg-gray-50 transition-colors">
-                                        <td className="p-2 border font-bold text-gray-700 sticky left-0 bg-white z-10 align-top">{period}</td>
-                                        {WEEK_DAYS_BR.map(day => (
-                                            <td key={`${period}-${day}`} className="p-2 border align-top">
-                                                {weeklyMenuOverviewData[period]?.[day]?.length > 0 ? (
-                                                    <ul className="space-y-1">
-                                                        {weeklyMenuOverviewData[period][day].map((item, idx) => (
-                                                            <li key={idx} className="bg-indigo-50 text-indigo-900 p-1.5 rounded text-[11px] font-medium leading-tight">
-                                                                {item.foodItem}
-                                                                {item.contractedItem && <span className="block text-[9px] text-indigo-400 font-bold uppercase truncate pt-0.5" title={item.contractedItem}>↳ {item.contractedItem}</span>}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                ) : (<div className="h-16"></div>)}
-                                            </td>
-                                        ))}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    {weeklyTemplateAnalysis.length > 0 ? (
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
+                            {weeklyTemplateAnalysis.map(item => {
+                                const requirementForComparison = item.unitType === 'dozen' ? item.requirementInKg : item.requirementInKg;
+                                return (
+                                <div key={item.itemName} className="bg-white p-4 rounded-lg border shadow-sm">
+                                    <h4 className="font-black text-gray-800 uppercase tracking-tight">{item.itemName}</h4>
+                                    <div className="my-3 bg-gray-50 p-3 rounded-lg text-center">
+                                        <p className="text-[10px] font-bold uppercase text-gray-400">Total Necessário na Semana</p>
+                                        <p className="text-2xl font-mono font-bold text-indigo-600">{item.weeklyRequirement}</p>
+                                    </div>
+                                    <div>
+                                        <h5 className="text-[10px] font-bold uppercase text-gray-400 mb-2">Fornecedores com Saldo</h5>
+                                        {item.suppliers.length > 0 ? (
+                                            <ul className="space-y-2 text-sm">
+                                                {item.suppliers.map(s => {
+                                                    const canCover = s.remainingBalance >= requirementForComparison;
+                                                    const balanceExhausted = s.remainingBalance <= 0;
+                                                    const formattingOptions: Intl.NumberFormatOptions = {
+                                                        minimumFractionDigits: (s.unit === 'Dz' || s.unit === 'Un') ? 0 : 2,
+                                                        maximumFractionDigits: (s.unit === 'Dz' || s.unit === 'Un') ? 0 : 2,
+                                                    };
+                                                    return(
+                                                    <li key={s.name} className="flex justify-between items-center bg-gray-50/70 p-2 rounded-md">
+                                                        <span className="font-semibold text-gray-700">{s.name}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`font-mono text-xs font-bold ${balanceExhausted ? 'text-red-500' : 'text-gray-600'}`}>
+                                                                {s.remainingBalance.toLocaleString('pt-BR', formattingOptions)} {s.unit}
+                                                            </span>
+                                                            {!balanceExhausted && (
+                                                                <span title={canCover ? 'Saldo suficiente para a semana' : 'Saldo insuficiente para a semana'} className={`w-3 h-3 rounded-full ${canCover ? 'bg-green-500' : 'bg-yellow-400'}`}></span>
+                                                            )}
+                                                        </div>
+                                                    </li>
+                                                )})}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-xs text-center text-red-500 bg-red-50 p-2 rounded-md italic">Nenhum fornecedor com este item no contrato.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )})}
+                        </div>
+                    ) : (
+                        <div className="text-center py-20 bg-gray-50 rounded-lg border-2 border-dashed">
+                            <p className="text-gray-400 font-medium">Nenhum item de contrato foi adicionado ao cardápio semanal.</p>
+                            <p className="text-xs text-gray-400 mt-1">Vá em "Editar por Dia" para construir seu template.</p>
+                        </div>
+                    )}
                 </div>
-            )}
-
-            {(!isEditingTemplate || templateView === 'day') && (
+            ) : (
             <div className="border rounded-2xl overflow-hidden shadow-sm bg-white">
                 <div className={`${isEditingTemplate ? 'bg-indigo-50' : 'bg-amber-50'} p-4 border-b flex justify-between items-center gap-4`}>
                     <h3 className="text-xl font-black text-gray-800 tracking-tight">
