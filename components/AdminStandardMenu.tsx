@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { StandardMenu, DailyMenus, MenuRow, Supplier } from '../types';
 
@@ -11,7 +12,7 @@ interface AdminStandardMenuProps {
   suppliers: Supplier[];
 }
 
-const WEEK_DAYS_BR = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SÁBADO'];
+const WEEK_DAYS_BR = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
 const MEAL_PERIODS = ['CAFÉ DA MANHÃ', 'ALMOÇO', 'JANTA', 'LANCHE NOITE'];
 const ROWS_PER_DAY = 15;
 
@@ -22,6 +23,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const [templateDay, setTemplateDay] = useState<string>('SEGUNDA-FEIRA');
   const [isLoadedFromSaved, setIsLoadedFromSaved] = useState(false);
+  const [templateView, setTemplateView] = useState<'week' | 'day'>('week');
 
   const availableContractItems = useMemo(() => {
     const itemSet = new Set<string>();
@@ -84,10 +86,12 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     };
 
     if (isEditingTemplate) {
-        setIsLoadedFromSaved(false);
-        const baseRows = template[templateDay] || [];
-        const paddedRows = Array.from({ length: ROWS_PER_DAY }, (_, i) => baseRows[i] || {});
-        setCurrentMenu(normalize(paddedRows, templateDay));
+        if (templateView === 'day') {
+            setIsLoadedFromSaved(false);
+            const baseRows = template[templateDay] || [];
+            const paddedRows = Array.from({ length: ROWS_PER_DAY }, (_, i) => baseRows[i] || {});
+            setCurrentMenu(normalize(paddedRows, templateDay));
+        }
     } else {
         let rowsToSet: MenuRow[];
         if (dailyMenus[selectedDate]) {
@@ -112,7 +116,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
         });
         setCurrentMenu(rowsToSet);
     }
-  }, [selectedDate, dailyMenus, template, isEditingTemplate, templateDay, inmateCount]);
+  }, [selectedDate, dailyMenus, template, isEditingTemplate, templateDay, inmateCount, templateView]);
 
 
   const handleInputChange = (index: number, field: keyof MenuRow, value: string) => {
@@ -169,11 +173,19 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                     .reduce((sum, d) => sum + (d.kg || 0), 0);
                 
                 const remainingBalance = Math.max(0, totalContracted - totalDelivered);
+                
+                const unitString = contractItem?.unit || 'kg-1';
+                const [unitType] = unitString.split('-');
+                
+                let displayUnit = 'Kg';
+                if (unitType === 'dz') displayUnit = 'Dz';
+                else if (unitType === 'un') displayUnit = 'Un';
+                else if (['litro', 'l', 'embalagem', 'caixa'].includes(unitType)) displayUnit = 'L';
 
                 return {
                     name: supplier.name,
                     remainingBalance,
-                    unit: contractItem?.unit || 'Kg'
+                    displayUnit
                 };
             });
 
@@ -183,6 +195,23 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
         };
     });
   }, [currentMenu, suppliers]);
+
+  const weeklyMenuOverviewData = useMemo(() => {
+    const overview: Record<string, Record<string, { foodItem: string, contractedItem?: string }[]>> = {};
+
+    MEAL_PERIODS.forEach(period => {
+        overview[period] = {};
+        WEEK_DAYS_BR.forEach(day => {
+            const menuForDay = template[day] || [];
+            const itemsForPeriod = menuForDay
+                .filter(row => row.period === period && row.foodItem)
+                .map(row => ({ foodItem: row.foodItem, contractedItem: row.contractedItem }));
+            overview[period][day] = itemsForPeriod;
+        });
+    });
+
+    return overview;
+  }, [template]);
 
   return (
     <div className="bg-white p-6 rounded-2xl shadow-xl max-w-full mx-auto border-t-8 border-amber-500 animate-fade-in">
@@ -230,27 +259,35 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                 </div>
             ) : (
                 <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                    <label className="block text-[10px] font-black text-indigo-400 uppercase mb-2">Selecionar Modelo</label>
-                    <select 
-                        value={templateDay} 
-                        onChange={(e) => setTemplateDay(e.target.value)}
-                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                    >
-                        {WEEK_DAYS_BR.map(day => <option key={day} value={day}>{day}</option>)}
-                    </select>
-                    <p className="mt-2 text-[10px] text-indigo-600 font-medium">
-                        Você está editando o modelo padrão usado para novas datas.
-                    </p>
+                    <label className="block text-[10px] font-black text-indigo-400 uppercase mb-2">Modo de Visualização</label>
+                    <div className="flex gap-1 bg-indigo-200/50 p-1 rounded-lg">
+                        <button onClick={() => setTemplateView('week')} className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${templateView === 'week' ? 'bg-white text-indigo-700 shadow' : 'text-indigo-500'}`}>Visão Semanal</button>
+                        <button onClick={() => setTemplateView('day')} className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${templateView === 'day' ? 'bg-white text-indigo-700 shadow' : 'text-indigo-500'}`}>Editar por Dia</button>
+                    </div>
+                    {templateView === 'day' && (
+                        <div className="mt-4 animate-fade-in">
+                            <label className="block text-[10px] font-black text-indigo-400 uppercase mb-2">Selecionar Dia do Modelo</label>
+                            <select 
+                                value={templateDay} 
+                                onChange={(e) => setTemplateDay(e.target.value)}
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                            >
+                                {WEEK_DAYS_BR.map(day => <option key={day} value={day}>{day}</option>)}
+                            </select>
+                        </div>
+                    )}
                 </div>
             )}
 
-            <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className={`w-full font-black py-4 rounded-xl shadow-lg transition-all active:scale-95 uppercase text-sm tracking-widest text-white ${isEditingTemplate ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-amber-600 hover:bg-amber-700'}`}
-            >
-                {isSaving ? 'Salvando...' : (isEditingTemplate ? 'Salvar Template' : isLoadedFromSaved ? 'Atualizar Cardápio' : 'Salvar Cardápio do Dia')}
-            </button>
+            {(!isEditingTemplate || templateView === 'day') && (
+                <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className={`w-full font-black py-4 rounded-xl shadow-lg transition-all active:scale-95 uppercase text-sm tracking-widest text-white ${isEditingTemplate ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-amber-600 hover:bg-amber-700'}`}
+                >
+                    {isSaving ? 'Salvando...' : (isEditingTemplate ? 'Salvar Template' : isLoadedFromSaved ? 'Atualizar Cardápio' : 'Salvar Cardápio do Dia')}
+                </button>
+            )}
 
             {!isEditingTemplate && sortedHistory.length > 0 && (
                 <div className="pt-6 border-t">
@@ -271,6 +308,46 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
         </div>
 
         <div className="lg:col-span-3">
+            {isEditingTemplate && templateView === 'week' && (
+                 <div className="border rounded-2xl overflow-hidden shadow-sm bg-white animate-fade-in">
+                    <div className="bg-indigo-50 p-4 border-b">
+                        <h3 className="text-xl font-black text-gray-800 tracking-tight">Visão Geral do Cardápio Semanal (Templates)</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs border-collapse">
+                            <thead className="bg-gray-100 text-gray-500 font-black uppercase text-[10px] tracking-widest">
+                                <tr>
+                                    <th className="p-2 border text-left sticky left-0 bg-gray-100 z-10 w-32">Período</th>
+                                    {WEEK_DAYS_BR.map(day => <th key={day} className="p-2 border text-center min-w-[180px]">{day}</th>)}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {MEAL_PERIODS.map(period => (
+                                    <tr key={period} className="hover:bg-gray-50 transition-colors">
+                                        <td className="p-2 border font-bold text-gray-700 sticky left-0 bg-white z-10 align-top">{period}</td>
+                                        {WEEK_DAYS_BR.map(day => (
+                                            <td key={`${period}-${day}`} className="p-2 border align-top">
+                                                {weeklyMenuOverviewData[period]?.[day]?.length > 0 ? (
+                                                    <ul className="space-y-1">
+                                                        {weeklyMenuOverviewData[period][day].map((item, idx) => (
+                                                            <li key={idx} className="bg-indigo-50 text-indigo-900 p-1.5 rounded text-[11px] font-medium leading-tight">
+                                                                {item.foodItem}
+                                                                {item.contractedItem && <span className="block text-[9px] text-indigo-400 font-bold uppercase truncate pt-0.5" title={item.contractedItem}>↳ {item.contractedItem}</span>}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                ) : (<div className="h-16"></div>)}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {(!isEditingTemplate || templateView === 'day') && (
             <div className="border rounded-2xl overflow-hidden shadow-sm bg-white">
                 <div className={`${isEditingTemplate ? 'bg-indigo-50' : 'bg-amber-50'} p-4 border-b flex justify-between items-center gap-4`}>
                     <h3 className="text-xl font-black text-gray-800 tracking-tight">
@@ -354,9 +431,11 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                     </table>
                 </div>
             </div>
+            )}
         </div>
       </div>
       
+      {(!isEditingTemplate || templateView === 'day') && (
       <div className="mt-12 pt-8 border-t-2 border-dashed">
           <h3 className="text-2xl font-black text-gray-800 tracking-tight text-center mb-6 uppercase">
               Análise de Fornecedores Disponíveis
@@ -368,7 +447,13 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                           <h4 className="font-bold text-gray-800 border-b pb-2 mb-3 truncate" title={contractedItem}>{contractedItem}</h4>
                           {foundSuppliers.length > 0 ? (
                               <ul className="mt-2 text-sm space-y-3">
-                                  {foundSuppliers.map(s => (
+                                  {foundSuppliers.map(s => {
+                                      const isWholeNumberUnit = s.displayUnit === 'Dz' || s.displayUnit === 'Un';
+                                      const formattingOptions: Intl.NumberFormatOptions = {
+                                          minimumFractionDigits: isWholeNumberUnit ? 0 : 2,
+                                          maximumFractionDigits: isWholeNumberUnit ? 0 : 2,
+                                      };
+                                      return (
                                       <li key={s.name} className="flex flex-col gap-1 border-b border-gray-100 last:border-none pb-2">
                                           <div className="flex items-center gap-2 text-gray-800 font-semibold">
                                               <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -378,7 +463,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                               <span className="text-[10px] text-gray-400 uppercase font-black">Saldo Restante:</span>
                                               {s.remainingBalance > 0 ? (
                                                   <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                                                      {s.remainingBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} {s.unit.includes('dz') ? 'Dz' : 'Kg'}
+                                                      {s.remainingBalance.toLocaleString('pt-BR', formattingOptions)} {s.displayUnit}
                                                   </span>
                                               ) : (
                                                   <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded uppercase">
@@ -387,7 +472,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                               )}
                                           </div>
                                       </li>
-                                  ))}
+                                  )})}
                               </ul>
                           ) : (
                               <p className="mt-2 text-sm text-red-600 font-semibold flex items-center gap-2">
@@ -402,6 +487,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
               <p className="text-center text-gray-400 italic py-4">Selecione um 'Item Contratado' no cardápio acima para ver a disponibilidade dos fornecedores.</p>
           )}
       </div>
+      )}
 
       <style>{`
         @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
