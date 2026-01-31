@@ -24,7 +24,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   // Carrega o cardápio para a data selecionada
   useEffect(() => {
     const normalize = (rows: any[], baseId: string): MenuRow[] => {
-      const defaultRow = { period: '', foodItem: '', siafemCode: '', comprasCode: '', unitWeight: '', totalWeight: '' };
+      const defaultRow = { period: '', foodItem: '', unitWeight: '', totalWeight: '' };
       return (rows || []).map((row, i) => ({
         ...defaultRow,
         ...row,
@@ -198,8 +198,6 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                             <tr>
                                 <th className="p-3 border text-left w-40">Período</th>
                                 <th className="p-3 border text-left w-2/5">Alimento / Preparação</th>
-                                <th className="p-3 border text-center w-28">Cód. SIAFEM</th>
-                                <th className="p-3 border text-center w-28">Cód. COMPRAS</th>
                                 <th className="p-3 border text-center w-28">Peso Unit. (g/ml)</th>
                                 <th className="p-3 border text-center w-28">Peso Total (Calculado)</th>
                             </tr>
@@ -224,24 +222,6 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                             onChange={(e) => handleInputChange(idx, 'foodItem', e.target.value)}
                                             placeholder="..."
                                             className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-medium"
-                                        />
-                                    </td>
-                                    <td className="p-1 border">
-                                        <input
-                                            type="text"
-                                            value={row.siafemCode || ''}
-                                            onChange={(e) => handleInputChange(idx, 'siafemCode', e.target.value)}
-                                            placeholder="000000"
-                                            className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-center font-mono text-gray-600"
-                                        />
-                                    </td>
-                                    <td className="p-1 border">
-                                        <input
-                                            type="text"
-                                            value={row.comprasCode || ''}
-                                            onChange={(e) => handleInputChange(idx, 'comprasCode', e.target.value)}
-                                            placeholder="000000"
-                                            className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-center font-mono text-gray-600"
                                         />
                                     </td>
                                     <td className="p-1 border">

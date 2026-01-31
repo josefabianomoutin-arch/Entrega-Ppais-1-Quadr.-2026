@@ -30,6 +30,8 @@ export interface ContractItem {
   valuePerKg: number;
   unit?: string;
   order?: number;
+  siafemCode?: string;
+  comprasCode?: string;
 }
 
 export interface Supplier {
@@ -94,8 +96,6 @@ export interface MenuRow {
   id: string;
   period?: 'CAFÉ DA MANHÃ' | 'ALMOÇO' | 'JANTA' | 'LANCHE NOITE' | '';
   foodItem: string;
-  siafemCode?: string;
-  comprasCode?: string;
   unitWeight: string;
   totalWeight: string;
 }

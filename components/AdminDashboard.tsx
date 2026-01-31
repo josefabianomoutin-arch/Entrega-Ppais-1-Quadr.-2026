@@ -90,6 +90,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   const [newItemKg, setNewItemKg] = useState('');
   const [newItemValue, setNewItemValue] = useState('');
   const [newItemUnit, setNewItemUnit] = useState('kg-1');
+  const [newItemSiafem, setNewItemSiafem] = useState('');
+  const [newItemCompras, setNewItemCompras] = useState('');
 
   const tabs: { id: AdminTab; name: string; icon: React.ReactElement }[] = [
     { id: 'register', name: 'Gestão de fornecedores', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 11a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1z" /></svg> },
@@ -132,7 +134,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       name: newItemName.toUpperCase(),
       totalKg: kg,
       valuePerKg: val,
-      unit: newItemUnit
+      unit: newItemUnit,
+      siafemCode: newItemSiafem,
+      comprasCode: newItemCompras,
     };
 
     const updatedSuppliers = (suppliers || []).map(s => {
@@ -148,6 +152,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     setNewItemName('');
     setNewItemKg('');
     setNewItemValue('');
+    setNewItemSiafem('');
+    setNewItemCompras('');
   };
 
   const handleRemoveItem = (supplierCpf: string, itemName: string) => {
@@ -247,30 +253,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         );
       case 'contracts':
         return (
-          <div className="space-y-8 max-w-6xl mx-auto">
+          <div className="space-y-8 max-w-7xl mx-auto">
             <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-indigo-500">
               <h2 className="text-xl font-black text-gray-800 mb-6 uppercase tracking-tight">Vincular Item ao Fornecedor</h2>
-              <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-                <div className="lg:col-span-2 space-y-1">
+              <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4 items-end">
+                <div className="lg:col-span-2 md:col-span-3 space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Selecione o Fornecedor</label>
                   <select value={selectedSupplierCpf} onChange={e => setSelectedSupplierCpf(e.target.value)} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-400" required>
                     <option value="">-- SELECIONE --</option>
                     {suppliers.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}
                   </select>
                 </div>
-                <div className="space-y-1">
+                <div className="lg:col-span-1 space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Descrição do Item</label>
                   <input type="text" placeholder="EX: ARROZ" value={newItemName} onChange={e => setNewItemName(e.target.value)} className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-400" required />
                 </div>
-                <div className="space-y-1">
+                <div className="lg:col-span-1 space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Cód. SIAFEM</label>
+                  <input type="text" placeholder="000000" value={newItemSiafem} onChange={e => setNewItemSiafem(e.target.value)} className="w-full p-2 border rounded-lg font-mono focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div className="lg:col-span-1 space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Cód. COMPRAS</label>
+                  <input type="text" placeholder="000000" value={newItemCompras} onChange={e => setNewItemCompras(e.target.value)} className="w-full p-2 border rounded-lg font-mono focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div className="lg:col-span-1 space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Qtd Total (Kg)</label>
                   <input type="text" placeholder="0.00" value={newItemKg} onChange={e => setNewItemKg(e.target.value)} className="w-full p-2 border rounded-lg font-mono focus:ring-2 focus:ring-indigo-400" required />
                 </div>
-                <div className="space-y-1">
+                <div className="lg:col-span-1 space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Preço Unitário (R$)</label>
                   <input type="text" placeholder="0.00" value={newItemValue} onChange={e => setNewItemValue(e.target.value)} className="w-full p-2 border rounded-lg font-mono focus:ring-2 focus:ring-indigo-400" required />
                 </div>
-                <div className="lg:col-span-5 flex justify-end">
+                <div className="lg:col-span-7 flex justify-end">
                   <button type="submit" className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-10 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-sm">Adicionar ao Contrato</button>
                 </div>
               </form>
@@ -297,6 +311,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                                   <thead className="bg-gray-50 text-gray-400 font-black uppercase tracking-widest">
                                   <tr>
                                       <th className="p-4 text-left">Descrição do Item</th>
+                                      <th className="p-4 text-left">Cód. SIAFEM</th>
+                                      <th className="p-4 text-left">Cód. COMPRAS</th>
                                       <th className="p-4 text-right">Peso Total</th>
                                       <th className="p-4 text-right">Preço p/ Kg</th>
                                       <th className="p-4 text-right">Subtotal</th>
@@ -307,6 +323,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                                   {s.contractItems.map((item, idx) => (
                                       <tr key={`${s.cpf}-${item.name}-${idx}`} className="hover:bg-gray-50 transition-colors">
                                       <td className="p-4 font-bold text-gray-700 uppercase">{item.name}</td>
+                                      <td className="p-4 font-mono text-gray-500 text-xs">{item.siafemCode || '-'}</td>
+                                      <td className="p-4 font-mono text-gray-500 text-xs">{item.comprasCode || '-'}</td>
                                       <td className="p-4 text-right font-mono">{(item.totalKg || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})} Kg</td>
                                       <td className="p-4 text-right font-mono text-gray-500">{formatCurrency(item.valuePerKg)}</td>
                                       <td className="p-4 text-right font-black text-gray-800">{formatCurrency((item.totalKg || 0) * (item.valuePerKg || 0))}</td>
