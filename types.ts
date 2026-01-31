@@ -95,7 +95,8 @@ export interface DirectorPerCapitaLog {
 export interface MenuRow {
   id: string;
   period?: 'CAFÉ DA MANHÃ' | 'ALMOÇO' | 'JANTA' | 'LANCHE NOITE' | '';
-  foodItem: string;
+  foodItem: string; // Descrição da preparação
+  contractedItem?: string; // Item do contrato vinculado para análise
   unitWeight: string;
   totalWeight: string;
 }

@@ -23,10 +23,20 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   const [templateDay, setTemplateDay] = useState<string>('SEGUNDA-FEIRA');
   const [isLoadedFromSaved, setIsLoadedFromSaved] = useState(false);
 
+  const availableContractItems = useMemo(() => {
+    const itemSet = new Set<string>();
+    (suppliers || []).forEach(s => {
+        (s.contractItems || []).forEach(ci => {
+            itemSet.add(ci.name);
+        });
+    });
+    return Array.from(itemSet).sort();
+  }, [suppliers]);
+
   // Carrega o cardápio para a data selecionada
   useEffect(() => {
     const normalize = (rows: any[], baseId: string): MenuRow[] => {
-      const defaultRow = { period: '', foodItem: '', unitWeight: '', totalWeight: '' };
+      const defaultRow = { period: '', foodItem: '', contractedItem: '', unitWeight: '', totalWeight: '' };
       return (rows || []).map((row, i) => ({
         ...defaultRow,
         ...row,
@@ -102,31 +112,21 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     return Object.keys(dailyMenus).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
   }, [dailyMenus]);
   
-  const suppliersByFoodItem = useMemo(() => {
-    // FIX: Explicitly type the Set as Set<string> to ensure correct type inference for `foodItems`.
-    // This prevents `foodItem` from being inferred as `unknown` in the subsequent map operation.
-    const foodItems = [...new Set<string>(currentMenu.map(row => row.foodItem.trim().toUpperCase()).filter(Boolean))];
+  const supplierAnalysis = useMemo(() => {
+    const contractedItems = [...new Set(currentMenu.map(row => row.contractedItem).filter(Boolean) as string[])];
 
-    if (foodItems.length === 0 || !suppliers || suppliers.length === 0) {
+    if (contractedItems.length === 0 || !suppliers || suppliers.length === 0) {
         return [];
     }
 
-    return foodItems.map(foodItem => {
-        const foundSuppliers = new Set<string>();
-        const searchTerms = foodItem.toLowerCase().split(' ').filter(s => s.length > 2);
-
-        suppliers.forEach(supplier => {
-            supplier.contractItems.forEach(contractItem => {
-                const contractName = contractItem.name.toLowerCase();
-                if (searchTerms.some(term => contractName.includes(term))) {
-                    foundSuppliers.add(supplier.name);
-                }
-            });
-        });
+    return contractedItems.map(item => {
+        const foundSuppliers = suppliers
+            .filter(supplier => supplier.contractItems.some(ci => ci.name === item))
+            .map(supplier => supplier.name);
 
         return {
-            foodItem,
-            suppliers: Array.from(foundSuppliers).sort(),
+            contractedItem: item,
+            suppliers: foundSuppliers.sort(),
         };
     });
   }, [currentMenu, suppliers]);
@@ -235,8 +235,9 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                     <table className="w-full text-sm border-collapse">
                         <thead className="bg-gray-100 text-gray-500 font-black uppercase text-[10px] tracking-widest">
                             <tr>
-                                <th className="p-3 border text-left w-40">Período</th>
-                                <th className="p-3 border text-left w-2/5">Alimento / Preparação</th>
+                                <th className="p-3 border text-left w-32">Período</th>
+                                <th className="p-3 border text-left">Alimento / Preparação</th>
+                                <th className="p-3 border text-left">Item Contratado (p/ Análise)</th>
                                 <th className="p-3 border text-center w-28">Peso Unit. (g/ml)</th>
                                 <th className="p-3 border text-center w-28">Peso Total (Calculado)</th>
                             </tr>
@@ -259,9 +260,21 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                             type="text"
                                             value={row.foodItem}
                                             onChange={(e) => handleInputChange(idx, 'foodItem', e.target.value)}
-                                            placeholder="..."
+                                            placeholder="Ex: Arroz à grega"
                                             className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-medium"
                                         />
+                                    </td>
+                                     <td className="p-1 border">
+                                        <select
+                                            value={row.contractedItem || ''}
+                                            onChange={(e) => handleInputChange(idx, 'contractedItem', e.target.value)}
+                                            className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-medium text-xs"
+                                        >
+                                            <option value="">-- Selecionar Item --</option>
+                                            {availableContractItems.map(item => (
+                                                <option key={item} value={item}>{item}</option>
+                                            ))}
+                                        </select>
                                     </td>
                                     <td className="p-1 border">
                                         <input
@@ -294,11 +307,11 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
           <h3 className="text-2xl font-black text-gray-800 tracking-tight text-center mb-6 uppercase">
               Análise de Fornecedores para o Cardápio Selecionado
           </h3>
-          {suppliersByFoodItem.length > 0 ? (
+          {supplierAnalysis.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {suppliersByFoodItem.map(({ foodItem, suppliers: foundSuppliers }) => (
-                      <div key={foodItem} className="bg-gray-50 border border-gray-200 rounded-lg p-4 transition-shadow hover:shadow-md">
-                          <h4 className="font-bold text-gray-800 truncate" title={foodItem}>{foodItem}</h4>
+                  {supplierAnalysis.map(({ contractedItem, suppliers: foundSuppliers }) => (
+                      <div key={contractedItem} className="bg-gray-50 border border-gray-200 rounded-lg p-4 transition-shadow hover:shadow-md">
+                          <h4 className="font-bold text-gray-800 truncate" title={contractedItem}>{contractedItem}</h4>
                           {foundSuppliers.length > 0 ? (
                               <ul className="mt-2 text-sm space-y-1">
                                   {foundSuppliers.map(name => (
@@ -318,7 +331,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                   ))}
               </div>
           ) : (
-              <p className="text-center text-gray-400 italic py-4">Preencha o cardápio acima para ver a análise de fornecedores.</p>
+              <p className="text-center text-gray-400 italic py-4">Selecione um 'Item Contratado' no cardápio para ver a análise de fornecedores.</p>
           )}
       </div>
 
