@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { StandardMenu, DailyMenus, MenuRow, Supplier } from '../types';
 
@@ -13,7 +14,7 @@ interface AdminStandardMenuProps {
 
 const WEEK_DAYS_BR = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
 const MEAL_PERIODS = ['CAFÉ DA MANHÃ', 'ALMOÇO', 'JANTA', 'LANCHE NOITE'];
-const ROWS_PER_DAY = 15;
+const ROWS_PER_DAY = 20;
 
 const unitBasedKeywords = [
     'OVO', 'OVOS', 'PÃO', 'PAO', 'BISCOITO', 'BOLACHA', 
@@ -440,6 +441,9 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
         <div className="flex-1">
           <h2 className="text-3xl font-black text-amber-900 uppercase tracking-tighter">Cardápio Institucional</h2>
           <p className="text-gray-400 font-medium">Gestão de descrições e pesos por data.</p>
+          <p className="text-xs text-gray-500 italic mt-2">
+            Relação de gêneros e produtos alimentícios, de que trata o art. 1º do Decreto estadual nº 43.339, de 21 de julho de 1998, e o Anexo IV da Resolução SAMSP nº 16, de 1998<sup>3-4</sup>.
+          </p>
         </div>
 
         <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 text-center">
