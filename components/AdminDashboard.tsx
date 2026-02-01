@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useMemo } from 'react';
 import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus } from '../types';
 import AdminAnalytics from './AdminAnalytics';
@@ -516,7 +517,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'analytics': return <AdminAnalytics suppliers={suppliers} />;
       case 'graphs': return <AdminGraphs suppliers={suppliers} />;
       case 'perCapita': return <AdminPerCapita suppliers={suppliers} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={onUpdatePerCapitaConfig} />;
-      case 'menu': return <AdminStandardMenu suppliers={suppliers} template={standardMenu} dailyMenus={dailyMenus} onUpdateTemplate={onUpdateStandardMenu} onUpdateDailyMenus={onUpdateDailyMenu} inmateCount={perCapitaConfig.inmateCount || 0} />;
+      case 'menu': return <AdminStandardMenu suppliers={suppliers} template={standardMenu} dailyMenus={dailyMenus} onUpdateDailyMenu={onUpdateDailyMenu} inmateCount={perCapitaConfig.inmateCount || 0} />;
       case 'info':
         return (
           <div className="bg-red-50 p-8 md:p-12 rounded-3xl border-2 border-red-200 text-center space-y-6 max-w-2xl mx-auto shadow-xl mt-10">
