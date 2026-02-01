@@ -167,6 +167,146 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
       setIsSaving(false);
     }
   };
+  
+  const handlePrintReport = () => {
+    const menuToPrint = currentMenu.filter(row => row.foodItem || row.contractedItem);
+    if (menuToPrint.length === 0) {
+      alert('Não há itens no cardápio para gerar um relatório.');
+      return;
+    }
+  
+    const groupedMenu = menuToPrint.reduce((acc, row) => {
+      const period = row.period || 'Não especificado';
+      if (!acc[period]) {
+        acc[period] = [];
+      }
+      acc[period].push(row);
+      return acc;
+    }, {} as Record<string, MenuRow[]>);
+  
+    const itemSummary = new Map<string, { total: number; unit: string }>();
+    menuToPrint.forEach(row => {
+        if (row.contractedItem && row.totalWeight) {
+            const [valueStr, unit] = row.totalWeight.split(' ');
+            const value = parseFloat(valueStr.replace(',', '.')) || 0;
+            
+            const existing = itemSummary.get(row.contractedItem) || { total: 0, unit: unit || 'Kg' };
+            existing.total += value;
+            itemSummary.set(row.contractedItem, existing);
+        }
+    });
+    
+    const sortedSummary = Array.from(itemSummary.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  
+    const printContent = `
+      <html>
+        <head>
+          <title>Cardápio do Dia - ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.4; }
+            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+            .header-sap { font-size: 14px; margin-bottom: 2px; }
+            .header-unit { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+            .header-address { font-size: 11px; }
+            .header-contact { font-size: 11px; }
+            .report-title { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0; text-transform: uppercase; }
+            .info-bar { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 12px; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            th, td { border: 1px solid #ccc; padding: 6px; text-align: left; font-size: 10px; }
+            th { background-color: #f5f5f5; font-weight: bold; }
+            .period-header { background-color: #e0e0e0; font-weight: bold; text-align: center; text-transform: uppercase; }
+            .summary-section { margin-top: 30px; page-break-inside: avoid; }
+            .summary-title { font-size: 14px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 10px; }
+            .footer { margin-top: 60px; display: flex; justify-content: space-around; }
+            .sig { border-top: 1px solid #000; width: 220px; text-align: center; padding-top: 5px; font-size: 11px; font-weight: bold; }
+            @media print {
+              body { -webkit-print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="header-sap">Secretaria da Administração Penitenciária</div>
+            <div class="header-unit">Polícia Penal - Penitenciária de Taiúva</div>
+            <div class="header-address">Rodovia Brigadeiro Faria Lima, SP 326, KM 359,6 Taiúva/SP - CEP: 14.720-000</div>
+            <div class="header-contact">Fone: (16) 3247-6261 - E-mail: dg@ptaiuva.sap.gov.br</div>
+          </div>
+          
+          <div class="report-title">Cardápio Diário e Necessidade de Gêneros</div>
+  
+          <div class="info-bar">
+              <span>Data: ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} (Semana ${weekOfSelectedDate})</span>
+              <span>População Carcerária: ${inmateCount}</span>
+          </div>
+          
+          <div class="menu-section">
+              <div class="summary-title">Cardápio Detalhado</div>
+              <table>
+                  <thead>
+                      <tr>
+                          <th style="width: 40%;">Alimento / Preparação</th>
+                          <th style="width: 30%;">Item Contratado (p/ Análise)</th>
+                          <th style="width: 15%; text-align: right;">Peso/Qtd. Unit.</th>
+                          <th style="width: 15%; text-align: right;">Peso/Qtd. Total</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                    ${MEAL_PERIODS.map(period => {
+                      if (!groupedMenu[period] || groupedMenu[period].length === 0) return '';
+                      return `
+                        <tr><td colspan="4" class="period-header">${period}</td></tr>
+                        ${groupedMenu[period].map(row => `
+                          <tr>
+                            <td>${row.foodItem}</td>
+                            <td>${row.contractedItem || '-'}</td>
+                            <td style="text-align: right;">${row.unitWeight}</td>
+                            <td style="text-align: right;">${row.totalWeight}</td>
+                          </tr>
+                        `).join('')}
+                      `;
+                    }).join('')}
+                  </tbody>
+              </table>
+          </div>
+  
+          <div class="summary-section">
+              <div class="summary-title">Resumo de Gêneros Necessários para o Dia</div>
+              <table>
+                  <thead>
+                      <tr>
+                          <th>Item Contratado</th>
+                          <th style="text-align: right;">Quantidade Total Necessária</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      ${sortedSummary.length > 0 ? sortedSummary.map(([name, data]) => `
+                          <tr>
+                              <td>${name}</td>
+                              <td style="text-align: right;">${data.total.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} ${data.unit}</td>
+                          </tr>
+                      `).join('') : '<tr><td colspan="2" style="text-align: center;">Nenhum item contratado no cardápio.</td></tr>'}
+                  </tbody>
+              </table>
+          </div>
+  
+          <div class="footer">
+            <div class="sig">Responsável (Almoxarifado)</div>
+            <div class="sig">Nutricionista</div>
+            <div class="sig">Diretor (Núcleo de Infraestrutura)</div>
+          </div>
+        </body>
+      </html>
+    `;
+  
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(printContent);
+      win.document.close();
+      setTimeout(() => {
+        win.print();
+      }, 500);
+    }
+  };
 
   const sortedHistory = useMemo(() => {
     return Object.keys(dailyMenus).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
@@ -310,14 +450,24 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                     )}
                 </div>
             </div>
+            
+            <div className='space-y-2'>
+                <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className={`w-full font-black py-4 rounded-xl shadow-lg transition-all active:scale-95 uppercase text-sm tracking-widest text-white bg-amber-600 hover:bg-amber-700`}
+                >
+                    {isSaving ? 'Salvando...' : (isLoadedFromSaved ? 'Atualizar Cardápio' : 'Salvar Cardápio do Dia')}
+                </button>
+                 <button
+                    onClick={handlePrintReport}
+                    className="w-full font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 uppercase text-xs tracking-wider text-gray-700 bg-gray-200 hover:bg-gray-300 flex items-center justify-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                    Gerar PDF do Dia
+                </button>
+            </div>
 
-            <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className={`w-full font-black py-4 rounded-xl shadow-lg transition-all active:scale-95 uppercase text-sm tracking-widest text-white bg-amber-600 hover:bg-amber-700`}
-            >
-                {isSaving ? 'Salvando...' : (isLoadedFromSaved ? 'Atualizar Cardápio' : 'Salvar Cardápio do Dia')}
-            </button>
 
             {sortedHistory.length > 0 && (
                 <div className="pt-6 border-t">
