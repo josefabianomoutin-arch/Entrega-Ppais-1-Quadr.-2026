@@ -166,51 +166,9 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   const sortedHistory = useMemo(() => {
     return Object.keys(dailyMenus).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
   }, [dailyMenus]);
-  
-  const supplierAnalysisForDay = useMemo(() => {
-    const contractedItemsInMenu = [...new Set(currentMenu.map(row => row.contractedItem).filter(Boolean) as string[])];
 
-    if (contractedItemsInMenu.length === 0 || !suppliers || suppliers.length === 0) {
-        return [];
-    }
-
-    return contractedItemsInMenu.map(itemName => {
-        const foundSuppliers = suppliers
-            .filter(supplier => (supplier.contractItems || []).some(ci => ci.name === itemName))
-            .map(supplier => {
-                const contractItem = supplier.contractItems.find(ci => ci.name === itemName);
-                const totalContracted = contractItem?.totalKg || 0;
-                
-                const totalDelivered = (supplier.deliveries || [])
-                    .filter(d => d.item === itemName)
-                    .reduce((sum, d) => sum + (d.kg || 0), 0);
-                
-                const remainingBalance = Math.max(0, totalContracted - totalDelivered);
-                
-                const unitString = contractItem?.unit || 'kg-1';
-                const [unitType] = unitString.split('-');
-                
-                let displayUnit = 'Kg';
-                if (unitType === 'dz') displayUnit = 'Dz';
-                else if (unitType === 'un') displayUnit = 'Un';
-                else if (['litro', 'l', 'embalagem', 'caixa'].includes(unitType)) displayUnit = 'L';
-
-                return {
-                    name: supplier.name,
-                    remainingBalance,
-                    displayUnit
-                };
-            });
-
-        return {
-            contractedItem: itemName,
-            suppliers: foundSuppliers.sort((a, b) => b.remainingBalance - a.remainingBalance),
-        };
-    });
-  }, [currentMenu, suppliers]);
-
-  const weeklyAnalysisData = useMemo(() => {
-    if (!selectedWeek || !dailyMenus || !suppliers) return [];
+  const supplierAnalysisForWeek = useMemo(() => {
+    if (!selectedWeek || !dailyMenus || !suppliers) return { analysis: [], hasRequiredItems: false };
 
     const datesOfWeek = getDatesOfWeek(selectedWeek, 2026);
     
@@ -226,7 +184,8 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
         }
     });
 
-    if (requiredItems.size === 0) return [];
+    const hasRequiredItems = requiredItems.size > 0;
+    if (!hasRequiredItems) return { analysis: [], hasRequiredItems: false };
 
     const scheduledSuppliers = suppliers.filter(supplier => {
         return !supplier.allowedWeeks || supplier.allowedWeeks.length === 0 || supplier.allowedWeeks.includes(selectedWeek);
@@ -243,7 +202,8 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
         };
     }).filter(s => s.items.length > 0);
 
-    return result.sort((a,b) => a.supplierName.localeCompare(b.supplierName));
+    const analysis = result.sort((a,b) => a.supplierName.localeCompare(b.supplierName));
+    return { analysis, hasRequiredItems };
   }, [selectedWeek, dailyMenus, suppliers]);
 
 
@@ -289,8 +249,8 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                 </select>
                 
                 <div className="mt-4 pt-4 border-t border-indigo-200 space-y-3 max-h-60 overflow-y-auto custom-scrollbar">
-                    {weeklyAnalysisData.length > 0 ? (
-                        weeklyAnalysisData.map(data => (
+                    {supplierAnalysisForWeek.analysis.length > 0 ? (
+                        supplierAnalysisForWeek.analysis.map(data => (
                             <div key={data.supplierName} className="bg-white p-3 rounded-lg shadow-sm">
                                 <h5 className="font-bold text-sm text-indigo-800">{data.supplierName}</h5>
                                 <ul className="text-xs text-gray-600 mt-1 list-disc list-inside">
@@ -421,53 +381,28 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
       
       <div className="mt-12 pt-8 border-t-2 border-dashed">
           <h3 className="text-2xl font-black text-gray-800 tracking-tight text-center mb-6 uppercase">
-              Análise de Fornecedores Disponíveis (para o dia selecionado)
+              Análise de Fornecedores para a Semana {selectedWeek}
           </h3>
-          {supplierAnalysisForDay.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {supplierAnalysisForDay.map(({ contractedItem, suppliers: foundSuppliers }) => (
-                      <div key={contractedItem} className="bg-gray-50 border border-gray-200 rounded-lg p-4 transition-shadow hover:shadow-md">
-                          <h4 className="font-bold text-gray-800 border-b pb-2 mb-3 truncate" title={contractedItem}>{contractedItem}</h4>
-                          {foundSuppliers.length > 0 ? (
-                              <ul className="mt-2 text-sm space-y-3">
-                                  {foundSuppliers.map(s => {
-                                      const isWholeNumberUnit = s.displayUnit === 'Dz' || s.displayUnit === 'Un';
-                                      const formattingOptions: Intl.NumberFormatOptions = {
-                                          minimumFractionDigits: isWholeNumberUnit ? 0 : 2,
-                                          maximumFractionDigits: isWholeNumberUnit ? 0 : 2,
-                                      };
-                                      return (
-                                      <li key={s.name} className="flex flex-col gap-1 border-b border-gray-100 last:border-none pb-2">
-                                          <div className="flex items-center gap-2 text-gray-800 font-semibold">
-                                              <svg className="w-4 h-4 flex-shrink-0 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                              <span>{s.name}</span>
-                                          </div>
-                                          <div className="pl-6 flex justify-between items-center">
-                                              <span className="text-[10px] text-gray-400 uppercase font-black">Saldo Restante:</span>
-                                              {s.remainingBalance > 0 ? (
-                                                  <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                                                      {s.remainingBalance.toLocaleString('pt-BR', formattingOptions)} {s.displayUnit}
-                                                  </span>
-                                              ) : (
-                                                  <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded uppercase">
-                                                      Saldo Esgotado
-                                                  </span>
-                                              )}
-                                          </div>
-                                      </li>
-                                  )})}
-                              </ul>
-                          ) : (
-                              <p className="mt-2 text-sm text-red-600 font-semibold flex items-center gap-2">
-                                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                  Nenhum fornecedor contratado para este item.
-                              </p>
-                          )}
-                      </div>
-                  ))}
-              </div>
+          {supplierAnalysisForWeek.hasRequiredItems ? (
+              supplierAnalysisForWeek.analysis.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {supplierAnalysisForWeek.analysis.map(data => (
+                        <div key={data.supplierName} className="bg-gray-50 border border-gray-200 rounded-lg p-4 transition-shadow hover:shadow-md">
+                            <h4 className="font-bold text-gray-800 border-b pb-2 mb-3">{data.supplierName}</h4>
+                            <ul className="mt-2 text-sm space-y-1 list-disc list-inside text-gray-700">
+                                {data.items.map(item => <li key={item}>{item}</li>)}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center text-lg text-orange-700 bg-orange-50 p-6 rounded-lg border border-orange-200">
+                    <p className="font-bold">Atenção!</p>
+                    <p>Verificar saldo em estoque, sem entrega para a semana.</p>
+                </div>
+              )
           ) : (
-              <p className="text-center text-gray-400 italic py-4">Selecione um 'Item Contratado' no cardápio acima para ver a disponibilidade dos fornecedores.</p>
+              <p className="text-center text-gray-400 italic py-4">Nenhum item contratado lançado no cardápio para a semana selecionada.</p>
           )}
       </div>
 
