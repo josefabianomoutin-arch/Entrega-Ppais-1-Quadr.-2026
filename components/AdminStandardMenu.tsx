@@ -200,7 +200,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     if (!template || inmateCount <= 0) return [];
   
     const analysisMap = new Map<string, {
-        totalRequiredBaseUnit: number; // Store in grams for weight/volume, or units for Dz/Un
+        totalRequiredBaseUnit: number;
         unitType: 'weight' | 'volume' | 'dozen' | 'unit';
         suppliers: { name: string; remainingBalance: number; unit: string; }[];
     }>();
@@ -215,7 +215,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
           if (requiredForThisRow > 0) {
             const itemInfo = analysisMap.get(row.contractedItem) || {
               totalRequiredBaseUnit: 0,
-              unitType: 'weight', // default
+              unitType: 'weight',
               suppliers: []
             };
   
@@ -265,24 +265,36 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     // 3. Format for display
     return Array.from(analysisMap.entries()).map(([itemName, data]) => {
       let displayRequirement = '';
-      let requirementInKg = 0; // For comparison with supplier balance
+      let requirementForComparison = 0;
+      let displayUnit = '';
 
       if (data.unitType === 'dozen' || data.unitType === 'unit') {
         const unitLabel = data.unitType === 'dozen' ? 'Dz' : 'Un';
-        displayRequirement = `${data.totalRequiredBaseUnit.toLocaleString('pt-BR')} ${unitLabel}`;
-        requirementInKg = data.totalRequiredBaseUnit; // Here it's units/dozens, not Kg
+        displayRequirement = `${data.totalRequiredBaseUnit.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} ${unitLabel}`;
+        requirementForComparison = data.totalRequiredBaseUnit;
+        displayUnit = unitLabel;
       } else {
         const unitLabel = data.unitType === 'volume' ? 'L' : 'Kg';
         const totalInKgOrL = data.totalRequiredBaseUnit / 1000;
-        displayRequirement = `${totalInKgOrL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${unitLabel}`;
-        requirementInKg = totalInKgOrL;
+        displayRequirement = `${totalInKgOrL.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unitLabel}`;
+        requirementForComparison = totalInKgOrL;
+        displayUnit = unitLabel;
       }
+
+      const totalAvailableBalance = data.suppliers.reduce((sum, s) => sum + s.remainingBalance, 0);
+      const isSufficient = totalAvailableBalance >= requirementForComparison;
+      
+      const formattingOptions: Intl.NumberFormatOptions = {
+          minimumFractionDigits: (displayUnit === 'Dz' || displayUnit === 'Un') ? 0 : 2,
+          maximumFractionDigits: (displayUnit === 'Dz' || displayUnit === 'Un') ? 0 : 2,
+      };
+      const formattedTotalAvailable = `${totalAvailableBalance.toLocaleString('pt-BR', formattingOptions)} ${displayUnit}`;
       
       return {
         itemName,
         weeklyRequirement: displayRequirement,
-        requirementInKg, // Standardized for comparison
-        unitType: data.unitType,
+        totalAvailableBalance: formattedTotalAvailable,
+        isSufficient,
         suppliers: data.suppliers,
       };
     }).sort((a,b) => a.itemName.localeCompare(b.itemName));
@@ -387,50 +399,56 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                 <div className="space-y-6 animate-fade-in">
                     <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                         <h3 className="text-xl font-black text-gray-800 tracking-tight">Análise Semanal do Template</h3>
-                        <p className="text-sm text-indigo-800/60">Previsão de consumo e disponibilidade de fornecedores com base no cardápio padrão.</p>
+                        <p className="text-sm text-indigo-800/60">Resumo de consumo semanal, saldos de contrato e disponibilidade de fornecedores.</p>
                     </div>
                     {weeklyTemplateAnalysis.length > 0 ? (
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
-                            {weeklyTemplateAnalysis.map(item => {
-                                const requirementForComparison = item.unitType === 'dozen' ? item.requirementInKg : item.requirementInKg;
-                                return (
-                                <div key={item.itemName} className="bg-white p-4 rounded-lg border shadow-sm">
-                                    <h4 className="font-black text-gray-800 uppercase tracking-tight">{item.itemName}</h4>
-                                    <div className="my-3 bg-gray-50 p-3 rounded-lg text-center">
-                                        <p className="text-[10px] font-bold uppercase text-gray-400">Total Necessário na Semana</p>
-                                        <p className="text-2xl font-mono font-bold text-indigo-600">{item.weeklyRequirement}</p>
-                                    </div>
-                                    <div>
-                                        <h5 className="text-[10px] font-bold uppercase text-gray-400 mb-2">Fornecedores com Saldo</h5>
-                                        {item.suppliers.length > 0 ? (
-                                            <ul className="space-y-2 text-sm">
-                                                {item.suppliers.map(s => {
-                                                    const canCover = s.remainingBalance >= requirementForComparison;
-                                                    const balanceExhausted = s.remainingBalance <= 0;
-                                                    const formattingOptions: Intl.NumberFormatOptions = {
-                                                        minimumFractionDigits: (s.unit === 'Dz' || s.unit === 'Un') ? 0 : 2,
-                                                        maximumFractionDigits: (s.unit === 'Dz' || s.unit === 'Un') ? 0 : 2,
-                                                    };
-                                                    return(
-                                                    <li key={s.name} className="flex justify-between items-center bg-gray-50/70 p-2 rounded-md">
-                                                        <span className="font-semibold text-gray-700">{s.name}</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`font-mono text-xs font-bold ${balanceExhausted ? 'text-red-500' : 'text-gray-600'}`}>
-                                                                {s.remainingBalance.toLocaleString('pt-BR', formattingOptions)} {s.unit}
-                                                            </span>
-                                                            {!balanceExhausted && (
-                                                                <span title={canCover ? 'Saldo suficiente para a semana' : 'Saldo insuficiente para a semana'} className={`w-3 h-3 rounded-full ${canCover ? 'bg-green-500' : 'bg-yellow-400'}`}></span>
-                                                            )}
-                                                        </div>
-                                                    </li>
-                                                )})}
-                                            </ul>
-                                        ) : (
-                                            <p className="text-xs text-center text-red-500 bg-red-50 p-2 rounded-md italic">Nenhum fornecedor com este item no contrato.</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )})}
+                        <div className="border rounded-xl overflow-hidden shadow-sm bg-white max-h-[70vh] overflow-y-auto custom-scrollbar">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-100 text-gray-500 font-black uppercase text-[10px] tracking-widest sticky top-0 z-10">
+                                    <tr>
+                                        <th className="p-3 text-left">Item Contratado</th>
+                                        <th className="p-3 text-right">Necessidade Semanal</th>
+                                        <th className="p-3 text-right">Saldo Total Disponível</th>
+                                        <th className="p-3 text-center">Status</th>
+                                        <th className="p-3 text-left">Fornecedores (Saldo em Contrato)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {weeklyTemplateAnalysis.map(item => (
+                                        <tr key={item.itemName} className="hover:bg-indigo-50/30">
+                                            <td className="p-3 font-bold text-gray-800 uppercase">{item.itemName}</td>
+                                            <td className="p-3 text-right font-mono text-indigo-600 font-semibold">{item.weeklyRequirement}</td>
+                                            <td className="p-3 text-right font-mono text-blue-600 font-semibold">{item.totalAvailableBalance}</td>
+                                            <td className="p-3 text-center">
+                                                {item.isSufficient ? (
+                                                    <span title="O saldo total disponível em contrato é suficiente para cobrir a necessidade da semana." className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full">Suficiente</span>
+                                                ) : (
+                                                    <span title="O saldo total disponível em contrato NÃO é suficiente para cobrir a necessidade da semana." className="bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full">Insuficiente</span>
+                                                )}
+                                            </td>
+                                            <td className="p-3 text-xs">
+                                                {item.suppliers.length > 0 ? (
+                                                    <ul className="space-y-1">
+                                                        {item.suppliers.map(s => {
+                                                            const formattingOptions: Intl.NumberFormatOptions = {
+                                                                minimumFractionDigits: (s.unit === 'Dz' || s.unit === 'Un') ? 0 : 2,
+                                                                maximumFractionDigits: (s.unit === 'Dz' || s.unit === 'Un') ? 0 : 2,
+                                                            };
+                                                            return (
+                                                            <li key={s.name} className="flex justify-between items-center gap-2">
+                                                                <span className="text-gray-700 truncate" title={s.name}>{s.name}</span>
+                                                                <span className="font-mono text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">{s.remainingBalance.toLocaleString('pt-BR', formattingOptions)} {s.unit}</span>
+                                                            </li>
+                                                        )})}
+                                                    </ul>
+                                                ) : (
+                                                    <span className="text-red-500 italic">Nenhum fornecedor</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     ) : (
                         <div className="text-center py-20 bg-gray-50 rounded-lg border-2 border-dashed">
