@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus } from '../types';
 import AdminAnalytics from './AdminAnalytics';
@@ -49,6 +50,131 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 };
 
+// --- Edit Contract Item Modal Component ---
+interface EditContractItemModalProps {
+  supplier: Supplier;
+  item: ContractItem;
+  onClose: () => void;
+  onSave: (supplierCpf: string, originalItemName: string, updatedItem: ContractItem) => void;
+}
+
+const EditContractItemModal: React.FC<EditContractItemModalProps> = ({ supplier, item, onClose, onSave }) => {
+  const [updatedItem, setUpdatedItem] = useState<ContractItem>({ ...item });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleChange = (field: keyof ContractItem, value: string) => {
+    setUpdatedItem(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleNumericChange = (field: 'totalKg' | 'valuePerKg', value: string) => {
+    const sanitizedValue = value.replace(/[^0-9,]/g, '');
+    setUpdatedItem(prev => ({ ...prev, [field]: sanitizedValue as any })); // Store as string for input control
+  };
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    
+    const finalItem: ContractItem = {
+      ...updatedItem,
+      name: updatedItem.name.toUpperCase(),
+      totalKg: parseFloat((String(updatedItem.totalKg) || '0').replace(',', '.')),
+      valuePerKg: parseFloat((String(updatedItem.valuePerKg) || '0').replace(',', '.'))
+    };
+    
+    onSave(supplier.cpf, item.name, finalItem);
+    // Parent will close modal.
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 animate-fade-in-up">
+        <div className="flex justify-between items-start mb-4">
+            <div>
+                <h2 className="text-xl font-bold text-gray-800">Editar Item do Contrato</h2>
+                <p className="text-sm text-gray-500">{supplier.name}</p>
+            </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-3xl font-light">&times;</button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Descrição do Item</label>
+                <input 
+                    type="text" 
+                    value={updatedItem.name || ''}
+                    onChange={e => handleChange('name', e.target.value)}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-400"
+                    required 
+                />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Cód. SIAFEM</label>
+                    <input 
+                        type="text" 
+                        value={updatedItem.siafemCode || ''}
+                        onChange={e => handleChange('siafemCode', e.target.value)}
+                        className="w-full p-2 border rounded-lg font-mono outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                </div>
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Cód. COMPRAS</label>
+                    <input 
+                        type="text" 
+                        value={updatedItem.comprasCode || ''}
+                        onChange={e => handleChange('comprasCode', e.target.value)}
+                        className="w-full p-2 border rounded-lg font-mono outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Qtd Total (Kg)</label>
+                    <input 
+                        type="text" 
+                        value={String(updatedItem.totalKg).replace('.',',')}
+                        onChange={e => handleNumericChange('totalKg', e.target.value)}
+                        className="w-full p-2 border rounded-lg font-mono outline-none focus:ring-2 focus:ring-blue-400"
+                        required
+                    />
+                </div>
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Preço Unitário (R$)</label>
+                    <input 
+                        type="text" 
+                        value={String(updatedItem.valuePerKg).replace('.',',')}
+                        onChange={e => handleNumericChange('valuePerKg', e.target.value)}
+                        className="w-full p-2 border rounded-lg font-mono outline-none focus:ring-2 focus:ring-blue-400"
+                        required
+                    />
+                </div>
+            </div>
+
+            <div className="pt-4 flex justify-end space-x-3 border-t">
+                <button type="button" onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit" disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-gray-400">
+                    {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+            </div>
+        </form>
+        <style>{`
+            @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fade-in-up {
+            animation: fade-in-up 0.3s ease-out forwards;
+            }
+        `}</style>
+      </div>
+    </div>
+  );
+};
+
+
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   const { 
     suppliers = [], 
@@ -84,6 +210,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   const [regCpf, setRegCpf] = useState('');
   const [regWeeks, setRegWeeks] = useState<number[]>([]);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [editingItem, setEditingItem] = useState<{ supplier: Supplier; item: ContractItem } | null>(null);
   
   const [selectedSupplierCpf, setSelectedSupplierCpf] = useState('');
   const [newItemName, setNewItemName] = useState('');
@@ -154,6 +281,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     setNewItemValue('');
     setNewItemSiafem('');
     setNewItemCompras('');
+  };
+
+  const handleUpdateItem = (supplierCpf: string, originalItemName: string, updatedItem: ContractItem) => {
+    const updatedSuppliers = (suppliers || []).map(s => {
+      if (s.cpf === supplierCpf) {
+        const items = (s.contractItems || []).map(i => i.name === originalItemName ? updatedItem : i);
+        const initialValue = items.reduce((acc, i) => acc + ((i.totalKg || 0) * (i.valuePerKg || 0)), 0);
+        return { ...s, contractItems: items, initialValue };
+      }
+      return s;
+    });
+    onPersistSuppliers(updatedSuppliers);
+    setEditingItem(null);
   };
 
   const handleRemoveItem = (supplierCpf: string, itemName: string) => {
@@ -329,13 +469,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                                       <td className="p-4 text-right font-mono text-gray-500">{formatCurrency(item.valuePerKg)}</td>
                                       <td className="p-4 text-right font-black text-gray-800">{formatCurrency((item.totalKg || 0) * (item.valuePerKg || 0))}</td>
                                       <td className="p-4 text-center">
-                                          <button 
-                                              onClick={() => handleRemoveItem(s.cpf, item.name)} 
-                                              className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
-                                              title="Remover item do contrato"
-                                          >
-                                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                          </button>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <button 
+                                                onClick={() => setEditingItem({ supplier: s, item: item })}
+                                                className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
+                                                title="Editar item do contrato"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z" />
+                                                </svg>
+                                            </button>
+                                            <button 
+                                                onClick={() => handleRemoveItem(s.cpf, item.name)} 
+                                                className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
+                                                title="Remover item do contrato"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
                                       </td>
                                       </tr>
                                   ))}
@@ -422,6 +573,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
            {renderContent()}
         </main>
       </div>
+
+      {editingItem && (
+        <EditContractItemModal
+          supplier={editingItem.supplier}
+          item={editingItem.item}
+          onClose={() => setEditingItem(null)}
+          onSave={handleUpdateItem}
+        />
+      )}
 
       {editingSupplier && (
         <EditSupplierModal 

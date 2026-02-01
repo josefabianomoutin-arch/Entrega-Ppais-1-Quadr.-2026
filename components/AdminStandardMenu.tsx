@@ -48,7 +48,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
 
   const getUnitLabel = (unitString: string | undefined): string => {
     if (!unitString) return 'g/ml';
-    const [type] = unitString.split('-');
+    const [type] = (unitString || 'kg-1').split('-');
     if (type === 'dz') return 'Dz';
     if (type === 'un') return 'Un';
     return 'g/ml';
@@ -61,14 +61,15 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     }
 
     const unitString = contractItemUnitMap.get(contractedItemName || '');
-    const unitLabel = getUnitLabel(unitString);
+    const [unitType] = (unitString || 'kg-1').split('-');
     const calculatedTotal = unitVal * inmateCount;
 
-    if (unitLabel === 'Dz' || unitLabel === 'Un') {
+    if (unitType === 'dz' || unitType === 'un') {
+        const unitLabel = unitType === 'dz' ? 'Dz' : 'Un';
         return `${calculatedTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} ${unitLabel}`;
     }
     
-    const suffix = (unitString || 'kg').includes('litro') ? 'L' : 'Kg';
+    const suffix = (unitString || 'kg').toLowerCase().includes('litro') ? 'L' : 'Kg';
     return `${(calculatedTotal / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} ${suffix}`;
   }
 
@@ -122,10 +123,10 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     const updated = [...currentMenu];
     let newRow = { ...updated[index], [field]: value };
 
-    if (field === 'unitWeight') {
-        newRow.totalWeight = calculateTotalWeight(value, newRow.contractedItem);
-    } else if (field === 'contractedItem') {
-        newRow.totalWeight = calculateTotalWeight(newRow.unitWeight, value);
+    if (field === 'unitWeight' || field === 'contractedItem') {
+        const item = field === 'contractedItem' ? value : newRow.contractedItem;
+        const weight = field === 'unitWeight' ? value : newRow.unitWeight;
+        newRow.totalWeight = calculateTotalWeight(weight, item);
     }
 
     updated[index] = newRow;
