@@ -50,6 +50,11 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   const [isLoadedFromSaved, setIsLoadedFromSaved] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<number>(getWeekNumber(new Date()));
 
+  const weekOfSelectedDate = useMemo(() => {
+    if (!selectedDate) return getWeekNumber(new Date());
+    return getWeekNumber(new Date(selectedDate + 'T00:00:00'));
+  }, [selectedDate]);
+
   const availableContractItems = useMemo(() => {
     const itemSet = new Set<string>();
     (suppliers || []).forEach(s => {
@@ -336,7 +341,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
             <div className="border rounded-2xl overflow-hidden shadow-sm bg-white">
                 <div className={'bg-amber-50 p-4 border-b flex justify-between items-center gap-4'}>
                     <h3 className="text-xl font-black text-gray-800 tracking-tight">
-                        {`Data: ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}`}
+                        {`Data: ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} (Semana ${weekOfSelectedDate})`}
                     </h3>
                      {isLoadedFromSaved && (
                         <span className="text-xs font-bold uppercase bg-green-100 text-green-700 px-3 py-1 rounded-full animate-fade-in">
