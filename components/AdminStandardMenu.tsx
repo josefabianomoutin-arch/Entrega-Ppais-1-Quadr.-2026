@@ -15,6 +15,12 @@ const WEEK_DAYS_BR = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA'
 const MEAL_PERIODS = ['CAFÉ DA MANHÃ', 'ALMOÇO', 'JANTA', 'LANCHE NOITE'];
 const ROWS_PER_DAY = 15;
 
+const unitBasedKeywords = [
+    'OVO', 'OVOS', 'PÃO', 'PAO', 'BISCOITO', 'BOLACHA', 
+    'MAÇÃ', 'MACA', 'BANANA', 'LARANJA', 'PÊRA', 'PERA', 'CAQUI', 'GOIABA', 'MANGA', 'MARACUJÁ', 'TANGERINA', 'ABACAXI', 'MELANCIA', 'MELÃO', 'UVA', 
+    'DOCE DE LEITE', 'IOGURTE', 'BEBIDA LÁCTEA', 'REFRIGERANTE'
+];
+
 const getWeekNumber = (d: Date): number => {
     d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
@@ -77,11 +83,17 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     return map;
   }, [suppliers]);
 
-  const getUnitLabel = (unitString: string | undefined): string => {
-    if (!unitString) return 'g/ml';
-    const [type] = (unitString || 'kg-1').split('-');
+  const getUnitLabel = (unitString: string | undefined, contractedItemName: string | undefined): string => {
+    const [type] = (unitString || '').split('-');
+    
     if (type === 'dz') return 'Dz';
     if (type === 'un') return 'Un';
+
+    const itemName = (contractedItemName || '').toUpperCase();
+    if (unitBasedKeywords.some(keyword => itemName.includes(keyword))) {
+        return 'Un';
+    }
+
     return 'g/ml';
   };
 
@@ -92,12 +104,19 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     }
 
     const unitString = contractItemUnitMap.get(contractedItemName || '');
-    const [unitType] = (unitString || 'kg-1').split('-');
+    const [unitType] = (unitString || '').split('-');
     const calculatedTotal = unitVal * inmateCount;
 
-    if (unitType === 'dz' || unitType === 'un') {
-        const unitLabel = unitType === 'dz' ? 'Dz' : 'Un';
-        return `${calculatedTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} ${unitLabel}`;
+    if (unitType === 'dz') {
+        return `${calculatedTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} Dz`;
+    }
+    if (unitType === 'un') {
+        return `${calculatedTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} Un`;
+    }
+    
+    const itemName = (contractedItemName || '').toUpperCase();
+    if (unitBasedKeywords.some(keyword => itemName.includes(keyword))) {
+        return `${calculatedTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} Un`;
     }
     
     const suffix = (unitString || 'kg').toLowerCase().includes('litro') ? 'L' : 'Kg';
@@ -188,7 +207,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     menuToPrint.forEach(row => {
         if (row.contractedItem && row.totalWeight) {
             const [valueStr, unit] = row.totalWeight.split(' ');
-            const value = parseFloat(valueStr.replace(',', '.')) || 0;
+            const value = parseFloat(valueStr.replace(/\./g, '').replace(',', '.')) || 0;
             
             const existing = itemSummary.get(row.contractedItem) || { total: 0, unit: unit || 'Kg' };
             existing.total += value;
@@ -197,7 +216,19 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     });
     
     const sortedSummary = Array.from(itemSummary.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  
+    
+    const datesOfWeek = getDatesOfWeek(weekOfSelectedDate, 2026);
+    const suppliersThisWeek = new Set<string>();
+    suppliers.forEach(supplier => {
+        const hasDeliveryThisWeek = (supplier.deliveries || []).some(delivery => 
+            datesOfWeek.includes(delivery.date) && delivery.item !== 'AGENDAMENTO PENDENTE'
+        );
+        if (hasDeliveryThisWeek) {
+            suppliersThisWeek.add(supplier.name);
+        }
+    });
+    const sortedSuppliersList = Array.from(suppliersThisWeek).sort();
+
     const printContent = `
       <html>
         <head>
@@ -282,11 +313,22 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                       ${sortedSummary.length > 0 ? sortedSummary.map(([name, data]) => `
                           <tr>
                               <td>${name}</td>
-                              <td style="text-align: right;">${data.total.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} ${data.unit}</td>
+                              <td style="text-align: right;">${data.total.toLocaleString('pt-BR', { minimumFractionDigits: ['Kg', 'L'].includes(data.unit) ? 3 : 0, maximumFractionDigits: ['Kg', 'L'].includes(data.unit) ? 3 : 0 })} ${data.unit}</td>
                           </tr>
                       `).join('') : '<tr><td colspan="2" style="text-align: center;">Nenhum item contratado no cardápio.</td></tr>'}
                   </tbody>
               </table>
+          </div>
+          
+          <div class="summary-section">
+            <div class="summary-title">Fornecedores com Entregas na Semana ${weekOfSelectedDate}</div>
+            ${sortedSuppliersList.length > 0 ? `
+                <ul style="list-style-type: disc; padding-left: 20px; font-size: 10px;">
+                    ${sortedSuppliersList.map(name => `<li>${name}</li>`).join('')}
+                </ul>
+            ` : `
+                <p style="font-size: 10px; text-align: center; font-style: italic;">Nenhum fornecedor realizou entregas nesta semana.</p>
+            `}
           </div>
   
           <div class="footer">
@@ -513,7 +555,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                         <tbody>
                             {currentMenu.map((row, idx) => {
                                 const unitString = contractItemUnitMap.get(row.contractedItem || '');
-                                const unitLabel = getUnitLabel(unitString);
+                                const unitLabel = getUnitLabel(unitString, row.contractedItem);
                                 return (
                                 <tr key={row.id || idx} className="hover:bg-gray-50 transition-colors">
                                     <td className="p-1 border">
