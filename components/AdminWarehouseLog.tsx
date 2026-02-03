@@ -1,17 +1,21 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import type { WarehouseMovement, Supplier } from '../types';
 
 interface AdminWarehouseLogProps {
     warehouseLog: WarehouseMovement[];
     suppliers: Supplier[];
     onDeleteEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
+    onRegisterEntry: (payload: any) => Promise<{ success: boolean; message: string }>;
+    onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
 }
 
-const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, suppliers, onDeleteEntry }) => {
+const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, suppliers, onDeleteEntry, onRegisterEntry, onRegisterWithdrawal }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'entrada' | 'saída'>('all');
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const itemUnitInfoMap = useMemo(() => {
         const map = new Map<string, { name: string; factorToKg: number }>();
@@ -72,20 +76,140 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
         }
     };
 
+    const handleDownloadTemplate = () => {
+        const headers = ["Tipo (ENTRADA ou SAIDA)", "Item (Nome Exato)", "Fornecedor (Nome Exato)", "NF", "Lote", "Quantidade (em Kg ou Litro)", "Data Movimentacao (AAAA-MM-DD)", "Vencimento (AAAA-MM-DD)"];
+        const csvContent = "data:text/csv;charset=utf-8," + headers.join(";");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "modelo_estoque_offline.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const text = e.target?.result as string;
+            const lines = text.split(/\r?\n/);
+            if (lines.length <= 1) {
+                alert("Arquivo vazio ou inválido.");
+                return;
+            }
+
+            setIsImporting(true);
+            let successCount = 0;
+            let errorCount = 0;
+            let errorDetails: string[] = [];
+
+            // Skip header
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                const columns = line.split(";");
+                if (columns.length < 8) continue;
+
+                const [tipo, itemName, supplierName, nf, lote, qtd, data, venc] = columns.map(c => c.trim().toUpperCase());
+                
+                const supplier = suppliers.find(s => s.name === supplierName);
+                if (!supplier) {
+                    errorCount++;
+                    errorDetails.push(`Linha ${i+1}: Fornecedor '${supplierName}' não encontrado.`);
+                    continue;
+                }
+
+                const qtyVal = parseFloat(qtd.replace(',', '.'));
+                if (isNaN(qtyVal)) {
+                    errorCount++;
+                    errorDetails.push(`Linha ${i+1}: Quantidade '${qtd}' inválida.`);
+                    continue;
+                }
+
+                try {
+                    if (tipo === 'ENTRADA') {
+                        await onRegisterEntry({
+                            supplierCpf: supplier.cpf,
+                            itemName,
+                            invoiceNumber: nf,
+                            invoiceDate: data,
+                            lotNumber: lote,
+                            quantity: qtyVal,
+                            expirationDate: venc
+                        });
+                        successCount++;
+                    } else if (tipo === 'SAIDA' || tipo === 'SAÍDA') {
+                        await onRegisterWithdrawal({
+                            supplierCpf: supplier.cpf,
+                            itemName,
+                            outboundInvoice: nf,
+                            lotNumber: lote,
+                            quantity: qtyVal,
+                            expirationDate: venc
+                        });
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        errorDetails.push(`Linha ${i+1}: Tipo '${tipo}' desconhecido.`);
+                    }
+                } catch (err) {
+                    errorCount++;
+                    errorDetails.push(`Linha ${i+1}: Erro no processamento.`);
+                }
+            }
+
+            setIsImporting(false);
+            alert(`Processamento concluído!\nSucesso: ${successCount}\nErros: ${errorCount}${errorDetails.length > 0 ? '\n\nDetalhes dos erros:\n' + errorDetails.join('\n') : ''}`);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        };
+        reader.readAsText(file);
+    };
+
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-gray-700 animate-fade-in">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 border-b pb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
                 <div>
                     <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Histórico de Estoque</h2>
-                    <p className="text-gray-400 font-medium">Visualize o histórico de movimentações de estoque.</p>
+                    <p className="text-gray-400 font-medium">Visualize movimentações e importe planilhas offline.</p>
                 </div>
-                <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                    <button 
+                        onClick={handleDownloadTemplate}
+                        className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg text-xs border border-gray-300 transition-colors flex items-center gap-2"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        Baixar Modelo CSV
+                    </button>
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isImporting}
+                        className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center gap-2 shadow-md disabled:bg-indigo-300"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                        {isImporting ? 'Importando...' : 'Importar Planilha CSV'}
+                    </button>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileUpload} 
+                        className="hidden" 
+                        accept=".csv"
+                    />
+                </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                <div className="flex items-center gap-4 flex-wrap w-full">
                     <input
                         type="text"
                         placeholder="Pesquisar..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full sm:w-auto border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all"
+                        className="flex-1 border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all"
                     />
                     <select
                         value={filterType}
@@ -174,6 +298,8 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+                @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
             `}</style>
         </div>
     );

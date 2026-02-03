@@ -149,7 +149,7 @@ const App: React.FC = () => {
     const sIdx = newSuppliers.findIndex(s => s.cpf === payload.supplierCpf);
     const targetSupplier = newSuppliers[sIdx];
     
-    const lotId = `lot-${Date.now()}`;
+    const lotId = `lot-${Date.now()}-${Math.random()}`;
     const newLot = {
       id: lotId,
       lotNumber: payload.lotNumber,
@@ -164,7 +164,7 @@ const App: React.FC = () => {
       delivery.lots = [...(delivery.lots || []), newLot];
     } else {
       const newDelivery: Delivery = {
-        id: `del-entry-${Date.now()}`,
+        id: `del-entry-${Date.now()}-${Math.random()}`,
         date: payload.invoiceDate,
         time: '08:00',
         item: payload.itemName,
@@ -196,10 +196,10 @@ const App: React.FC = () => {
         await set(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
         await set(newMovementRef, newLog);
         setIsSaving(false);
-        return { success: true, message: "Entrada registrada e histórico atualizado!" };
+        return { success: true, message: "Entrada registrada!" };
     } catch (e) {
         setIsSaving(false);
-        return { success: false, message: "Erro ao salvar no banco de dados." };
+        return { success: false, message: "Erro ao salvar." };
     }
   };
 
@@ -259,7 +259,7 @@ const App: React.FC = () => {
         await set(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
         await set(newMovementRef, newLog);
         setIsSaving(false);
-        return { success: true, message: "Saída registrada e histórico atualizado!" };
+        return { success: true, message: "Saída registrada!" };
     } catch (e) {
         setIsSaving(false);
         return { success: false, message: "Erro ao salvar saída." };
@@ -473,6 +473,8 @@ const App: React.FC = () => {
             dailyMenus={dailyMenus}
             onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)}
             onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)}
+            onRegisterEntry={handleRegisterWarehouseEntry}
+            onRegisterWithdrawal={handleRegisterWarehouseWithdrawal}
           />
         ) : currentUser ? (
           <Dashboard 

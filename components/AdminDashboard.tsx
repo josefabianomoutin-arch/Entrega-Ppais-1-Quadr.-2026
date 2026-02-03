@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useMemo } from 'react';
 import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus } from '../types';
 import AdminAnalytics from './AdminAnalytics';
@@ -45,6 +43,8 @@ interface AdminDashboardProps {
   dailyMenus: DailyMenus;
   onUpdateStandardMenu: (menu: StandardMenu) => Promise<void>;
   onUpdateDailyMenu: (menus: DailyMenus) => Promise<void>;
+  onRegisterEntry: (payload: any) => Promise<{ success: boolean; message: string }>;
+  onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
 }
 
 const formatCurrency = (value: number) => {
@@ -203,7 +203,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     standardMenu,
     dailyMenus,
     onUpdateStandardMenu,
-    onUpdateDailyMenu
+    onUpdateDailyMenu,
+    onRegisterEntry,
+    onRegisterWithdrawal
   } = props;
 
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -513,7 +515,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'schedule': return <AdminScheduleView suppliers={suppliers} />;
       case 'directorPerCapita': return <AdminDirectorPerCapita suppliers={suppliers} logs={directorWithdrawals} onRegister={onRegisterDirectorWithdrawal} onDelete={onDeleteDirectorWithdrawal} />;
       case 'cleaning': return <AdminCleaningLog logs={cleaningLogs} onRegister={onRegisterCleaningLog} onDelete={onDeleteCleaningLog} />;
-      case 'warehouse': return <AdminWarehouseLog suppliers={suppliers} warehouseLog={warehouseLog} onDeleteEntry={onDeleteWarehouseEntry} />;
+      case 'warehouse': return <AdminWarehouseLog suppliers={suppliers} warehouseLog={warehouseLog} onDeleteEntry={onDeleteWarehouseEntry} onRegisterEntry={onRegisterEntry} onRegisterWithdrawal={onRegisterWithdrawal} />;
       case 'analytics': return <AdminAnalytics suppliers={suppliers} />;
       case 'graphs': return <AdminGraphs suppliers={suppliers} />;
       case 'perCapita': return <AdminPerCapita suppliers={suppliers} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={onUpdatePerCapitaConfig} />;
