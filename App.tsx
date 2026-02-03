@@ -90,8 +90,6 @@ const App: React.FC = () => {
 
     const unsubMenu = onValue(standardMenuRef, (snapshot) => {
       const menuData = snapshot.val() || {};
-      // Firebase can return arrays as objects if keys are numerical but sparse.
-      // We need to ensure each day's menu is a proper array.
       for (const day in menuData) {
         if (Object.prototype.hasOwnProperty.call(menuData, day)) {
             menuData[day] = normalizeArray<MenuRow>(menuData[day]);
@@ -115,7 +113,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Sync current user state when suppliers list updates
   useEffect(() => {
     if (currentUser) {
       const updated = suppliers.find(s => s.cpf === currentUser.cpf);
@@ -288,32 +285,27 @@ const App: React.FC = () => {
     if (!supplier) return;
     const newDelivery: Delivery = { id: `del-${Date.now()}`, date, time, item: 'AGENDAMENTO PENDENTE', invoiceUploaded: false };
     const updatedDeliveries = [...(supplier.deliveries || []), newDelivery];
-    const updatedSupplier = { ...supplier, deliveries: updatedDeliveries };
-    const updatedMap = suppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p.cpf === supplierCpf ? updatedSupplier : p }), {});
-    await writeToDatabase(suppliersRef, updatedMap);
+    await writeToDatabase(ref(database, `suppliers/${supplierCpf}`), { ...supplier, deliveries: updatedDeliveries });
   };
 
   const handleFulfillAndInvoice = async (supplierCpf: string, placeholderIds: string[], invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }) => {
     const supplier = suppliers.find(s => s.cpf === supplierCpf);
     if (!supplier) return;
-    let updatedDeliveries = (supplier.deliveries || []).filter(d => !placeholderIds.includes(d.id));
+    let remainingDeliveries = (supplier.deliveries || []).filter(d => !placeholderIds.includes(d.id));
     const original = (supplier.deliveries || []).find(d => placeholderIds.includes(d.id));
     const date = original?.date || new Date().toISOString().split('T')[0];
     const time = original?.time || '08:00';
     const newDeliveries: Delivery[] = invoiceData.fulfilledItems.map((item, idx) => ({
         id: `del-${Date.now()}-${idx}`, date, time, item: item.name, kg: item.kg, value: item.value, invoiceUploaded: true, invoiceNumber: invoiceData.invoiceNumber,
     }));
-    const updatedSupplier = { ...supplier, deliveries: [...updatedDeliveries, ...newDeliveries] };
-    const updatedMap = suppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p.cpf === supplierCpf ? updatedSupplier : p }), {});
-    await writeToDatabase(suppliersRef, updatedMap);
+    await writeToDatabase(ref(database, `suppliers/${supplierCpf}`), { ...supplier, deliveries: [...remainingDeliveries, ...newDeliveries] });
   };
 
   const handleCancelDeliveries = async (supplierCpf: string, ids: string[]) => {
     const supplier = suppliers.find(s => s.cpf === supplierCpf);
     if (!supplier) return;
-    const updated = { ...supplier, deliveries: (supplier.deliveries || []).filter(d => !ids.includes(d.id)) };
-    const map = suppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p.cpf === supplierCpf ? updated : p }), {});
-    await writeToDatabase(suppliersRef, map);
+    const updatedDeliveries = (supplier.deliveries || []).filter(d => !ids.includes(d.id));
+    await writeToDatabase(ref(database, `suppliers/${supplierCpf}`), { ...supplier, deliveries: updatedDeliveries });
   };
 
   const handleReopenInvoice = async (supplierCpf: string, invoiceNumber: string) => {
@@ -321,12 +313,8 @@ const App: React.FC = () => {
     if (!supplier) return;
 
     setIsSaving(true);
-    const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
-    const sIdx = newSuppliers.findIndex(s => s.cpf === supplierCpf);
-    const target = newSuppliers[sIdx];
-
+    const target = JSON.parse(JSON.stringify(supplier)) as Supplier;
     const dates = [...new Set(target.deliveries.filter(d => d.invoiceNumber === invoiceNumber).map(d => d.date))];
-    
     target.deliveries = target.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
     
     dates.forEach(date => {
@@ -342,21 +330,16 @@ const App: React.FC = () => {
         }
     });
 
-    await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+    await writeToDatabase(ref(database, `suppliers/${supplierCpf}`), target);
   };
 
   const handleDeleteInvoice = async (supplierCpf: string, invoiceNumber: string) => {
     const supplier = suppliers.find(s => s.cpf === supplierCpf);
     if (!supplier) return;
-
     setIsSaving(true);
-    const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
-    const sIdx = newSuppliers.findIndex(s => s.cpf === supplierCpf);
-    const target = newSuppliers[sIdx];
-
+    const target = JSON.parse(JSON.stringify(supplier)) as Supplier;
     target.deliveries = target.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
-
-    await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+    await writeToDatabase(ref(database, `suppliers/${supplierCpf}`), target);
   };
 
   const handleRegisterDirectorWithdrawal = async (log: Omit<DirectorPerCapitaLog, 'id'>) => {
@@ -475,6 +458,7 @@ const App: React.FC = () => {
             onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)}
             onRegisterEntry={handleRegisterWarehouseEntry}
             onRegisterWithdrawal={handleRegisterWarehouseWithdrawal}
+            onCancelDeliveries={handleCancelDeliveries}
           />
         ) : currentUser ? (
           <Dashboard 
