@@ -1,8 +1,10 @@
+
 import React, { useState, useMemo } from 'react';
-import type { Supplier } from '../types';
+import type { Supplier, Delivery } from '../types';
 
 interface AdminScheduleViewProps {
   suppliers: Supplier[];
+  onCancelDeliveries: (supplierCpf: string, deliveryIds: string[]) => void;
 }
 
 const formatDate = (dateString: string) => {
@@ -10,7 +12,7 @@ const formatDate = (dateString: string) => {
     return date.toLocaleDateString('pt-BR');
 };
 
-const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers }) => {
+const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCancelDeliveries }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredSuppliers = useMemo(() => {
@@ -22,12 +24,18 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers }) => {
         return [...filteredSuppliers].sort((a, b) => a.name.localeCompare(b.name));
     }, [filteredSuppliers]);
 
+    const handleCancel = (supplierCpf: string, deliveryId: string, date: string) => {
+        if (window.confirm(`Deseja realmente remover o agendamento do dia ${formatDate(date)}?`)) {
+            onCancelDeliveries(supplierCpf, [deliveryId]);
+        }
+    };
+
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-purple-600 animate-fade-in">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 border-b pb-6">
                 <div>
                     <h2 className="text-3xl font-black text-purple-900 uppercase tracking-tighter">Agenda de Entregas</h2>
-                    <p className="text-gray-400 font-medium">Visualize as semanas e os agendamentos de cada fornecedor.</p>
+                    <p className="text-gray-400 font-medium">Visualize as semanas e gerencie os agendamentos de cada fornecedor.</p>
                 </div>
                 <input
                     type="text"
@@ -40,10 +48,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers }) => {
 
             <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-3 custom-scrollbar">
                 {sortedSuppliers.length > 0 ? sortedSuppliers.map(supplier => {
-                    // FIX: Explicitly typing the Set with <string> ensures that `scheduledDates` is correctly inferred
-                    // as a string array, resolving downstream type errors with `new Date()` and `formatDate`.
-                    const scheduledDates = [...new Set<string>(supplier.deliveries.map(d => d.date))]
-                        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+                    const sortedDeliveries = [...(supplier.deliveries || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
                     return (
                         <div key={supplier.cpf} className="p-5 border rounded-xl bg-gray-50/50 hover:bg-white transition-shadow hover:shadow-md">
@@ -65,12 +70,19 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers }) => {
                                 </div>
                                 <div className="bg-white p-4 rounded-lg border">
                                     <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Agendamentos Confirmados</h4>
-                                    {scheduledDates.length > 0 ? (
-                                        <div className="flex flex-wrap gap-2">
-                                            {scheduledDates.map(date => (
-                                                <span key={date} className="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-1 rounded-full font-mono">
-                                                    {formatDate(date)}
-                                                </span>
+                                    {sortedDeliveries.length > 0 ? (
+                                        <div className="flex flex-wrap gap-3">
+                                            {sortedDeliveries.map(delivery => (
+                                                <div key={delivery.id} className="flex items-center gap-1 bg-green-100 text-green-800 text-xs font-semibold pl-2.5 pr-1 py-1 rounded-full font-mono border border-green-200">
+                                                    <span>{formatDate(delivery.date)}</span>
+                                                    <button 
+                                                        onClick={() => handleCancel(supplier.cpf, delivery.id, delivery.date)}
+                                                        className="hover:bg-green-200 rounded-full p-0.5 text-green-600 transition-colors"
+                                                        title="Remover agendamento"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    </button>
+                                                </div>
                                             ))}
                                         </div>
                                     ) : (

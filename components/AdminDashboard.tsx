@@ -45,6 +45,7 @@ interface AdminDashboardProps {
   onUpdateDailyMenu: (menus: DailyMenus) => Promise<void>;
   onRegisterEntry: (payload: any) => Promise<{ success: boolean; message: string }>;
   onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
+  onCancelDeliveries: (supplierCpf: string, deliveryIds: string[]) => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -205,7 +206,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     onUpdateStandardMenu,
     onUpdateDailyMenu,
     onRegisterEntry,
-    onRegisterWithdrawal
+    onRegisterWithdrawal,
+    onCancelDeliveries
   } = props;
 
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -512,7 +514,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           </div>
         );
       case 'invoices': return <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} onDeleteInvoice={onDeleteInvoice} />;
-      case 'schedule': return <AdminScheduleView suppliers={suppliers} />;
+      case 'schedule': return <AdminScheduleView suppliers={suppliers} onCancelDeliveries={onCancelDeliveries} />;
       case 'directorPerCapita': return <AdminDirectorPerCapita suppliers={suppliers} logs={directorWithdrawals} onRegister={onRegisterDirectorWithdrawal} onDelete={onDeleteDirectorWithdrawal} />;
       case 'cleaning': return <AdminCleaningLog logs={cleaningLogs} onRegister={onRegisterCleaningLog} onDelete={onDeleteCleaningLog} />;
       case 'warehouse': return <AdminWarehouseLog suppliers={suppliers} warehouseLog={warehouseLog} onDeleteEntry={onDeleteWarehouseEntry} onRegisterEntry={onRegisterEntry} onRegisterWithdrawal={onRegisterWithdrawal} />;
