@@ -17,6 +17,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Mapeia unidades para exibição amigável
     const itemUnitInfoMap = useMemo(() => {
         const map = new Map<string, { name: string; factorToKg: number }>();
         suppliers.forEach(s => {
@@ -38,6 +39,18 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
         });
         return map;
     }, [suppliers]);
+
+    // Cria um Set de assinaturas de registros existentes para busca ultra-rápida de duplicatas
+    const existingSignatures = useMemo(() => {
+        const signatures = new Set<string>();
+        warehouseLog.forEach(log => {
+            const nf = (log.inboundInvoice || log.outboundInvoice || '').trim().toUpperCase();
+            // Assinatura: Tipo | Item | Fornecedor | NF | Lote | Qtd (arredondada para evitar erros de precisão)
+            const sig = `${log.type}|${log.itemName.toUpperCase()}|${log.supplierName.toUpperCase()}|${nf}|${log.lotNumber.toUpperCase()}|${(log.quantity || 0).toFixed(4)}`;
+            signatures.add(sig);
+        });
+        return signatures;
+    }, [warehouseLog]);
 
     const filteredLog = useMemo(() => {
         return warehouseLog
@@ -71,7 +84,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
         if (window.confirm(confirmationMessage)) {
             setIsDeleting(log.id);
             const result = await onDeleteEntry(log);
-            alert(result.message); // Simple feedback
+            alert(result.message);
             setIsDeleting(null);
         }
     };
@@ -96,7 +109,6 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
         const reader = new FileReader();
         reader.onload = async (e) => {
             let text = e.target?.result as string;
-            // Remove BOM do Excel e normaliza quebras de linha
             text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             
             const lines = text.split('\n');
@@ -108,55 +120,60 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
             setIsImporting(true);
             let successCount = 0;
             let errorCount = 0;
+            let duplicateCount = 0;
             let errorDetails: string[] = [];
 
-            // Pular cabeçalho
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
 
-                // Detectar delimitador (tenta ; depois ,)
                 let columns = line.split(";");
                 if (columns.length < 5) columns = line.split(",");
                 
-                if (columns.length < 7) {
+                if (columns.length < 6) {
                     errorCount++;
-                    errorDetails.push(`Linha ${i+1}: Colunas insuficientes.`);
                     continue;
                 }
 
-                // Limpar colunas
                 const [tipoRaw, itemName, supplierName, nf, lote, qtd, data, venc] = columns.map(c => c.trim());
-                const tipo = tipoRaw.toUpperCase();
+                const tipo = tipoRaw.toUpperCase().includes('ENTRADA') ? 'entrada' : 'saída';
+                const qtyVal = parseFloat(qtd.replace(',', '.'));
                 
-                // Busca insensível ao caso
+                if (isNaN(qtyVal)) {
+                    errorCount++;
+                    errorDetails.push(`Linha ${i+1}: Qtd inválida.`);
+                    continue;
+                }
+
+                // VERIFICAÇÃO DE DUPLICIDADE
+                // Criamos a mesma assinatura para comparar com o que já existe no sistema
+                const rowSignature = `${tipo}|${itemName.toUpperCase()}|${supplierName.toUpperCase()}|${nf.toUpperCase()}|${lote.toUpperCase()}|${qtyVal.toFixed(4)}`;
+                
+                if (existingSignatures.has(rowSignature)) {
+                    duplicateCount++;
+                    continue; // Pula para a próxima linha sem importar
+                }
+
                 const supplier = suppliers.find(s => s.name.toUpperCase() === supplierName.toUpperCase());
                 if (!supplier) {
                     errorCount++;
-                    errorDetails.push(`Linha ${i+1}: Fornecedor '${supplierName}' não cadastrado.`);
-                    continue;
-                }
-
-                const qtyVal = parseFloat(qtd.replace(',', '.'));
-                if (isNaN(qtyVal)) {
-                    errorCount++;
-                    errorDetails.push(`Linha ${i+1}: Quantidade '${qtd}' inválida.`);
+                    errorDetails.push(`Linha ${i+1}: Fornecedor '${supplierName}' não existe.`);
                     continue;
                 }
 
                 try {
                     let result;
-                    if (tipo === 'ENTRADA') {
+                    if (tipo === 'entrada') {
                         result = await onRegisterEntry({
                             supplierCpf: supplier.cpf,
-                            itemName: itemName, // O banco já normaliza
+                            itemName: itemName,
                             invoiceNumber: nf,
                             invoiceDate: data || new Date().toISOString().split('T')[0],
                             lotNumber: lote,
                             quantity: qtyVal,
                             expirationDate: venc || ''
                         });
-                    } else if (tipo === 'SAIDA' || tipo === 'SAÍDA') {
+                    } else {
                         result = await onRegisterWithdrawal({
                             supplierCpf: supplier.cpf,
                             itemName: itemName,
@@ -165,10 +182,6 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                             quantity: qtyVal,
                             expirationDate: venc || ''
                         });
-                    } else {
-                        errorCount++;
-                        errorDetails.push(`Linha ${i+1}: Tipo '${tipo}' inválido (use ENTRADA ou SAIDA).`);
-                        continue;
                     }
 
                     if (result.success) {
@@ -179,12 +192,16 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     }
                 } catch (err) {
                     errorCount++;
-                    errorDetails.push(`Linha ${i+1}: Erro inesperado.`);
                 }
             }
 
             setIsImporting(false);
-            alert(`Importação Concluída!\n\nRegistros com sucesso: ${successCount}\nRegistros com erro: ${errorCount}${errorDetails.length > 0 ? '\n\nPrimeiros erros:\n' + errorDetails.slice(0, 5).join('\n') : ''}`);
+            alert(`Processamento Concluído!\n\n` +
+                  `✅ Novos registros: ${successCount}\n` +
+                  `⏭️ Já existiam (puldados): ${duplicateCount}\n` +
+                  `❌ Erros: ${errorCount}` +
+                  (errorDetails.length > 0 ? `\n\nResumo de erros:\n${errorDetails.slice(0, 3).join('\n')}` : ''));
+            
             if (fileInputRef.current) fileInputRef.current.value = '';
         };
         reader.readAsText(file);
@@ -195,7 +212,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
             <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
                 <div>
                     <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Histórico de Estoque</h2>
-                    <p className="text-gray-400 font-medium">Visualize movimentações e importe planilhas offline.</p>
+                    <p className="text-gray-400 font-medium">Visualize movimentações e importe planilhas (Duplicidades são ignoradas).</p>
                 </div>
                 <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
                     <button 
@@ -203,7 +220,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                         className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg text-xs border border-gray-300 transition-colors flex items-center gap-2"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                        Baixar Modelo CSV
+                        Modelo CSV
                     </button>
                     <button 
                         onClick={() => fileInputRef.current?.click()}
@@ -211,7 +228,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                         className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center gap-2 shadow-md disabled:bg-indigo-300"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                        {isImporting ? 'Importando...' : 'Importar Planilha CSV'}
+                        {isImporting ? 'Lendo Arquivo...' : 'Importar Planilha'}
                     </button>
                     <input 
                         type="file" 
@@ -238,8 +255,8 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                         className="border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all bg-white"
                     >
                         <option value="all">Todos os Tipos</option>
-                        <option value="entrada">Apenas Entradas</option>
-                        <option value="saída">Apenas Saídas</option>
+                        <option value="entrada">Entradas</option>
+                        <option value="saída">Saídas</option>
                     </select>
                 </div>
             </div>
@@ -307,7 +324,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                         )) : (
                             <tr>
                                 <td colSpan={9} className="p-12 text-center text-gray-400 italic">
-                                    Nenhuma movimentação encontrada para os filtros selecionados.
+                                    Nenhuma movimentação encontrada.
                                 </td>
                             </tr>
                         )}
