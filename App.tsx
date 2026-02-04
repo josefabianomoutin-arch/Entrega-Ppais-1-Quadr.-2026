@@ -7,7 +7,7 @@ import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AlmoxarifadoDashboard from './components/AlmoxarifadoDashboard';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set, runTransaction, push, child } from 'firebase/database';
+import { getDatabase, ref, onValue, set, runTransaction, push, child, update } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
 
 const app = initializeApp(firebaseConfig);
@@ -139,13 +139,12 @@ const App: React.FC = () => {
     quantity: number;
     expirationDate: string;
   }) => {
-    const supplier = suppliers.find(s => s.cpf === payload.supplierCpf);
-    if (!supplier) return { success: false, message: "Fornecedor não encontrado." };
+    // Busca fornecedor mais recente para evitar sobrescrita de dados
+    const supplierSnapshot = suppliers.find(s => s.cpf === payload.supplierCpf);
+    if (!supplierSnapshot) return { success: false, message: "Fornecedor não encontrado." };
 
     setIsSaving(true);
-    const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
-    const sIdx = newSuppliers.findIndex(s => s.cpf === payload.supplierCpf);
-    const targetSupplier = newSuppliers[sIdx];
+    const targetSupplier = JSON.parse(JSON.stringify(supplierSnapshot)) as Supplier;
     
     const lotId = `lot-${Date.now()}-${Math.random()}`;
     const newLot = {
@@ -156,7 +155,11 @@ const App: React.FC = () => {
       expirationDate: payload.expirationDate
     };
 
-    let delivery = targetSupplier.deliveries.find(d => d.invoiceNumber === payload.invoiceNumber && d.item === payload.itemName);
+    // Busca entrega existente com o mesmo item e NF (indiferente de case)
+    let delivery = targetSupplier.deliveries.find(d => 
+        d.invoiceNumber === payload.invoiceNumber && 
+        d.item?.toUpperCase() === payload.itemName.toUpperCase()
+    );
     
     if (delivery) {
       delivery.lots = [...(delivery.lots || []), newLot];
@@ -165,7 +168,7 @@ const App: React.FC = () => {
         id: `del-entry-${Date.now()}-${Math.random()}`,
         date: payload.invoiceDate,
         time: '08:00',
-        item: payload.itemName,
+        item: payload.itemName.toUpperCase(), // Padroniza para maiúscula
         kg: payload.quantity,
         invoiceUploaded: true,
         invoiceNumber: payload.invoiceNumber,
@@ -182,7 +185,7 @@ const App: React.FC = () => {
       timestamp: new Date().toISOString(),
       lotId: lotId,
       lotNumber: payload.lotNumber,
-      itemName: payload.itemName,
+      itemName: payload.itemName.toUpperCase(),
       supplierName: targetSupplier.name,
       deliveryId: delivery?.id || `del-entry-${Date.now()}`,
       inboundInvoice: payload.invoiceNumber,
@@ -191,7 +194,8 @@ const App: React.FC = () => {
     };
 
     try {
-        await set(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+        // Atualiza apenas o fornecedor específico e a log separadamente para evitar conflitos de loop
+        await set(ref(database, `suppliers/${targetSupplier.cpf}`), targetSupplier);
         await set(newMovementRef, newLog);
         setIsSaving(false);
         return { success: true, message: "Entrada registrada!" };
@@ -209,19 +213,17 @@ const App: React.FC = () => {
     outboundInvoice: string;
     expirationDate: string;
   }) => {
-    const supplier = suppliers.find(s => s.cpf === payload.supplierCpf);
-    if (!supplier) return { success: false, message: "Fornecedor não encontrado." };
+    const supplierSnapshot = suppliers.find(s => s.cpf === payload.supplierCpf);
+    if (!supplierSnapshot) return { success: false, message: "Fornecedor não encontrado." };
 
     setIsSaving(true);
-    const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
-    const sIdx = newSuppliers.findIndex(s => s.cpf === payload.supplierCpf);
-    const targetSupplier = newSuppliers[sIdx];
+    const targetSupplier = JSON.parse(JSON.stringify(supplierSnapshot)) as Supplier;
     
     let quantityToDeduct = payload.quantity;
     let lotFound = false;
 
     for (const delivery of targetSupplier.deliveries) {
-      if (delivery.item !== payload.itemName || !delivery.lots) continue;
+      if (delivery.item?.toUpperCase() !== payload.itemName.toUpperCase() || !delivery.lots) continue;
       const lot = delivery.lots.find(l => l.lotNumber === payload.lotNumber);
       if (lot && lot.remainingQuantity > 0) {
         const deduct = Math.min(lot.remainingQuantity, quantityToDeduct);
@@ -234,7 +236,7 @@ const App: React.FC = () => {
 
     if (!lotFound) {
         setIsSaving(false);
-        return { success: false, message: "Lote não encontrado ou sem saldo." };
+        return { success: false, message: "Lote não encontrado ou sem saldo suficiente." };
     }
 
     const newMovementRef = push(warehouseLogRef);
@@ -245,7 +247,7 @@ const App: React.FC = () => {
       timestamp: new Date().toISOString(),
       lotId: 'various',
       lotNumber: payload.lotNumber,
-      itemName: payload.itemName,
+      itemName: payload.itemName.toUpperCase(),
       supplierName: targetSupplier.name,
       deliveryId: 'various',
       outboundInvoice: payload.outboundInvoice,
@@ -254,7 +256,7 @@ const App: React.FC = () => {
     };
 
     try {
-        await set(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+        await set(ref(database, `suppliers/${targetSupplier.cpf}`), targetSupplier);
         await set(newMovementRef, newLog);
         setIsSaving(false);
         return { success: true, message: "Saída registrada!" };
@@ -267,13 +269,13 @@ const App: React.FC = () => {
   const handleDeleteWarehouseEntry = async (logEntry: WarehouseMovement) => {
     setIsSaving(true);
     if (logEntry.type === 'entrada') {
-      const newSuppliers = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
-      const supplier = newSuppliers.find(s => s.name === logEntry.supplierName);
+      const supplier = suppliers.find(s => s.name === logEntry.supplierName);
       if (supplier) {
-        for (const del of supplier.deliveries) {
+        const target = JSON.parse(JSON.stringify(supplier)) as Supplier;
+        for (const del of target.deliveries) {
           if (del.lots) del.lots = del.lots.filter(l => l.id !== logEntry.lotId);
         }
-        await set(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+        await set(ref(database, `suppliers/${target.cpf}`), target);
       }
     }
     await set(ref(database, `warehouseLog/${logEntry.id}`), null);

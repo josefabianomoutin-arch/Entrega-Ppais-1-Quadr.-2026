@@ -78,10 +78,11 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
 
     const handleDownloadTemplate = () => {
         const headers = ["Tipo (ENTRADA ou SAIDA)", "Item (Nome Exato)", "Fornecedor (Nome Exato)", "NF", "Lote", "Quantidade (em Kg ou Litro)", "Data Movimentacao (AAAA-MM-DD)", "Vencimento (AAAA-MM-DD)"];
-        const csvContent = "data:text/csv;charset=utf-8," + headers.join(";");
-        const encodedUri = encodeURI(csvContent);
+        const csvContent = "\uFEFF" + headers.join(";");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
+        link.setAttribute("href", url);
         link.setAttribute("download", "modelo_estoque_offline.csv");
         document.body.appendChild(link);
         link.click();
@@ -94,8 +95,11 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
 
         const reader = new FileReader();
         reader.onload = async (e) => {
-            const text = e.target?.result as string;
-            const lines = text.split(/\r?\n/);
+            let text = e.target?.result as string;
+            // Remove BOM do Excel e normaliza quebras de linha
+            text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            
+            const lines = text.split('\n');
             if (lines.length <= 1) {
                 alert("Arquivo vazio ou inválido.");
                 return;
@@ -106,20 +110,30 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
             let errorCount = 0;
             let errorDetails: string[] = [];
 
-            // Skip header
+            // Pular cabeçalho
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
 
-                const columns = line.split(";");
-                if (columns.length < 8) continue;
-
-                const [tipo, itemName, supplierName, nf, lote, qtd, data, venc] = columns.map(c => c.trim().toUpperCase());
+                // Detectar delimitador (tenta ; depois ,)
+                let columns = line.split(";");
+                if (columns.length < 5) columns = line.split(",");
                 
-                const supplier = suppliers.find(s => s.name === supplierName);
+                if (columns.length < 7) {
+                    errorCount++;
+                    errorDetails.push(`Linha ${i+1}: Colunas insuficientes.`);
+                    continue;
+                }
+
+                // Limpar colunas
+                const [tipoRaw, itemName, supplierName, nf, lote, qtd, data, venc] = columns.map(c => c.trim());
+                const tipo = tipoRaw.toUpperCase();
+                
+                // Busca insensível ao caso
+                const supplier = suppliers.find(s => s.name.toUpperCase() === supplierName.toUpperCase());
                 if (!supplier) {
                     errorCount++;
-                    errorDetails.push(`Linha ${i+1}: Fornecedor '${supplierName}' não encontrado.`);
+                    errorDetails.push(`Linha ${i+1}: Fornecedor '${supplierName}' não cadastrado.`);
                     continue;
                 }
 
@@ -131,39 +145,46 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 }
 
                 try {
+                    let result;
                     if (tipo === 'ENTRADA') {
-                        await onRegisterEntry({
+                        result = await onRegisterEntry({
                             supplierCpf: supplier.cpf,
-                            itemName,
+                            itemName: itemName, // O banco já normaliza
                             invoiceNumber: nf,
-                            invoiceDate: data,
+                            invoiceDate: data || new Date().toISOString().split('T')[0],
                             lotNumber: lote,
                             quantity: qtyVal,
-                            expirationDate: venc
+                            expirationDate: venc || ''
                         });
-                        successCount++;
                     } else if (tipo === 'SAIDA' || tipo === 'SAÍDA') {
-                        await onRegisterWithdrawal({
+                        result = await onRegisterWithdrawal({
                             supplierCpf: supplier.cpf,
-                            itemName,
+                            itemName: itemName,
                             outboundInvoice: nf,
                             lotNumber: lote,
                             quantity: qtyVal,
-                            expirationDate: venc
+                            expirationDate: venc || ''
                         });
+                    } else {
+                        errorCount++;
+                        errorDetails.push(`Linha ${i+1}: Tipo '${tipo}' inválido (use ENTRADA ou SAIDA).`);
+                        continue;
+                    }
+
+                    if (result.success) {
                         successCount++;
                     } else {
                         errorCount++;
-                        errorDetails.push(`Linha ${i+1}: Tipo '${tipo}' desconhecido.`);
+                        errorDetails.push(`Linha ${i+1}: ${result.message}`);
                     }
                 } catch (err) {
                     errorCount++;
-                    errorDetails.push(`Linha ${i+1}: Erro no processamento.`);
+                    errorDetails.push(`Linha ${i+1}: Erro inesperado.`);
                 }
             }
 
             setIsImporting(false);
-            alert(`Processamento concluído!\nSucesso: ${successCount}\nErros: ${errorCount}${errorDetails.length > 0 ? '\n\nDetalhes dos erros:\n' + errorDetails.join('\n') : ''}`);
+            alert(`Importação Concluída!\n\nRegistros com sucesso: ${successCount}\nRegistros com erro: ${errorCount}${errorDetails.length > 0 ? '\n\nPrimeiros erros:\n' + errorDetails.slice(0, 5).join('\n') : ''}`);
             if (fileInputRef.current) fileInputRef.current.value = '';
         };
         reader.readAsText(file);
@@ -206,7 +227,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 <div className="flex items-center gap-4 flex-wrap w-full">
                     <input
                         type="text"
-                        placeholder="Pesquisar..."
+                        placeholder="Pesquisar por item, fornecedor, NF ou lote..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="flex-1 border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all"
@@ -225,7 +246,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
 
             <div className="overflow-x-auto max-h-[65vh] pr-2 custom-scrollbar">
                 <table className="w-full text-sm">
-                    <thead className="bg-gray-100 sticky top-0">
+                    <thead className="bg-gray-100 sticky top-0 z-10">
                         <tr>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Tipo</th>
                             <th className="p-3 text-left text-xs font-bold uppercase text-gray-600">Data e Hora</th>
