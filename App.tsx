@@ -45,6 +45,7 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse' | 'cleaning' | 'directorPerCapita' | 'menu'>('register');
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
+  const [emailModalData, setEmailModalData] = useState<{ recipient: string; cc: string; subject: string; body: string; mailtoLink: string; } | null>(null);
 
   // Global Sync Effect - Runs only once on mount to keep listeners active
   useEffect(() => {
@@ -299,6 +300,30 @@ const App: React.FC = () => {
         id: `del-${Date.now()}-${idx}`, date, time, item: item.name, kg: item.kg, value: item.value, invoiceUploaded: true, invoiceNumber: invoiceData.invoiceNumber,
     }));
     await writeToDatabase(ref(database, `suppliers/${supplierCpf}`), { ...supplier, deliveries: [...remainingDeliveries, ...newDeliveries] });
+    
+    // Preparar dados do e-mail
+    const recipient = "dg@ptaiuva.sap.gov.br";
+    const cc = "almoxarifado@ptaiuva.sap.gov.br";
+    const subject = `ENVIO DE NOTA FISCAL - ${supplier.name} - NF ${invoiceData.invoiceNumber}`;
+    
+    let body = `Olá,\n\nSegue em anexo a Nota Fiscal nº ${invoiceData.invoiceNumber} referente às entregas realizadas em ${new Date(date + 'T00:00:00').toLocaleDateString('pt-BR')}.\n\nDetalhes da Entrega:\n`;
+    
+    invoiceData.fulfilledItems.forEach(item => {
+        body += `- ${item.name}: ${item.kg.toFixed(2).replace('.',',')} Kg (${new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(item.value)})\n`;
+    });
+    
+    const total = invoiceData.fulfilledItems.reduce((s, i) => s + i.value, 0);
+    body += `\nVALOR TOTAL DA NOTA: ${new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(total)}\n\nAtenciosamente,\n${supplier.name}`;
+
+    const mailtoLink = `mailto:${recipient}?cc=${cc}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    setEmailModalData({
+        recipient,
+        cc,
+        subject,
+        body,
+        mailtoLink
+    });
   };
 
   const handleCancelDeliveries = async (supplierCpf: string, ids: string[]) => {
@@ -463,7 +488,7 @@ const App: React.FC = () => {
         ) : currentUser ? (
           <Dashboard 
             supplier={currentUser} onLogout={() => setCurrentUser(null)} onScheduleDelivery={handleScheduleDelivery} 
-            onFulfillAndInvoice={handleFulfillAndInvoice} onCancelDeliveries={handleCancelDeliveries} emailModalData={null} onCloseEmailModal={() => {}} 
+            onFulfillAndInvoice={handleFulfillAndInvoice} onCancelDeliveries={handleCancelDeliveries} emailModalData={emailModalData} onCloseEmailModal={() => setEmailModalData(null)} 
           />
         ) : isAlmoxarifadoLoggedIn ? (
           <AlmoxarifadoDashboard 

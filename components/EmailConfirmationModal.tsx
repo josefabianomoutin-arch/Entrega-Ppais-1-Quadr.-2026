@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface EmailConfirmationModalProps {
@@ -31,8 +32,10 @@ const CopyableField: React.FC<{label: string, value: string}> = ({ label, value 
 
 const EmailConfirmationModal: React.FC<EmailConfirmationModalProps> = ({ data, onClose }) => {
   const openMailClient = () => {
-    window.open(data.mailtoLink, '_blank');
-    onClose(); // Fecha o modal imediatamente após abrir o cliente de e-mail
+    // Usar window.location.href é mais confiável para mailto do que window.open
+    window.location.href = data.mailtoLink;
+    // Opcional: fechar o modal após um pequeno delay para garantir que o link foi processado
+    setTimeout(onClose, 1000);
   };
 
   return (
@@ -64,7 +67,7 @@ const EmailConfirmationModal: React.FC<EmailConfirmationModalProps> = ({ data, o
         <div className="space-y-4 text-center">
             <button 
               onClick={openMailClient}
-              className="w-full max-w-md bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg transition-transform transform hover:scale-105 text-lg"
+              className="w-full max-w-md bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg transition-transform transform hover:scale-105 text-lg shadow-lg"
             >
               Abrir Programa de E-mail
             </button>
