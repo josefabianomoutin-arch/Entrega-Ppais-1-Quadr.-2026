@@ -82,8 +82,9 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     const allContractItems = useMemo(() => {
         const items = new Map<string, { name: string }>();
         suppliers.forEach(s => s.contractItems.forEach(ci => {
-            if (!items.has(ci.name)) {
-                items.set(ci.name, { name: ci.name });
+            const normalizedName = ci.name.toUpperCase().trim();
+            if (!items.has(normalizedName)) {
+                items.set(normalizedName, { name: normalizedName });
             }
         }));
         return Array.from(items.values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -92,15 +93,17 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     // --- ENTRADA DERIVED STATE ---
     const entrySuppliersForItem = useMemo(() => {
         if (!selectedEntryItem) return [];
+        const normalizedSelected = selectedEntryItem.toUpperCase().trim();
         return suppliers
-            .filter(s => s.contractItems.some(ci => ci.name === selectedEntryItem))
+            .filter(s => s.contractItems.some(ci => ci.name.toUpperCase().trim() === normalizedSelected))
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [selectedEntryItem, suppliers]);
 
     const entryItemData = useMemo(() => {
         if (!selectedEntryItem) return null;
         
-        const contractItems = suppliers.flatMap(s => s.contractItems.filter(ci => ci.name === selectedEntryItem));
+        const normalizedSelected = selectedEntryItem.toUpperCase().trim();
+        const contractItems = suppliers.flatMap(s => s.contractItems.filter(ci => ci.name.toUpperCase().trim() === normalizedSelected));
         if (contractItems.length === 0) return null;
 
         const { name: displayUnit, factorToKg } = getUnitInfo(contractItems[0]);
@@ -110,7 +113,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         let totalRecebidoHistoricoKg = 0;
         suppliers.forEach(s => {
             s.deliveries.forEach(d => {
-                if (d.item === selectedEntryItem) {
+                if ((d.item || '').toUpperCase().trim() === normalizedSelected) {
                     totalRecebidoHistoricoKg += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
                 }
             });
@@ -133,15 +136,17 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     // --- SAÍDA DERIVED STATE ---
     const exitSuppliersForItem = useMemo(() => {
         if (!selectedExitItem) return [];
+        const normalizedSelected = selectedExitItem.toUpperCase().trim();
         return suppliers
-            .filter(s => s.contractItems.some(ci => ci.name === selectedExitItem))
+            .filter(s => s.contractItems.some(ci => ci.name.toUpperCase().trim() === normalizedSelected))
             .sort((a,b) => a.name.localeCompare(b.name));
     }, [selectedExitItem, suppliers]);
 
     const exitItemData = useMemo(() => {
         if (!selectedExitItem) return null;
         
-        const contractItems = suppliers.flatMap(s => s.contractItems.filter(ci => ci.name === selectedExitItem));
+        const normalizedSelected = selectedExitItem.toUpperCase().trim();
+        const contractItems = suppliers.flatMap(s => s.contractItems.filter(ci => ci.name.toUpperCase().trim() === normalizedSelected));
         if (contractItems.length === 0) return null;
         
         const { name: displayUnit, factorToKg } = getUnitInfo(contractItems[0]);
@@ -150,7 +155,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         let estoqueAtualKg = 0;
         suppliers.forEach(s => {
             s.deliveries.forEach(d => {
-                if (d.item === selectedExitItem) {
+                if ((d.item || '').toUpperCase().trim() === normalizedSelected) {
                     totalRecebidoHistoricoKg += (d.lots || []).reduce((sum, lot) => sum + lot.initialQuantity, 0);
                     estoqueAtualKg += (d.lots || []).reduce((sum, lot) => sum + lot.remainingQuantity, 0);
                 }
@@ -380,7 +385,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                             )}
                                         </td>
                                         <td className="p-3 text-xs text-gray-500 font-mono">{new Date(mov.timestamp).toLocaleString('pt-BR')}</td>
-                                        <td className="p-3 font-bold text-gray-700">{mov.itemName}</td>
+                                        <td className="p-3 font-bold text-gray-700 uppercase">{mov.itemName}</td>
                                         <td className="p-3 text-right font-mono font-bold">{(mov.quantity || 0).toLocaleString('pt-BR')} kg</td>
                                         <td className="p-3 text-xs text-gray-500 font-mono">{mov.inboundInvoice || mov.outboundInvoice || '-'}</td>
                                     </tr>

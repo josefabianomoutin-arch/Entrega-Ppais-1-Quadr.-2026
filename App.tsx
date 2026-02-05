@@ -56,12 +56,13 @@ const App: React.FC = () => {
       const raw = normalizeArray<any>(data);
       const suppliersArray: Supplier[] = raw.map(p => ({
           ...p,
-          name: p.name || 'SEM NOME',
+          name: (p.name || 'SEM NOME').toUpperCase().trim(),
           cpf: p.cpf || String(Math.random()),
-          contractItems: normalizeArray(p.contractItems),
+          contractItems: normalizeArray(p.contractItems).map((ci: any) => ({ ...ci, name: (ci.name || '').toUpperCase().trim() })),
           deliveries: normalizeArray<any>(p.deliveries).map((d: any) => ({ 
               ...d, 
-              lots: normalizeArray(d.lots), 
+              item: (d.item || '').toUpperCase().trim(),
+              lots: normalizeArray(d.lots).map((l: any) => ({ ...l, lotNumber: (l.lotNumber || '').toUpperCase().trim() })), 
               withdrawals: normalizeArray(d.withdrawals) 
           })),
           allowedWeeks: normalizeArray<number>(p.allowedWeeks),
@@ -139,69 +140,74 @@ const App: React.FC = () => {
     quantity: number;
     expirationDate: string;
   }) => {
-    // Busca fornecedor mais recente para evitar sobrescrita de dados
-    const supplierSnapshot = suppliers.find(s => s.cpf === payload.supplierCpf);
-    if (!supplierSnapshot) return { success: false, message: "Fornecedor não encontrado." };
-
     setIsSaving(true);
-    const targetSupplier = JSON.parse(JSON.stringify(supplierSnapshot)) as Supplier;
-    
+    const supplierRef = ref(database, `suppliers/${payload.supplierCpf}`);
+    const normalizedItemName = payload.itemName.toUpperCase().trim();
+    const normalizedLotNumber = payload.lotNumber.toUpperCase().trim();
     const lotId = `lot-${Date.now()}-${Math.random()}`;
-    const newLot = {
-      id: lotId,
-      lotNumber: payload.lotNumber,
-      initialQuantity: payload.quantity,
-      remainingQuantity: payload.quantity,
-      expirationDate: payload.expirationDate
-    };
-
-    // Busca entrega existente com o mesmo item e NF (indiferente de case)
-    let delivery = targetSupplier.deliveries.find(d => 
-        d.invoiceNumber === payload.invoiceNumber && 
-        d.item?.toUpperCase() === payload.itemName.toUpperCase()
-    );
     
-    if (delivery) {
-      delivery.lots = [...(delivery.lots || []), newLot];
-    } else {
-      const newDelivery: Delivery = {
-        id: `del-entry-${Date.now()}-${Math.random()}`,
-        date: payload.invoiceDate,
-        time: '08:00',
-        item: payload.itemName.toUpperCase(), // Padroniza para maiúscula
-        kg: payload.quantity,
-        invoiceUploaded: true,
-        invoiceNumber: payload.invoiceNumber,
-        lots: [newLot]
-      };
-      targetSupplier.deliveries.push(newDelivery);
-    }
-
-    const newMovementRef = push(warehouseLogRef);
-    const movementId = newMovementRef.key || `mov-${Date.now()}`;
-    const newLog: WarehouseMovement = {
-      id: movementId,
-      type: 'entrada',
-      timestamp: new Date().toISOString(),
-      lotId: lotId,
-      lotNumber: payload.lotNumber,
-      itemName: payload.itemName.toUpperCase(),
-      supplierName: targetSupplier.name,
-      deliveryId: delivery?.id || `del-entry-${Date.now()}`,
-      inboundInvoice: payload.invoiceNumber,
-      quantity: payload.quantity,
-      expirationDate: payload.expirationDate
-    };
-
     try {
-        // Atualiza apenas o fornecedor específico e a log separadamente para evitar conflitos de loop
-        await set(ref(database, `suppliers/${targetSupplier.cpf}`), targetSupplier);
+      const result = await runTransaction(supplierRef, (currentSupplier) => {
+        if (!currentSupplier) return null;
+        
+        const newLot = {
+          id: lotId,
+          lotNumber: normalizedLotNumber,
+          initialQuantity: payload.quantity,
+          remainingQuantity: payload.quantity,
+          expirationDate: payload.expirationDate
+        };
+
+        const deliveries = normalizeArray<any>(currentSupplier.deliveries);
+        let delivery = deliveries.find(d => 
+          d.invoiceNumber === payload.invoiceNumber && 
+          (d.item || '').toUpperCase().trim() === normalizedItemName
+        );
+
+        if (delivery) {
+          delivery.lots = [...normalizeArray(delivery.lots), newLot];
+        } else {
+          const newDelivery: Delivery = {
+            id: `del-entry-${Date.now()}-${Math.random()}`,
+            date: payload.invoiceDate,
+            time: '08:00',
+            item: normalizedItemName,
+            kg: payload.quantity,
+            invoiceUploaded: true,
+            invoiceNumber: payload.invoiceNumber,
+            lots: [newLot]
+          };
+          deliveries.push(newDelivery);
+        }
+        
+        currentSupplier.deliveries = deliveries;
+        return currentSupplier;
+      });
+
+      if (result.committed) {
+        const newMovementRef = push(warehouseLogRef);
+        const newLog: WarehouseMovement = {
+          id: newMovementRef.key || `mov-${Date.now()}`,
+          type: 'entrada',
+          timestamp: new Date().toISOString(),
+          lotId: lotId, 
+          lotNumber: normalizedLotNumber,
+          itemName: normalizedItemName,
+          supplierName: result.snapshot.val().name,
+          deliveryId: 'various',
+          inboundInvoice: payload.invoiceNumber,
+          quantity: payload.quantity,
+          expirationDate: payload.expirationDate
+        };
         await set(newMovementRef, newLog);
         setIsSaving(false);
         return { success: true, message: "Entrada registrada!" };
+      }
+      setIsSaving(false);
+      return { success: false, message: "Erro ao processar transação." };
     } catch (e) {
-        setIsSaving(false);
-        return { success: false, message: "Erro ao salvar." };
+      setIsSaving(false);
+      return { success: false, message: "Erro ao salvar." };
     }
   };
 
@@ -213,69 +219,105 @@ const App: React.FC = () => {
     outboundInvoice: string;
     expirationDate: string;
   }) => {
-    const supplierSnapshot = suppliers.find(s => s.cpf === payload.supplierCpf);
-    if (!supplierSnapshot) return { success: false, message: "Fornecedor não encontrado." };
-
     setIsSaving(true);
-    const targetSupplier = JSON.parse(JSON.stringify(supplierSnapshot)) as Supplier;
-    
-    let quantityToDeduct = payload.quantity;
-    let lotFound = false;
-
-    for (const delivery of targetSupplier.deliveries) {
-      if (delivery.item?.toUpperCase() !== payload.itemName.toUpperCase() || !delivery.lots) continue;
-      const lot = delivery.lots.find(l => l.lotNumber === payload.lotNumber);
-      if (lot && lot.remainingQuantity > 0) {
-        const deduct = Math.min(lot.remainingQuantity, quantityToDeduct);
-        lot.remainingQuantity -= deduct;
-        quantityToDeduct -= deduct;
-        lotFound = true;
-        if (quantityToDeduct <= 0) break;
-      }
-    }
-
-    if (!lotFound) {
-        setIsSaving(false);
-        return { success: false, message: "Lote não encontrado ou sem saldo suficiente." };
-    }
-
-    const newMovementRef = push(warehouseLogRef);
-    const movementId = newMovementRef.key || `mov-out-${Date.now()}`;
-    const newLog: WarehouseMovement = {
-      id: movementId,
-      type: 'saída',
-      timestamp: new Date().toISOString(),
-      lotId: 'various',
-      lotNumber: payload.lotNumber,
-      itemName: payload.itemName.toUpperCase(),
-      supplierName: targetSupplier.name,
-      deliveryId: 'various',
-      outboundInvoice: payload.outboundInvoice,
-      quantity: payload.quantity,
-      expirationDate: payload.expirationDate
-    };
+    const supplierRef = ref(database, `suppliers/${payload.supplierCpf}`);
+    const normalizedItemName = payload.itemName.toUpperCase().trim();
+    const normalizedLotNumber = payload.lotNumber.toUpperCase().trim();
 
     try {
-        await set(ref(database, `suppliers/${targetSupplier.cpf}`), targetSupplier);
+      const result = await runTransaction(supplierRef, (currentSupplier) => {
+        if (!currentSupplier) return null;
+        
+        let quantityToDeduct = payload.quantity;
+        let lotFound = false;
+        let totalAvailableInMatchingLots = 0;
+        const deliveries = normalizeArray<any>(currentSupplier.deliveries);
+
+        // Primeiro passo: verificar disponibilidade total do lote para este item
+        for (const delivery of deliveries) {
+          if ((delivery.item || '').toUpperCase().trim() !== normalizedItemName || !delivery.lots) continue;
+          const lots = normalizeArray<any>(delivery.lots);
+          const matchingLots = lots.filter(l => (l.lotNumber || '').toUpperCase().trim() === normalizedLotNumber);
+          totalAvailableInMatchingLots += matchingLots.reduce((sum, l) => sum + (l.remainingQuantity || 0), 0);
+        }
+
+        if (totalAvailableInMatchingLots < quantityToDeduct) {
+            // Retornamos undefined para abortar a transação
+            return undefined; 
+        }
+
+        // Segundo passo: realizar a dedução
+        for (const delivery of deliveries) {
+          if ((delivery.item || '').toUpperCase().trim() !== normalizedItemName || !delivery.lots) continue;
+          
+          const lots = normalizeArray<any>(delivery.lots);
+          for (const lot of lots) {
+            if ((lot.lotNumber || '').toUpperCase().trim() === normalizedLotNumber && lot.remainingQuantity > 0) {
+              const deduct = Math.min(lot.remainingQuantity, quantityToDeduct);
+              lot.remainingQuantity -= deduct;
+              quantityToDeduct -= deduct;
+              lotFound = true;
+              if (quantityToDeduct <= 0) break;
+            }
+          }
+          delivery.lots = lots;
+          if (quantityToDeduct <= 0) break;
+        }
+
+        currentSupplier.deliveries = deliveries;
+        return currentSupplier;
+      });
+
+      if (result.committed) {
+        const newMovementRef = push(warehouseLogRef);
+        const newLog: WarehouseMovement = {
+          id: newMovementRef.key || `mov-out-${Date.now()}`,
+          type: 'saída',
+          timestamp: new Date().toISOString(),
+          lotId: 'various',
+          lotNumber: normalizedLotNumber,
+          itemName: normalizedItemName,
+          supplierName: result.snapshot.val().name,
+          deliveryId: 'various',
+          outboundInvoice: payload.outboundInvoice,
+          quantity: payload.quantity,
+          expirationDate: payload.expirationDate
+        };
         await set(newMovementRef, newLog);
         setIsSaving(false);
         return { success: true, message: "Saída registrada!" };
+      }
+      setIsSaving(false);
+      return { success: false, message: "Lote não encontrado ou saldo insuficiente para o item informado." };
     } catch (e) {
-        setIsSaving(false);
-        return { success: false, message: "Erro ao salvar saída." };
+      setIsSaving(false);
+      return { success: false, message: "Erro ao salvar saída." };
     }
   };
 
   const handleDeleteWarehouseEntry = async (logEntry: WarehouseMovement) => {
     setIsSaving(true);
     if (logEntry.type === 'entrada') {
-      const supplier = suppliers.find(s => s.name === logEntry.supplierName);
-      if (supplier) {
-        const target = JSON.parse(JSON.stringify(supplier)) as Supplier;
-        for (const del of target.deliveries) {
-          if (del.lots) del.lots = del.lots.filter(l => l.id !== logEntry.lotId);
-        }
-        await set(ref(database, `suppliers/${target.cpf}`), target);
+      const supplierCpf = suppliers.find(s => s.name === logEntry.supplierName)?.cpf;
+      if (supplierCpf) {
+          const supplierRef = ref(database, `suppliers/${supplierCpf}`);
+          try {
+              await runTransaction(supplierRef, (current) => {
+                  if (!current) return null;
+                  const deliveries = normalizeArray<any>(current.deliveries);
+                  for (const del of deliveries) {
+                      if (del.lots) {
+                          const originalLotsCount = del.lots.length;
+                          del.lots = normalizeArray<any>(del.lots).filter(l => 
+                              l.id !== logEntry.lotId && 
+                              (l.lotNumber !== logEntry.lotNumber || l.initialQuantity !== logEntry.quantity)
+                          );
+                      }
+                  }
+                  current.deliveries = deliveries;
+                  return current;
+              });
+          } catch (e) { console.error("Error deleting from supplier:", e); }
       }
     }
     await set(ref(database, `warehouseLog/${logEntry.id}`), null);
@@ -299,7 +341,7 @@ const App: React.FC = () => {
     const date = original?.date || new Date().toISOString().split('T')[0];
     const time = original?.time || '08:00';
     const newDeliveries: Delivery[] = invoiceData.fulfilledItems.map((item, idx) => ({
-        id: `del-${Date.now()}-${idx}`, date, time, item: item.name, kg: item.kg, value: item.value, invoiceUploaded: true, invoiceNumber: invoiceData.invoiceNumber,
+        id: `del-${Date.now()}-${idx}`, date, time, item: item.name.toUpperCase().trim(), kg: item.kg, value: item.value, invoiceUploaded: true, invoiceNumber: invoiceData.invoiceNumber,
     }));
     await writeToDatabase(ref(database, `suppliers/${supplierCpf}`), { ...supplier, deliveries: [...remainingDeliveries, ...newDeliveries] });
     
@@ -377,7 +419,8 @@ const App: React.FC = () => {
 
     for (const itemReq of log.items) {
       let needed = itemReq.quantity;
-      const allLots = tempSuppliers.flatMap(s => s.deliveries.filter(d => d.item === itemReq.name && d.lots && d.lots.length > 0).map(d => ({ s, d })))
+      const normalizedReqName = itemReq.name.toUpperCase().trim();
+      const allLots = tempSuppliers.flatMap(s => s.deliveries.filter(d => (d.item || '').toUpperCase().trim() === normalizedReqName && d.lots && d.lots.length > 0).map(d => ({ s, d })))
                         .sort((a, b) => a.d.date.localeCompare(b.d.date));
 
       for (const entry of allLots) {
@@ -391,7 +434,7 @@ const App: React.FC = () => {
             const newMovementRef = push(warehouseLogRef);
             const movId = newMovementRef.key || `mov-dir-${Date.now()}-${Math.random()}`;
             await set(newMovementRef, {
-                id: movId, type: 'saída', timestamp: ts, lotId: lot.id, lotNumber: lot.lotNumber, itemName: itemReq.name, supplierName: entry.s.name, deliveryId: entry.d.id, outboundInvoice: `DIR-${log.recipient.substring(0,3).toUpperCase()}`, quantity: take, expirationDate: lot.expirationDate
+                id: movId, type: 'saída', timestamp: ts, lotId: lot.id, lotNumber: lot.lotNumber, itemName: normalizedReqName, supplierName: entry.s.name, deliveryId: entry.d.id, outboundInvoice: `DIR-${log.recipient.substring(0,3).toUpperCase()}`, quantity: take, expirationDate: lot.expirationDate
             });
           }
         }
@@ -449,7 +492,7 @@ const App: React.FC = () => {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
               <svg className="animate-spin h-12 w-12 text-green-600 mb-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              <p className="text-gray-600 font-bold uppercase tracking-widest text-sm">Sincronizando Banco de Dados...</p>
+              <p className="text-gray-600 font-bold uppercase tracking-widest text-sm" translate="no">Sincronizando Banco de Dados...</p>
           </div>
       );
   }

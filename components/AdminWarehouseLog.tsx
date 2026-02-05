@@ -10,6 +10,11 @@ interface AdminWarehouseLogProps {
     onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
 }
 
+// Helper para normalizar strings de tipo (remover acentos)
+const normalizeType = (type: string) => {
+    return type.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+};
+
 const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, suppliers, onDeleteEntry, onRegisterEntry, onRegisterWithdrawal }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'entrada' | 'saída'>('all');
@@ -22,9 +27,10 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
         const map = new Map<string, { name: string; factorToKg: number }>();
         suppliers.forEach(s => {
             (s.contractItems || []).forEach(ci => {
-                if (!map.has(ci.name)) {
+                const itemName = ci.name.toUpperCase().trim();
+                if (!map.has(itemName)) {
                     if (!ci.unit) {
-                        map.set(ci.name, { name: 'Kg', factorToKg: 1 });
+                        map.set(itemName, { name: 'Kg', factorToKg: 1 });
                     } else {
                         const [type, weightStr] = ci.unit.split('-');
                         const nameMap: { [key: string]: string } = { saco: 'Sacos', balde: 'Baldes', embalagem: 'Litros', kg: 'Kg', litro: 'Litros', caixa: 'Litros', pacote: 'Pacotes', pote: 'Potes', dz: 'Dúzias', un: 'Unidades' };
@@ -32,7 +38,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                         let factorToKg = parseFloat(weightStr);
                         if (type === 'dz') factorToKg = 0;
                         else if (isNaN(factorToKg)) factorToKg = 1;
-                        map.set(ci.name, { name, factorToKg });
+                        map.set(itemName, { name, factorToKg });
                     }
                 }
             });
@@ -45,8 +51,9 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
         const signatures = new Set<string>();
         warehouseLog.forEach(log => {
             const nf = (log.inboundInvoice || log.outboundInvoice || '').trim().toUpperCase();
+            const type = normalizeType(log.type);
             // Assinatura: Tipo | Item | Fornecedor | NF | Lote | Qtd (arredondada para evitar erros de precisão)
-            const sig = `${log.type}|${log.itemName.toUpperCase()}|${log.supplierName.toUpperCase()}|${nf}|${log.lotNumber.toUpperCase()}|${(log.quantity || 0).toFixed(4)}`;
+            const sig = `${type}|${log.itemName.toUpperCase().trim()}|${log.supplierName.toUpperCase().trim()}|${nf}|${log.lotNumber.toUpperCase().trim()}|${(log.quantity || 0).toFixed(4)}`;
             signatures.add(sig);
         });
         return signatures;
@@ -55,7 +62,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
     const filteredLog = useMemo(() => {
         return warehouseLog
             .filter(log => {
-                const typeMatch = filterType === 'all' || log.type === filterType;
+                const typeMatch = filterType === 'all' || normalizeType(log.type) === normalizeType(filterType);
                 const searchMatch = searchTerm === '' ||
                     log.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                     log.lotNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -68,7 +75,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
     }, [warehouseLog, searchTerm, filterType]);
 
     const getDisplayQuantity = (log: WarehouseMovement): string => {
-        const unitInfo = itemUnitInfoMap.get(log.itemName);
+        const unitInfo = itemUnitInfoMap.get(log.itemName.toUpperCase().trim());
         const quantityKg = log.quantity || 0;
 
         if (unitInfo && unitInfo.factorToKg > 0) {
@@ -136,7 +143,8 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 }
 
                 const [tipoRaw, itemName, supplierName, nf, lote, qtd, data, venc] = columns.map(c => c.trim());
-                const tipo = tipoRaw.toUpperCase().includes('ENTRADA') ? 'entrada' : 'saída';
+                const isEntrada = tipoRaw.toUpperCase().includes('ENTRADA');
+                const tipoNormalized = isEntrada ? 'entrada' : 'saida';
                 const qtyVal = parseFloat(qtd.replace(',', '.'));
                 
                 if (isNaN(qtyVal)) {
@@ -146,15 +154,14 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 }
 
                 // VERIFICAÇÃO DE DUPLICIDADE
-                // Criamos a mesma assinatura para comparar com o que já existe no sistema
-                const rowSignature = `${tipo}|${itemName.toUpperCase()}|${supplierName.toUpperCase()}|${nf.toUpperCase()}|${lote.toUpperCase()}|${qtyVal.toFixed(4)}`;
+                const rowSignature = `${tipoNormalized}|${itemName.toUpperCase().trim()}|${supplierName.toUpperCase().trim()}|${nf.toUpperCase().trim()}|${lote.toUpperCase().trim()}|${qtyVal.toFixed(4)}`;
                 
                 if (existingSignatures.has(rowSignature)) {
                     duplicateCount++;
-                    continue; // Pula para a próxima linha sem importar
+                    continue;
                 }
 
-                const supplier = suppliers.find(s => s.name.toUpperCase() === supplierName.toUpperCase());
+                const supplier = suppliers.find(s => s.name.toUpperCase().trim() === supplierName.toUpperCase().trim());
                 if (!supplier) {
                     errorCount++;
                     errorDetails.push(`Linha ${i+1}: Fornecedor '${supplierName}' não existe.`);
@@ -163,7 +170,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
 
                 try {
                     let result;
-                    if (tipo === 'entrada') {
+                    if (isEntrada) {
                         result = await onRegisterEntry({
                             supplierCpf: supplier.cpf,
                             itemName: itemName,
@@ -280,14 +287,14 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                         {filteredLog.length > 0 ? filteredLog.map(log => (
                             <tr key={log.id} className="border-b hover:bg-gray-50 transition-colors">
                                 <td className="p-3">
-                                    {log.type === 'entrada' ? (
+                                    {normalizeType(log.type) === 'entrada' ? (
                                         <span className="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-1 rounded-full">Entrada</span>
                                     ) : (
                                         <span className="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-1 rounded-full">Saída</span>
                                     )}
                                 </td>
                                 <td className="p-3 font-mono text-gray-600">{new Date(log.timestamp).toLocaleString('pt-BR')}</td>
-                                <td className="p-3 font-semibold text-gray-800">{log.itemName}</td>
+                                <td className="p-3 font-semibold text-gray-800 uppercase">{log.itemName}</td>
                                 <td className="p-3 font-mono">{log.lotNumber}</td>
                                 <td className="p-3 font-mono text-gray-600">
                                     {log.expirationDate ? new Date(log.expirationDate + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
@@ -297,10 +304,10 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                                     {getDisplayQuantity(log)}
                                 </td>
                                 <td className="p-3 font-mono text-gray-600">
-                                    {log.type === 'entrada' ? log.inboundInvoice || 'N/A' : log.outboundInvoice || 'N/A'}
+                                    {normalizeType(log.type) === 'entrada' ? (log.inboundInvoice || 'N/A') : (log.outboundInvoice || 'N/A')}
                                 </td>
                                 <td className="p-3 text-center">
-                                    {log.type === 'entrada' && (
+                                    {normalizeType(log.type) === 'entrada' && (
                                         <button
                                             onClick={() => handleDelete(log)}
                                             disabled={isDeleting === log.id}
@@ -324,7 +331,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                         )) : (
                             <tr>
                                 <td colSpan={9} className="p-12 text-center text-gray-400 italic">
-                                    Nenhuma movimentação encontrada.
+                                    Nenhuma movimentação encontrada para os filtros selecionados.
                                 </td>
                             </tr>
                         )}
