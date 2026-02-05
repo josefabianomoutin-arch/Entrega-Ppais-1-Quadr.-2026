@@ -87,8 +87,19 @@ const App: React.FC = () => {
     });
 
     const unsubLog = onValue(warehouseLogRef, (snapshot) => {
-      setWarehouseLog(normalizeArray<WarehouseMovement>(snapshot.val()));
+      const data = snapshot.val();
+      if (!data) {
+        setWarehouseLog([]);
+        return;
+      }
+      // Mapeia as chaves do Firebase para o campo ID, garantindo que a exclusão funcione
+      const logsArray = Object.entries(data).map(([key, val]: [string, any]) => ({
+        ...val,
+        id: key 
+      }));
+      setWarehouseLog(logsArray);
     });
+
     const unsubClean = onValue(cleaningLogsRef, (snapshot) => setCleaningLogs(normalizeArray<CleaningLog>(snapshot.val())));
     const unsubDir = onValue(directorWithdrawalsRef, (snapshot) => setDirectorWithdrawals(normalizeArray<DirectorPerCapitaLog>(snapshot.val())));
     const unsubConfig = onValue(perCapitaConfigRef, (snapshot) => setPerCapitaConfig(snapshot.val() || {}));
@@ -142,8 +153,9 @@ const App: React.FC = () => {
       });
 
       if (result.committed) {
-        const newLog: WarehouseMovement = { id: `mov-${Date.now()}`, type: 'entrada', timestamp: new Date().toISOString(), lotId: lotId, lotNumber: normalizedLotNumber, itemName: normalizedItemName, supplierName: result.snapshot.val().name, deliveryId: 'various', inboundInvoice: payload.invoiceNumber, quantity: payload.quantity, expirationDate: payload.expirationDate };
-        await set(push(warehouseLogRef), newLog);
+        const logEntryRef = push(warehouseLogRef);
+        const newLog: WarehouseMovement = { id: logEntryRef.key || `mov-${Date.now()}`, type: 'entrada', timestamp: new Date().toISOString(), lotId: lotId, lotNumber: normalizedLotNumber, itemName: normalizedItemName, supplierName: result.snapshot.val().name, deliveryId: 'various', inboundInvoice: payload.invoiceNumber, quantity: payload.quantity, expirationDate: payload.expirationDate };
+        await set(logEntryRef, newLog);
         setIsSaving(false);
         return { success: true, message: "Entrada registrada!" };
       }
@@ -172,7 +184,6 @@ const App: React.FC = () => {
         let qtyToDeduct = Number(payload.quantity);
         const deliveries = normalizeArray<any>(currentSupplier.deliveries);
 
-        // 1. Verificar estoque total para este item + lote (Busca flexível)
         let totalAvail = 0;
         deliveries.forEach(d => {
             if (superNormalize(d.item) !== normReqItem) return;
@@ -184,11 +195,10 @@ const App: React.FC = () => {
         });
 
         if (totalAvail < (qtyToDeduct - EPSILON)) {
-            errorDetail = `Saldo insuficiente encontrado. (Encontrado: ${totalAvail.toFixed(2)} kg, Requerido: ${qtyToDeduct.toFixed(2)} kg). Verifique se o lote e o item pertencem a este fornecedor.`;
-            return undefined; // Aborta transação
+            errorDetail = `Saldo insuficiente (Encontrado: ${totalAvail.toFixed(2)} kg, Requerido: ${qtyToDeduct.toFixed(2)} kg).`;
+            return undefined; 
         }
 
-        // 2. Realizar a baixa
         for (const d of deliveries) {
             if (superNormalize(d.item) !== normReqItem) continue;
             const lots = normalizeArray<any>(d.lots);
@@ -209,14 +219,15 @@ const App: React.FC = () => {
       });
 
       if (result.committed) {
-        const newLog: WarehouseMovement = { id: `mov-out-${Date.now()}`, type: 'saída', timestamp: new Date().toISOString(), lotId: 'various', lotNumber: payload.lotNumber.toUpperCase().trim(), itemName: payload.itemName.toUpperCase().trim(), supplierName: result.snapshot.val().name, deliveryId: 'various', outboundInvoice: payload.outboundInvoice, quantity: payload.quantity, expirationDate: payload.expirationDate };
-        await set(push(warehouseLogRef), newLog);
+        const logEntryRef = push(warehouseLogRef);
+        const newLog: WarehouseMovement = { id: logEntryRef.key || `mov-out-${Date.now()}`, type: 'saída', timestamp: new Date().toISOString(), lotId: 'various', lotNumber: payload.lotNumber.toUpperCase().trim(), itemName: payload.itemName.toUpperCase().trim(), supplierName: result.snapshot.val().name, deliveryId: 'various', outboundInvoice: payload.outboundInvoice, quantity: payload.quantity, expirationDate: payload.expirationDate };
+        await set(logEntryRef, newLog);
         setIsSaving(false);
         return { success: true, message: "Saída registrada!" };
       }
       setIsSaving(false);
-      return { success: false, message: errorDetail || `Lote '${payload.lotNumber}' não localizado para o item informado.` };
-    } catch (e) { setIsSaving(false); return { success: false, message: "Falha ao processar saída no banco de dados." }; }
+      return { success: false, message: errorDetail || `Lote '${payload.lotNumber}' não localizado.` };
+    } catch (e) { setIsSaving(false); return { success: false, message: "Falha técnica no banco de dados." }; }
   };
 
   const writeToDatabase = useCallback(async (dbRef: any, data: any) => {
@@ -226,8 +237,8 @@ const App: React.FC = () => {
 
   const handleDeleteWarehouseEntry = async (logEntry: WarehouseMovement) => {
     setIsSaving(true);
-    // Busca o CPF usando normalização absoluta para garantir que encontre mesmo com diferenças de digitação
     const supplierCpf = suppliers.find(s => superNormalize(s.name) === superNormalize(logEntry.supplierName))?.cpf;
+    let estornoSucesso = true;
     
     if (supplierCpf) {
         try {
@@ -236,7 +247,6 @@ const App: React.FC = () => {
                 const deliveries = normalizeArray<any>(current.deliveries);
 
                 if (logEntry.type === 'entrada') {
-                    // Remover o lote e devolver saldo ao contrato
                     for (const del of deliveries) {
                         if (del.lots) {
                             del.lots = normalizeArray<any>(del.lots).filter(l => 
@@ -246,10 +256,10 @@ const App: React.FC = () => {
                         }
                     }
                 } else if (logEntry.type === 'saída') {
-                    // Estornar saldo ao lote
                     let qtyToRestore = Number(logEntry.quantity || 0);
                     const normReqItem = superNormalize(logEntry.itemName);
                     const normReqLot = superNormalize(logEntry.lotNumber);
+                    let found = false;
 
                     for (const d of deliveries) {
                         if (superNormalize(d.item) !== normReqItem) continue;
@@ -258,29 +268,32 @@ const App: React.FC = () => {
                             if (superNormalize(l.lotNumber) === normReqLot) {
                                 l.remainingQuantity = Number((Number(l.remainingQuantity || 0) + qtyToRestore).toFixed(4));
                                 qtyToRestore = 0;
+                                found = true;
                                 break;
                             }
                         }
                         if (qtyToRestore <= 0) break;
                     }
+                    if (!found) estornoSucesso = false;
                 }
 
                 current.deliveries = deliveries;
                 return current;
             });
-        } catch (e) { 
-            console.error("Erro na transação de exclusão de estoque:", e); 
-        }
+        } catch (e) { console.error("Erro no estorno:", e); estornoSucesso = false; }
     }
 
-    // Deleta o registro do log de qualquer forma (limpeza forçada)
     try {
+        // Exclui usando a chave real capturada no sincronismo
         await set(ref(database, `warehouseLog/${logEntry.id}`), null);
         setIsSaving(false);
+        if (!estornoSucesso && logEntry.type === 'saída') {
+            return { success: true, message: "Registro removido do histórico, mas o saldo não pôde ser estornado (lote não encontrado)." };
+        }
         return { success: true, message: "Registro removido com sucesso." };
     } catch (e) {
         setIsSaving(false);
-        return { success: false, message: "Erro ao deletar o registro do banco de dados." };
+        return { success: false, message: "Erro ao comunicar com o banco de dados." };
     }
   };
 
@@ -349,7 +362,8 @@ const App: React.FC = () => {
             const take = Math.min(Number(lot.remainingQuantity), need);
             lot.remainingQuantity = Number((Number(lot.remainingQuantity) - take).toFixed(4));
             need -= take;
-            await set(push(warehouseLogRef), { id: `mov-dir-${Date.now()}`, type: 'saída', timestamp: ts, lotId: lot.id, lotNumber: lot.lotNumber, itemName: req.name.toUpperCase(), supplierName: entry.s.name, deliveryId: entry.d.id, outboundInvoice: `DIR-${log.recipient.substring(0,3).toUpperCase()}`, quantity: take, expirationDate: lot.expirationDate });
+            const logRef = push(warehouseLogRef);
+            await set(logRef, { id: logRef.key, type: 'saída', timestamp: ts, lotId: lot.id, lotNumber: lot.lotNumber, itemName: req.name.toUpperCase(), supplierName: entry.s.name, deliveryId: entry.d.id, outboundInvoice: `DIR-${log.recipient.substring(0,3).toUpperCase()}`, quantity: take, expirationDate: lot.expirationDate });
           }
         }
       }
