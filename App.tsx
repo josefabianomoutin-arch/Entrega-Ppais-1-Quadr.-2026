@@ -47,7 +47,7 @@ const App: React.FC = () => {
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
   const [emailModalData, setEmailModalData] = useState<{ recipient: string; cc: string; subject: string; body: string; mailtoLink: string; } | null>(null);
 
-  // Global Sync Effect - Runs only once on mount to keep listeners active
+  // Global Sync Effect
   useEffect(() => {
     setLoading(true);
     
@@ -62,7 +62,11 @@ const App: React.FC = () => {
           deliveries: normalizeArray<any>(p.deliveries).map((d: any) => ({ 
               ...d, 
               item: (d.item || '').toUpperCase().trim(),
-              lots: normalizeArray(d.lots).map((l: any) => ({ ...l, lotNumber: (l.lotNumber || '').toUpperCase().trim() })), 
+              lots: normalizeArray(d.lots).map((l: any) => ({ 
+                ...l, 
+                lotNumber: (l.lotNumber || '').toUpperCase().trim(),
+                remainingQuantity: typeof l.remainingQuantity === 'number' ? l.remainingQuantity : (l.initialQuantity || 0)
+              })), 
               withdrawals: normalizeArray(d.withdrawals) 
           })),
           allowedWeeks: normalizeArray<number>(p.allowedWeeks),
@@ -223,41 +227,48 @@ const App: React.FC = () => {
     const supplierRef = ref(database, `suppliers/${payload.supplierCpf}`);
     const normalizedItemName = payload.itemName.toUpperCase().trim();
     const normalizedLotNumber = payload.lotNumber.toUpperCase().trim();
+    const EPSILON = 0.0001; // Tolerância para erros de precisão de ponto flutuante
 
     try {
       const result = await runTransaction(supplierRef, (currentSupplier) => {
         if (!currentSupplier) return null;
         
         let quantityToDeduct = payload.quantity;
-        let lotFound = false;
         let totalAvailableInMatchingLots = 0;
         const deliveries = normalizeArray<any>(currentSupplier.deliveries);
 
         // Primeiro passo: verificar disponibilidade total do lote para este item
         for (const delivery of deliveries) {
-          if ((delivery.item || '').toUpperCase().trim() !== normalizedItemName || !delivery.lots) continue;
+          const dItemName = (delivery.item || '').toUpperCase().trim();
+          if (dItemName !== normalizedItemName || !delivery.lots) continue;
+          
           const lots = normalizeArray<any>(delivery.lots);
           const matchingLots = lots.filter(l => (l.lotNumber || '').toUpperCase().trim() === normalizedLotNumber);
           totalAvailableInMatchingLots += matchingLots.reduce((sum, l) => sum + (l.remainingQuantity || 0), 0);
         }
 
-        if (totalAvailableInMatchingLots < quantityToDeduct) {
-            // Retornamos undefined para abortar a transação
+        // Verifica se há saldo suficiente considerando a tolerância EPSILON
+        if (totalAvailableInMatchingLots < (quantityToDeduct - EPSILON)) {
+            // Aborta a transação para cair no bloco commited === false
             return undefined; 
         }
 
-        // Segundo passo: realizar a dedução
+        // Segundo passo: realizar a dedução consumindo lotes sequencialmente
         for (const delivery of deliveries) {
-          if ((delivery.item || '').toUpperCase().trim() !== normalizedItemName || !delivery.lots) continue;
+          const dItemName = (delivery.item || '').toUpperCase().trim();
+          if (dItemName !== normalizedItemName || !delivery.lots) continue;
           
           const lots = normalizeArray<any>(delivery.lots);
           for (const lot of lots) {
-            if ((lot.lotNumber || '').toUpperCase().trim() === normalizedLotNumber && lot.remainingQuantity > 0) {
+            const lLotNumber = (lot.lotNumber || '').toUpperCase().trim();
+            if (lLotNumber === normalizedLotNumber && lot.remainingQuantity > 0) {
               const deduct = Math.min(lot.remainingQuantity, quantityToDeduct);
               lot.remainingQuantity -= deduct;
               quantityToDeduct -= deduct;
-              lotFound = true;
-              if (quantityToDeduct <= 0) break;
+              if (quantityToDeduct <= EPSILON) {
+                  quantityToDeduct = 0;
+                  break;
+              }
             }
           }
           delivery.lots = lots;
@@ -288,10 +299,10 @@ const App: React.FC = () => {
         return { success: true, message: "Saída registrada!" };
       }
       setIsSaving(false);
-      return { success: false, message: "Lote não encontrado ou saldo insuficiente para o item informado." };
+      return { success: false, message: `O lote '${normalizedLotNumber}' do item '${normalizedItemName}' não possui saldo suficiente (${payload.quantity} requeridos).` };
     } catch (e) {
       setIsSaving(false);
-      return { success: false, message: "Erro ao salvar saída." };
+      return { success: false, message: "Falha técnica ao processar a saída. Tente novamente." };
     }
   };
 
@@ -307,7 +318,6 @@ const App: React.FC = () => {
                   const deliveries = normalizeArray<any>(current.deliveries);
                   for (const del of deliveries) {
                       if (del.lots) {
-                          const originalLotsCount = del.lots.length;
                           del.lots = normalizeArray<any>(del.lots).filter(l => 
                               l.id !== logEntry.lotId && 
                               (l.lotNumber !== logEntry.lotNumber || l.initialQuantity !== logEntry.quantity)

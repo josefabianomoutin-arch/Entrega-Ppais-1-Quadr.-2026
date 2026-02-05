@@ -10,7 +10,15 @@ interface AdminWarehouseLogProps {
     onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
 }
 
-// Helper para normalizar strings de tipo (remover acentos)
+// Helper para normalizar strings para comparação (remove acentos e espaços extras)
+const fuzzyNormalize = (text: string) => {
+    return text.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // remove acentos
+        .replace(/[^a-z0-9]/g, "") // remove tudo que não for letra ou número
+        .trim();
+};
+
 const normalizeType = (type: string) => {
     return type.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 };
@@ -46,13 +54,11 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
         return map;
     }, [suppliers]);
 
-    // Cria um Set de assinaturas de registros existentes para busca ultra-rápida de duplicatas
     const existingSignatures = useMemo(() => {
         const signatures = new Set<string>();
         warehouseLog.forEach(log => {
             const nf = (log.inboundInvoice || log.outboundInvoice || '').trim().toUpperCase();
             const type = normalizeType(log.type);
-            // Assinatura: Tipo | Item | Fornecedor | NF | Lote | Qtd (arredondada para evitar erros de precisão)
             const sig = `${type}|${log.itemName.toUpperCase().trim()}|${log.supplierName.toUpperCase().trim()}|${nf}|${log.lotNumber.toUpperCase().trim()}|${(log.quantity || 0).toFixed(4)}`;
             signatures.add(sig);
         });
@@ -142,7 +148,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     continue;
                 }
 
-                const [tipoRaw, itemName, supplierName, nf, lote, qtd, data, venc] = columns.map(c => c.trim());
+                const [tipoRaw, csvItemName, supplierName, nf, lote, qtd, data, venc] = columns.map(c => c.trim());
                 const isEntrada = tipoRaw.toUpperCase().includes('ENTRADA');
                 const tipoNormalized = isEntrada ? 'entrada' : 'saida';
                 const qtyVal = parseFloat(qtd.replace(',', '.'));
@@ -153,18 +159,28 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     continue;
                 }
 
-                // VERIFICAÇÃO DE DUPLICIDADE
-                const rowSignature = `${tipoNormalized}|${itemName.toUpperCase().trim()}|${supplierName.toUpperCase().trim()}|${nf.toUpperCase().trim()}|${lote.toUpperCase().trim()}|${qtyVal.toFixed(4)}`;
-                
-                if (existingSignatures.has(rowSignature)) {
-                    duplicateCount++;
+                // Busca o fornecedor primeiro
+                const supplier = suppliers.find(s => fuzzyNormalize(s.name) === fuzzyNormalize(supplierName));
+                if (!supplier) {
+                    errorCount++;
+                    errorDetails.push(`Linha ${i+1}: Fornecedor '${supplierName}' não localizado.`);
                     continue;
                 }
 
-                const supplier = suppliers.find(s => s.name.toUpperCase().trim() === supplierName.toUpperCase().trim());
-                if (!supplier) {
+                // Busca o item exato no contrato desse fornecedor (Fuzzy Match)
+                const officialItem = supplier.contractItems.find(ci => fuzzyNormalize(ci.name) === fuzzyNormalize(csvItemName));
+                if (!officialItem) {
                     errorCount++;
-                    errorDetails.push(`Linha ${i+1}: Fornecedor '${supplierName}' não existe.`);
+                    errorDetails.push(`Linha ${i+1}: Item '${csvItemName}' não existe no contrato de ${supplier.name}.`);
+                    continue;
+                }
+
+                // Agora usamos o nome oficial para a assinatura de duplicidade e registro
+                const officialName = officialItem.name;
+                const rowSignature = `${tipoNormalized}|${officialName.toUpperCase().trim()}|${supplier.name.toUpperCase().trim()}|${nf.toUpperCase().trim()}|${lote.toUpperCase().trim()}|${qtyVal.toFixed(4)}`;
+                
+                if (existingSignatures.has(rowSignature)) {
+                    duplicateCount++;
                     continue;
                 }
 
@@ -173,7 +189,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     if (isEntrada) {
                         result = await onRegisterEntry({
                             supplierCpf: supplier.cpf,
-                            itemName: itemName,
+                            itemName: officialName,
                             invoiceNumber: nf,
                             invoiceDate: data || new Date().toISOString().split('T')[0],
                             lotNumber: lote,
@@ -183,7 +199,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     } else {
                         result = await onRegisterWithdrawal({
                             supplierCpf: supplier.cpf,
-                            itemName: itemName,
+                            itemName: officialName,
                             outboundInvoice: nf,
                             lotNumber: lote,
                             quantity: qtyVal,
