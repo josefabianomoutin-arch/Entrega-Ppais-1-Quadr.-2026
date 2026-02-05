@@ -226,7 +226,8 @@ const App: React.FC = () => {
 
   const handleDeleteWarehouseEntry = async (logEntry: WarehouseMovement) => {
     setIsSaving(true);
-    const supplierCpf = suppliers.find(s => s.name === logEntry.supplierName)?.cpf;
+    // Busca o CPF usando normalização absoluta para garantir que encontre mesmo com diferenças de digitação
+    const supplierCpf = suppliers.find(s => superNormalize(s.name) === superNormalize(logEntry.supplierName))?.cpf;
     
     if (supplierCpf) {
         try {
@@ -267,12 +268,20 @@ const App: React.FC = () => {
                 current.deliveries = deliveries;
                 return current;
             });
-        } catch (e) { console.error("Erro na transação de exclusão:", e); }
+        } catch (e) { 
+            console.error("Erro na transação de exclusão de estoque:", e); 
+        }
     }
 
-    await set(ref(database, `warehouseLog/${logEntry.id}`), null);
-    setIsSaving(false);
-    return { success: true, message: "Registro removido e estoque atualizado com sucesso." };
+    // Deleta o registro do log de qualquer forma (limpeza forçada)
+    try {
+        await set(ref(database, `warehouseLog/${logEntry.id}`), null);
+        setIsSaving(false);
+        return { success: true, message: "Registro removido com sucesso." };
+    } catch (e) {
+        setIsSaving(false);
+        return { success: false, message: "Erro ao deletar o registro do banco de dados." };
+    }
   };
 
   const handleScheduleDelivery = async (supplierCpf: string, date: string, time: string) => {

@@ -104,8 +104,11 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
             
         if (window.confirm(msg)) {
             setIsDeleting(log.id);
-            await onDeleteEntry(log);
+            const result = await onDeleteEntry(log);
             setIsDeleting(null);
+            if (!result.success) {
+                alert(`Erro ao excluir: ${result.message}`);
+            }
         }
     };
 
