@@ -57,11 +57,16 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 const [tipoRaw, csvItem, csvSupplier, nf, lote, qtd, data, venc] = cols.map(c => c.trim());
                 const isEntrada = tipoRaw.toUpperCase().includes('ENTRADA');
                 
-                // Melhoria no parsing: Remove pontos (milhar) e troca vírgula por ponto (decimal)
-                const sanitizedQty = qtd.replace(/\./g, '').replace(',', '.');
+                // LIMPEZA REFORÇADA: Remove aspas, espaços extras e trata o formato brasileiro (1.000,00)
+                const cleanQtdStr = qtd.replace(/['"]/g, '').trim(); 
+                const sanitizedQty = cleanQtdStr.replace(/\./g, '').replace(',', '.');
                 const qtyVal = parseFloat(sanitizedQty);
 
-                if (isNaN(qtyVal)) { errorCount++; errorDetails.push(`Linha ${i+1}: Quantidade '${qtd}' inválida.`); continue; }
+                if (isNaN(qtyVal)) { 
+                    errorCount++; 
+                    errorDetails.push(`Linha ${i+1}: Quantidade '${qtd}' inválida.`); 
+                    continue; 
+                }
 
                 const supplier = suppliers.find(s => superNormalize(s.name) === superNormalize(csvSupplier));
                 if (!supplier) { errorCount++; errorDetails.push(`Linha ${i+1}: Fornecedor '${csvSupplier}' não localizado.`); continue; }
