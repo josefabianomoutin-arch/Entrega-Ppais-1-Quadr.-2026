@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import type { Delivery } from '../types';
 import { MONTHS_2026, WEEK_DAYS } from '../constants';
@@ -57,10 +58,20 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
         dayClasses += " cursor-pointer transition-colors";
         const isPast = currentDate < simulatedToday;
         const hasDeliveries = deliveriesOnThisDate && deliveriesOnThisDate.length > 0;
+        
+        // Regra de cor priorizada:
+        // 1. Se tem entregas no passado e alguma NÃO foi faturada -> VERMELHO
+        // 2. Se tem entregas e TODAS foram faturadas (independente de ser passado ou futuro) -> VERDE
+        // 3. Se tem entregas no futuro/presente e estão pendentes -> VERDE CLARO (Agendado)
+        // 4. Se não tem nada -> PADRÃO
+        
         const needsInvoice = hasDeliveries && isPast && deliveriesOnThisDate.some(d => !d.invoiceUploaded);
+        const allFulfilled = hasDeliveries && deliveriesOnThisDate.every(d => d.invoiceUploaded);
 
         if (needsInvoice) {
           dayClasses += " bg-red-500 hover:bg-red-600 text-white font-bold";
+        } else if (allFulfilled) {
+          dayClasses += " bg-green-500 hover:bg-green-600 text-white font-bold";
         } else if (hasDeliveries) {
           dayClasses += " bg-green-200 hover:bg-green-300 text-green-900 font-bold";
         } else {
@@ -73,11 +84,11 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
           <span className="text-sm md:text-base">{day}</span>
           {isClickable && deliveriesOnThisDate && deliveriesOnThisDate.length > 0 && (
             <span className="text-xs mt-1 px-1 rounded bg-black bg-opacity-10 truncate">
-              Entrega
+              {deliveriesOnThisDate.some(d => d.invoiceUploaded) ? 'Faturado' : 'Entrega'}
             </span>
           )}
           {isClickable && deliveriesOnThisDate && deliveriesOnThisDate.length > 0 && deliveriesOnThisDate.some(d => !d.invoiceUploaded) && currentDate < simulatedToday && (
-            <span className="absolute bottom-1 right-1 text-xs text-white font-semibold">NF!</span>
+            <span className="absolute bottom-1 right-1 text-xs text-white font-semibold animate-pulse">NF!</span>
           )}
         </div>
       );

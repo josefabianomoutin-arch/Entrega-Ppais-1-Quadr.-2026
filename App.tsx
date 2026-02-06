@@ -354,52 +354,109 @@ const App: React.FC = () => {
   };
 
   const handleScheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
-    const s = suppliers.find(s => s.cpf === supplierCpf);
-    if (!s) return;
-    const updated = [...(s.deliveries || []), { id: `del-${Date.now()}`, date, time, item: 'AGENDAMENTO PENDENTE', invoiceUploaded: false }];
-    await writeToDatabase(ref(database, `suppliers/${supplierCpf}`), { ...s, deliveries: updated });
+    setIsSaving(true);
+    const supplierRef = ref(database, `suppliers/${supplierCpf}`);
+    try {
+      await runTransaction(supplierRef, (current) => {
+        if (!current) return null;
+        const deliveries = normalizeArray<any>(current.deliveries);
+        deliveries.push({ id: `del-${Date.now()}`, date, time, item: 'AGENDAMENTO PENDENTE', invoiceUploaded: false });
+        current.deliveries = deliveries;
+        return current;
+      });
+    } catch (e) { console.error(e); } finally { setIsSaving(false); }
   };
 
   const handleFulfillAndInvoice = async (supplierCpf: string, placeholderIds: string[], inv: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }) => {
-    const s = suppliers.find(s => s.cpf === supplierCpf);
-    if (!s) return;
-    const rem = (s.deliveries || []).filter(d => !placeholderIds.includes(d.id));
-    const orig = (s.deliveries || []).find(d => placeholderIds.includes(d.id));
-    const date = orig?.date || new Date().toISOString().split('T')[0];
-    const nDels: Delivery[] = inv.fulfilledItems.map((it, idx) => ({ id: `del-${Date.now()}-${idx}`, date, time: '08:00', item: it.name.toUpperCase().trim(), kg: Number(it.kg), value: Number(it.value), invoiceUploaded: true, invoiceNumber: inv.invoiceNumber }));
-    await writeToDatabase(ref(database, `suppliers/${supplierCpf}`), { ...s, deliveries: [...rem, ...nDels] });
-    
-    const subj = `ENVIO DE NOTA FISCAL - ${s.name} - NF ${inv.invoiceNumber}`;
-    let b = `Olá,\n\nSegue em anexo a Nota Fiscal nº ${inv.invoiceNumber}.\n\nItens:\n`;
-    inv.fulfilledItems.forEach(i => b += `- ${i.name}: ${i.kg.toFixed(2)} Kg\n`);
-    const mailto = `mailto:dg@ptaiuva.sap.gov.br?cc=almoxarifado@ptaiuva.sap.gov.br&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(b)}`;
-    setEmailModalData({ recipient: "dg@ptaiuva.sap.gov.br", cc: "almoxarifado@ptaiuva.sap.gov.br", subject: subj, body: b, mailtoLink: mailto });
+    setIsSaving(true);
+    const supplierRef = ref(database, `suppliers/${supplierCpf}`);
+    let targetSupplierName = '';
+
+    try {
+      const result = await runTransaction(supplierRef, (current) => {
+        if (!current) return null;
+        targetSupplierName = current.name;
+        let deliveries = normalizeArray<any>(current.deliveries);
+        
+        // Identificar a data original a partir de um dos IDs sendo removidos
+        const originalPlaceholder = deliveries.find(d => placeholderIds.includes(d.id));
+        const date = originalPlaceholder?.date || new Date().toISOString().split('T')[0];
+        
+        // Filtrar removendo os placeholders
+        const remaining = deliveries.filter(d => !placeholderIds.includes(d.id));
+        
+        // Adicionar os novos itens reais
+        const nDels: Delivery[] = inv.fulfilledItems.map((it, idx) => ({ 
+            id: `del-f-${Date.now()}-${idx}`, 
+            date, 
+            time: '08:00', 
+            item: it.name.toUpperCase().trim(), 
+            kg: Number(it.kg), 
+            value: Number(it.value), 
+            invoiceUploaded: true, 
+            invoiceNumber: inv.invoiceNumber 
+        }));
+        
+        current.deliveries = [...remaining, ...nDels];
+        return current;
+      });
+
+      if (result.committed) {
+        const subj = `ENVIO DE NOTA FISCAL - ${targetSupplierName} - NF ${inv.invoiceNumber}`;
+        let b = `Olá,\n\nSegue em anexo a Nota Fiscal nº ${inv.invoiceNumber}.\n\nItens:\n`;
+        inv.fulfilledItems.forEach(i => b += `- ${i.name}: ${i.kg.toFixed(2)} Kg\n`);
+        const mailto = `mailto:dg@ptaiuva.sap.gov.br?cc=almoxarifado@ptaiuva.sap.gov.br&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(b)}`;
+        setEmailModalData({ recipient: "dg@ptaiuva.sap.gov.br", cc: "almoxarifado@ptaiuva.sap.gov.br", subject: subj, body: b, mailtoLink: mailto });
+      }
+    } catch (e) { console.error(e); } finally { setIsSaving(false); }
   };
 
-  const handleCancelDeliveries = (sCpf: string, ids: string[]) => {
-    const s = suppliers.find(x => x.cpf === sCpf);
-    if (s) {
-        const updatedDeliveries = (s.deliveries || []).filter(d => !ids.includes(d.id));
-        writeToDatabase(ref(database, `suppliers/${sCpf}`), { ...s, deliveries: updatedDeliveries });
-    }
+  const handleCancelDeliveries = async (sCpf: string, ids: string[]) => {
+    setIsSaving(true);
+    const supplierRef = ref(database, `suppliers/${sCpf}`);
+    try {
+        await runTransaction(supplierRef, (current) => {
+            if (!current) return null;
+            let deliveries = normalizeArray<any>(current.deliveries);
+            current.deliveries = deliveries.filter(d => !ids.includes(d.id));
+            return current;
+        });
+    } catch (e) { console.error(e); } finally { setIsSaving(false); }
   };
 
   const handleReopenInvoice = async (sCpf: string, invNum: string) => {
-    const s = suppliers.find(x => x.cpf === sCpf);
-    if (!s) return;
-    const target = JSON.parse(JSON.stringify(s)) as Supplier;
-    const dates = [...new Set(target.deliveries.filter(d => d.invoiceNumber === invNum).map(d => d.date))];
-    target.deliveries = target.deliveries.filter(d => d.invoiceNumber !== invNum);
-    dates.forEach(dt => target.deliveries.push({ id: `del-re-${Date.now()}-${Math.random()}`, date: dt, time: '08:00', item: 'AGENDAMENTO PENDENTE', invoiceUploaded: false }));
-    await writeToDatabase(ref(database, `suppliers/${sCpf}`), target);
+    setIsSaving(true);
+    const supplierRef = ref(database, `suppliers/${sCpf}`);
+    try {
+        await runTransaction(supplierRef, (current) => {
+            if (!current) return null;
+            let deliveries = normalizeArray<any>(current.deliveries);
+            const dates = [...new Set(deliveries.filter(d => d.invoiceNumber === invNum).map(d => d.date))];
+            const remaining = deliveries.filter(d => d.invoiceNumber !== invNum);
+            const reAgendamentos = dates.map(dt => ({ 
+                id: `del-re-${Date.now()}-${Math.random()}`, 
+                date: dt, 
+                time: '08:00', 
+                item: 'AGENDAMENTO PENDENTE', 
+                invoiceUploaded: false 
+            }));
+            current.deliveries = [...remaining, ...reAgendamentos];
+            return current;
+        });
+    } catch (e) { console.error(e); } finally { setIsSaving(false); }
   };
 
   const handleDeleteInvoice = async (sCpf: string, invNum: string) => {
-    const s = suppliers.find(x => x.cpf === sCpf);
-    if (!s) return;
-    const target = JSON.parse(JSON.stringify(s)) as Supplier;
-    target.deliveries = target.deliveries.filter(d => d.invoiceNumber !== invNum);
-    await writeToDatabase(ref(database, `suppliers/${sCpf}`), target);
+    setIsSaving(true);
+    const supplierRef = ref(database, `suppliers/${sCpf}`);
+    try {
+        await runTransaction(supplierRef, (current) => {
+            if (!current) return null;
+            let deliveries = normalizeArray<any>(current.deliveries);
+            current.deliveries = deliveries.filter(d => d.invoiceNumber !== invNum);
+            return current;
+        });
+    } catch (e) { console.error(e); } finally { setIsSaving(false); }
   };
 
   const handleRegisterDirectorWithdrawal = async (log: Omit<DirectorPerCapitaLog, 'id'>) => {

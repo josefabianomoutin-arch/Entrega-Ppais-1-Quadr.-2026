@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Supplier, Delivery, ContractItem } from '../types';
 import Calendar from './Calendar';
@@ -7,6 +8,9 @@ import SummaryCard from './SummaryCard';
 import InvoiceUploader from './InvoiceUploader';
 import EmailConfirmationModal from './EmailConfirmationModal';
 import FulfillmentModal from './FulfillmentModal';
+
+// Constante global de "Hoje" para o sistema
+const SIMULATED_TODAY = new Date('2026-04-30T00:00:00');
 
 interface DashboardProps {
   supplier: Supplier;
@@ -44,8 +48,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [deliveriesToShow, setDeliveriesToShow] = useState<Delivery[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
-  const SIMULATED_TODAY = new Date('2026-04-30T00:00:00');
-
   const handleDayClick = (date: Date) => {
     const dateString = date.toISOString().split('T')[0];
     const deliveriesOnDate = supplier.deliveries.filter(d => d.date === dateString);
@@ -213,12 +215,12 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       <main className="p-4 md:p-8">
         {pendingDailyInvoices.length > 0 && (
-          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 mb-8 rounded-r-lg shadow" role="alert">
+          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 mb-8 rounded-r-lg shadow animate-pulse" role="alert">
             <div className="flex items-center">
-              <svg className="w-6 h-6 mr-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
+              <svg className="w-6 h-6 mr-3 text-orange-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
               <div>
-                <p className="font-bold">Faturamento Pendente</p>
-                <p className="text-sm">Você possui {pendingDailyInvoices.length} dia(s) de entrega para preencher os dados e faturar. <a href="#invoice-uploader-section" className="font-semibold underline hover:text-yellow-900">Verificar agora</a>.</p>
+                <p className="font-bold">Ação Necessária: Faturamento em Atraso</p>
+                <p className="text-sm">Você possui {pendingDailyInvoices.length} dia(s) de entrega concluídos que ainda não foram faturados. Clique no botão laranja à direita para preencher os dados da NF.</p>
               </div>
             </div>
           </div>
