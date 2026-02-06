@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 // Import types directly to ensure they are available for use in generic positions
 import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow } from './types';
 import LoginScreen from './components/LoginScreen';
@@ -49,13 +49,22 @@ const App: React.FC = () => {
   const [standardMenu, setStandardMenu] = useState<StandardMenu>({});
   const [dailyMenus, setDailyMenus] = useState<DailyMenus>({});
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<Supplier | null>(null);
+  
+  // LOGIN STATE - Usamos o CPF para manter a sessão "viva" e reativa
+  const [loggedInCpf, setLoggedInCpf] = useState<string | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isAlmoxarifadoLoggedIn, setIsAlmoxarifadoLoggedIn] = useState(false);
+  
   const [isSaving, setIsSaving] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse' | 'cleaning' | 'directorPerCapita' | 'menu'>('register');
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
   const [emailModalData, setEmailModalData] = useState<{ recipient: string; cc: string; subject: string; body: string; mailtoLink: string; } | null>(null);
+
+  // Deriva o usuário atual da lista global que é atualizada em tempo real pelo Firebase
+  const currentUser = useMemo(() => {
+    if (!loggedInCpf) return null;
+    return suppliers.find(s => s.cpf === loggedInCpf) || null;
+  }, [suppliers, loggedInCpf]);
 
   // Global Sync Effect
   useEffect(() => {
@@ -492,8 +501,13 @@ const App: React.FC = () => {
     const cl = c.replace(/[^\d]/g, '');
     if (n.toLowerCase() === 'administrador' && cl === '15210361870') { setIsAdminLoggedIn(true); return true; }
     if (n.toLowerCase() === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
+    
+    // Procura o usuário
     const u = suppliers.find(p => p.name === n.toUpperCase() && p.cpf === cl);
-    if (u) { setCurrentUser(u); return true; }
+    if (u) { 
+        setLoggedInCpf(cl); 
+        return true; 
+    }
     return false;
   };
 
@@ -509,7 +523,7 @@ const App: React.FC = () => {
     <>
       <div className={`fixed bottom-4 right-4 z-50 ${isSaving ? 'opacity-100' : 'opacity-0'}`}><div className="bg-blue-600 text-white px-3 py-2 rounded-full shadow text-xs font-bold animate-pulse">Gravando...</div></div>
       {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={handleRegister} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async (o, n, c, w) => { await runTransaction(suppliersRef, (curr) => { if(!curr || !curr[o]) return; const d = { ...curr[o], name: n.toUpperCase(), cpf: c, allowedWeeks: w }; if(o !== c) delete curr[o]; curr[c] = d; return curr; }); return null; }} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async (s) => { await writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {})); return true; }} activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={registrationStatus} onClearRegistrationStatus={() => setRegistrationStatus(null)} onReopenInvoice={handleReopenInvoice} onDeleteInvoice={handleDeleteInvoice} onUpdateInvoiceItems={handleUpdateInvoiceItems} onManualInvoiceEntry={handleManualInvoiceEntry} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={handleDeleteWarehouseEntry} onRegisterCleaningLog={async (l) => { await set(ref(database, `cleaningLogs/${Date.now()}`), { ...l, id: String(Date.now()) }); return {success: true, message: 'OK'}; }} onDeleteCleaningLog={async (id) => set(ref(database, `cleaningLogs/${id}`), null)} onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal} onDeleteDirectorWithdrawal={async (id) => set(ref(database, `directorWithdrawals/${id}`), null)} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} onCancelDeliveries={handleCancelDeliveries} />
-      : currentUser ? <Dashboard supplier={currentUser} onLogout={() => setCurrentUser(null)} onScheduleDelivery={handleScheduleDelivery} onFulfillAndInvoice={handleFulfillAndInvoice} onCancelDeliveries={handleCancelDeliveries} emailModalData={emailModalData} onCloseEmailModal={() => setEmailModalData(null)} />
+      : currentUser ? <Dashboard supplier={currentUser} onLogout={() => setLoggedInCpf(null)} onScheduleDelivery={handleScheduleDelivery} onFulfillAndInvoice={handleFulfillAndInvoice} onCancelDeliveries={handleCancelDeliveries} emailModalData={emailModalData} onCloseEmailModal={() => setEmailModalData(null)} />
       : isAlmoxarifadoLoggedIn ? <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} />
       : <LoginScreen onLogin={handleLogin} />}
     </>
