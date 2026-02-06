@@ -377,15 +377,9 @@ const App: React.FC = () => {
         if (!current) return null;
         targetSupplierName = current.name;
         let deliveries = normalizeArray<any>(current.deliveries);
-        
-        // Identificar a data original a partir de um dos IDs sendo removidos
         const originalPlaceholder = deliveries.find(d => placeholderIds.includes(d.id));
         const date = originalPlaceholder?.date || new Date().toISOString().split('T')[0];
-        
-        // Filtrar removendo os placeholders
         const remaining = deliveries.filter(d => !placeholderIds.includes(d.id));
-        
-        // Adicionar os novos itens reais
         const nDels: Delivery[] = inv.fulfilledItems.map((it, idx) => ({ 
             id: `del-f-${Date.now()}-${idx}`, 
             date, 
@@ -396,7 +390,6 @@ const App: React.FC = () => {
             invoiceUploaded: true, 
             invoiceNumber: inv.invoiceNumber 
         }));
-        
         current.deliveries = [...remaining, ...nDels];
         return current;
       });
@@ -418,10 +411,16 @@ const App: React.FC = () => {
         await runTransaction(supplierRef, (current) => {
             if (!current) return null;
             let deliveries = normalizeArray<any>(current.deliveries);
+            // Filtro rigoroso: mantém apenas quem NÃO está na lista de IDs a remover
             current.deliveries = deliveries.filter(d => !ids.includes(d.id));
             return current;
         });
-    } catch (e) { console.error(e); } finally { setIsSaving(false); }
+    } catch (e) { 
+        console.error("Falha ao cancelar entregas:", e); 
+        alert("Erro ao remover registro. Tente novamente.");
+    } finally { 
+        setIsSaving(false); 
+    }
   };
 
   const handleReopenInvoice = async (sCpf: string, invNum: string) => {
