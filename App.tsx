@@ -92,7 +92,6 @@ const App: React.FC = () => {
         setWarehouseLog([]);
         return;
       }
-      // Mapeia as chaves do Firebase para o campo ID, garantindo que a exclusão funcione
       const logsArray = Object.entries(data).map(([key, val]: [string, any]) => ({
         ...val,
         id: key 
@@ -284,7 +283,6 @@ const App: React.FC = () => {
     }
 
     try {
-        // Exclui usando a chave real capturada no sincronismo
         await set(ref(database, `warehouseLog/${logEntry.id}`), null);
         setIsSaving(false);
         if (!estornoSucesso && logEntry.type === 'saída') {
@@ -304,13 +302,8 @@ const App: React.FC = () => {
         await runTransaction(supplierRef, (current) => {
             if (!current) return null;
             let deliveries = normalizeArray<any>(current.deliveries);
-            // Mantemos a data original das entregas dessa nota
             const originalDate = deliveries.find(d => d.invoiceNumber === invoiceNumber)?.date || new Date().toISOString().split('T')[0];
-            
-            // Remove as entregas antigas dessa nota
             deliveries = deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
-            
-            // Adiciona as novas versões
             const nDels: Delivery[] = newItems.map((it, idx) => ({ 
                 id: `del-edit-${Date.now()}-${idx}`, 
                 date: originalDate, 
@@ -321,7 +314,6 @@ const App: React.FC = () => {
                 invoiceUploaded: true, 
                 invoiceNumber: invoiceNumber 
             }));
-            
             current.deliveries = [...deliveries, ...nDels];
             return current;
         });
@@ -330,6 +322,34 @@ const App: React.FC = () => {
     } catch (e) {
         setIsSaving(false);
         return { success: false, message: "Erro ao atualizar faturamento no servidor." };
+    }
+  };
+
+  const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => {
+    setIsSaving(true);
+    const supplierRef = ref(database, `suppliers/${supplierCpf}`);
+    try {
+        await runTransaction(supplierRef, (current) => {
+            if (!current) return null;
+            const deliveries = normalizeArray<any>(current.deliveries);
+            const nDels: Delivery[] = items.map((it, idx) => ({ 
+                id: `del-manual-${Date.now()}-${idx}`, 
+                date: date, 
+                time: '08:00', 
+                item: it.name.toUpperCase().trim(), 
+                kg: Number(it.kg), 
+                value: Number(it.value), 
+                invoiceUploaded: true, 
+                invoiceNumber: invoiceNumber 
+            }));
+            current.deliveries = [...deliveries, ...nDels];
+            return current;
+        });
+        setIsSaving(false);
+        return { success: true };
+    } catch (e) {
+        setIsSaving(false);
+        return { success: false, message: "Erro ao salvar faturamento manual." };
     }
   };
 
@@ -358,7 +378,10 @@ const App: React.FC = () => {
 
   const handleCancelDeliveries = (sCpf: string, ids: string[]) => {
     const s = suppliers.find(x => x.cpf === sCpf);
-    if (s) writeToDatabase(ref(database, `suppliers/${sCpf}`), { ...s, deliveries: (s.deliveries || []).filter(d => !ids.includes(d.id)) });
+    if (s) {
+        const updatedDeliveries = (s.deliveries || []).filter(d => !ids.includes(d.id));
+        writeToDatabase(ref(database, `suppliers/${sCpf}`), { ...s, deliveries: updatedDeliveries });
+    }
   };
 
   const handleReopenInvoice = async (sCpf: string, invNum: string) => {
@@ -429,7 +452,7 @@ const App: React.FC = () => {
   return (
     <>
       <div className={`fixed bottom-4 right-4 z-50 ${isSaving ? 'opacity-100' : 'opacity-0'}`}><div className="bg-blue-600 text-white px-3 py-2 rounded-full shadow text-xs font-bold animate-pulse">Gravando...</div></div>
-      {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={handleRegister} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async (o, n, c, w) => { await runTransaction(suppliersRef, (curr) => { if(!curr || !curr[o]) return; const d = { ...curr[o], name: n.toUpperCase(), cpf: c, allowedWeeks: w }; if(o !== c) delete curr[o]; curr[c] = d; return curr; }); return null; }} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async (s) => { await writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {})); return true; }} activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={registrationStatus} onClearRegistrationStatus={() => setRegistrationStatus(null)} onReopenInvoice={handleReopenInvoice} onDeleteInvoice={handleDeleteInvoice} onUpdateInvoiceItems={handleUpdateInvoiceItems} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={handleDeleteWarehouseEntry} onRegisterCleaningLog={async (l) => { await set(ref(database, `cleaningLogs/${Date.now()}`), { ...l, id: String(Date.now()) }); return {success: true, message: 'OK'}; }} onDeleteCleaningLog={async (id) => set(ref(database, `cleaningLogs/${id}`), null)} onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal} onDeleteDirectorWithdrawal={async (id) => set(ref(database, `directorWithdrawals/${id}`), null)} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} onCancelDeliveries={handleCancelDeliveries} />
+      {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={handleRegister} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async (o, n, c, w) => { await runTransaction(suppliersRef, (curr) => { if(!curr || !curr[o]) return; const d = { ...curr[o], name: n.toUpperCase(), cpf: c, allowedWeeks: w }; if(o !== c) delete curr[o]; curr[c] = d; return curr; }); return null; }} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async (s) => { await writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {})); return true; }} activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={registrationStatus} onClearRegistrationStatus={() => setRegistrationStatus(null)} onReopenInvoice={handleReopenInvoice} onDeleteInvoice={handleDeleteInvoice} onUpdateInvoiceItems={handleUpdateInvoiceItems} onManualInvoiceEntry={handleManualInvoiceEntry} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={handleDeleteWarehouseEntry} onRegisterCleaningLog={async (l) => { await set(ref(database, `cleaningLogs/${Date.now()}`), { ...l, id: String(Date.now()) }); return {success: true, message: 'OK'}; }} onDeleteCleaningLog={async (id) => set(ref(database, `cleaningLogs/${id}`), null)} onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal} onDeleteDirectorWithdrawal={async (id) => set(ref(database, `directorWithdrawals/${id}`), null)} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} onCancelDeliveries={handleCancelDeliveries} />
       : currentUser ? <Dashboard supplier={currentUser} onLogout={() => setCurrentUser(null)} onScheduleDelivery={handleScheduleDelivery} onFulfillAndInvoice={handleFulfillAndInvoice} onCancelDeliveries={handleCancelDeliveries} emailModalData={emailModalData} onCloseEmailModal={() => setEmailModalData(null)} />
       : isAlmoxarifadoLoggedIn ? <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} />
       : <LoginScreen onLogin={handleLogin} />}

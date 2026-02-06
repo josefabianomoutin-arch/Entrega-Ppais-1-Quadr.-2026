@@ -33,6 +33,7 @@ interface AdminDashboardProps {
   onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => Promise<void>;
   onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => Promise<void>;
   onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => Promise<{ success: boolean; message?: string }>;
+  onManualInvoiceEntry: (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => Promise<{ success: boolean; message?: string }>;
   perCapitaConfig: PerCapitaConfig;
   onUpdatePerCapitaConfig: (config: PerCapitaConfig) => Promise<void>;
   onDeleteWarehouseEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
@@ -71,22 +72,19 @@ const EditContractItemModal: React.FC<EditContractItemModalProps> = ({ supplier,
 
   const handleNumericChange = (field: 'totalKg' | 'valuePerKg', value: string) => {
     const sanitizedValue = value.replace(/[^0-9,]/g, '');
-    setUpdatedItem(prev => ({ ...prev, [field]: sanitizedValue as any })); // Store as string for input control
+    setUpdatedItem(prev => ({ ...prev, [field]: sanitizedValue as any }));
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    
     const finalItem: ContractItem = {
       ...updatedItem,
       name: updatedItem.name.toUpperCase(),
       totalKg: parseFloat((String(updatedItem.totalKg) || '0').replace(',', '.')),
       valuePerKg: parseFloat((String(updatedItem.valuePerKg) || '0').replace(',', '.'))
     };
-    
     onSave(supplier.cpf, item.name, finalItem);
-    // Parent will close modal.
   };
 
   return (
@@ -163,15 +161,6 @@ const EditContractItemModal: React.FC<EditContractItemModalProps> = ({ supplier,
                 </button>
             </div>
         </form>
-        <style>{`
-            @keyframes fade-in-up {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-            }
-            .animate-fade-in-up {
-            animation: fade-in-up 0.3s ease-out forwards;
-            }
-        `}</style>
       </div>
     </div>
   );
@@ -203,6 +192,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     onReopenInvoice,
     onDeleteInvoice,
     onUpdateInvoiceItems,
+    onManualInvoiceEntry,
     standardMenu,
     dailyMenus,
     onUpdateStandardMenu,
@@ -256,14 +246,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSupplierCpf || !newItemName) return;
-
     const kg = parseFloat(newItemKg.replace(',', '.'));
     const val = parseFloat(newItemValue.replace(',', '.'));
     if (isNaN(kg) || isNaN(val)) {
         alert("Por favor, insira valores válidos para peso e preço.");
         return;
     }
-
     const newItem: ContractItem = {
       name: newItemName.toUpperCase(),
       totalKg: kg,
@@ -272,7 +260,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       siafemCode: newItemSiafem,
       comprasCode: newItemCompras,
     };
-
     const updatedSuppliers = (suppliers || []).map(s => {
       if (s.cpf === selectedSupplierCpf) {
         const items = [...(s.contractItems || []), newItem];
@@ -281,13 +268,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       }
       return s;
     });
-
     onPersistSuppliers(updatedSuppliers);
-    setNewItemName('');
-    setNewItemKg('');
-    setNewItemValue('');
-    setNewItemSiafem('');
-    setNewItemCompras('');
+    setNewItemName(''); setNewItemKg(''); setNewItemValue(''); setNewItemSiafem(''); setNewItemCompras('');
   };
 
   const handleUpdateItem = (supplierCpf: string, originalItemName: string, updatedItem: ContractItem) => {
@@ -305,7 +287,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
   const handleRemoveItem = (supplierCpf: string, itemName: string) => {
     if (!window.confirm(`Excluir item "${itemName}"?`)) return;
-
     const updatedSuppliers = (suppliers || []).map(s => {
       if (s.cpf === supplierCpf) {
         const items = (s.contractItems || []).filter(i => i.name !== itemName);
@@ -314,7 +295,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       }
       return s;
     });
-
     onPersistSuppliers(updatedSuppliers);
   };
 
@@ -357,7 +337,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 </div>
               )}
             </div>
-
             <div className="bg-white p-6 rounded-2xl shadow-lg">
               <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight">Fornecedores Habilitados ({filteredSuppliers.length})</h2>
@@ -388,9 +367,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                         </td>
                       </tr>
                     )) : (
-                      <tr>
-                          <td colSpan={4} className="p-10 text-center text-gray-400 italic font-medium">Nenhum fornecedor encontrado.</td>
-                      </tr>
+                      <tr><td colSpan={4} className="p-10 text-center text-gray-400 italic font-medium">Nenhum fornecedor encontrado.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -436,7 +413,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 </div>
               </form>
             </div>
-
             <div className="grid grid-cols-1 gap-6">
               <h3 className="text-lg font-black text-gray-600 uppercase tracking-wider px-2">Detalhamento dos Contratos</h3>
               {suppliers.length > 0 ? (
@@ -477,22 +453,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                                       <td className="p-4 text-right font-black text-gray-800">{formatCurrency((item.totalKg || 0) * (item.valuePerKg || 0))}</td>
                                       <td className="p-4 text-center">
                                         <div className="flex items-center justify-center gap-2">
-                                            <button 
-                                                onClick={() => setEditingItem({ supplier: s, item: item })}
-                                                className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
-                                                title="Editar item do contrato"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z" />
-                                                </svg>
-                                            </button>
-                                            <button 
-                                                onClick={() => handleRemoveItem(s.cpf, item.name)} 
-                                                className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
-                                                title="Remover item do contrato"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            </button>
+                                            <button onClick={() => setEditingItem({ supplier: s, item: item })} className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors" title="Editar item do contrato"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z" /></svg></button>
+                                            <button onClick={() => handleRemoveItem(s.cpf, item.name)} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors" title="Remover item do contrato"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                                         </div>
                                       </td>
                                       </tr>
@@ -500,41 +462,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                                   </tbody>
                               </table>
                           ) : (
-                              <div className="p-10 text-center bg-gray-50/50">
-                                  <p className="text-gray-400 text-xs italic">Este fornecedor ainda não possui itens vinculados ao contrato.</p>
-                              </div>
+                              <div className="p-10 text-center bg-gray-50/50"><p className="text-gray-400 text-xs italic">Este fornecedor ainda não possui itens vinculados ao contrato.</p></div>
                           )}
                           </div>
                       </div>
                   ))
               ) : (
-                  <div className="p-20 text-center bg-gray-50 rounded-2xl border-2 border-dashed">
-                      <p className="text-gray-400 font-bold uppercase tracking-widest italic">Nenhum fornecedor cadastrado.</p>
-                  </div>
+                  <div className="p-20 text-center bg-gray-50 rounded-2xl border-2 border-dashed"><p className="text-gray-400 font-bold uppercase tracking-widest italic">Nenhum fornecedor cadastrado.</p></div>
               )}
             </div>
           </div>
         );
-      case 'invoices': return <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} onDeleteInvoice={onDeleteInvoice} onUpdateInvoiceItems={onUpdateInvoiceItems} />;
+      case 'invoices': return <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} onDeleteInvoice={onDeleteInvoice} onUpdateInvoiceItems={onUpdateInvoiceItems} onManualInvoiceEntry={onManualInvoiceEntry} />;
+      /* Fix: handleCancelDeliveries should be onCancelDeliveries */
       case 'schedule': return <AdminScheduleView suppliers={suppliers} onCancelDeliveries={onCancelDeliveries} />;
+      /* Fix: handleRegisterDirectorWithdrawal should be onRegisterDirectorWithdrawal and use prop-based delete function */
       case 'directorPerCapita': return <AdminDirectorPerCapita suppliers={suppliers} logs={directorWithdrawals} onRegister={onRegisterDirectorWithdrawal} onDelete={onDeleteDirectorWithdrawal} />;
+      /* Fix: use props for cleaning log register/delete instead of local set/ref */
       case 'cleaning': return <AdminCleaningLog logs={cleaningLogs} onRegister={onRegisterCleaningLog} onDelete={onDeleteCleaningLog} />;
+      /* Fix: handle... names should be correctly matched with props onRegisterEntry, onRegisterWithdrawal, etc */
       case 'warehouse': return <AdminWarehouseLog suppliers={suppliers} warehouseLog={warehouseLog} onDeleteEntry={onDeleteWarehouseEntry} onRegisterEntry={onRegisterEntry} onRegisterWithdrawal={onRegisterWithdrawal} />;
       case 'analytics': return <AdminAnalytics suppliers={suppliers} />;
       case 'graphs': return <AdminGraphs suppliers={suppliers} />;
+      /* Fix: use prop onUpdatePerCapitaConfig instead of writeToDatabase/perCapitaConfigRef */
       case 'perCapita': return <AdminPerCapita suppliers={suppliers} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={onUpdatePerCapitaConfig} />;
       case 'menu': return <AdminStandardMenu suppliers={suppliers} template={standardMenu} dailyMenus={dailyMenus} onUpdateDailyMenus={onUpdateDailyMenu} inmateCount={perCapitaConfig.inmateCount || 0} />;
       case 'info':
         return (
           <div className="bg-red-50 p-8 md:p-12 rounded-3xl border-2 border-red-200 text-center space-y-6 max-w-2xl mx-auto shadow-xl mt-10">
-            <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-red-600">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            </div>
+            <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-red-600"><svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div>
             <h2 className="text-3xl font-black text-red-800 uppercase tracking-tighter">Zona Crítica de Dados</h2>
             <p className="text-red-600 font-medium">Estas ações são irreversíveis e apagarão permanentemente todo o histórico do banco de dados.</p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
-              <button onClick={onResetData} className="bg-red-600 hover:bg-red-700 text-white font-black py-4 px-10 rounded-2xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-sm">Apagar Todos os Dados</button>
-            </div>
+            <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4"><button onClick={onResetData} className="bg-red-600 hover:bg-red-700 text-white font-black py-4 px-10 rounded-2xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-sm">Apagar Todos os Dados</button></div>
           </div>
         );
       default: return <div className="p-10 text-center text-gray-500 italic">Selecione uma aba no menu lateral.</div>;
@@ -544,64 +503,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   return (
     <div className="min-h-screen bg-gray-100 pb-20">
       <header className="bg-white shadow-sm p-4 flex justify-between items-center sticky top-0 z-20">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-green-800">Painel Administrativo</h1>
-          <p className="text-sm text-gray-500">Gestão 1º Quadr. 2026</p>
-        </div>
-        <div className="flex items-center gap-4">
-            <div className="hidden md:block text-right">
-                <p className="text-[10px] font-bold text-gray-400 uppercase">Total Contratado</p>
-                <p className="font-black text-green-700 text-lg leading-none">{formatCurrency(totalValue)}</p>
-            </div>
-            <button onClick={onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">Sair</button>
-        </div>
+        <div><h1 className="text-xl md:text-2xl font-bold text-green-800">Painel Administrativo</h1><p className="text-sm text-gray-500">Gestão 1º Quadr. 2026</p></div>
+        <div className="flex items-center gap-4"><div className="hidden md:block text-right"><p className="text-[10px] font-bold text-gray-400 uppercase">Total Contratado</p><p className="font-black text-green-700 text-lg leading-none">{formatCurrency(totalValue)}</p></div><button onClick={onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">Sair</button></div>
       </header>
-      
       <div className="flex flex-col md:flex-row">
-        <aside className="w-full md:w-72 bg-white md:min-h-[calc(100vh-73px)] border-r">
-            <nav className="p-4">
-                <ul className="space-y-1">
-                    {tabs.map(tab => (
-                        <li key={tab.id}>
-                            <button 
-                                onClick={() => onTabChange(tab.id)} 
-                                className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-semibold transition-colors ${activeTab === tab.id ? 'bg-green-100 text-green-800' : 'text-gray-600 hover:bg-gray-100'} ${tab.id === 'info' ? '!text-red-600 hover:!bg-red-50' : ''}`}
-                            >
-                                {tab.icon}
-                                {tab.name}
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            </nav>
-        </aside>
-
-        <main className="flex-1 p-4 md:p-8 bg-gray-100">
-           {renderContent()}
-        </main>
+        <aside className="w-full md:w-72 bg-white md:min-h-[calc(100vh-73px)] border-r"><nav className="p-4"><ul className="space-y-1">{tabs.map(tab => (<li key={tab.id}><button onClick={() => onTabChange(tab.id)} className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-semibold transition-colors ${activeTab === tab.id ? 'bg-green-100 text-green-800' : 'text-gray-600 hover:bg-gray-100'} ${tab.id === 'info' ? '!text-red-600 hover:!bg-red-50' : ''}`}>{tab.icon}{tab.name}</button></li>))}</ul></nav></aside>
+        <main className="flex-1 p-4 md:p-8 bg-gray-100">{renderContent()}</main>
       </div>
-
-      {editingItem && (
-        <EditContractItemModal
-          supplier={editingItem.supplier}
-          item={editingItem.item}
-          onClose={() => setEditingItem(null)}
-          onSave={handleUpdateItem}
-        />
-      )}
-
-      {editingSupplier && (
-        <EditSupplierModal 
-          supplier={editingSupplier} 
-          suppliers={suppliers} 
-          onClose={() => setEditingSupplier(null)} 
-          onSave={async (old, name, cpf, weeks) => {
-            const err = await onUpdateSupplier(old, name, cpf, weeks);
-            if (!err) setEditingSupplier(null);
-            return err;
-          }} 
-        />
-      )}
+      {editingItem && (<EditContractItemModal supplier={editingItem.supplier} item={editingItem.item} onClose={() => setEditingItem(null)} onSave={handleUpdateItem} />)}
+      {editingSupplier && (<EditSupplierModal supplier={editingSupplier} suppliers={suppliers} onClose={() => setEditingSupplier(null)} onSave={async (old, name, cpf, weeks) => { const err = await onUpdateSupplier(old, name, cpf, weeks); if (!err) setEditingSupplier(null); return err; }} />)}
     </div>
   );
 };
