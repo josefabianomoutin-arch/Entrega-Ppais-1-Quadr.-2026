@@ -42,13 +42,16 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
     for (let day = 1; day <= daysInMonth; day++) {
       const currentDate = new Date(year, month, day);
       const dateString = currentDate.toISOString().split('T')[0];
-      const deliveriesOnThisDate = deliveriesByDate.get(dateString);
+      const deliveriesOnThisDate = deliveriesByDate.get(dateString) || [];
       
       const weekNumber = getWeekNumber(currentDate);
       const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
       const isWeekAllowed = !allowedWeeks || allowedWeeks.length === 0 || allowedWeeks.includes(weekNumber);
-      const isClickable = isWeekAllowed && !isWeekend;
+      
+      const hasDeliveries = deliveriesOnThisDate.length > 0;
+      // REGRA: É clicável se a semana for permitida OU se já houver uma entrega agendada no dia
+      const isClickable = (isWeekAllowed && !isWeekend) || hasDeliveries;
       
       let dayClasses = "p-2 text-center border-r border-b border-gray-200 h-20 flex flex-col justify-center items-center relative";
 
@@ -57,14 +60,8 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
       } else {
         dayClasses += " cursor-pointer transition-colors";
         const isPast = currentDate < simulatedToday;
-        const hasDeliveries = deliveriesOnThisDate && deliveriesOnThisDate.length > 0;
         
         // Regra de cor priorizada:
-        // 1. Se tem entregas no passado e alguma NÃO foi faturada -> VERMELHO
-        // 2. Se tem entregas e TODAS foram faturadas (independente de ser passado ou futuro) -> VERDE
-        // 3. Se tem entregas no futuro/presente e estão pendentes -> VERDE CLARO (Agendado)
-        // 4. Se não tem nada -> PADRÃO
-        
         const needsInvoice = hasDeliveries && isPast && deliveriesOnThisDate.some(d => !d.invoiceUploaded);
         const allFulfilled = hasDeliveries && deliveriesOnThisDate.every(d => d.invoiceUploaded);
 
@@ -82,13 +79,13 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
       grid.push(
         <div key={day} className={dayClasses} onClick={() => isClickable && onDayClick(currentDate)}>
           <span className="text-sm md:text-base">{day}</span>
-          {isClickable && deliveriesOnThisDate && deliveriesOnThisDate.length > 0 && (
-            <span className="text-xs mt-1 px-1 rounded bg-black bg-opacity-10 truncate">
+          {hasDeliveries && (
+            <span className="text-[10px] mt-1 px-1 rounded bg-black bg-opacity-10 truncate max-w-full">
               {deliveriesOnThisDate.some(d => d.invoiceUploaded) ? 'Faturado' : 'Entrega'}
             </span>
           )}
-          {isClickable && deliveriesOnThisDate && deliveriesOnThisDate.length > 0 && deliveriesOnThisDate.some(d => !d.invoiceUploaded) && currentDate < simulatedToday && (
-            <span className="absolute bottom-1 right-1 text-xs text-white font-semibold animate-pulse">NF!</span>
+          {hasDeliveries && deliveriesOnThisDate.some(d => !d.invoiceUploaded) && currentDate < simulatedToday && (
+            <span className="absolute top-1 right-1 text-[10px] bg-white text-red-600 px-1 rounded font-black shadow-sm animate-pulse">NF!</span>
           )}
         </div>
       );

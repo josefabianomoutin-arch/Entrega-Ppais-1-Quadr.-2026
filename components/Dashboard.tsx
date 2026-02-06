@@ -88,15 +88,16 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const handleCancelDeliveries = (deliveryIds: string[]) => {
-    if(window.confirm('Tem certeza que deseja cancelar este agendamento? Após cancelar, você poderá escolher uma nova data disponível no calendário.')) {
-      onCancelDeliveries(supplier.cpf, deliveryIds);
-      handleCloseViewModal();
+    if(window.confirm('Excluir agendamento selecionado?')) {
+        onCancelDeliveries(supplier.cpf, deliveryIds);
+        handleCloseViewModal();
     }
   };
 
   const handleOpenFulfillmentModal = (invoiceInfo: { date: string; deliveries: Delivery[] }) => {
     setInvoiceToFulfill(invoiceInfo);
     setIsFulfillmentModalOpen(true);
+    setIsViewModalOpen(false); // Fecha o modal de detalhes se estiver aberto
   };
   
   const handleCloseFulfillmentModal = () => {
@@ -129,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     return Object.entries(groupedByDate).map(([date, deliveries]) => ({
         date,
         deliveries,
-    }));
+    })).sort((a,b) => a.date.localeCompare(b.date));
   }, [supplier.deliveries]);
 
   const monthlyQuotas = useMemo(() => {
@@ -229,7 +230,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="lg:col-span-2">
             <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
                 <h2 className="text-2xl font-semibold mb-4 text-center text-gray-700">Agenda de Entregas - 2026</h2>
-                <p className="text-center text-gray-500 mb-6">Clique em um dia para agendar ou visualizar uma entrega.</p>
+                <p className="text-center text-gray-500 mb-6">Clique em um dia para agendar ou faturar entregas.</p>
                 <Calendar 
                   onDayClick={handleDayClick} 
                   deliveries={supplier.deliveries} 
@@ -244,7 +245,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <div id="invoice-uploader-section">
                     <InvoiceUploader 
                         pendingInvoices={pendingDailyInvoices} 
-                        onFulfill={handleOpenFulfillmentModal} 
+                        onFulfill={handleOpenFulfillmentModal}
+                        onCancel={(ids) => onCancelDeliveries(supplier.cpf, ids)}
                     />
                 </div>
             )}
@@ -268,6 +270,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           onClose={handleCloseViewModal}
           onAddNew={handleAddNewFromView}
           onCancel={handleCancelDeliveries}
+          onFulfill={handleOpenFulfillmentModal}
           simulatedToday={SIMULATED_TODAY}
         />
       )}
