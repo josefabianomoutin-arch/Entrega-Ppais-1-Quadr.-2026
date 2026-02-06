@@ -56,9 +56,12 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
                 const [tipoRaw, csvItem, csvSupplier, nf, lote, qtd, data, venc] = cols.map(c => c.trim());
                 const isEntrada = tipoRaw.toUpperCase().includes('ENTRADA');
-                const qtyVal = parseFloat(qtd.replace(',', '.'));
+                
+                // Melhoria no parsing: Remove pontos (milhar) e troca vírgula por ponto (decimal)
+                const sanitizedQty = qtd.replace(/\./g, '').replace(',', '.');
+                const qtyVal = parseFloat(sanitizedQty);
 
-                if (isNaN(qtyVal)) { errorCount++; errorDetails.push(`Linha ${i+1}: Quantidade inválida.`); continue; }
+                if (isNaN(qtyVal)) { errorCount++; errorDetails.push(`Linha ${i+1}: Quantidade '${qtd}' inválida.`); continue; }
 
                 const supplier = suppliers.find(s => superNormalize(s.name) === superNormalize(csvSupplier));
                 if (!supplier) { errorCount++; errorDetails.push(`Linha ${i+1}: Fornecedor '${csvSupplier}' não localizado.`); continue; }
@@ -153,7 +156,9 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                         </td>
                                         <td className="p-4 text-xs text-gray-500 font-mono">{new Date(mov.timestamp).toLocaleString('pt-BR')}</td>
                                         <td className="p-4 font-bold text-gray-700 uppercase">{mov.itemName}</td>
-                                        <td className="p-4 text-right font-mono font-bold">{(mov.quantity || 0).toLocaleString('pt-BR')} kg</td>
+                                        <td className="p-4 text-right font-mono font-bold">
+                                            {(mov.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
+                                        </td>
                                         <td className="p-4 text-xs font-mono text-gray-500">{mov.lotNumber}</td>
                                         <td className="p-4 text-xs text-gray-500 font-mono">{mov.inboundInvoice || mov.outboundInvoice || '-'}</td>
                                     </tr>

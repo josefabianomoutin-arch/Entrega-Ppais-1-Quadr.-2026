@@ -65,9 +65,12 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
 
                 const [tipoRaw, csvItem, csvSupplier, nf, lote, qtd, data, venc] = cols.map(c => c.trim());
                 const isEntrada = tipoRaw.toUpperCase().includes('ENTRADA');
-                const qtyVal = parseFloat(qtd.replace(',', '.'));
+                
+                // Melhoria no parsing: Remove pontos (milhar) e troca vírgula por ponto (decimal)
+                const sanitizedQty = qtd.replace(/\./g, '').replace(',', '.');
+                const qtyVal = parseFloat(sanitizedQty);
 
-                if (isNaN(qtyVal)) { errorCount++; errorDetails.push(`Linha ${i+1}: Quantidade inválida.`); continue; }
+                if (isNaN(qtyVal)) { errorCount++; errorDetails.push(`Linha ${i+1}: Quantidade '${qtd}' inválida.`); continue; }
 
                 // Busca o fornecedor ignorando acentos
                 const supplier = suppliers.find(s => superNormalize(s.name) === superNormalize(csvSupplier));
@@ -161,7 +164,9 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                                 <td className="p-3 font-semibold text-gray-800 uppercase">{log.itemName}</td>
                                 <td className="p-3 font-mono">{log.lotNumber}</td>
                                 <td className="p-3 text-gray-600">{log.supplierName}</td>
-                                <td className="p-3 text-right font-mono text-gray-800">{(log.quantity || 0).toLocaleString('pt-BR')} kg</td>
+                                <td className="p-3 text-right font-mono text-gray-800">
+                                    {(log.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
+                                </td>
                                 <td className="p-3 font-mono text-gray-600">{log.inboundInvoice || log.outboundInvoice || '-'}</td>
                                 <td className="p-3 text-center">
                                     <button 
