@@ -297,6 +297,42 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, newItems: { name: string; kg: number; value: number }[]) => {
+    setIsSaving(true);
+    const supplierRef = ref(database, `suppliers/${supplierCpf}`);
+    try {
+        await runTransaction(supplierRef, (current) => {
+            if (!current) return null;
+            let deliveries = normalizeArray<any>(current.deliveries);
+            // Mantemos a data original das entregas dessa nota
+            const originalDate = deliveries.find(d => d.invoiceNumber === invoiceNumber)?.date || new Date().toISOString().split('T')[0];
+            
+            // Remove as entregas antigas dessa nota
+            deliveries = deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+            
+            // Adiciona as novas versões
+            const nDels: Delivery[] = newItems.map((it, idx) => ({ 
+                id: `del-edit-${Date.now()}-${idx}`, 
+                date: originalDate, 
+                time: '08:00', 
+                item: it.name.toUpperCase().trim(), 
+                kg: Number(it.kg), 
+                value: Number(it.value), 
+                invoiceUploaded: true, 
+                invoiceNumber: invoiceNumber 
+            }));
+            
+            current.deliveries = [...deliveries, ...nDels];
+            return current;
+        });
+        setIsSaving(false);
+        return { success: true };
+    } catch (e) {
+        setIsSaving(false);
+        return { success: false, message: "Erro ao atualizar faturamento no servidor." };
+    }
+  };
+
   const handleScheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
     const s = suppliers.find(s => s.cpf === supplierCpf);
     if (!s) return;
@@ -393,7 +429,7 @@ const App: React.FC = () => {
   return (
     <>
       <div className={`fixed bottom-4 right-4 z-50 ${isSaving ? 'opacity-100' : 'opacity-0'}`}><div className="bg-blue-600 text-white px-3 py-2 rounded-full shadow text-xs font-bold animate-pulse">Gravando...</div></div>
-      {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={handleRegister} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async (o, n, c, w) => { await runTransaction(suppliersRef, (curr) => { if(!curr || !curr[o]) return; const d = { ...curr[o], name: n.toUpperCase(), cpf: c, allowedWeeks: w }; if(o !== c) delete curr[o]; curr[c] = d; return curr; }); return null; }} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async (s) => { await writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {})); return true; }} activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={registrationStatus} onClearRegistrationStatus={() => setRegistrationStatus(null)} onReopenInvoice={handleReopenInvoice} onDeleteInvoice={handleDeleteInvoice} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={handleDeleteWarehouseEntry} onRegisterCleaningLog={async (l) => { await set(ref(database, `cleaningLogs/${Date.now()}`), { ...l, id: String(Date.now()) }); return {success: true, message: 'OK'}; }} onDeleteCleaningLog={async (id) => set(ref(database, `cleaningLogs/${id}`), null)} onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal} onDeleteDirectorWithdrawal={async (id) => set(ref(database, `directorWithdrawals/${id}`), null)} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} onCancelDeliveries={handleCancelDeliveries} />
+      {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={handleRegister} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async (o, n, c, w) => { await runTransaction(suppliersRef, (curr) => { if(!curr || !curr[o]) return; const d = { ...curr[o], name: n.toUpperCase(), cpf: c, allowedWeeks: w }; if(o !== c) delete curr[o]; curr[c] = d; return curr; }); return null; }} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async (s) => { await writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {})); return true; }} activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={registrationStatus} onClearRegistrationStatus={() => setRegistrationStatus(null)} onReopenInvoice={handleReopenInvoice} onDeleteInvoice={handleDeleteInvoice} onUpdateInvoiceItems={handleUpdateInvoiceItems} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={handleDeleteWarehouseEntry} onRegisterCleaningLog={async (l) => { await set(ref(database, `cleaningLogs/${Date.now()}`), { ...l, id: String(Date.now()) }); return {success: true, message: 'OK'}; }} onDeleteCleaningLog={async (id) => set(ref(database, `cleaningLogs/${id}`), null)} onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal} onDeleteDirectorWithdrawal={async (id) => set(ref(database, `directorWithdrawals/${id}`), null)} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} onCancelDeliveries={handleCancelDeliveries} />
       : currentUser ? <Dashboard supplier={currentUser} onLogout={() => setCurrentUser(null)} onScheduleDelivery={handleScheduleDelivery} onFulfillAndInvoice={handleFulfillAndInvoice} onCancelDeliveries={handleCancelDeliveries} emailModalData={emailModalData} onCloseEmailModal={() => setEmailModalData(null)} />
       : isAlmoxarifadoLoggedIn ? <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} />
       : <LoginScreen onLogin={handleLogin} />}

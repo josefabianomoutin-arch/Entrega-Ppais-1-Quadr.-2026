@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Supplier, Delivery } from '../types';
+import type { Supplier, Delivery, ContractItem } from '../types';
 
 interface InvoiceInfo {
     id: string;
@@ -16,6 +16,7 @@ interface AdminInvoicesProps {
     suppliers: Supplier[];
     onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => void;
     onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => void;
+    onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => Promise<{ success: boolean; message?: string }>;
 }
 
 const formatCurrency = (value: number) => {
@@ -24,8 +25,9 @@ const formatCurrency = (value: number) => {
 };
 
 const formatDate = (dateString: string) => {
+    if (!dateString || dateString === "Invalid Date") return 'N/A';
     const date = new Date(dateString + 'T00:00:00');
-    return date.toLocaleDateString('pt-BR');
+    return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('pt-BR');
 };
 
 const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoice, onDeleteInvoice }) => {
@@ -40,7 +42,6 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
         (suppliers || []).forEach(supplier => {
             const deliveriesByInvoice = new Map<string, Delivery[]>();
             
-            // Group deliveries by invoice number for this supplier
             (supplier.deliveries || []).forEach(delivery => {
                 if (delivery.invoiceNumber && delivery.invoiceNumber.trim() !== "") {
                     const existing = deliveriesByInvoice.get(delivery.invoiceNumber) || [];
@@ -52,7 +53,6 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                 const invoiceId = `${supplier.cpf}-${invoiceNumber}`;
                 const totalValue = deliveries.reduce((sum, d) => sum + (d.value || 0), 0);
                 
-                // Extraímos os itens reais, ignorando apenas o placeholder "AGENDAMENTO PENDENTE"
                 const items = deliveries
                     .filter(d => d.item && d.item !== 'AGENDAMENTO PENDENTE')
                     .map(d => ({ 
@@ -63,7 +63,8 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                 
                 if(items.length === 0 && totalValue === 0) return;
 
-                const earliestDate = deliveries.reduce((earliest, d) => (d.date < earliest ? d.date : earliest), deliveries[0].date);
+                const validDates = deliveries.map(d => d.date).filter(d => d && d !== "Invalid Date");
+                const earliestDate = validDates.length > 0 ? validDates.sort()[0] : new Date().toISOString().split('T')[0];
 
                 invoicesMap.set(invoiceId, {
                     id: invoiceId,
@@ -113,14 +114,14 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
     };
 
     const handleReopenClick = (supplierCpf: string, invoiceNumber: string) => {
-        const confirmationMessage = `Tem certeza que deseja REABRIR esta nota fiscal (NF: ${invoiceNumber})?\n\nAs entregas associadas voltarão ao estado de agendamento pendente para nova digitação.\n\nEsta ação não pode ser desfeita.`;
+        const confirmationMessage = `Tem certeza que deseja REABRIR esta nota fiscal (NF: ${invoiceNumber})?\n\nAs entregas associadas voltarão ao estado de agendamento pendente para nova digitação.`;
         if (window.confirm(confirmationMessage)) {
             onReopenInvoice(supplierCpf, invoiceNumber);
         }
     };
 
     const handleDeleteClick = (supplierCpf: string, invoiceNumber: string) => {
-        const confirmationMessage = `ATENÇÃO: Deseja EXCLUIR permanentemente o faturamento desta NF (${invoiceNumber})?\n\nIsso removerá os registros de entrega e liberará o saldo no contrato. Os agendamentos não serão mantidos.\n\nEsta ação é irreversível.`;
+        const confirmationMessage = `ATENÇÃO: Deseja EXCLUIR permanentemente o faturamento desta NF (${invoiceNumber})?\n\nEsta ação é irreversível.`;
         if (window.confirm(confirmationMessage)) {
             onDeleteInvoice(supplierCpf, invoiceNumber);
         }
@@ -131,7 +132,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
             <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 border-b pb-6">
                  <div>
                     <h2 className="text-3xl font-black text-teal-900 uppercase tracking-tighter">Consulta de Notas Fiscais</h2>
-                    <p className="text-gray-400 font-medium">Visualize todas as notas fiscais enviadas pelos fornecedores.</p>
+                    <p className="text-gray-400 font-medium">Visualize todas as faturas processadas. Para alterações de estoque, use a aba Histórico.</p>
                 </div>
                 <input
                     type="text"
@@ -150,8 +151,8 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                             <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('date')}>Data</th>
                             <th className="p-3 text-left">Nº Nota Fiscal</th>
                             <th className="p-3 text-right cursor-pointer" onClick={() => handleSort('totalValue')}>Valor Total</th>
-                            <th className="p-3 text-center">Detalhes</th>
-                            <th className="p-3 text-center">Ações</th>
+                            <th className="p-3 text-center">Itens</th>
+                            <th className="p-3 text-center">Controle</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -181,7 +182,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                                 <button 
                                                     onClick={() => handleDeleteClick(invoice.supplierCpf, invoice.invoiceNumber)}
                                                     className="bg-red-100 text-red-700 hover:bg-red-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors"
-                                                    title="Excluir faturamento permanentemente"
+                                                    title="Excluir permanentemente"
                                                 >
                                                     Excluir
                                                 </button>
@@ -192,7 +193,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                         <tr className="bg-gray-100">
                                             <td colSpan={6} className="p-4">
                                                 <div className="bg-white p-4 rounded-lg shadow-inner">
-                                                    <h4 className="text-xs font-bold uppercase text-gray-600 mb-2">Itens na Nota Fiscal {invoice.invoiceNumber}</h4>
+                                                    <h4 className="text-xs font-bold uppercase text-gray-600 mb-2">Detalhamento da NF {invoice.invoiceNumber}</h4>
                                                     <ul className="space-y-1 text-xs">
                                                         {invoice.items.map((item, index) => (
                                                             <li key={index} className="flex justify-between items-center p-2 border-b last:border-b-0">
@@ -208,7 +209,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                 </React.Fragment>
                             )
                         }) : (
-                            <tr><td colSpan={6} className="p-8 text-center text-gray-400 italic">Nenhuma nota fiscal encontrada para exibir.</td></tr>
+                            <tr><td colSpan={6} className="p-8 text-center text-gray-400 italic">Nenhuma nota fiscal registrada.</td></tr>
                         )}
                     </tbody>
                 </table>
