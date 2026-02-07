@@ -96,6 +96,7 @@ export interface MenuRow {
   id: string;
   period?: 'CAFÉ DA MANHÃ' | 'ALMOÇO' | 'JANTA' | 'LANCHE NOITE' | '';
   foodItem: string; // Descrição da preparação
+  preparationDetails?: string;
   contractedItem?: string; // Item do contrato vinculado para análise
   unitWeight: string;
   totalWeight: string;

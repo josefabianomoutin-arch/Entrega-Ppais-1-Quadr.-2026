@@ -127,7 +127,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   // Carrega o cardápio para a data selecionada
   useEffect(() => {
     const normalize = (rows: any[], baseId: string): MenuRow[] => {
-      const defaultRow = { period: '', foodItem: '', contractedItem: '', unitWeight: '', totalWeight: '' };
+      const defaultRow = { period: '', foodItem: '', preparationDetails: '', contractedItem: '', unitWeight: '', totalWeight: '' };
       return (rows || []).map((row, i) => ({
         ...defaultRow,
         ...row,
@@ -179,7 +179,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onUpdateDailyMenus({ ...dailyMenus, [selectedDate]: currentMenu.filter(r => r.foodItem || r.contractedItem || r.unitWeight) });
+      await onUpdateDailyMenus({ ...dailyMenus, [selectedDate]: currentMenu.filter(r => r.foodItem || r.contractedItem || r.unitWeight || r.preparationDetails) });
       alert(isLoadedFromSaved ? 'Cardápio atualizado com sucesso!' : 'Cardápio do dia salvo com sucesso!');
     } catch (e) {
       alert('Erro ao salvar.');
@@ -276,20 +276,22 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
               <table>
                   <thead>
                       <tr>
-                          <th style="width: 40%;">Alimento / Preparação</th>
-                          <th style="width: 30%;">Item Contratado (p/ Análise)</th>
-                          <th style="width: 15%; text-align: right;">Peso/Qtd. Unit.</th>
-                          <th style="width: 15%; text-align: right;">Peso/Qtd. Total</th>
+                          <th style="width: 30%;">Alimento / Preparação</th>
+                          <th style="width: 25%;">Descrição Preparo</th>
+                          <th style="width: 20%;">Item Contratado (p/ Análise)</th>
+                          <th style="width: 12.5%; text-align: right;">Peso/Qtd. Unit.</th>
+                          <th style="width: 12.5%; text-align: right;">Peso/Qtd. Total</th>
                       </tr>
                   </thead>
                   <tbody>
                     ${MEAL_PERIODS.map(period => {
                       if (!groupedMenu[period] || groupedMenu[period].length === 0) return '';
                       return `
-                        <tr><td colspan="4" class="period-header">${period}</td></tr>
+                        <tr><td colspan="5" class="period-header">${period}</td></tr>
                         ${groupedMenu[period].map(row => `
                           <tr>
                             <td>${row.foodItem}</td>
+                            <td>${row.preparationDetails || ''}</td>
                             <td>${row.contractedItem || '-'}</td>
                             <td style="text-align: right;">${row.unitWeight}</td>
                             <td style="text-align: right;">${row.totalWeight}</td>
@@ -551,6 +553,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                             <tr>
                                 <th className="p-3 border text-left w-32">Período</th>
                                 <th className="p-3 border text-left">Alimento / Preparação</th>
+                                <th className="p-3 border text-left">Descrição Preparo</th>
                                 <th className="p-3 border text-left">Item Contratado (p/ Análise)</th>
                                 <th className="p-3 border text-center w-28">Peso/Qtd. Unit.</th>
                                 <th className="p-3 border text-center w-32">Peso/Qtd. Total</th>
@@ -578,6 +581,15 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                             value={row.foodItem}
                                             onChange={(e) => handleInputChange(idx, 'foodItem', e.target.value)}
                                             placeholder="Ex: Arroz à grega"
+                                            className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-medium"
+                                        />
+                                    </td>
+                                    <td className="p-1 border">
+                                        <input
+                                            type="text"
+                                            value={row.preparationDetails || ''}
+                                            onChange={(e) => handleInputChange(idx, 'preparationDetails', e.target.value)}
+                                            placeholder="Ex: Cozido com legumes"
                                             className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-medium"
                                         />
                                     </td>
