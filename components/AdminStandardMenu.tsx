@@ -55,12 +55,28 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   const [currentMenu, setCurrentMenu] = useState<MenuRow[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadedFromSaved, setIsLoadedFromSaved] = useState(false);
-  const [selectedWeek, setSelectedWeek] = useState<number>(getWeekNumber(new Date()));
+  const [selectedWeek, setSelectedWeek] = useState<number>(getWeekNumber(new Date(new Date().toISOString().split('T')[0] + 'T00:00:00')));
 
-  const weekOfSelectedDate = useMemo(() => {
-    if (!selectedDate) return getWeekNumber(new Date());
-    return getWeekNumber(new Date(selectedDate + 'T00:00:00'));
-  }, [selectedDate]);
+  useEffect(() => {
+    const weekForDate = getWeekNumber(new Date(selectedDate + 'T00:00:00'));
+    if (weekForDate !== selectedWeek) {
+        setSelectedWeek(weekForDate);
+    }
+  }, [selectedDate, selectedWeek]);
+
+  const handleWeekChange = (weekNumber: number) => {
+    const year = new Date(selectedDate + 'T00:00:00').getFullYear();
+    const datesOfWeek = getDatesOfWeek(weekNumber, year);
+    setSelectedWeek(weekNumber);
+    if (datesOfWeek.length > 0) {
+        const firstDayOfWeek = datesOfWeek[0];
+        const currentSelectedDate = new Date(selectedDate + 'T00:00:00');
+        const newDate = new Date(firstDayOfWeek + 'T00:00:00');
+        if (currentSelectedDate.getTime() !== newDate.getTime()) {
+            setSelectedDate(firstDayOfWeek);
+        }
+    }
+  };
 
   const availableContractItems = useMemo(() => {
     const itemSet = new Set<string>();
@@ -218,7 +234,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     
     const sortedSummary = Array.from(itemSummary.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     
-    const datesOfWeek = getDatesOfWeek(weekOfSelectedDate, 2026);
+    const datesOfWeek = getDatesOfWeek(selectedWeek, 2026);
     const suppliersThisWeek = new Set<string>();
     suppliers.forEach(supplier => {
         const hasDeliveryThisWeek = (supplier.deliveries || []).some(delivery => 
@@ -267,7 +283,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
           <div class="report-title">Cardápio Diário e Necessidade de Gêneros</div>
   
           <div class="info-bar">
-              <span>Data: ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} (Semana ${weekOfSelectedDate})</span>
+              <span>Data: ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} (Semana ${selectedWeek})</span>
               <span>População Carcerária: ${inmateCount}</span>
           </div>
           
@@ -324,7 +340,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
           </div>
           
           <div class="summary-section">
-            <div class="summary-title">Fornecedores com Entregas na Semana ${weekOfSelectedDate}</div>
+            <div class="summary-title">Fornecedores com Entregas na Semana ${selectedWeek}</div>
             ${sortedSuppliersList.length > 0 ? `
                 <ul style="list-style-type: disc; padding-left: 20px; font-size: 10px;">
                     ${sortedSuppliersList.map(name => `<li>${name}</li>`).join('')}
@@ -473,7 +489,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                 <label className="block text-[10px] font-black text-indigo-400 uppercase mb-2">Geral da Semana</label>
                 <select
                     value={selectedWeek || ''}
-                    onChange={e => setSelectedWeek(Number(e.target.value))}
+                    onChange={e => handleWeekChange(Number(e.target.value))}
                     className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
                 >
                     {Array.from({ length: 18 }, (_, i) => i + 1).map(week => (
@@ -539,7 +555,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
             <div className="border rounded-2xl overflow-hidden shadow-sm bg-white">
                 <div className={'bg-amber-50 p-4 border-b flex justify-between items-center gap-4'}>
                     <h3 className="text-xl font-black text-gray-800 tracking-tight">
-                        {`Data: ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} (Semana ${weekOfSelectedDate})`}
+                        {`Data: ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} (Semana ${selectedWeek})`}
                     </h3>
                      {isLoadedFromSaved && (
                         <span className="text-xs font-bold uppercase bg-green-100 text-green-700 px-3 py-1 rounded-full animate-fade-in">
