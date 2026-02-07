@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 // Import types directly to ensure they are available for use in generic positions
 import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow } from './types';
@@ -407,8 +408,10 @@ const App: React.FC = () => {
         const subj = `ENVIO DE NOTA FISCAL - ${targetSupplierName} - NF ${inv.invoiceNumber}`;
         let b = `Olá,\n\nSegue em anexo a Nota Fiscal nº ${inv.invoiceNumber}.\n\nItens:\n`;
         inv.fulfilledItems.forEach(i => b += `- ${i.name}: ${i.kg.toFixed(2)} Kg\n`);
-        const mailto = `mailto:dg@ptaiuva.sap.gov.br?cc=almoxarifado@ptaiuva.sap.gov.br&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(b)}`;
-        setEmailModalData({ recipient: "dg@ptaiuva.sap.gov.br", cc: "almoxarifado@ptaiuva.sap.gov.br", subject: subj, body: b, mailtoLink: mailto });
+        const recipientEmail = "dg@ptaiuva.sap.sp.gov.br";
+        const ccEmails = "almoxarifado@ptaiuva.sap.sp.gov.br;financas@ptaiuva.sap.sp.gov.br";
+        const mailto = `mailto:${recipientEmail}?cc=${ccEmails}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(b)}`;
+        setEmailModalData({ recipient: recipientEmail, cc: ccEmails, subject: subj, body: b, mailtoLink: mailto });
       }
     } catch (e) { console.error(e); } finally { setIsSaving(false); }
   };
