@@ -58,11 +58,9 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     const supplierOptions = useMemo(() => {
         const uniqueNames = [...new Set(suppliers.map(s => s.name))];
         return uniqueNames
-            // FIX: Explicitly type `a` and `b` as strings to resolve TypeScript inference issue.
             .sort((a: string, b: string) => a.localeCompare(b))
             .map(name => ({
-                cpf: name, // Use name as the value
-                name: name,
+                value: name,
                 displayName: name
             }));
     }, [suppliers]);
@@ -498,7 +496,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                         >
                             <option value="all">Todos os Fornecedores</option>
                             {supplierOptions.map(option => (
-                                <option key={option.cpf} value={option.cpf}>{option.displayName}</option>
+                                <option key={option.value} value={option.value}>{option.displayName}</option>
                             ))}
                         </select>
                         <select
