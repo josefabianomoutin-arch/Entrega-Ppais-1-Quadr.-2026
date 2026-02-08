@@ -45,7 +45,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
 
     const analyticsData = useMemo(() => {
         const totalContracted = suppliers.reduce((sum, p) => sum + p.initialValue, 0);
-        const totalDelivered = suppliers.reduce((sum, p) => sum + p.deliveries.reduce((dSum, d) => dSum + (d.value || 0), 0), 0);
+        const totalDelivered = suppliers.reduce((sum, p) => sum + p.deliveries.filter(d => d.invoiceUploaded).reduce((dSum, d) => dSum + (d.value || 0), 0), 0);
         
         return {
             totalContracted,
@@ -78,8 +78,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
 
     const sortedSuppliers = useMemo(() => {
       return [...filteredSuppliers].sort((a, b) => {
-            const aDelivered = a.deliveries.reduce((sum, d) => sum + (d.value || 0), 0);
-            const bDelivered = b.deliveries.reduce((sum, d) => sum + (d.value || 0), 0);
+            const aDelivered = a.deliveries.filter(d => d.invoiceUploaded).reduce((sum, d) => sum + (d.value || 0), 0);
+            const bDelivered = b.deliveries.filter(d => d.invoiceUploaded).reduce((sum, d) => sum + (d.value || 0), 0);
             const aProgress = a.initialValue > 0 ? aDelivered / a.initialValue : 0;
             const bProgress = b.initialValue > 0 ? bDelivered / b.initialValue : 0;
             let comp = 0;
@@ -114,7 +114,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
 
                 months.forEach((monthName, monthIndex) => {
                     const deliveredInMonth = (supplier.deliveries || [])
-                        .filter(d => d.item === item.name && new Date(d.date + 'T00:00:00').getMonth() === monthIndex)
+                        .filter(d => d.item === item.name && new Date(d.date + 'T00:00:00').getMonth() === monthIndex && d.invoiceUploaded)
                         .reduce((sum, d) => sum + (d.kg || 0), 0);
 
                     const deficit = monthlyExpectedWeight - deliveredInMonth;
@@ -183,7 +183,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                 const monthlyKg = totalItemWeight / 4;
                 const monthlyValue = itemTotalValue / 4;
                 const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
-                const deliveriesForItem = p.deliveries.filter(d => d.item === item.name && d.kg);
+                const deliveriesForItem = p.deliveries.filter(d => d.item === item.name && d.kg && d.invoiceUploaded);
                 let surplusFromPreviousMonth = 0;
     
                 months.forEach((month, index) => {
@@ -322,7 +322,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                                                 const monthlyValue = itemTotalValue / 4;
                                                                 const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
                                                                 
-                                                                const deliveriesForItem = supplier.deliveries.filter(d => d.item === item.name && d.kg);
+                                                                const deliveriesForItem = supplier.deliveries.filter(d => d.item === item.name && d.kg && d.invoiceUploaded);
                                                                 const totalDeliveredKgForItem = deliveriesForItem.reduce((sum, d) => sum + (d.kg || 0), 0);
                                                                 const totalRemainingKgForItem = totalItemWeight - totalDeliveredKgForItem;
 
@@ -433,7 +433,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                         </thead>
                         <tbody>
                             {sortedSuppliers.length > 0 ? sortedSuppliers.map(p => {
-                                const deliveredValue = p.deliveries.reduce((s, d) => s + (d.value || 0), 0);
+                                const deliveredValue = p.deliveries.filter(d => d.invoiceUploaded).reduce((s, d) => s + (d.value || 0), 0);
                                 const contractedValue = p.initialValue;
                                 const progress = contractedValue > 0 ? (deliveredValue / contractedValue) * 100 : 0;
                                 return (
