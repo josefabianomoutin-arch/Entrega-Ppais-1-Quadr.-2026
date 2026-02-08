@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import type { Supplier } from '../types';
+import type { Supplier, Delivery } from '../types';
 
 interface AdminAnalyticsProps {
   suppliers: Supplier[];
@@ -40,7 +40,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
     const [expandedSupplierCpf, setExpandedSupplierCpf] = useState<string | null>(null);
-    const [selectedSupplierCpf, setSelectedSupplierCpf] = useState<string>('all');
+    const [selectedSupplierName, setSelectedSupplierName] = useState<string>('all');
     const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all');
 
     const analyticsData = useMemo(() => {
@@ -56,20 +56,15 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     }, [suppliers]);
 
     const supplierOptions = useMemo(() => {
-        const nameCounts = suppliers.reduce((acc, supplier) => {
-            acc.set(supplier.name, (acc.get(supplier.name) || 0) + 1);
-            return acc;
-        }, new Map<string, number>());
-    
-        return suppliers
-            .map(supplier => ({
-                cpf: supplier.cpf,
-                name: supplier.name,
-                displayName: (nameCounts.get(supplier.name) || 1) > 1
-                    ? `${supplier.name} (${supplier.cpf})`
-                    : supplier.name
-            }))
-            .sort((a, b) => a.displayName.localeCompare(b.displayName));
+        const uniqueNames = [...new Set(suppliers.map(s => s.name))];
+        return uniqueNames
+            // FIX: Explicitly type `a` and `b` as strings to resolve TypeScript inference issue.
+            .sort((a: string, b: string) => a.localeCompare(b))
+            .map(name => ({
+                cpf: name, // Use name as the value
+                name: name,
+                displayName: name
+            }));
     }, [suppliers]);
     
     const filteredSuppliers = useMemo(() => {
@@ -92,9 +87,37 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     }, [filteredSuppliers, sortKey, sortDirection]);
 
     const shortfallData = useMemo(() => {
+        const aggregatedByName = new Map<string, {
+            contractItems: Map<string, { totalKg: number; totalValue: number; }>;
+            deliveries: Delivery[];
+        }>();
+    
+        suppliers.forEach(supplier => {
+            if (!aggregatedByName.has(supplier.name)) {
+                aggregatedByName.set(supplier.name, {
+                    contractItems: new Map(),
+                    deliveries: []
+                });
+            }
+            const entry = aggregatedByName.get(supplier.name)!;
+    
+            (supplier.contractItems || []).forEach(item => {
+                if (!entry.contractItems.has(item.name)) {
+                    entry.contractItems.set(item.name, {
+                        totalKg: 0,
+                        totalValue: 0,
+                    });
+                }
+                const aggItem = entry.contractItems.get(item.name)!;
+                const itemWeight = getContractItemWeight(item);
+                aggItem.totalKg += itemWeight;
+                aggItem.totalValue += itemWeight * (item.valuePerKg || 0);
+            });
+            entry.deliveries.push(...(supplier.deliveries || []));
+        });
+    
         const shortfalls: {
             id: string;
-            supplierCpf: string;
             supplierName: string;
             productName: string;
             month: string;
@@ -104,51 +127,51 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
             financialLoss: number;
         }[] = [];
         const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
-
-        suppliers.forEach(supplier => {
-            (supplier.contractItems || []).forEach(item => {
-                const totalContractedWeight = getContractItemWeight(item);
+    
+        aggregatedByName.forEach((data, supplierName) => {
+            data.contractItems.forEach((aggItem, productName) => {
+                const totalContractedWeight = aggItem.totalKg;
                 if (totalContractedWeight <= 0) return;
-
+    
+                const weightedAvgPrice = aggItem.totalValue / totalContractedWeight;
                 const monthlyExpectedWeight = totalContractedWeight / 4;
-
+    
                 months.forEach((monthName, monthIndex) => {
-                    const deliveredInMonth = (supplier.deliveries || [])
-                        .filter(d => d.item === item.name && new Date(d.date + 'T00:00:00').getMonth() === monthIndex && d.invoiceUploaded)
+                    const deliveredInMonth = data.deliveries
+                        .filter(d => d.item === productName && new Date(d.date + 'T00:00:00').getMonth() === monthIndex && d.invoiceUploaded)
                         .reduce((sum, d) => sum + (d.kg || 0), 0);
-
+    
                     const deficit = monthlyExpectedWeight - deliveredInMonth;
-
-                    if (deficit > 0.001) { // Use a small epsilon to avoid floating point issues
+    
+                    if (deficit > 0.001) {
                         shortfalls.push({
-                            id: `${supplier.cpf}-${item.name}-${monthName}`,
-                            supplierCpf: supplier.cpf,
-                            supplierName: supplier.name,
-                            productName: item.name,
+                            id: `${supplierName}-${productName}-${monthName}`,
+                            supplierName: supplierName,
+                            productName: productName,
                             month: monthName,
                             expectedKg: monthlyExpectedWeight,
                             deliveredKg: deliveredInMonth,
                             shortfallKg: deficit,
-                            financialLoss: deficit * (item.valuePerKg || 0)
+                            financialLoss: deficit * weightedAvgPrice
                         });
                     }
                 });
             });
         });
-
+    
         return shortfalls.sort((a, b) => new Date(`2026-${a.month}-01`).getMonth() - new Date(`2026-${b.month}-01`).getMonth() || a.supplierName.localeCompare(b.supplierName));
     }, [suppliers]);
 
     const filteredShortfallData = useMemo(() => {
-        if (selectedSupplierCpf === 'all' && selectedMonthFilter === 'all') {
+        if (selectedSupplierName === 'all' && selectedMonthFilter === 'all') {
             return shortfallData;
         }
         return shortfallData.filter(item => {
-            const supplierMatch = selectedSupplierCpf === 'all' || item.supplierCpf === selectedSupplierCpf;
+            const supplierMatch = selectedSupplierName === 'all' || item.supplierName === selectedSupplierName;
             const monthMatch = selectedMonthFilter === 'all' || item.month === selectedMonthFilter;
             return supplierMatch && monthMatch;
         });
-    }, [shortfallData, selectedSupplierCpf, selectedMonthFilter]);
+    }, [shortfallData, selectedSupplierName, selectedMonthFilter]);
 
     const totalFinancialLoss = useMemo(() => {
         return filteredShortfallData.reduce((sum, item) => sum + item.financialLoss, 0);
@@ -469,8 +492,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                     <h3 className="text-lg font-bold text-gray-800">Relatório de Falhas de Entrega Mensal</h3>
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                          <select
-                            value={selectedSupplierCpf}
-                            onChange={(e) => setSelectedSupplierCpf(e.target.value)}
+                            value={selectedSupplierName}
+                            onChange={(e) => setSelectedSupplierName(e.target.value)}
                             className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-400 transition-all w-full sm:w-auto bg-white"
                         >
                             <option value="all">Todos os Fornecedores</option>
