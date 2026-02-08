@@ -139,11 +139,16 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
         return shortfalls.sort((a, b) => new Date(`2026-${a.month}-01`).getMonth() - new Date(`2026-${b.month}-01`).getMonth() || a.supplierName.localeCompare(b.supplierName));
     }, [suppliers]);
 
-    const filteredShortfallData = shortfallData.filter(item => {
-        const supplierMatch = selectedSupplierCpf === 'all' || item.supplierCpf === selectedSupplierCpf;
-        const monthMatch = selectedMonthFilter === 'all' || item.month === selectedMonthFilter;
-        return supplierMatch && monthMatch;
-    });
+    const filteredShortfallData = useMemo(() => {
+        if (selectedSupplierCpf === 'all' && selectedMonthFilter === 'all') {
+            return shortfallData;
+        }
+        return shortfallData.filter(item => {
+            const supplierMatch = selectedSupplierCpf === 'all' || item.supplierCpf === selectedSupplierCpf;
+            const monthMatch = selectedMonthFilter === 'all' || item.month === selectedMonthFilter;
+            return supplierMatch && monthMatch;
+        });
+    }, [shortfallData, selectedSupplierCpf, selectedMonthFilter]);
 
     const totalFinancialLoss = useMemo(() => {
         return filteredShortfallData.reduce((sum, item) => sum + item.financialLoss, 0);
@@ -490,11 +495,11 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                     <table className="w-full text-sm">
                         <thead className="bg-red-50 text-xs uppercase text-red-800">
                             <tr>
-                                <th className="p-3 text-left">Fornecedor</th>
-                                <th className="p-3 text-left">Produto</th>
-                                <th className="p-3 text-left">Mês da Falha</th>
-                                <th className="p-3 text-right">Qtd. Não Entregue</th>
-                                <th className="p-3 text-right">Prejuízo (R$)</th>
+                                <th className="p-3 text-left">FORNECEDOR</th>
+                                <th className="p-3 text-left">PRODUTO</th>
+                                <th className="p-3 text-left">MÊS DA FALHA</th>
+                                <th className="p-3 text-right">QTD. NÃO ENTREGUE</th>
+                                <th className="p-3 text-right">PREJUÍZO (R$)</th>
                             </tr>
                         </thead>
                         <tbody>
