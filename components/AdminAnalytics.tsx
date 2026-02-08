@@ -139,13 +139,11 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
         return shortfalls.sort((a, b) => new Date(`2026-${a.month}-01`).getMonth() - new Date(`2026-${b.month}-01`).getMonth() || a.supplierName.localeCompare(b.supplierName));
     }, [suppliers]);
 
-    const filteredShortfallData = useMemo(() => {
-        return shortfallData.filter(item => {
-            const supplierMatch = selectedSupplierCpf === 'all' || item.supplierCpf === selectedSupplierCpf;
-            const monthMatch = selectedMonthFilter === 'all' || item.month === selectedMonthFilter;
-            return supplierMatch && monthMatch;
-        });
-    }, [shortfallData, selectedSupplierCpf, selectedMonthFilter]);
+    const filteredShortfallData = shortfallData.filter(item => {
+        const supplierMatch = selectedSupplierCpf === 'all' || item.supplierCpf === selectedSupplierCpf;
+        const monthMatch = selectedMonthFilter === 'all' || item.month === selectedMonthFilter;
+        return supplierMatch && monthMatch;
+    });
 
     const totalFinancialLoss = useMemo(() => {
         return filteredShortfallData.reduce((sum, item) => sum + item.financialLoss, 0);
@@ -494,10 +492,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                             <tr>
                                 <th className="p-3 text-left">Fornecedor</th>
                                 <th className="p-3 text-left">Produto</th>
-                                <th className="p-3 text-left">Mês</th>
-                                <th className="p-3 text-right">Qtd. Prevista</th>
-                                <th className="p-3 text-right">Qtd. Entregue</th>
-                                <th className="p-3 text-right">Qtd. Faltante</th>
+                                <th className="p-3 text-left">Mês da Falha</th>
+                                <th className="p-3 text-right">Qtd. Não Entregue</th>
                                 <th className="p-3 text-right">Prejuízo (R$)</th>
                             </tr>
                         </thead>
@@ -507,12 +503,6 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                     <td className="p-3 font-bold text-gray-800">{item.supplierName}</td>
                                     <td className="p-3 text-gray-700">{item.productName}</td>
                                     <td className="p-3 text-gray-600 font-semibold">{item.month}</td>
-                                    <td className="p-3 text-right font-mono text-gray-500">
-                                        {item.expectedKg.toFixed(2).replace('.', ',')} Kg
-                                    </td>
-                                    <td className="p-3 text-right font-mono text-green-600">
-                                        {item.deliveredKg.toFixed(2).replace('.', ',')} Kg
-                                    </td>
                                     <td className="p-3 text-right font-mono text-red-600 font-bold">
                                         {item.shortfallKg.toFixed(2).replace('.', ',')} Kg
                                     </td>
@@ -521,13 +511,13 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                     </td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan={7} className="p-8 text-center text-gray-400 italic">Nenhuma falha de entrega registrada com os filtros atuais.</td></tr>
+                                <tr><td colSpan={5} className="p-8 text-center text-gray-400 italic">Nenhuma falha de entrega registrada com os filtros atuais.</td></tr>
                             )}
                         </tbody>
                         {filteredShortfallData.length > 0 && (
                             <tfoot className="bg-gray-100 font-bold">
                                 <tr>
-                                    <td colSpan={6} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total (Filtrado):</td>
+                                    <td colSpan={4} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total (Filtrado):</td>
                                     <td className="p-3 text-right text-red-800 text-base font-extrabold">{formatCurrency(totalFinancialLoss)}</td>
                                 </tr>
                             </tfoot>
