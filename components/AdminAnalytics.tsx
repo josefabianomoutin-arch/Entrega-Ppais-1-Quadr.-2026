@@ -40,7 +40,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
     const [expandedSupplierCpf, setExpandedSupplierCpf] = useState<string | null>(null);
-    const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>('all');
+    const [selectedSupplierCpf, setSelectedSupplierCpf] = useState<string>('all');
     const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all');
 
     const analyticsData = useMemo(() => {
@@ -53,6 +53,23 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
             progress: totalContracted > 0 ? (totalDelivered / totalContracted) * 100 : 0,
             supplierCount: suppliers.length,
         };
+    }, [suppliers]);
+
+    const supplierOptions = useMemo(() => {
+        const nameCounts = suppliers.reduce((acc, supplier) => {
+            acc.set(supplier.name, (acc.get(supplier.name) || 0) + 1);
+            return acc;
+        }, new Map<string, number>());
+    
+        return suppliers
+            .map(supplier => ({
+                cpf: supplier.cpf,
+                name: supplier.name,
+                displayName: (nameCounts.get(supplier.name) || 1) > 1
+                    ? `${supplier.name} (${supplier.cpf})`
+                    : supplier.name
+            }))
+            .sort((a, b) => a.displayName.localeCompare(b.displayName));
     }, [suppliers]);
     
     const filteredSuppliers = useMemo(() => {
@@ -77,9 +94,12 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     const shortfallData = useMemo(() => {
         const shortfalls: {
             id: string;
+            supplierCpf: string;
             supplierName: string;
             productName: string;
             month: string;
+            expectedKg: number;
+            deliveredKg: number;
             shortfallKg: number;
             financialLoss: number;
         }[] = [];
@@ -102,9 +122,12 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                     if (deficit > 0.001) { // Use a small epsilon to avoid floating point issues
                         shortfalls.push({
                             id: `${supplier.cpf}-${item.name}-${monthName}`,
+                            supplierCpf: supplier.cpf,
                             supplierName: supplier.name,
                             productName: item.name,
                             month: monthName,
+                            expectedKg: monthlyExpectedWeight,
+                            deliveredKg: deliveredInMonth,
                             shortfallKg: deficit,
                             financialLoss: deficit * (item.valuePerKg || 0)
                         });
@@ -118,11 +141,11 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
 
     const filteredShortfallData = useMemo(() => {
         return shortfallData.filter(item => {
-            const supplierMatch = selectedSupplierFilter === 'all' || item.supplierName === selectedSupplierFilter;
+            const supplierMatch = selectedSupplierCpf === 'all' || item.supplierCpf === selectedSupplierCpf;
             const monthMatch = selectedMonthFilter === 'all' || item.month === selectedMonthFilter;
             return supplierMatch && monthMatch;
         });
-    }, [shortfallData, selectedSupplierFilter, selectedMonthFilter]);
+    }, [shortfallData, selectedSupplierCpf, selectedMonthFilter]);
 
     const totalFinancialLoss = useMemo(() => {
         return filteredShortfallData.reduce((sum, item) => sum + item.financialLoss, 0);
@@ -443,13 +466,13 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                     <h3 className="text-lg font-bold text-gray-800">Relatório de Falhas de Entrega Mensal</h3>
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                          <select
-                            value={selectedSupplierFilter}
-                            onChange={(e) => setSelectedSupplierFilter(e.target.value)}
+                            value={selectedSupplierCpf}
+                            onChange={(e) => setSelectedSupplierCpf(e.target.value)}
                             className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-400 transition-all w-full sm:w-auto bg-white"
                         >
                             <option value="all">Todos os Fornecedores</option>
-                            {[...new Set(suppliers.map(s => s.name))].sort().map(name => (
-                                <option key={name} value={name}>{name}</option>
+                            {supplierOptions.map(option => (
+                                <option key={option.cpf} value={option.cpf}>{option.displayName}</option>
                             ))}
                         </select>
                         <select
@@ -471,8 +494,10 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                             <tr>
                                 <th className="p-3 text-left">Fornecedor</th>
                                 <th className="p-3 text-left">Produto</th>
-                                <th className="p-3 text-left">Mês da Falha</th>
-                                <th className="p-3 text-right">Qtd. Não Entregue</th>
+                                <th className="p-3 text-left">Mês</th>
+                                <th className="p-3 text-right">Qtd. Prevista</th>
+                                <th className="p-3 text-right">Qtd. Entregue</th>
+                                <th className="p-3 text-right">Qtd. Faltante</th>
                                 <th className="p-3 text-right">Prejuízo (R$)</th>
                             </tr>
                         </thead>
@@ -482,6 +507,12 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                     <td className="p-3 font-bold text-gray-800">{item.supplierName}</td>
                                     <td className="p-3 text-gray-700">{item.productName}</td>
                                     <td className="p-3 text-gray-600 font-semibold">{item.month}</td>
+                                    <td className="p-3 text-right font-mono text-gray-500">
+                                        {item.expectedKg.toFixed(2).replace('.', ',')} Kg
+                                    </td>
+                                    <td className="p-3 text-right font-mono text-green-600">
+                                        {item.deliveredKg.toFixed(2).replace('.', ',')} Kg
+                                    </td>
                                     <td className="p-3 text-right font-mono text-red-600 font-bold">
                                         {item.shortfallKg.toFixed(2).replace('.', ',')} Kg
                                     </td>
@@ -490,13 +521,13 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                     </td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan={5} className="p-8 text-center text-gray-400 italic">Nenhuma falha de entrega registrada com os filtros atuais.</td></tr>
+                                <tr><td colSpan={7} className="p-8 text-center text-gray-400 italic">Nenhuma falha de entrega registrada com os filtros atuais.</td></tr>
                             )}
                         </tbody>
                         {filteredShortfallData.length > 0 && (
                             <tfoot className="bg-gray-100 font-bold">
                                 <tr>
-                                    <td colSpan={4} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total (Filtrado):</td>
+                                    <td colSpan={6} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total (Filtrado):</td>
                                     <td className="p-3 text-right text-red-800 text-base font-extrabold">{formatCurrency(totalFinancialLoss)}</td>
                                 </tr>
                             </tfoot>
