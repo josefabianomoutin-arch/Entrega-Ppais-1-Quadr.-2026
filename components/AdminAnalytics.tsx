@@ -39,6 +39,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
     const [expandedSupplierCpf, setExpandedSupplierCpf] = useState<string | null>(null);
+    const [shortfallSearchTerm, setShortfallSearchTerm] = useState('');
 
     const analyticsData = useMemo(() => {
         const totalContracted = suppliers.reduce((sum, p) => sum + p.initialValue, 0);
@@ -70,6 +71,61 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
             return sortDirection === 'asc' ? comp : -comp;
         });
     }, [filteredSuppliers, sortKey, sortDirection]);
+
+    const shortfallData = useMemo(() => {
+        const shortfalls: {
+            id: string;
+            supplierName: string;
+            productName: string;
+            month: string;
+            shortfallKg: number;
+            financialLoss: number;
+        }[] = [];
+        const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
+
+        suppliers.forEach(supplier => {
+            (supplier.contractItems || []).forEach(item => {
+                const totalContractedWeight = getContractItemWeight(item);
+                if (totalContractedWeight <= 0) return;
+
+                const monthlyExpectedWeight = totalContractedWeight / 4;
+
+                months.forEach((monthName, monthIndex) => {
+                    const deliveredInMonth = (supplier.deliveries || [])
+                        .filter(d => d.item === item.name && new Date(d.date + 'T00:00:00').getMonth() === monthIndex)
+                        .reduce((sum, d) => sum + (d.kg || 0), 0);
+
+                    const deficit = monthlyExpectedWeight - deliveredInMonth;
+
+                    if (deficit > 0.001) { // Use a small epsilon to avoid floating point issues
+                        shortfalls.push({
+                            id: `${supplier.cpf}-${item.name}-${monthName}`,
+                            supplierName: supplier.name,
+                            productName: item.name,
+                            month: monthName,
+                            shortfallKg: deficit,
+                            financialLoss: deficit * (item.valuePerKg || 0)
+                        });
+                    }
+                });
+            });
+        });
+
+        return shortfalls.sort((a, b) => new Date(`2026-${a.month}-01`).getMonth() - new Date(`2026-${b.month}-01`).getMonth() || a.supplierName.localeCompare(b.supplierName));
+    }, [suppliers]);
+
+    const filteredShortfallData = useMemo(() => {
+        if (!shortfallSearchTerm) return shortfallData;
+        const lowerSearch = shortfallSearchTerm.toLowerCase();
+        return shortfallData.filter(item => 
+            item.supplierName.toLowerCase().includes(lowerSearch) ||
+            item.productName.toLowerCase().includes(lowerSearch)
+        );
+    }, [shortfallData, shortfallSearchTerm]);
+
+    const totalFinancialLoss = useMemo(() => {
+        return shortfallData.reduce((sum, item) => sum + item.financialLoss, 0);
+    }, [shortfallData]);
 
     const handleSort = (key: 'name' | 'progress' | 'delivered' | 'contracted') => {
       if (key === sortKey) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -380,6 +436,58 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                     </table>
                 </div>
             </div>
+            
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                    <h3 className="text-lg font-bold text-gray-800">Relatório de Falhas de Entrega Mensal</h3>
+                    <input 
+                        type="text" 
+                        placeholder="Filtrar por fornecedor ou produto..." 
+                        value={shortfallSearchTerm} 
+                        onChange={(e) => setShortfallSearchTerm(e.target.value)}
+                        className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-400 transition-all w-full sm:w-auto"
+                    />
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-red-50 text-xs uppercase text-red-800">
+                            <tr>
+                                <th className="p-3 text-left">Fornecedor</th>
+                                <th className="p-3 text-left">Produto</th>
+                                <th className="p-3 text-left">Mês da Falha</th>
+                                <th className="p-3 text-right">Qtd. Não Entregue</th>
+                                <th className="p-3 text-right">Prejuízo (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredShortfallData.length > 0 ? filteredShortfallData.map(item => (
+                                <tr key={item.id} className="border-b hover:bg-red-50/50 transition-colors">
+                                    <td className="p-3 font-bold text-gray-800">{item.supplierName}</td>
+                                    <td className="p-3 text-gray-700">{item.productName}</td>
+                                    <td className="p-3 text-gray-600 font-semibold">{item.month}</td>
+                                    <td className="p-3 text-right font-mono text-red-600 font-bold">
+                                        {item.shortfallKg.toFixed(2).replace('.', ',')} Kg
+                                    </td>
+                                    <td className="p-3 text-right font-mono text-red-700 font-extrabold">
+                                        {formatCurrency(item.financialLoss)}
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr><td colSpan={5} className="p-8 text-center text-gray-400 italic">Nenhuma falha de entrega registrada no período.</td></tr>
+                            )}
+                        </tbody>
+                        {filteredShortfallData.length > 0 && (
+                            <tfoot className="bg-gray-100 font-bold">
+                                <tr>
+                                    <td colSpan={4} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total:</td>
+                                    <td className="p-3 text-right text-red-800 text-base font-extrabold">{formatCurrency(totalFinancialLoss)}</td>
+                                </tr>
+                            </tfoot>
+                        )}
+                    </table>
+                </div>
+            </div>
+
             <style>{`
               .custom-scrollbar::-webkit-scrollbar { width: 6px; } 
               .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
