@@ -131,7 +131,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                 const totalContractedWeight = aggItem.totalKg;
                 if (totalContractedWeight <= 0) return;
     
-                const weightedAvgPrice = aggItem.totalValue / totalContractedWeight;
+                const weightedAvgPrice = aggItem.totalValue > 0 && totalContractedWeight > 0 ? aggItem.totalValue / totalContractedWeight : 0;
                 const monthlyExpectedWeight = totalContractedWeight / 4;
     
                 months.forEach((monthName, monthIndex) => {
@@ -140,19 +140,18 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                         .reduce((sum, d) => sum + (d.kg || 0), 0);
     
                     const deficit = monthlyExpectedWeight - deliveredInMonth;
-    
-                    if (deficit > 0.001) {
-                        shortfalls.push({
-                            id: `${supplierName}-${productName}-${monthName}`,
-                            supplierName: supplierName,
-                            productName: productName,
-                            month: monthName,
-                            expectedKg: monthlyExpectedWeight,
-                            deliveredKg: deliveredInMonth,
-                            shortfallKg: deficit,
-                            financialLoss: deficit * weightedAvgPrice
-                        });
-                    }
+                    const shortfallKgValue = Math.max(0, deficit);
+
+                    shortfalls.push({
+                        id: `${supplierName}-${productName}-${monthName}`,
+                        supplierName: supplierName,
+                        productName: productName,
+                        month: monthName,
+                        expectedKg: monthlyExpectedWeight,
+                        deliveredKg: deliveredInMonth,
+                        shortfallKg: shortfallKgValue,
+                        financialLoss: shortfallKgValue * weightedAvgPrice
+                    });
                 });
             });
         });
@@ -171,9 +170,21 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
         });
     }, [shortfallData, selectedSupplierName, selectedMonthFilter]);
 
+    const hasActualFailures = useMemo(() => 
+        filteredShortfallData.some(item => item.shortfallKg > 0.001), 
+        [filteredShortfallData]
+    );
+
+    const finalDataForTable = useMemo(() => {
+        if (hasActualFailures) {
+            return filteredShortfallData.filter(item => item.shortfallKg > 0.001);
+        }
+        return filteredShortfallData;
+    }, [filteredShortfallData, hasActualFailures]);
+
     const totalFinancialLoss = useMemo(() => {
-        return filteredShortfallData.reduce((sum, item) => sum + item.financialLoss, 0);
-    }, [filteredShortfallData]);
+        return finalDataForTable.reduce((sum, item) => sum + item.financialLoss, 0);
+    }, [finalDataForTable]);
 
     const handleSort = (key: 'name' | 'progress' | 'delivered' | 'contracted') => {
       if (key === sortKey) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -526,7 +537,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredShortfallData.length > 0 ? filteredShortfallData.map(item => (
+                            {finalDataForTable.length > 0 ? finalDataForTable.map(item => (
                                 <tr key={item.id} className="border-b hover:bg-red-50/50 transition-colors">
                                     <td className="p-3 font-bold text-gray-800">{item.supplierName}</td>
                                     <td className="p-3 text-gray-700">{item.productName}</td>
@@ -548,12 +559,19 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                 <tr><td colSpan={7} className="p-8 text-center text-gray-400 italic">Nenhuma falha de entrega registrada com os filtros atuais.</td></tr>
                             )}
                         </tbody>
-                        {filteredShortfallData.length > 0 && (
-                            <tfoot className="bg-gray-100 font-bold">
-                                <tr>
+                        {finalDataForTable.length > 0 && (
+                            <tfoot className="font-bold">
+                                <tr className="bg-gray-100">
                                     <td colSpan={6} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total (Filtrado):</td>
                                     <td className="p-3 text-right text-red-800 text-base font-extrabold">{formatCurrency(totalFinancialLoss)}</td>
                                 </tr>
+                                {!hasActualFailures && (
+                                    <tr className="bg-white border-t">
+                                        <td colSpan={7} className="p-4 text-center text-green-600 italic">
+                                            Nenhuma falha na entrega registrada com os filtros atuais.
+                                        </td>
+                                    </tr>
+                                )}
                             </tfoot>
                         )}
                     </table>
