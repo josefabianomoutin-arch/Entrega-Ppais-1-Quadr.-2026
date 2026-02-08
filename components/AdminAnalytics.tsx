@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import type { Supplier } from '../types';
 
@@ -39,7 +40,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
     const [expandedSupplierCpf, setExpandedSupplierCpf] = useState<string | null>(null);
-    const [shortfallSearchTerm, setShortfallSearchTerm] = useState('');
+    const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>('all');
+    const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all');
 
     const analyticsData = useMemo(() => {
         const totalContracted = suppliers.reduce((sum, p) => sum + p.initialValue, 0);
@@ -115,17 +117,16 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     }, [suppliers]);
 
     const filteredShortfallData = useMemo(() => {
-        if (!shortfallSearchTerm) return shortfallData;
-        const lowerSearch = shortfallSearchTerm.toLowerCase();
-        return shortfallData.filter(item => 
-            item.supplierName.toLowerCase().includes(lowerSearch) ||
-            item.productName.toLowerCase().includes(lowerSearch)
-        );
-    }, [shortfallData, shortfallSearchTerm]);
+        return shortfallData.filter(item => {
+            const supplierMatch = selectedSupplierFilter === 'all' || item.supplierName === selectedSupplierFilter;
+            const monthMatch = selectedMonthFilter === 'all' || item.month === selectedMonthFilter;
+            return supplierMatch && monthMatch;
+        });
+    }, [shortfallData, selectedSupplierFilter, selectedMonthFilter]);
 
     const totalFinancialLoss = useMemo(() => {
-        return shortfallData.reduce((sum, item) => sum + item.financialLoss, 0);
-    }, [shortfallData]);
+        return filteredShortfallData.reduce((sum, item) => sum + item.financialLoss, 0);
+    }, [filteredShortfallData]);
 
     const handleSort = (key: 'name' | 'progress' | 'delivered' | 'contracted') => {
       if (key === sortKey) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -440,13 +441,29 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
             <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                     <h3 className="text-lg font-bold text-gray-800">Relatório de Falhas de Entrega Mensal</h3>
-                    <input 
-                        type="text" 
-                        placeholder="Filtrar por fornecedor ou produto..." 
-                        value={shortfallSearchTerm} 
-                        onChange={(e) => setShortfallSearchTerm(e.target.value)}
-                        className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-400 transition-all w-full sm:w-auto"
-                    />
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                         <select
+                            value={selectedSupplierFilter}
+                            onChange={(e) => setSelectedSupplierFilter(e.target.value)}
+                            className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-400 transition-all w-full sm:w-auto bg-white"
+                        >
+                            <option value="all">Todos os Fornecedores</option>
+                            {[...new Set(suppliers.map(s => s.name))].sort().map(name => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={selectedMonthFilter}
+                            onChange={(e) => setSelectedMonthFilter(e.target.value)}
+                            className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-400 transition-all w-full sm:w-auto bg-white"
+                        >
+                            <option value="all">Todos os Meses</option>
+                            <option value="Janeiro">Janeiro</option>
+                            <option value="Fevereiro">Fevereiro</option>
+                            <option value="Março">Março</option>
+                            <option value="Abril">Abril</option>
+                        </select>
+                    </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -473,13 +490,13 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                     </td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan={5} className="p-8 text-center text-gray-400 italic">Nenhuma falha de entrega registrada no período.</td></tr>
+                                <tr><td colSpan={5} className="p-8 text-center text-gray-400 italic">Nenhuma falha de entrega registrada com os filtros atuais.</td></tr>
                             )}
                         </tbody>
                         {filteredShortfallData.length > 0 && (
                             <tfoot className="bg-gray-100 font-bold">
                                 <tr>
-                                    <td colSpan={4} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total:</td>
+                                    <td colSpan={4} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total (Filtrado):</td>
                                     <td className="p-3 text-right text-red-800 text-base font-extrabold">{formatCurrency(totalFinancialLoss)}</td>
                                 </tr>
                             </tfoot>
