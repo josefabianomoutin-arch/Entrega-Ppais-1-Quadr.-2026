@@ -12,6 +12,7 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+// Normalização absoluta para nomes de itens e fornecedores
 const superNormalize = (text: string) => {
     return (text || "")
         .toString()
@@ -22,11 +23,16 @@ const superNormalize = (text: string) => {
         .trim();
 };
 
+// Normalização específica para Notas Fiscais (remove zeros à esquerda e símbolos)
+const normalizeInvoice = (text: string) => {
+    const cleaned = (text || "").toString().replace(/\D/g, ''); // Mantém apenas números
+    return cleaned.replace(/^0+/, ''); // Remove zeros à esquerda
+};
+
 const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehouseLog = [] }) => {
     const [sortKey, setSortKey] = useState<'name' | 'progress' | 'delivered' | 'contracted'>('progress');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
-    const [expandedSupplierCpf, setExpandedSupplierCpf] = useState<string | null>(null);
     const [selectedSupplierName, setSelectedSupplierName] = useState<string>('all');
     const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all');
 
@@ -74,77 +80,74 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
     const shortfallData = useMemo(() => {
         if (!suppliers || !warehouseLog) return [];
         
-        const shortfalls: {
-            id: string;
-            supplierName: string;
-            productName: string;
-            invoices: string;
-            month: string;
-            billedKg: number;
-            receivedKg: number;
-            shortfallKg: number;
-            financialLoss: number;
-        }[] = [];
-        
-        const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
+        const shortfalls: any[] = [];
+        const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-        // Passo 1: Mapear Preços do Contrato para cálculo de prejuízo
+        // 1. Mapear Preços e nomes reais
         const priceMap = new Map<string, number>();
+        const realNamesMap = new Map<string, { supplier: string, item: string }>();
+
         suppliers.forEach(s => {
             (s.contractItems || []).forEach(ci => {
-                priceMap.set(`${superNormalize(s.name)}-${superNormalize(ci.name)}`, ci.valuePerKg || 0);
+                const sKey = superNormalize(s.name);
+                const iKey = superNormalize(ci.name);
+                priceMap.set(`${sKey}|${iKey}`, ci.valuePerKg || 0);
+                realNamesMap.set(`${sKey}|${iKey}`, { supplier: s.name, item: ci.name });
             });
         });
 
-        // Passo 2: Agrupar o que foi FATURADO (Deliveries com Nota)
+        // 2. Agrupar FATURAMENTO (Notas Fiscais do Fornecedor)
+        // Chave: normalizeSupplier | normalizeItem | monthName | normalizeNF
         const billedData = new Map<string, number>(); 
         suppliers.forEach(s => {
             (s.deliveries || []).forEach(d => {
                 if (d.invoiceUploaded && d.invoiceNumber && d.item && d.item !== 'AGENDAMENTO PENDENTE') {
                     const dateObj = new Date(d.date + 'T00:00:00');
-                    const mIdx = dateObj.getMonth();
-                    if (mIdx < 4) {
-                        const key = `${superNormalize(s.name)}|${superNormalize(d.item)}|${months[mIdx]}|${d.invoiceNumber}`;
-                        billedData.set(key, (billedData.get(key) || 0) + (d.kg || 0));
-                    }
+                    const mName = months[dateObj.getMonth()];
+                    const nf = normalizeInvoice(d.invoiceNumber);
+                    const key = `${superNormalize(s.name)}|${superNormalize(d.item)}|${mName}|${nf}`;
+                    
+                    billedData.set(key, (billedData.get(key) || 0) + (d.kg || 0));
                 }
             });
         });
 
-        // Passo 3: Agrupar o que entrou no ESTOQUE (WarehouseLog tipo 'entrada')
+        // 3. Agrupar ENTRADAS (Registros do Almoxarifado)
         const receivedData = new Map<string, number>();
         warehouseLog.forEach(log => {
             if (log.type === 'entrada' && log.inboundInvoice) {
                 const dateObj = new Date(log.timestamp);
-                const mIdx = dateObj.getMonth();
-                if (mIdx < 4) {
-                    const key = `${superNormalize(log.supplierName)}|${superNormalize(log.itemName)}|${months[mIdx]}|${log.inboundInvoice}`;
-                    receivedData.set(key, (receivedData.get(key) || 0) + (log.quantity || 0));
-                }
+                const mName = months[dateObj.getMonth()];
+                const nf = normalizeInvoice(log.inboundInvoice);
+                const key = `${superNormalize(log.supplierName)}|${superNormalize(log.itemName)}|${mName}|${nf}`;
+                
+                receivedData.set(key, (receivedData.get(key) || 0) + (log.quantity || 0));
             }
         });
 
-        // Passo 4: Cruzar os dados
+        // 4. Cruzar dados usando as chaves de Billed (se faturou, deveria ter entrado)
+        // Também pegamos chaves de Received que não estão em Billed (erro inverso)
         const allKeys = new Set([...billedData.keys(), ...receivedData.keys()]);
 
         allKeys.forEach(key => {
-            const [sNorm, iNorm, month, invoice] = key.split('|');
+            const [sNorm, iNorm, mName, nfNorm] = key.split('|');
             const billed = billedData.get(key) || 0;
             const received = receivedData.get(key) || 0;
+            
             const diff = billed - received;
             const shortfall = Math.max(0, diff);
 
+            // Só incluímos no relatório se houver alguma quantidade em um dos lados
             if (billed > 0 || received > 0) {
-                const supplierObj = suppliers.find(s => superNormalize(s.name) === sNorm);
-                const itemObj = supplierObj?.contractItems?.find(ci => superNormalize(ci.name) === iNorm);
-                const price = priceMap.get(`${sNorm}-${iNorm}`) || 0;
+                const names = realNamesMap.get(`${sNorm}|${iNorm}`);
+                const price = priceMap.get(`${sNorm}|${iNorm}`) || 0;
 
                 shortfalls.push({
                     id: key,
-                    supplierName: supplierObj?.name || sNorm.toUpperCase(),
-                    productName: itemObj?.name || iNorm.toUpperCase(),
-                    invoices: invoice,
-                    month: month,
+                    supplierName: names?.supplier || sNorm.toUpperCase(),
+                    productName: names?.item || iNorm.toUpperCase(),
+                    invoices: nfNorm,
+                    month: mName,
                     billedKg: billed,
                     receivedKg: received,
                     shortfallKg: shortfall,
@@ -154,15 +157,12 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
         });
 
         return shortfalls.sort((a, b) => 
-            new Date(`2026-${a.month}-01`).getMonth() - new Date(`2026-${b.month}-01`).getMonth() || 
+            months.indexOf(a.month) - months.indexOf(b.month) || 
             a.supplierName.localeCompare(b.supplierName)
         );
     }, [suppliers, warehouseLog]);
 
     const filteredShortfallData = useMemo(() => {
-        if (selectedSupplierName === 'all' && selectedMonthFilter === 'all') {
-            return shortfallData;
-        }
         return shortfallData.filter(item => {
             const supplierMatch = selectedSupplierName === 'all' || item.supplierName === selectedSupplierName;
             const monthMatch = selectedMonthFilter === 'all' || item.month === selectedMonthFilter;
@@ -170,17 +170,14 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
         });
     }, [shortfallData, selectedSupplierName, selectedMonthFilter]);
 
-    const hasActualFailures = useMemo(() => 
-        filteredShortfallData.some(item => item.shortfallKg > 0.001), 
-        [filteredShortfallData]
-    );
-
     const finalDataForTable = useMemo(() => {
-        if (hasActualFailures) {
-            return filteredShortfallData.filter(item => item.shortfallKg > 0.001);
-        }
-        return filteredShortfallData;
-    }, [filteredShortfallData, hasActualFailures]);
+        // Por padrão mostramos apenas onde houve discrepância (billed > received)
+        // Mas se o usuário filtrou algo específico, mostramos tudo daquele filtro
+        const hasFilters = selectedSupplierName !== 'all' || selectedMonthFilter !== 'all';
+        if (hasFilters) return filteredShortfallData;
+        
+        return filteredShortfallData.filter(item => item.shortfallKg > 0.001);
+    }, [filteredShortfallData, selectedSupplierName, selectedMonthFilter]);
 
     const totalFinancialLoss = useMemo(() => {
         return finalDataForTable.reduce((sum, item) => sum + item.financialLoss, 0);
@@ -218,7 +215,10 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
 
             <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                    <h3 className="text-lg font-bold text-gray-800">Relatório de Falhas: Nota Fiscal vs. Estoque</h3>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-800">Relatório de Falhas: Nota Fiscal vs. Estoque</h3>
+                        <p className="text-xs text-gray-500">Compara o peso faturado na nota com o peso que realmente entrou no almoxarifado.</p>
+                    </div>
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                          <select
                             value={selectedSupplierName}
@@ -240,6 +240,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                             <option value="Fevereiro">Fevereiro</option>
                             <option value="Março">Março</option>
                             <option value="Abril">Abril</option>
+                            <option value="Maio">Maio</option>
+                            <option value="Junho">Junho</option>
                         </select>
                     </div>
                 </div>
@@ -249,11 +251,11 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                             <tr>
                                 <th className="p-3 text-left">FORNECEDOR</th>
                                 <th className="p-3 text-left">PRODUTO</th>
-                                <th className="p-3 text-left">Nº DA NOTA</th>
+                                <th className="p-3 text-left">Nº NOTA</th>
                                 <th className="p-3 text-left">MÊS</th>
-                                <th className="p-3 text-right">TOTAL EM NOTA (KG)</th>
-                                <th className="p-3 text-right">ENTRADA ESTOQUE (KG)</th>
-                                <th className="p-3 text-right">FALHA NA ENTREGA (KG)</th>
+                                <th className="p-3 text-right">PESO EM NOTA (KG)</th>
+                                <th className="p-3 text-right">PESO ESTOQUE (KG)</th>
+                                <th className="p-3 text-right">DIFERENÇA (KG)</th>
                                 <th className="p-3 text-right">PREJUÍZO (R$)</th>
                             </tr>
                         </thead>
@@ -270,7 +272,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                                     <td className="p-3 text-right font-mono text-green-600 font-bold">
                                         {item.receivedKg.toFixed(2).replace('.', ',')}
                                     </td>
-                                    <td className={`p-3 text-right font-mono font-bold ${item.shortfallKg > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                    <td className={`p-3 text-right font-mono font-bold ${item.shortfallKg > 0.01 ? 'text-red-600' : 'text-gray-400'}`}>
                                         {item.shortfallKg.toFixed(2).replace('.', ',')}
                                     </td>
                                     <td className="p-3 text-right font-mono text-red-700 font-extrabold">
@@ -278,13 +280,13 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                                     </td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan={8} className="p-8 text-center text-gray-400 italic font-bold">Nenhuma falha física detectada entre Notas e Estoque.</td></tr>
+                                <tr><td colSpan={8} className="p-8 text-center text-gray-400 italic font-bold">Nenhuma falha de conferência detectada com os filtros atuais.</td></tr>
                             )}
                         </tbody>
                         {finalDataForTable.length > 0 && (
                             <tfoot className="font-bold">
                                 <tr className="bg-gray-100">
-                                    <td colSpan={7} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total em Discrepâncias:</td>
+                                    <td colSpan={7} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total Estimado:</td>
                                     <td className="p-3 text-right text-red-800 text-base font-extrabold">{formatCurrency(totalFinancialLoss)}</td>
                                 </tr>
                             </tfoot>
@@ -298,8 +300,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
               .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
               .custom-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
               .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
-              @keyframes slide-down { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-              .animate-slide-down { animation: slide-down 0.3s ease-out forwards; }
+              @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+              .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
             `}</style>
         </div>
     );
