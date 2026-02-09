@@ -22,7 +22,7 @@ const superNormalize = (text: string) => {
         .trim();
 };
 
-const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers, warehouseLog }) => {
+const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehouseLog = [] }) => {
     const [sortKey, setSortKey] = useState<'name' | 'progress' | 'delivered' | 'contracted'>('progress');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
@@ -31,8 +31,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers, warehouseLog
     const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all');
 
     const analyticsData = useMemo(() => {
-        const totalContracted = suppliers.reduce((sum, p) => sum + p.initialValue, 0);
-        const totalDelivered = suppliers.reduce((sum, p) => sum + p.deliveries.filter(d => d.invoiceUploaded).reduce((dSum, d) => dSum + (d.value || 0), 0), 0);
+        const totalContracted = suppliers.reduce((sum, p) => sum + (p.initialValue || 0), 0);
+        const totalDelivered = suppliers.reduce((sum, p) => sum + (p.deliveries || []).filter(d => d.invoiceUploaded).reduce((dSum, d) => dSum + (d.value || 0), 0), 0);
         
         return {
             totalContracted,
@@ -45,7 +45,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers, warehouseLog
     const supplierOptions = useMemo(() => {
         const uniqueNames = [...new Set(suppliers.map(s => s.name))];
         return uniqueNames
-            .sort((a: string, b: string) => a.localeCompare(b))
+            .sort((a: string, b: string) => (a || '').localeCompare(b || ''))
             .map(name => ({
                 value: name,
                 displayName: name
@@ -53,25 +53,27 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers, warehouseLog
     }, [suppliers]);
     
     const filteredSuppliers = useMemo(() => {
-      return suppliers.filter(p => p.name.toLowerCase().includes(supplierSearchTerm.toLowerCase()));
+      return suppliers.filter(p => (p.name || '').toLowerCase().includes(supplierSearchTerm.toLowerCase()));
     }, [suppliers, supplierSearchTerm]);
 
     const sortedSuppliers = useMemo(() => {
       return [...filteredSuppliers].sort((a, b) => {
-            const aDelivered = a.deliveries.filter(d => d.invoiceUploaded).reduce((sum, d) => sum + (d.value || 0), 0);
-            const bDelivered = b.deliveries.filter(d => d.invoiceUploaded).reduce((sum, d) => sum + (d.value || 0), 0);
-            const aProgress = a.initialValue > 0 ? aDelivered / a.initialValue : 0;
-            const bProgress = b.initialValue > 0 ? bDelivered / b.initialValue : 0;
+            const aDelivered = (a.deliveries || []).filter(d => d.invoiceUploaded).reduce((sum, d) => sum + (d.value || 0), 0);
+            const bDelivered = (b.deliveries || []).filter(d => d.invoiceUploaded).reduce((sum, d) => sum + (d.value || 0), 0);
+            const aProgress = (a.initialValue || 0) > 0 ? aDelivered / a.initialValue : 0;
+            const bProgress = (b.initialValue || 0) > 0 ? bDelivered / b.initialValue : 0;
             let comp = 0;
-            if (sortKey === 'name') comp = a.name.localeCompare(b.name);
+            if (sortKey === 'name') comp = (a.name || '').localeCompare(b.name || '');
             else if (sortKey === 'progress') comp = bProgress - aProgress;
             else if (sortKey === 'delivered') comp = bDelivered - aDelivered;
-            else comp = b.initialValue - a.initialValue;
+            else comp = (b.initialValue || 0) - (a.initialValue || 0);
             return sortDirection === 'asc' ? comp : -comp;
         });
     }, [filteredSuppliers, sortKey, sortDirection]);
 
     const shortfallData = useMemo(() => {
+        if (!suppliers || !warehouseLog) return [];
+        
         const shortfalls: {
             id: string;
             supplierName: string;
@@ -89,17 +91,18 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers, warehouseLog
         // Passo 1: Mapear Preços do Contrato para cálculo de prejuízo
         const priceMap = new Map<string, number>();
         suppliers.forEach(s => {
-            s.contractItems.forEach(ci => {
+            (s.contractItems || []).forEach(ci => {
                 priceMap.set(`${superNormalize(s.name)}-${superNormalize(ci.name)}`, ci.valuePerKg || 0);
             });
         });
 
         // Passo 2: Agrupar o que foi FATURADO (Deliveries com Nota)
-        const billedData = new Map<string, number>(); // Key: supplierNorm-itemNorm-monthName-invoiceNum
+        const billedData = new Map<string, number>(); 
         suppliers.forEach(s => {
-            s.deliveries.forEach(d => {
+            (s.deliveries || []).forEach(d => {
                 if (d.invoiceUploaded && d.invoiceNumber && d.item && d.item !== 'AGENDAMENTO PENDENTE') {
-                    const mIdx = new Date(d.date + 'T00:00:00').getMonth();
+                    const dateObj = new Date(d.date + 'T00:00:00');
+                    const mIdx = dateObj.getMonth();
                     if (mIdx < 4) {
                         const key = `${superNormalize(s.name)}|${superNormalize(d.item)}|${months[mIdx]}|${d.invoiceNumber}`;
                         billedData.set(key, (billedData.get(key) || 0) + (d.kg || 0));
@@ -112,7 +115,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers, warehouseLog
         const receivedData = new Map<string, number>();
         warehouseLog.forEach(log => {
             if (log.type === 'entrada' && log.inboundInvoice) {
-                const mIdx = new Date(log.timestamp).getMonth();
+                const dateObj = new Date(log.timestamp);
+                const mIdx = dateObj.getMonth();
                 if (mIdx < 4) {
                     const key = `${superNormalize(log.supplierName)}|${superNormalize(log.itemName)}|${months[mIdx]}|${log.inboundInvoice}`;
                     receivedData.set(key, (receivedData.get(key) || 0) + (log.quantity || 0));
@@ -120,8 +124,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers, warehouseLog
             }
         });
 
-        // Passo 4: Cruzar os dados e gerar linhas de relatório
-        // Usamos as chaves de FATURAMENTO como base (pois se foi faturado, deveria ter entrado)
+        // Passo 4: Cruzar os dados
         const allKeys = new Set([...billedData.keys(), ...receivedData.keys()]);
 
         allKeys.forEach(key => {
@@ -132,9 +135,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers, warehouseLog
             const shortfall = Math.max(0, diff);
 
             if (billed > 0 || received > 0) {
-                // Localizar nomes reais para exibição
                 const supplierObj = suppliers.find(s => superNormalize(s.name) === sNorm);
-                const itemObj = supplierObj?.contractItems.find(ci => superNormalize(ci.name) === iNorm);
+                const itemObj = supplierObj?.contractItems?.find(ci => superNormalize(ci.name) === iNorm);
                 const price = priceMap.get(`${sNorm}-${iNorm}`) || 0;
 
                 shortfalls.push({
@@ -285,13 +287,6 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers, warehouseLog
                                     <td colSpan={7} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total em Discrepâncias:</td>
                                     <td className="p-3 text-right text-red-800 text-base font-extrabold">{formatCurrency(totalFinancialLoss)}</td>
                                 </tr>
-                                {!hasActualFailures && (
-                                    <tr className="bg-white border-t">
-                                        <td colSpan={8} className="p-4 text-center text-green-600 italic">
-                                            Conferência realizada: Todos os itens faturados constam no estoque.
-                                        </td>
-                                    </tr>
-                                )}
                             </tfoot>
                         )}
                     </table>
