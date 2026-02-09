@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 
 interface LoginScreenProps {
@@ -20,27 +21,32 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Permite senha alfanumérica para o usuário 'almoxarifado'
-    if (loginName.toLowerCase() === 'almoxarifado') {
+    const name = loginName.toLowerCase();
+    
+    // LIBERAR LETRAS: Somente para ITESP e Almoxarifado (devido às senhas alfanuméricas)
+    if (name === 'itesp' || name === 'almoxarifado') {
       setLoginCpf(value);
     } else {
-      // Mantém a restrição de apenas números para fornecedores e admin
+      // MANTÉM RESTRIÇÃO: Apenas números para Fornecedores e Administrador (senhas baseadas em CPF)
       setLoginCpf(value.replace(/[^\d]/g, ''));
     }
   };
   
-  const passwordPlaceholder = useMemo(() => {
+  const isStringLogin = useMemo(() => {
     const name = loginName.toLowerCase();
-    if (name === 'almoxarifado') {
-        return "Senha";
+    return name === 'itesp' || name === 'almoxarifado';
+  }, [loginName]);
+
+  const passwordPlaceholder = useMemo(() => {
+    if (isStringLogin) {
+        return "Senha de acesso (letras e números)";
     }
+    const name = loginName.toLowerCase();
     if (name === 'administrador') {
         return "Senha (CPF do administrador)";
     }
     return "Senha (CPF/CNPJ do fornecedor)";
-  }, [loginName]);
-  
-  const isAlmoxarifadoLogin = loginName.toLowerCase() === 'almoxarifado';
+  }, [loginName, isStringLogin]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -48,37 +54,48 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         <div className="text-center">
           <h1 className="text-3xl font-bold text-green-800">Gestão de Fornecedores 1º Quadr. 2026</h1>
           <p className="mt-2 text-gray-600">
-            Gestão de Entregas dos Fornecedores
+            Acesso ao Sistema de Monitoramento
           </p>
         </div>
         
         <div className="mt-4 text-center text-sm text-yellow-800 bg-yellow-100 p-3 rounded-lg border border-yellow-300">
-            <p><strong>Atenção:</strong> Nome de fornecedor em <strong>MAIÚSCULA</strong> e senha (CPF/CNPJ) com <strong>apenas números</strong>. O usuário 'Almoxarifado' possui senha específica.</p>
+            <p><strong>Atenção:</strong> Fornecedores utilizam o <strong>CPF/CNPJ</strong> como senha. O ITESP utiliza senha alfanumérica.</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLoginSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
-            <input 
-              type="text"
-              autoComplete="username"
-              required 
-              value={loginName} 
-              onChange={(e) => setLoginName(e.target.value.toUpperCase())} 
-              placeholder="Usuário (Fornecedor, Admin, Almoxarifado)" 
-              className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-            />
-            <input 
-              type={isAlmoxarifadoLogin ? "text" : "password"} 
-              autoComplete="current-password" 
-              required 
-              value={loginCpf} 
-              onChange={handlePasswordChange}
-              maxLength={isAlmoxarifadoLogin ? undefined : 14}
-              placeholder={passwordPlaceholder} 
-              className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-            />
+            <div className="relative">
+                <input 
+                  type="text"
+                  autoComplete="username"
+                  required 
+                  value={loginName} 
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    setLoginName(val);
+                    // Se mudar de ITESP para outro, limpa a senha se ela contiver letras
+                    if (val !== 'ITESP' && val !== 'ALMOXARIFADO') {
+                        setLoginCpf(prev => prev.replace(/[^\d]/g, ''));
+                    }
+                  }} 
+                  placeholder="Usuário (Ex: ITESP ou Nome do Fornecedor)" 
+                  className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+            </div>
+            <div className="relative">
+                <input 
+                  type={isStringLogin ? "text" : "password"} 
+                  autoComplete="current-password" 
+                  required 
+                  value={loginCpf} 
+                  onChange={handlePasswordChange}
+                  maxLength={isStringLogin ? undefined : 14}
+                  placeholder={passwordPlaceholder} 
+                  className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+            </div>
           </div>
-          {loginError && <p className="text-red-500 text-sm text-center">{loginError}</p>}
+          {loginError && <p className="text-red-500 text-sm text-center font-bold animate-pulse">{loginError}</p>}
           <div>
             <button type="submit" className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">Entrar</button>
           </div>

@@ -6,6 +6,7 @@ import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AlmoxarifadoDashboard from './components/AlmoxarifadoDashboard';
+import ItespDashboard from './components/ItespDashboard';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, onValue, set, runTransaction, push, child, update } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
@@ -50,10 +51,11 @@ const App: React.FC = () => {
   const [dailyMenus, setDailyMenus] = useState<DailyMenus>({});
   const [loading, setLoading] = useState(true);
   
-  // LOGIN STATE - Usamos o CPF para manter a sessão "viva" e reativa
+  // LOGIN STATE
   const [loggedInCpf, setLoggedInCpf] = useState<string | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isAlmoxarifadoLoggedIn, setIsAlmoxarifadoLoggedIn] = useState(false);
+  const [isItespLoggedIn, setIsItespLoggedIn] = useState(false);
   
   const [isSaving, setIsSaving] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse' | 'cleaning' | 'directorPerCapita' | 'menu'>('register');
@@ -501,14 +503,18 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (n: string, c: string): boolean => {
-    const cl = c.replace(/[^\d]/g, '');
-    if (n.toLowerCase() === 'administrador' && cl === '15210361870') { setIsAdminLoggedIn(true); return true; }
-    if (n.toLowerCase() === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
+    const nl = n.toLowerCase();
+    const cl = c; // ITESP uses alphanumeric password
     
-    // Procura o usuário
-    const u = suppliers.find(p => p.name === n.toUpperCase() && p.cpf === cl);
+    if (nl === 'administrador' && cl === '15210361870') { setIsAdminLoggedIn(true); return true; }
+    if (nl === 'almoxarifado' && cl === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
+    if (nl === 'itesp' && cl === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
+    
+    // Fornecedores - CPF apenas números
+    const cleanCpf = c.replace(/[^\d]/g, '');
+    const u = suppliers.find(p => p.name === n.toUpperCase() && p.cpf === cleanCpf);
     if (u) { 
-        setLoggedInCpf(cl); 
+        setLoggedInCpf(cleanCpf); 
         return true; 
     }
     return false;
@@ -528,6 +534,7 @@ const App: React.FC = () => {
       {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={handleRegister} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async (o, n, c, w) => { await runTransaction(suppliersRef, (curr) => { if(!curr || !curr[o]) return; const d = { ...curr[o], name: n.toUpperCase(), cpf: c, allowedWeeks: w }; if(o !== c) delete curr[o]; curr[c] = d; return curr; }); return null; }} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async (s) => { await writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {})); return true; }} activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={registrationStatus} onClearRegistrationStatus={() => setRegistrationStatus(null)} onReopenInvoice={handleReopenInvoice} onDeleteInvoice={handleDeleteInvoice} onUpdateInvoiceItems={handleUpdateInvoiceItems} onManualInvoiceEntry={handleManualInvoiceEntry} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={handleDeleteWarehouseEntry} onRegisterCleaningLog={async (l) => { await set(ref(database, `cleaningLogs/${Date.now()}`), { ...l, id: String(Date.now()) }); return {success: true, message: 'OK'}; }} onDeleteCleaningLog={async (id) => set(ref(database, `cleaningLogs/${id}`), null)} onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal} onDeleteDirectorWithdrawal={async (id) => set(ref(database, `directorWithdrawals/${id}`), null)} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} onCancelDeliveries={handleCancelDeliveries} />
       : currentUser ? <Dashboard supplier={currentUser} onLogout={() => setLoggedInCpf(null)} onScheduleDelivery={handleScheduleDelivery} onFulfillAndInvoice={handleFulfillAndInvoice} onCancelDeliveries={handleCancelDeliveries} emailModalData={emailModalData} onCloseEmailModal={() => setEmailModalData(null)} />
       : isAlmoxarifadoLoggedIn ? <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} />
+      : isItespLoggedIn ? <ItespDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsItespLoggedIn(false)} />
       : <LoginScreen onLogin={handleLogin} />}
     </>
   );
