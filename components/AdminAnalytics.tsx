@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import type { Supplier, Delivery, WarehouseMovement } from '../types';
 
@@ -123,12 +122,17 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
             const receivedKg = receivedGroups.get(key) || 0;
             const shortfall = Math.max(0, data.kg - receivedKg);
 
+            const supplier = suppliers.find(s => s.name === data.supplierReal);
+            const contractItem = supplier?.contractItems.find(ci => superNormalize(ci.name) === superNormalize(data.itemReal));
+            const contractedKgMonthly = (contractItem?.totalKg || 0) / 4;
+
             result.push({
                 id: key,
                 supplierName: data.supplierReal,
                 productName: data.itemReal,
                 invoice: data.nfDisplay,
                 month: data.month,
+                contractedKgMonthly: contractedKgMonthly,
                 billedKg: data.kg,
                 receivedKg: receivedKg,
                 shortfallKg: shortfall,
@@ -146,6 +150,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                     productName: iNorm.toUpperCase(),
                     invoice: nfNorm,
                     month: "Desconhecido",
+                    contractedKgMonthly: 0,
                     billedKg: 0,
                     receivedKg: qty,
                     shortfallKg: 0,
@@ -172,7 +177,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
     return (
         <div className="space-y-8 animate-fade-in pb-12">
             <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-500">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Relatório de Conferência: Notas vs. Estoque</h2>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Relatório de Conferência: Contrato vs. Notas vs. Estoque</h2>
                 <p className="text-sm text-gray-500 font-medium">Cruzamento automático baseado no número da Nota Fiscal e Fornecedor.</p>
             </div>
             
@@ -234,9 +239,10 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                                 <th className="p-4 text-left border-b">Produto</th>
                                 <th className="p-4 text-left border-b">Nº Nota</th>
                                 <th className="p-4 text-left border-b">Mês (Nota)</th>
+                                <th className="p-4 text-right border-b">Peso Contrato (Mês)</th>
                                 <th className="p-4 text-right border-b">Peso na Nota</th>
                                 <th className="p-4 text-right border-b">Peso no Estoque</th>
-                                <th className="p-4 text-right border-b">Falta (Kg)</th>
+                                <th className="p-4 text-right border-b">Falta (Nota-Estoque)</th>
                                 <th className="p-4 text-right border-b">Prejuízo</th>
                             </tr>
                         </thead>
@@ -247,6 +253,9 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                                     <td className="p-4 text-gray-600 uppercase text-xs">{item.productName}</td>
                                     <td className="p-4 font-mono text-xs font-bold text-blue-600">{item.invoice}</td>
                                     <td className="p-4 font-medium text-gray-500">{item.month}</td>
+                                    <td className="p-4 text-right font-mono font-bold text-blue-600">
+                                        {item.contractedKgMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
+                                    </td>
                                     <td className="p-4 text-right font-mono text-gray-600">
                                         {item.billedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
                                     </td>
@@ -262,7 +271,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan={8} className="p-20 text-center text-gray-400 italic font-medium uppercase tracking-widest bg-gray-50">
+                                    <td colSpan={9} className="p-20 text-center text-gray-400 italic font-medium uppercase tracking-widest bg-gray-50">
                                         Nenhuma divergência localizada para os filtros selecionados.
                                     </td>
                                 </tr>
@@ -271,7 +280,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                         {filteredData.length > 0 && (
                             <tfoot className="bg-gray-50 font-black">
                                 <tr>
-                                    <td colSpan={7} className="p-4 text-right text-gray-500 uppercase text-xs">Total Estimado de Perda em Falhas:</td>
+                                    <td colSpan={8} className="p-4 text-right text-gray-500 uppercase text-xs">Total Estimado de Perda em Falhas (Nota vs. Estoque):</td>
                                     <td className="p-4 text-right text-red-800 text-lg">{formatCurrency(totalLoss)}</td>
                                 </tr>
                             </tfoot>

@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import type { Supplier, WarehouseMovement } from '../types';
 
@@ -35,7 +34,7 @@ const normalizeInvoice = (text: string) => {
 
 const ALLOWED_SUPPLIERS = [
     'BENEDITO OSMAR RAVAZZI',
-    'ADAO MÁXIMO DA FONSECA',
+    'ADÃO MÁXIMO DA FONSECA',
     'ANTÔNIO JOAQUIM DE OLIVEIRA',
     'CLAUDEMIR LUIZ TURRA',
     'CONSUELO ALCANTARA FERREIRA GUIMARÃES',
@@ -53,12 +52,12 @@ const ALLOWED_SUPPLIERS = [
     'ROSA MARIA GARBIN VELLONE',
     'SAULO ANTONINO',
     'SÔNIA REGINA COLOMBO CELESTINO',
-    'TÂNIA MARA BALDAO DE BARROS'
+    'TÂNIA MARA BALDÃO DE BARROS'
 ];
 
 const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehouseLog = [], onLogout }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedRoom, setSelectedRoom] = useState('all'); 
+    const [selectedSupplierName, setSelectedSupplierName] = useState('all'); 
     const [selectedMonth, setSelectedMonth] = useState('all');
 
     const itespSuppliers = useMemo(() => {
@@ -126,6 +125,10 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         billedGroups.forEach((data, key) => {
             const receivedKg = receivedGroups.get(key) || 0;
             const shortfall = Math.max(0, data.kg - receivedKg);
+            
+            const supplier = itespSuppliers.find(s => s.name === data.supplierReal);
+            const contractItem = supplier?.contractItems.find(ci => superNormalize(ci.name) === superNormalize(data.itemReal));
+            const contractedKgMonthly = (contractItem?.totalKg || 0) / 4;
 
             result.push({
                 id: key,
@@ -133,6 +136,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                 productName: data.itemReal,
                 invoice: data.nfDisplay,
                 month: data.month,
+                contractedKgMonthly: contractedKgMonthly,
                 billedKg: data.kg,
                 receivedKg: receivedKg,
                 shortfallKg: shortfall,
@@ -149,6 +153,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                     productName: iNorm.toUpperCase(),
                     invoice: nfNorm,
                     month: "Desconhecido",
+                    contractedKgMonthly: 0,
                     billedKg: 0,
                     receivedKg: qty,
                     shortfallKg: 0,
@@ -166,15 +171,32 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                item.invoice.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                item.productName.toLowerCase().includes(searchTerm.toLowerCase());
             const monthMatch = selectedMonth === 'all' || item.month === selectedMonth;
-            const roomMatch = selectedRoom === 'all' || item.supplierName === selectedRoom;
-            return searchMatch && monthMatch && roomMatch;
+            const supplierMatch = selectedSupplierName === 'all' || item.supplierName === selectedSupplierName;
+            return searchMatch && monthMatch && supplierMatch;
         });
-    }, [comparisonData, searchTerm, selectedMonth, selectedRoom]);
+    }, [comparisonData, searchTerm, selectedMonth, selectedSupplierName]);
 
     const supplierOptions = useMemo(() => {
         const uniqueNames = [...new Set(itespSuppliers.map(s => s.name))];
         return uniqueNames.sort().map(name => ({ value: name, displayName: name }));
     }, [itespSuppliers]);
+    
+    const totals = useMemo(() => {
+        return filteredData.reduce((acc, item) => {
+            acc.contractedKgMonthly += item.contractedKgMonthly || 0;
+            acc.billedKg += item.billedKg || 0;
+            acc.receivedKg += item.receivedKg || 0;
+            acc.shortfallKg += item.shortfallKg || 0;
+            acc.financialLoss += item.financialLoss || 0;
+            return acc;
+        }, {
+            contractedKgMonthly: 0,
+            billedKg: 0,
+            receivedKg: 0,
+            shortfallKg: 0,
+            financialLoss: 0,
+        });
+    }, [filteredData]);
 
     return (
         <div className="min-h-screen bg-[#F3F4F6] text-gray-800 pb-20">
@@ -206,11 +228,11 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                         </div>
                         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                             <select 
-                                value={selectedRoom} 
-                                onChange={(e) => setSelectedRoom(e.target.value)}
+                                value={selectedSupplierName} 
+                                onChange={(e) => setSelectedSupplierName(e.target.value)}
                                 className="w-full md:w-64 border-2 border-blue-500 rounded-lg px-4 py-2.5 text-sm font-medium outline-none text-gray-700 bg-white cursor-pointer"
                             >
-                                <option value="all">Todos os quartos</option>
+                                <option value="all">Todos os fornecedores</option>
                                 {supplierOptions.map(opt => (
                                     <option key={opt.value} value={opt.value}>{opt.displayName}</option>
                                 ))}
@@ -231,14 +253,15 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                         <table className="w-full text-sm">
                             <thead className="bg-[#F9FAFB] text-[#9CA3AF] text-[10px] uppercase font-black tracking-widest border-b">
                                 <tr>
-                                    <th className="p-4 text-left border-b min-w-[300px]">NÃO SE TRATA DE UM PROBLEMA DE SNOOKER.</th>
+                                    <th className="p-4 text-left border-b min-w-[300px]">FORNECEDOR</th>
                                     <th className="p-4 text-left border-b">PRODUTO</th>
                                     <th className="p-4 text-left border-b">Nº NOTA</th>
                                     <th className="p-4 text-left border-b">MÊS (NOTA)</th>
+                                    <th className="p-4 text-right border-b">PESO CONTRATO (MÊS)</th>
                                     <th className="p-4 text-right border-b">PESO NA NOTA</th>
                                     <th className="p-4 text-right border-b">PESO NO ESTOQUE</th>
-                                    <th className="p-4 text-right border-b">FALTA (KG)</th>
-                                    <th className="p-4 text-right border-b">PRECONCEITO</th>
+                                    <th className="p-4 text-right border-b">FALTA (NOTA-ESTOQUE)</th>
+                                    <th className="p-4 text-right border-b">PREJUÍZO</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -256,6 +279,9 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                         <td className="p-4 font-bold text-[#6B7280]">
                                             {item.month}
                                         </td>
+                                        <td className="p-4 text-right font-bold text-blue-600 font-mono">
+                                            {item.contractedKgMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
+                                        </td>
                                         <td className="p-4 text-right font-bold text-[#4B5563] font-mono">
                                             {item.billedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
                                         </td>
@@ -271,12 +297,22 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                     </tr>
                                 )) : (
                                     <tr>
-                                        <td colSpan={8} className="p-20 text-center text-gray-400 italic font-medium uppercase tracking-widest bg-gray-50/50">
+                                        <td colSpan={9} className="p-20 text-center text-gray-400 italic font-medium uppercase tracking-widest bg-gray-50/50">
                                             Nenhuma informação disponível para os filtros selecionados.
                                         </td>
                                     </tr>
                                 )}
                             </tbody>
+                            <tfoot className="bg-[#F9FAFB] font-black text-xs border-t-2">
+                                <tr>
+                                    <td colSpan={4} className="p-4 text-left text-gray-600 uppercase">Totais</td>
+                                    <td className="p-4 text-right text-blue-700 font-mono">{totals.contractedKgMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg</td>
+                                    <td className="p-4 text-right text-gray-800 font-mono">{totals.billedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg</td>
+                                    <td className="p-4 text-right text-green-700 font-mono">{totals.receivedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg</td>
+                                    <td className="p-4 text-right text-red-600 font-mono">{totals.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg</td>
+                                    <td className="p-4 text-right text-red-700">{formatCurrency(totals.financialLoss)}</td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 </div>
