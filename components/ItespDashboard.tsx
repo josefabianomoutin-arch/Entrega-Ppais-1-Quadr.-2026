@@ -18,7 +18,7 @@ const superNormalize = (text: string) => {
         .toString()
         .toLowerCase()
         .normalize("NFD")
-        .replace(/[\u0300-\u36f]/g, "") 
+        .replace(/[\u0300-\u036f]/g, "") 
         .replace(/[^a-z0-9]/g, "") 
         .trim();
 };
