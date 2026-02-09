@@ -18,7 +18,7 @@ const superNormalize = (text: string) => {
         .toString()
         .toLowerCase()
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") 
+        .replace(/[\u0300-\u36f]/g, "") 
         .replace(/[^a-z0-9]/g, "") 
         .trim();
 };
@@ -33,26 +33,42 @@ const normalizeInvoice = (text: string) => {
         .trim();
 };
 
+const ALLOWED_SUPPLIERS = [
+    'BENEDITO OSMAR RAVAZZI',
+    'ADAO MÁXIMO DA FONSECA',
+    'ANTÔNIO JOAQUIM DE OLIVEIRA',
+    'CLAUDEMIR LUIZ TURRA',
+    'CONSUELO ALCANTARA FERREIRA GUIMARÃES',
+    'DANILO ANTONIO MÁXIMO',
+    'DOMINGO APARECIDO ANTONINO',
+    'LEONARDO FELIPE VELHO MARSOLA',
+    'LÍDIA BERNARDES MONTEIRO BARBOSA',
+    'LUCIMARA MARQUES PEREIRA',
+    'MARCELO GIBERTONI',
+    'MARCOS DONADON AGOSTINHO',
+    'MICHEL JOSÉ RAVAZZI',
+    'MOISÉS PINHEIRO DE SA',
+    'PAULO HENRIQUE PUGLIERI',
+    'PEDRO TEODORO RODRIGUES',
+    'ROSA MARIA GARBIN VELLONE',
+    'SAULO ANTONINO',
+    'SÔNIA REGINA COLOMBO CELESTINO',
+    'TÂNIA MARA BALDAO DE BARROS'
+];
+
 const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehouseLog = [], onLogout }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRoom, setSelectedRoom] = useState('all'); 
     const [selectedMonth, setSelectedMonth] = useState('all');
 
-    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-
-    const summaryData = useMemo(() => {
-        const totalContracted = suppliers.reduce((sum, p) => sum + (p.initialValue || 0), 0);
-        const totalDelivered = suppliers.reduce((sum, p) => sum + (p.deliveries || []).filter(d => d.invoiceUploaded).reduce((dSum, d) => dSum + (d.value || 0), 0), 0);
-        
-        return {
-            totalContracted,
-            totalDelivered,
-            progress: totalContracted > 0 ? (totalDelivered / totalContracted) * 100 : 0
-        };
+    const itespSuppliers = useMemo(() => {
+        return suppliers.filter(s => ALLOWED_SUPPLIERS.includes(s.name.toUpperCase()));
     }, [suppliers]);
 
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
     const comparisonData = useMemo(() => {
-        if (!suppliers) return [];
+        if (!itespSuppliers) return [];
 
         const billedGroups = new Map<string, { 
             supplierReal: string, 
@@ -65,7 +81,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
 
         const receivedGroups = new Map<string, number>();
 
-        suppliers.forEach(s => {
+        itespSuppliers.forEach(s => {
             const supplierNorm = superNormalize(s.name);
             (s.deliveries || []).forEach(d => {
                 if (d.invoiceUploaded && d.invoiceNumber && d.item && d.item !== 'AGENDAMENTO PENDENTE') {
@@ -94,6 +110,8 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         warehouseLog.forEach(log => {
             if (log.type === 'entrada' && log.inboundInvoice) {
                 const sNorm = superNormalize(log.supplierName);
+                if (!ALLOWED_SUPPLIERS.map(superNormalize).includes(sNorm)) return;
+
                 const iNorm = superNormalize(log.itemName);
                 const nfNorm = normalizeInvoice(log.inboundInvoice);
                 const key = `${sNorm}|${iNorm}|${nfNorm}`;
@@ -140,7 +158,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         });
 
         return result.sort((a, b) => months.indexOf(a.month) - months.indexOf(b.month));
-    }, [suppliers, warehouseLog]);
+    }, [itespSuppliers, warehouseLog]);
 
     const filteredData = useMemo(() => {
         return comparisonData.filter(item => {
@@ -153,12 +171,10 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         });
     }, [comparisonData, searchTerm, selectedMonth, selectedRoom]);
 
-    const totalLoss = useMemo(() => filteredData.reduce((sum, item) => sum + item.financialLoss, 0), [filteredData]);
-
     const supplierOptions = useMemo(() => {
-        const uniqueNames = [...new Set(suppliers.map(s => s.name))];
+        const uniqueNames = [...new Set(itespSuppliers.map(s => s.name))];
         return uniqueNames.sort().map(name => ({ value: name, displayName: name }));
-    }, [suppliers]);
+    }, [itespSuppliers]);
 
     return (
         <div className="min-h-screen bg-[#F3F4F6] text-gray-800 pb-20">
@@ -175,23 +191,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                 </button>
             </header>
 
-            <main className="p-4 md:p-8 space-y-8 max-w-[1600px] mx-auto">
-                {/* Resumo Visual Superior */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white p-6 rounded-2xl shadow-md border-b-8 border-green-500 transition-all hover:shadow-lg">
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Total Contratado</p>
-                        <p className="text-2xl font-black text-gray-800">{formatCurrency(summaryData.totalContracted)}</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-md border-b-8 border-blue-500 transition-all hover:shadow-lg">
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Total Faturado</p>
-                        <p className="text-2xl font-black text-blue-600">{formatCurrency(summaryData.totalDelivered)}</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-md border-b-8 border-red-500 transition-all hover:shadow-lg">
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Total Preconceito (Divergência)</p>
-                        <p className="text-2xl font-black text-red-600">{formatCurrency(totalLoss)}</p>
-                    </div>
-                </div>
-
+            <main className="p-4 md:p-8 max-w-[1600px] mx-auto">
                 <div className="bg-white p-6 rounded-2xl shadow-xl animate-fade-in border border-gray-100">
                     {/* Barra de Filtros conforme Imagem */}
                     <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
@@ -263,10 +263,10 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                             {item.receivedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
                                         </td>
                                         <td className={`p-4 text-right font-black font-mono ${item.shortfallKg > 0.01 ? 'text-red-500' : 'text-[#E5E7EB]'}`}>
-                                            {item.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            {item.shortfallKg > 0.01 ? item.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
                                         </td>
                                         <td className={`p-4 text-right font-black ${item.financialLoss > 0.01 ? 'text-red-600' : 'text-[#E5E7EB]'}`}>
-                                            {formatCurrency(item.financialLoss)}
+                                            {item.financialLoss > 0.01 ? formatCurrency(item.financialLoss) : 'R$ 0,00'}
                                         </td>
                                     </tr>
                                 )) : (
