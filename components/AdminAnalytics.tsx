@@ -118,6 +118,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
             id: string;
             supplierName: string;
             productName: string;
+            invoices: string;
             month: string;
             expectedKg: number;
             deliveredKg: number;
@@ -135,9 +136,11 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                 const monthlyExpectedWeight = totalContractedWeight / 4;
     
                 months.forEach((monthName, monthIndex) => {
-                    const deliveredInMonth = data.deliveries
-                        .filter(d => d.item === productName && new Date(d.date + 'T00:00:00').getMonth() === monthIndex && d.invoiceUploaded)
-                        .reduce((sum, d) => sum + (d.kg || 0), 0);
+                    const monthlyDeliveries = data.deliveries
+                        .filter(d => d.item === productName && new Date(d.date + 'T00:00:00').getMonth() === monthIndex && d.invoiceUploaded);
+                    
+                    const deliveredInMonth = monthlyDeliveries.reduce((sum, d) => sum + (d.kg || 0), 0);
+                    const invoiceNums = [...new Set(monthlyDeliveries.map(d => d.invoiceNumber).filter(Boolean))].join(', ');
     
                     const deficit = monthlyExpectedWeight - deliveredInMonth;
                     const shortfallKgValue = Math.max(0, deficit);
@@ -146,6 +149,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                         id: `${supplierName}-${productName}-${monthName}`,
                         supplierName: supplierName,
                         productName: productName,
+                        invoices: invoiceNums || '-',
                         month: monthName,
                         expectedKg: monthlyExpectedWeight,
                         deliveredKg: deliveredInMonth,
@@ -529,6 +533,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                             <tr>
                                 <th className="p-3 text-left">FORNECEDOR</th>
                                 <th className="p-3 text-left">PRODUTO</th>
+                                <th className="p-3 text-left">Nº DA NOTA</th>
                                 <th className="p-3 text-left">MÊS DA FALHA</th>
                                 <th className="p-3 text-right">META MENSAL (KG)</th>
                                 <th className="p-3 text-right">TOTAL ENTREGUE (KG)</th>
@@ -541,6 +546,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                 <tr key={item.id} className="border-b hover:bg-red-50/50 transition-colors">
                                     <td className="p-3 font-bold text-gray-800">{item.supplierName}</td>
                                     <td className="p-3 text-gray-700">{item.productName}</td>
+                                    <td className="p-3 font-mono text-xs text-blue-600 font-bold">{item.invoices}</td>
                                     <td className="p-3 text-gray-600 font-semibold">{item.month}</td>
                                     <td className="p-3 text-right font-mono text-gray-500">
                                         {item.expectedKg.toFixed(2).replace('.', ',')}
@@ -556,18 +562,18 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                     </td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan={7} className="p-8 text-center text-gray-400 italic">Nenhuma falha de entrega registrada com os filtros atuais.</td></tr>
+                                <tr><td colSpan={8} className="p-8 text-center text-gray-400 italic">Nenhuma falha de entrega registrada com os filtros atuais.</td></tr>
                             )}
                         </tbody>
                         {finalDataForTable.length > 0 && (
                             <tfoot className="font-bold">
                                 <tr className="bg-gray-100">
-                                    <td colSpan={6} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total (Filtrado):</td>
+                                    <td colSpan={7} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total (Filtrado):</td>
                                     <td className="p-3 text-right text-red-800 text-base font-extrabold">{formatCurrency(totalFinancialLoss)}</td>
                                 </tr>
                                 {!hasActualFailures && (
                                     <tr className="bg-white border-t">
-                                        <td colSpan={7} className="p-4 text-center text-green-600 italic">
+                                        <td colSpan={8} className="p-4 text-center text-green-600 italic">
                                             Nenhuma falha na entrega registrada com os filtros atuais.
                                         </td>
                                     </tr>
