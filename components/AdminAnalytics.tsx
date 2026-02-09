@@ -1,9 +1,10 @@
 
 import React, { useMemo, useState } from 'react';
-import type { Supplier, Delivery } from '../types';
+import type { Supplier, Delivery, WarehouseMovement } from '../types';
 
 interface AdminAnalyticsProps {
   suppliers: Supplier[];
+  warehouseLog: WarehouseMovement[];
 }
 
 const formatCurrency = (value: number) => {
@@ -11,31 +12,17 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-const formatDate = (dateString: string) => {
-    const date = new Date(dateString + 'T00:00:00');
-    return date.toLocaleDateString('pt-BR');
+const superNormalize = (text: string) => {
+    return (text || "")
+        .toString()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") 
+        .replace(/[^a-z0-9]/g, "") 
+        .trim();
 };
 
-const getContractItemWeight = (item: Supplier['contractItems'][0]): number => {
-    if (!item) return 0;
-    const [unitType, unitWeightStr] = (item.unit || 'kg-1').split('-');
-    
-    const quantity = item.totalKg || 0;
-
-    if (unitType === 'un') {
-        const unitWeight = parseFloat(unitWeightStr) || 1;
-        return quantity * unitWeight;
-    }
-    if (unitType === 'dz') {
-        return 0; // Dúzias não têm peso associado no contrato para este cálculo
-    }
-
-    const unitWeight = parseFloat(unitWeightStr) || 1;
-    return quantity * unitWeight;
-};
-
-
-const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
+const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers, warehouseLog }) => {
     const [sortKey, setSortKey] = useState<'name' | 'progress' | 'delivered' | 'contracted'>('progress');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
@@ -85,83 +72,90 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
     }, [filteredSuppliers, sortKey, sortDirection]);
 
     const shortfallData = useMemo(() => {
-        const aggregatedByName = new Map<string, {
-            contractItems: Map<string, { totalKg: number; totalValue: number; }>;
-            deliveries: Delivery[];
-        }>();
-    
-        suppliers.forEach(supplier => {
-            if (!aggregatedByName.has(supplier.name)) {
-                aggregatedByName.set(supplier.name, {
-                    contractItems: new Map(),
-                    deliveries: []
-                });
-            }
-            const entry = aggregatedByName.get(supplier.name)!;
-    
-            (supplier.contractItems || []).forEach(item => {
-                if (!entry.contractItems.has(item.name)) {
-                    entry.contractItems.set(item.name, {
-                        totalKg: 0,
-                        totalValue: 0,
-                    });
-                }
-                const aggItem = entry.contractItems.get(item.name)!;
-                const itemWeight = getContractItemWeight(item);
-                aggItem.totalKg += itemWeight;
-                aggItem.totalValue += itemWeight * (item.valuePerKg || 0);
-            });
-            entry.deliveries.push(...(supplier.deliveries || []));
-        });
-    
         const shortfalls: {
             id: string;
             supplierName: string;
             productName: string;
             invoices: string;
             month: string;
-            expectedKg: number;
-            deliveredKg: number;
+            billedKg: number;
+            receivedKg: number;
             shortfallKg: number;
             financialLoss: number;
         }[] = [];
+        
         const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
-    
-        aggregatedByName.forEach((data, supplierName) => {
-            data.contractItems.forEach((aggItem, productName) => {
-                const totalContractedWeight = aggItem.totalKg;
-                if (totalContractedWeight <= 0) return;
-    
-                const weightedAvgPrice = aggItem.totalValue > 0 && totalContractedWeight > 0 ? aggItem.totalValue / totalContractedWeight : 0;
-                const monthlyExpectedWeight = totalContractedWeight / 4;
-    
-                months.forEach((monthName, monthIndex) => {
-                    const monthlyDeliveries = data.deliveries
-                        .filter(d => d.item === productName && new Date(d.date + 'T00:00:00').getMonth() === monthIndex && d.invoiceUploaded);
-                    
-                    const deliveredInMonth = monthlyDeliveries.reduce((sum, d) => sum + (d.kg || 0), 0);
-                    const invoiceNums = [...new Set(monthlyDeliveries.map(d => d.invoiceNumber).filter(Boolean))].join(', ');
-    
-                    const deficit = monthlyExpectedWeight - deliveredInMonth;
-                    const shortfallKgValue = Math.max(0, deficit);
 
-                    shortfalls.push({
-                        id: `${supplierName}-${productName}-${monthName}`,
-                        supplierName: supplierName,
-                        productName: productName,
-                        invoices: invoiceNums || '-',
-                        month: monthName,
-                        expectedKg: monthlyExpectedWeight,
-                        deliveredKg: deliveredInMonth,
-                        shortfallKg: shortfallKgValue,
-                        financialLoss: shortfallKgValue * weightedAvgPrice
-                    });
-                });
+        // Passo 1: Mapear Preços do Contrato para cálculo de prejuízo
+        const priceMap = new Map<string, number>();
+        suppliers.forEach(s => {
+            s.contractItems.forEach(ci => {
+                priceMap.set(`${superNormalize(s.name)}-${superNormalize(ci.name)}`, ci.valuePerKg || 0);
             });
         });
-    
-        return shortfalls.sort((a, b) => new Date(`2026-${a.month}-01`).getMonth() - new Date(`2026-${b.month}-01`).getMonth() || a.supplierName.localeCompare(b.supplierName));
-    }, [suppliers]);
+
+        // Passo 2: Agrupar o que foi FATURADO (Deliveries com Nota)
+        const billedData = new Map<string, number>(); // Key: supplierNorm-itemNorm-monthName-invoiceNum
+        suppliers.forEach(s => {
+            s.deliveries.forEach(d => {
+                if (d.invoiceUploaded && d.invoiceNumber && d.item && d.item !== 'AGENDAMENTO PENDENTE') {
+                    const mIdx = new Date(d.date + 'T00:00:00').getMonth();
+                    if (mIdx < 4) {
+                        const key = `${superNormalize(s.name)}|${superNormalize(d.item)}|${months[mIdx]}|${d.invoiceNumber}`;
+                        billedData.set(key, (billedData.get(key) || 0) + (d.kg || 0));
+                    }
+                }
+            });
+        });
+
+        // Passo 3: Agrupar o que entrou no ESTOQUE (WarehouseLog tipo 'entrada')
+        const receivedData = new Map<string, number>();
+        warehouseLog.forEach(log => {
+            if (log.type === 'entrada' && log.inboundInvoice) {
+                const mIdx = new Date(log.timestamp).getMonth();
+                if (mIdx < 4) {
+                    const key = `${superNormalize(log.supplierName)}|${superNormalize(log.itemName)}|${months[mIdx]}|${log.inboundInvoice}`;
+                    receivedData.set(key, (receivedData.get(key) || 0) + (log.quantity || 0));
+                }
+            }
+        });
+
+        // Passo 4: Cruzar os dados e gerar linhas de relatório
+        // Usamos as chaves de FATURAMENTO como base (pois se foi faturado, deveria ter entrado)
+        const allKeys = new Set([...billedData.keys(), ...receivedData.keys()]);
+
+        allKeys.forEach(key => {
+            const [sNorm, iNorm, month, invoice] = key.split('|');
+            const billed = billedData.get(key) || 0;
+            const received = receivedData.get(key) || 0;
+            const diff = billed - received;
+            const shortfall = Math.max(0, diff);
+
+            if (billed > 0 || received > 0) {
+                // Localizar nomes reais para exibição
+                const supplierObj = suppliers.find(s => superNormalize(s.name) === sNorm);
+                const itemObj = supplierObj?.contractItems.find(ci => superNormalize(ci.name) === iNorm);
+                const price = priceMap.get(`${sNorm}-${iNorm}`) || 0;
+
+                shortfalls.push({
+                    id: key,
+                    supplierName: supplierObj?.name || sNorm.toUpperCase(),
+                    productName: itemObj?.name || iNorm.toUpperCase(),
+                    invoices: invoice,
+                    month: month,
+                    billedKg: billed,
+                    receivedKg: received,
+                    shortfallKg: shortfall,
+                    financialLoss: shortfall * price
+                });
+            }
+        });
+
+        return shortfalls.sort((a, b) => 
+            new Date(`2026-${a.month}-01`).getMonth() - new Date(`2026-${b.month}-01`).getMonth() || 
+            a.supplierName.localeCompare(b.supplierName)
+        );
+    }, [suppliers, warehouseLog]);
 
     const filteredShortfallData = useMemo(() => {
         if (selectedSupplierName === 'all' && selectedMonthFilter === 'all') {
@@ -195,97 +189,12 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
       else { setSortKey(key); setSortDirection('desc'); }
     };
 
-    const handleExportCSV = () => {
-        const headers = [
-            "Fornecedor",
-            "CPF/CNPJ",
-            "Item",
-            "Mês",
-            "Peso Previsto (Kg)",
-            "Peso Entregue (Kg)",
-            "Peso Restante (Kg)",
-            "Valor Previsto (R$)",
-            "Observação"
-        ];
-    
-        const csvRows = [headers.join(';')];
-    
-        suppliers.forEach(p => {
-            csvRows.push('');
-            
-            p.contractItems.forEach(item => {
-                const totalItemWeight = getContractItemWeight(item);
-                const itemTotalValue = (item.totalKg || 0) * (item.valuePerKg || 0);
-                const monthlyKg = totalItemWeight / 4;
-                const monthlyValue = itemTotalValue / 4;
-                const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
-                const deliveriesForItem = p.deliveries.filter(d => d.item === item.name && d.kg && d.invoiceUploaded);
-                let surplusFromPreviousMonth = 0;
-    
-                months.forEach((month, index) => {
-                    const deliveredInMonth = deliveriesForItem
-                        .filter(d => new Date(d.date + 'T00:00:00').getMonth() === index)
-                        .reduce((sum, d) => sum + (d.kg || 0), 0);
-                    
-                    const surplusApplied = surplusFromPreviousMonth;
-                    const adjustedMonthlyKg = monthlyKg - surplusApplied;
-                    const remainingInMonth = adjustedMonthlyKg - deliveredInMonth;
-    
-                    surplusFromPreviousMonth = remainingInMonth < 0 ? -remainingInMonth : 0;
-    
-                    const observation = surplusApplied > 0 
-                        ? `Ajustado pelo excedente de ${surplusApplied.toFixed(2).replace('.', ',')}kg do mês anterior.` 
-                        : '';
-    
-                    const row = [
-                        `"${p.name}"`,
-                        `'${p.cpf}`,
-                        `"${item.name}"`,
-                        month,
-                        String(adjustedMonthlyKg.toFixed(2)).replace('.', ','),
-                        String(deliveredInMonth.toFixed(2)).replace('.', ','),
-                        String(Math.max(0, remainingInMonth).toFixed(2)).replace('.', ','),
-                        String(monthlyValue.toFixed(2)).replace('.', ','),
-                        `"${observation}"`
-                    ];
-                    csvRows.push(row.join(';'));
-                });
-    
-                const totalDeliveredKgForItem = deliveriesForItem.reduce((sum, d) => sum + (d.kg || 0), 0);
-                const totalRemainingKgForItem = totalItemWeight - totalDeliveredKgForItem;
-                const row = [
-                    "",
-                    "",
-                    `"Total ${item.name}"`,
-                    "",
-                    String(totalItemWeight.toFixed(2)).replace('.', ','),
-                    String(totalDeliveredKgForItem.toFixed(2)).replace('.', ','),
-                    String(totalRemainingKgForItem.toFixed(2)).replace('.', ','),
-                    String(itemTotalValue.toFixed(2)).replace('.', ','),
-                    ""
-                ];
-                csvRows.push(row.join(';'));
-                csvRows.push('');
-            });
-        });
-    
-        const csvString = csvRows.join('\n');
-        const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
-        
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', 'relatorio_analitico_fornecedores.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
     return (
         <div className="space-y-8 animate-fade-in pb-12">
             <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-500">
                 <h2 className="text-2xl font-bold text-gray-800 mb-2">Relatório Analítico de Contratos</h2>
             </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-blue-500">
                     <p className="text-xs text-gray-400 font-bold uppercase">Contratado</p>
@@ -307,202 +216,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
 
             <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                    <h3 className="text-lg font-bold text-gray-800">Desempenho Detalhado por Fornecedor</h3>
-                    <div className="flex items-center gap-2 flex-wrap">
-                         <input 
-                            type="text" 
-                            placeholder="Pesquisar fornecedor..." 
-                            value={supplierSearchTerm} 
-                            onChange={(e) => setSupplierSearchTerm(e.target.value)}
-                            className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all"
-                        />
-                         <button onClick={handleExportCSV} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                            Exportar CSV
-                        </button>
-                    </div>
-                </div>
-                <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                   {filteredSuppliers.length > 0 ? filteredSuppliers.map(supplier => {
-                       const isExpanded = expandedSupplierCpf === supplier.cpf;
-                       return (
-                           <div key={supplier.cpf} className={`border rounded-xl transition-all ${isExpanded ? 'ring-2 ring-blue-500 bg-white' : 'bg-gray-50/50 hover:bg-white'}`}>
-                               <div className="p-4 cursor-pointer flex justify-between items-center" onClick={() => setExpandedSupplierCpf(isExpanded ? null : supplier.cpf)}>
-                                   <span className="font-bold text-gray-700">{supplier.name}</span>
-                                   <div className="flex items-center gap-4">
-                                       <span className="text-sm font-bold text-blue-600">{formatCurrency(supplier.initialValue)}</span>
-                                       <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                                   </div>
-                               </div>
-                               {isExpanded && (
-                                   <div className="p-4 bg-gray-50 border-t animate-slide-down space-y-6">
-                                       <div>
-                                            <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Itens Contratados (Previsão Mensal)</h4>
-                                            <div className="overflow-x-auto">
-                                                    <table className="w-full text-xs">
-                                                        <thead className="bg-gray-200">
-                                                            <tr>
-                                                                <th className="p-2 text-left font-semibold">Item</th>
-                                                                <th className="p-2 text-left font-semibold">Mês</th>
-                                                                <th className="p-2 text-right font-semibold">Peso Previsto (Kg)</th>
-                                                                <th className="p-2 text-right font-semibold text-green-700">Peso Entregue (Kg)</th>
-                                                                <th className="p-2 text-right font-semibold text-red-700">Peso Restante (Kg)</th>
-                                                                <th className="p-2 text-right font-semibold">Valor Previsto (R$)</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {supplier.contractItems.length > 0 ? supplier.contractItems.map(item => {
-                                                                const totalItemWeight = getContractItemWeight(item);
-                                                                const monthlyKg = totalItemWeight / 4;
-                                                                const itemTotalValue = (item.totalKg || 0) * (item.valuePerKg || 0);
-                                                                const monthlyValue = itemTotalValue / 4;
-                                                                const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril'];
-                                                                
-                                                                const deliveriesForItem = supplier.deliveries.filter(d => d.item === item.name && d.kg && d.invoiceUploaded);
-                                                                const totalDeliveredKgForItem = deliveriesForItem.reduce((sum, d) => sum + (d.kg || 0), 0);
-                                                                const totalRemainingKgForItem = totalItemWeight - totalDeliveredKgForItem;
-
-                                                                let surplusFromPreviousMonth = 0;
-
-                                                                return (
-                                                                    <React.Fragment key={item.name}>
-                                                                        {months.map((month, index) => {
-                                                                            const deliveredInMonth = deliveriesForItem
-                                                                                .filter(d => new Date(d.date + 'T00:00:00').getMonth() === index)
-                                                                                .reduce((sum, d) => sum + (d.kg || 0), 0);
-                                                                            
-                                                                            const surplusApplied = surplusFromPreviousMonth;
-                                                                            const adjustedMonthlyKg = monthlyKg - surplusApplied;
-                                                                            const remainingInMonth = adjustedMonthlyKg - deliveredInMonth;
-                                                                            
-                                                                            surplusFromPreviousMonth = remainingInMonth < 0 ? -remainingInMonth : 0;
-                                                                            
-                                                                            return (
-                                                                                <tr key={`${item.name}-${month}`} className="border-b bg-white">
-                                                                                    {index === 0 ? (
-                                                                                        <td rowSpan={4} className="p-2 align-top border-r font-semibold text-gray-700">{item.name}</td>
-                                                                                    ) : null}
-                                                                                    <td className="p-2">{month}</td>
-                                                                                    <td className="p-2 text-right font-mono" title={surplusApplied > 0 ? `Valor ajustado pelo excedente de ${surplusApplied.toFixed(2).replace('.',',')}kg do mês anterior` : ''}>
-                                                                                      {adjustedMonthlyKg.toFixed(2).replace('.',',')}
-                                                                                      {surplusApplied > 0 && <span className="text-blue-500 font-bold">*</span>}
-                                                                                    </td>
-                                                                                    <td className="p-2 text-right font-mono font-semibold text-green-600">{deliveredInMonth.toFixed(2).replace('.',',')}</td>
-                                                                                    <td className={`p-2 text-right font-mono font-semibold ${remainingInMonth > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                                                        {Math.max(0, remainingInMonth).toFixed(2).replace('.',',')}
-                                                                                    </td>
-                                                                                    <td className="p-2 text-right font-mono">{formatCurrency(monthlyValue)}</td>
-                                                                                </tr>
-                                                                            );
-                                                                        })}
-                                                                        <tr className="bg-gray-100 font-bold border-b-2 border-gray-300">
-                                                                            <td colSpan={2} className="p-2 text-right">Total do Item:</td>
-                                                                            <td className="p-2 text-right font-mono">{totalItemWeight.toFixed(2).replace('.',',')}</td>
-                                                                            <td className="p-2 text-right font-mono text-green-700">{totalDeliveredKgForItem.toFixed(2).replace('.',',')}</td>
-                                                                            <td className={`p-2 text-right font-mono font-bold ${totalRemainingKgForItem > 0 ? 'text-red-700' : 'text-green-700'}`}>{totalRemainingKgForItem.toFixed(2).replace('.',',')}</td>
-                                                                            <td className="p-2 text-right font-mono">{formatCurrency(itemTotalValue)}</td>
-                                                                        </tr>
-                                                                    </React.Fragment>
-                                                                )
-                                                            }) : (
-                                                                <tr><td colSpan={6} className="p-4 text-center text-gray-500 italic">Nenhum item neste contrato.</td></tr>
-                                                            )}
-                                                        </tbody>
-                                                    </table>
-                                            </div>
-                                       </div>
-                                       <div>
-                                            <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Entregas Realizadas</h4>
-                                            <div className="overflow-x-auto">
-                                                    <table className="w-full text-xs">
-                                                        <thead className="bg-gray-200">
-                                                            <tr>
-                                                                <th className="p-2 text-left font-semibold">Data</th>
-                                                                <th className="p-2 text-left font-semibold">Item</th>
-                                                                <th className="p-2 text-left font-semibold">NF</th>
-                                                                <th className="p-2 text-right font-semibold">Valor (R$)</th>
-                                                                <th className="p-2 text-center font-semibold">Status NF</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {supplier.deliveries.length > 0 ? supplier.deliveries.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(delivery => (
-                                                                <tr key={delivery.id} className="border-b last:border-b-0 bg-white">
-                                                                    <td className="p-2 font-mono">{formatDate(delivery.date)}</td>
-                                                                    <td className="p-2">{delivery.item}</td>
-                                                                    <td className="p-2 font-mono">{delivery.invoiceNumber || '-'}</td>
-                                                                    <td className="p-2 text-right font-mono">{formatCurrency(delivery.value || 0)}</td>
-                                                                    <td className="p-2 text-center">
-                                                                        {delivery.invoiceUploaded ? (
-                                                                            <span className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full">Enviada</span>
-                                                                        ) : (
-                                                                            <span className="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">Pendente</span>
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                            )) : (
-                                                                <tr><td colSpan={5} className="p-4 text-center text-gray-500 italic">Nenhuma entrega registrada.</td></tr>
-                                                            )}
-                                                        </tbody>
-                                                    </table>
-                                            </div>
-                                       </div>
-                                   </div>
-                               )}
-                           </div>
-                       );
-                   }) : (
-                        <div className="text-center py-10"><p className="text-gray-400 italic">Nenhum fornecedor encontrado.</p></div>
-                   )}
-                </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h3 className="text-lg font-bold mb-4">Desempenho Geral dos Fornecedores</h3>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                            <tr>
-                                <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('name')}>Fornecedor</th>
-                                <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('progress')}>Progresso da Entrega</th>
-                                <th className="p-3 text-right cursor-pointer" onClick={() => handleSort('delivered')}>Entregue / Contratado (R$)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sortedSuppliers.length > 0 ? sortedSuppliers.map(p => {
-                                const deliveredValue = p.deliveries.filter(d => d.invoiceUploaded).reduce((s, d) => s + (d.value || 0), 0);
-                                const contractedValue = p.initialValue;
-                                const progress = contractedValue > 0 ? (deliveredValue / contractedValue) * 100 : 0;
-                                return (
-                                    <tr key={p.cpf} className="border-b hover:bg-gray-50 transition-colors">
-                                        <td className="p-3 font-bold text-gray-800">{p.name}</td>
-                                        <td className="p-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-full bg-gray-200 rounded-full h-5 relative overflow-hidden shadow-inner">
-                                                    <div
-                                                        className="bg-green-500 h-5 rounded-full transition-all duration-500"
-                                                        style={{ width: `${Math.min(100, progress)}%` }}
-                                                    />
-                                                    <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white mix-blend-lighten">{progress.toFixed(0)}%</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-3 text-right font-mono text-xs">
-                                            <span className="font-bold text-green-600">{formatCurrency(deliveredValue)}</span>
-                                            <span className="text-gray-400"> / {formatCurrency(contractedValue)}</span>
-                                        </td>
-                                    </tr>
-                                );
-                            }) : (
-                                <tr><td colSpan={3} className="p-8 text-center text-gray-400 italic">Nenhum dado de fornecedor para exibir.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-                <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                    <h3 className="text-lg font-bold text-gray-800">Relatório de Falhas de Entrega Mensal</h3>
+                    <h3 className="text-lg font-bold text-gray-800">Relatório de Falhas: Nota Fiscal vs. Estoque</h3>
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                          <select
                             value={selectedSupplierName}
@@ -534,9 +248,9 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                 <th className="p-3 text-left">FORNECEDOR</th>
                                 <th className="p-3 text-left">PRODUTO</th>
                                 <th className="p-3 text-left">Nº DA NOTA</th>
-                                <th className="p-3 text-left">MÊS DA FALHA</th>
-                                <th className="p-3 text-right">META MENSAL (KG)</th>
-                                <th className="p-3 text-right">TOTAL ENTREGUE (KG)</th>
+                                <th className="p-3 text-left">MÊS</th>
+                                <th className="p-3 text-right">TOTAL EM NOTA (KG)</th>
+                                <th className="p-3 text-right">ENTRADA ESTOQUE (KG)</th>
                                 <th className="p-3 text-right">FALHA NA ENTREGA (KG)</th>
                                 <th className="p-3 text-right">PREJUÍZO (R$)</th>
                             </tr>
@@ -544,17 +258,17 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                         <tbody>
                             {finalDataForTable.length > 0 ? finalDataForTable.map(item => (
                                 <tr key={item.id} className="border-b hover:bg-red-50/50 transition-colors">
-                                    <td className="p-3 font-bold text-gray-800">{item.supplierName}</td>
-                                    <td className="p-3 text-gray-700">{item.productName}</td>
+                                    <td className="p-3 font-bold text-gray-800 uppercase">{item.supplierName}</td>
+                                    <td className="p-3 text-gray-700 uppercase">{item.productName}</td>
                                     <td className="p-3 font-mono text-xs text-blue-600 font-bold">{item.invoices}</td>
                                     <td className="p-3 text-gray-600 font-semibold">{item.month}</td>
                                     <td className="p-3 text-right font-mono text-gray-500">
-                                        {item.expectedKg.toFixed(2).replace('.', ',')}
+                                        {item.billedKg.toFixed(2).replace('.', ',')}
                                     </td>
-                                    <td className="p-3 text-right font-mono text-green-600">
-                                        {item.deliveredKg.toFixed(2).replace('.', ',')}
+                                    <td className="p-3 text-right font-mono text-green-600 font-bold">
+                                        {item.receivedKg.toFixed(2).replace('.', ',')}
                                     </td>
-                                    <td className="p-3 text-right font-mono text-red-600 font-bold">
+                                    <td className={`p-3 text-right font-mono font-bold ${item.shortfallKg > 0 ? 'text-red-600' : 'text-gray-400'}`}>
                                         {item.shortfallKg.toFixed(2).replace('.', ',')}
                                     </td>
                                     <td className="p-3 text-right font-mono text-red-700 font-extrabold">
@@ -562,19 +276,19 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers }) => {
                                     </td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan={8} className="p-8 text-center text-gray-400 italic">Nenhuma falha de entrega registrada com os filtros atuais.</td></tr>
+                                <tr><td colSpan={8} className="p-8 text-center text-gray-400 italic font-bold">Nenhuma falha física detectada entre Notas e Estoque.</td></tr>
                             )}
                         </tbody>
                         {finalDataForTable.length > 0 && (
                             <tfoot className="font-bold">
                                 <tr className="bg-gray-100">
-                                    <td colSpan={7} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total (Filtrado):</td>
+                                    <td colSpan={7} className="p-3 text-right text-gray-700 uppercase">Prejuízo Total em Discrepâncias:</td>
                                     <td className="p-3 text-right text-red-800 text-base font-extrabold">{formatCurrency(totalFinancialLoss)}</td>
                                 </tr>
                                 {!hasActualFailures && (
                                     <tr className="bg-white border-t">
                                         <td colSpan={8} className="p-4 text-center text-green-600 italic">
-                                            Nenhuma falha na entrega registrada com os filtros atuais.
+                                            Conferência realizada: Todos os itens faturados constam no estoque.
                                         </td>
                                     </tr>
                                 )}

@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 // Import types directly to ensure they are available for use in generic positions
 import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow } from './types';
@@ -408,8 +407,8 @@ const App: React.FC = () => {
         const subj = `ENVIO DE NOTA FISCAL - ${targetSupplierName} - NF ${inv.invoiceNumber}`;
         let b = `Olá,\n\nSegue em anexo a Nota Fiscal nº ${inv.invoiceNumber}.\n\nItens:\n`;
         inv.fulfilledItems.forEach(i => b += `- ${i.name}: ${i.kg.toFixed(2)} Kg\n`);
-        const recipientEmail = "dg@ptaiuva.sap.sp.gov.br";
-        const ccEmails = "almoxarifado@ptaiuva.sap.sp.gov.br;financas@ptaiuva.sap.sp.gov.br";
+        const recipientEmail = "dg@ptaiuva.sap.gov.br";
+        const ccEmails = "almoxarifado@ptaiuva.sap.gov.br;financas@ptaiuva.sap.gov.br";
         const mailto = `mailto:${recipientEmail}?cc=${ccEmails}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(b)}`;
         setEmailModalData({ recipient: recipientEmail, cc: ccEmails, subject: subj, body: b, mailtoLink: mailto });
       }
@@ -478,6 +477,7 @@ const App: React.FC = () => {
     for (const req of log.items) {
       let need = Number(req.quantity);
       const nReqName = superNormalize(req.name);
+      // BUG FIX: Correctly access the date property via b.d.date in the sort comparison
       const lots = tempS.flatMap(s => s.deliveries.filter(d => superNormalize(d.item) === nReqName && d.lots).map(d => ({ s, d })))
                         .sort((a, b) => a.d.date.localeCompare(b.d.date));
 
