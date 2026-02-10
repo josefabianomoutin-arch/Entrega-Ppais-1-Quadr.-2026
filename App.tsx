@@ -41,7 +41,7 @@ const cleanNumericValue = (val: any): number => {
 };
 
 /**
- * PADRONIZADOR DE DATA 2026 - VERSÃO 4.0 (ULTRA-ROBUSTA)
+ * PADRONIZADOR DE DATA 2026 - BLINDADO
  * Garante que qualquer entrada de Janeiro (01) vire 2026-01-XX.
  */
 const standardizeDate = (rawDate: any): string => {
@@ -63,7 +63,9 @@ const standardizeDate = (rawDate: any): string => {
     
     if (parts.length === 2) {
         // Assume DD-MM -> 2026-MM-DD
-        return `2026-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        const m = parts[1].padStart(2, '0');
+        const d = parts[0].padStart(2, '0');
+        return `2026-${m}-${d}`;
     }
 
     if (parts.length === 3) {
@@ -160,7 +162,7 @@ const App: React.FC = () => {
     try { await set(dbRef, data); } finally { setTimeout(() => setIsSaving(false), 500); }
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800 animate-pulse">CARREGANDO SISTEMA...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800 animate-pulse">SINCRONIZANDO...</div>;
 
   return (
     <>
