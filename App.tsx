@@ -41,14 +41,14 @@ const cleanNumericValue = (val: any): number => {
 };
 
 /**
- * PADRONIZADOR DE DATA 2026 - BLINDADO
- * Garante que qualquer entrada de Janeiro (01) vire 2026-01-XX.
+ * PADRONIZADOR DE DATA 2026 - CORREÇÃO JANEIRO
+ * Garante que registros com mês 01 sejam identificados como Janeiro.
  */
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
     let s = String(rawDate).trim();
 
-    // Excel Serial
+    // Caso Excel Serial
     if (!isNaN(Number(s)) && Number(s) > 40000) {
         const excelDate = parseFloat(s);
         const date = new Date(Date.UTC(1899, 11, 30)); 
@@ -58,22 +58,23 @@ const standardizeDate = (rawDate: any): string => {
         return `2026-${m}-${d}`;
     }
 
+    // Limpeza de caracteres
     s = s.split(' ')[0].split('T')[0].replace(/[\.\/]/g, '-');
     const parts = s.split('-');
     
     if (parts.length === 2) {
-        // Assume DD-MM -> 2026-MM-DD
-        const m = parts[1].padStart(2, '0');
+        // Formato DD-MM assumindo 2026
         const d = parts[0].padStart(2, '0');
+        const m = parts[1].padStart(2, '0');
         return `2026-${m}-${d}`;
     }
 
     if (parts.length === 3) {
         let d, m, y = "2026";
-        if (parts[0].length === 4) { // ISO YYYY-MM-DD
+        if (parts[0].length === 4) { // ISO: YYYY-MM-DD
             m = parts[1].padStart(2, '0');
             d = parts[2].padStart(2, '0');
-        } else { // BR DD-MM-YYYY
+        } else { // BR: DD-MM-YYYY
             d = parts[0].padStart(2, '0');
             m = parts[1].padStart(2, '0');
         }
@@ -103,6 +104,7 @@ const App: React.FC = () => {
   const [isAlmoxarifadoLoggedIn, setIsAlmoxarifadoLoggedIn] = useState(false);
   const [isItespLoggedIn, setIsItespLoggedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [adminActiveTab, setAdminActiveTab] = useState<any>('register');
 
   useEffect(() => {
     setLoading(true);
@@ -167,7 +169,7 @@ const App: React.FC = () => {
   return (
     <>
       <div className={`fixed top-4 right-4 z-50 p-2 bg-blue-600 text-white text-[10px] font-bold rounded shadow-lg transition-opacity ${isSaving ? 'opacity-100' : 'opacity-0'}`}>SINC...</div>
-      {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={async () => {}} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async () => null} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async () => true} activeTab={'register'} onTabChange={() => {}} registrationStatus={null} onClearRegistrationStatus={() => {}} onReopenInvoice={async () => {}} onDeleteInvoice={async () => {}} onUpdateInvoiceItems={async () => ({success: true})} onManualInvoiceEntry={async () => ({success: true})} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={async (c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={async () => ({success: true, message: ''})} onRegisterCleaningLog={async () => ({success: true, message: ''})} onDeleteCleaningLog={async () => {}} onRegisterDirectorWithdrawal={async () => ({success: true, message: ''})} onDeleteDirectorWithdrawal={async () => {}} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={async (m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={async (m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={async () => ({success: true, message: ''})} onRegisterWithdrawal={async () => ({success: true, message: ''})} onCancelDeliveries={() => {}} />
+      {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={async () => {}} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async () => null} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async () => true} activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={null} onClearRegistrationStatus={() => {}} onReopenInvoice={async () => {}} onDeleteInvoice={async () => {}} onUpdateInvoiceItems={async () => ({success: true})} onManualInvoiceEntry={async () => ({success: true})} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={async (c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={async () => ({success: true, message: ''})} onRegisterCleaningLog={async () => ({success: true, message: ''})} onDeleteCleaningLog={async () => {}} onRegisterDirectorWithdrawal={async () => ({success: true, message: ''})} onDeleteDirectorWithdrawal={async () => {}} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={async (m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={async (m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={async () => ({success: true, message: ''})} onRegisterWithdrawal={async () => ({success: true, message: ''})} onCancelDeliveries={() => {}} />
       : isItespLoggedIn ? <ItespDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsItespLoggedIn(false)} />
       : isAlmoxarifadoLoggedIn ? <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={async () => ({success: true, message: ''})} onRegisterWithdrawal={async () => ({success: true, message: ''})} />
       : loggedInCpf ? <Dashboard supplier={suppliers.find(s => s.cpf === loggedInCpf)!} onLogout={() => setLoggedInCpf(null)} onScheduleDelivery={() => {}} onFulfillAndInvoice={() => {}} onCancelDeliveries={() => {}} emailModalData={null} onCloseEmailModal={() => {}} />
