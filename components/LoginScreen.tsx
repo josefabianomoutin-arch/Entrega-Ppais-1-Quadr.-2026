@@ -27,7 +27,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     if (['itesp', 'almoxarifado', 'financeiro'].includes(name)) {
       setLoginCpf(value);
     } else {
-      // MANTÉM RESTRIÇÃO: Apenas números para Fornecedores e Administrador
+      // MANTÉM RESTRIÇÃO: Apenas números para Fornecedores, Administrador e Douglas (que usa CPF numérico)
       setLoginCpf(value.replace(/[^\d]/g, ''));
     }
   };
@@ -45,6 +45,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     if (name === 'administrador') {
         return "Senha (CPF do administrador)";
     }
+    if (name.includes('douglas')) {
+        return "Senha (Seu CPF)";
+    }
     return "Senha (CPF/CNPJ do fornecedor)";
   }, [loginName, isStringLogin]);
 
@@ -59,7 +62,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         </div>
         
         <div className="mt-4 text-center text-sm text-yellow-800 bg-yellow-100 p-3 rounded-lg border border-yellow-300">
-            <p><strong>Atenção:</strong> Fornecedores utilizam o <strong>CPF/CNPJ</strong>. ITESP e FINANCEIRO utilizam senhas alfanuméricas.</p>
+            <p><strong>Atenção:</strong> Fornecedores e Diretores utilizam o <strong>CPF/CNPJ</strong> (apenas números). ITESP e FINANCEIRO utilizam senhas alfanuméricas.</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLoginSubmit}>
@@ -73,11 +76,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   onChange={(e) => {
                     const val = e.target.value.toUpperCase();
                     setLoginName(val);
+                    // Se não for um dos logins de string, limpa a senha de caracteres não numéricos
                     if (!['ITESP', 'ALMOXARIFADO', 'FINANCEIRO'].includes(val)) {
                         setLoginCpf(prev => prev.replace(/[^\d]/g, ''));
                     }
                   }} 
-                  placeholder="Usuário (Ex: ITESP, FINANCEIRO ou Nome)" 
+                  placeholder="Seu Nome Completo ou Usuário" 
                   className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                 />
             </div>

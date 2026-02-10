@@ -136,12 +136,21 @@ const App: React.FC = () => {
 
   const handleLogin = (n: string, c: string): boolean => {
     const inputNameNorm = superNormalize(n);
+    const passwordClean = c.replace(/[^\d]/g, '');
+
     if (inputNameNorm === 'nomedopainda' && c === 'itesp2026') { setIsItespLoggedIn(true); return true; }
     if (inputNameNorm === 'administrador' && c === '15210361870') { setIsAdminLoggedIn(true); return true; }
     if (inputNameNorm === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
     if (inputNameNorm === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
     if (inputNameNorm === 'financeiro' && c === 'taiuvafinanceiro2026') { setIsFinanceLoggedIn(true); return true; }
-    const u = suppliers.find(p => superNormalize(p.name) === inputNameNorm && p.cpf === c.replace(/[^\d]/g, ''));
+    
+    // Novo login Douglas (Financeiro Externo)
+    if (inputNameNorm === superNormalize('DOUGLAS FERNANDO SEMENZIN GALDION') && passwordClean === '29099022859') {
+        setIsFinanceLoggedIn(true);
+        return true;
+    }
+
+    const u = suppliers.find(p => superNormalize(p.name) === inputNameNorm && p.cpf === passwordClean);
     if (u) { setLoggedInCpf(u.cpf); return true; }
     return false;
   };
