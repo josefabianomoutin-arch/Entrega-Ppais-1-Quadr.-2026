@@ -46,7 +46,7 @@ interface AdminDashboardProps {
   onRegisterEntry: (payload: any) => Promise<{ success: boolean; message: string }>;
   onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
   onCancelDeliveries: (supplierCpf: string, deliveryIds: string[]) => void;
-  activeTab?: string; // Mantido apenas para evitar quebra de contrato mas não usado mais internamente
+  activeTab?: string;
   onTabChange?: (tab: any) => void;
 }
 
@@ -84,9 +84,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     onCancelDeliveries
   } = props;
 
-  // ESTADO INTERNO DE ABA - CURA DEFINITIVA PARA O TRAVAMENTO
   const [activeTab, setActiveTab] = useState<AdminTab>('register');
-  
   const [supplierSearch, setSupplierSearch] = useState('');
   const [regName, setRegName] = useState('');
   const [regCpf, setRegCpf] = useState('');
@@ -107,9 +105,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     { id: 'info', name: 'Zona Crítica', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg> },
   ];
 
-  const totalValue = useMemo(() => {
-    return (suppliers || []).reduce((s, p) => s + (p.initialValue || 0), 0);
-  }, [suppliers]);
+  const handleTabClick = (e: React.MouseEvent, tabId: AdminTab) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveTab(tabId);
+  };
 
   const filteredSuppliers = useMemo(() => {
     return suppliers.filter(s => (s.name || '').toLowerCase().includes(supplierSearch.toLowerCase()));
@@ -119,7 +119,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     switch (activeTab) {
       case 'register':
         return (
-          <div className="space-y-8 max-w-5xl mx-auto">
+          <div className="space-y-8 max-w-5xl mx-auto animate-fade-in">
             <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-500">
               <h2 className="text-xl font-black text-gray-800 mb-6 uppercase tracking-tight">Cadastro de Novo Fornecedor</h2>
               <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={async (e) => {
@@ -128,31 +128,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 setRegName(''); setRegCpf(''); setRegWeeks([]);
               }}>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Nome Fantasia / Razão Social</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Fornecedor</label>
                   <input type="text" placeholder="NOME DO FORNECEDOR" value={regName} onChange={e => setRegName(e.target.value.toUpperCase())} className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-400 outline-none" required />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Documento (CPF ou CNPJ)</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">CPF/CNPJ</label>
                   <input type="text" placeholder="APENAS NÚMEROS" value={regCpf} onChange={e => setRegCpf(e.target.value.replace(/\D/g, ''))} className="w-full p-2 border rounded-lg font-mono focus:ring-2 focus:ring-green-400 outline-none" required />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block ml-1">Restrição de Semanas (Opcional)</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block ml-1">Restrição de Semanas</label>
                   <WeekSelector selectedWeeks={regWeeks} onWeekToggle={(w) => setRegWeeks(prev => prev.includes(w) ? prev.filter(x => x !== w) : [...prev, w])} />
                 </div>
-                <button type="submit" className="md:col-span-2 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-sm">Registrar Fornecedor</button>
+                <button type="submit" className="md:col-span-2 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl shadow-md active:scale-95 uppercase tracking-widest text-sm">Salvar Fornecedor</button>
               </form>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-lg">
-              <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight">Fornecedores Habilitados ({filteredSuppliers.length})</h2>
-                <input type="text" placeholder="Pesquisar..." value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} className="w-full md:w-64 border p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
+              <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b pb-4">
+                <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight">Habilitados ({filteredSuppliers.length})</h2>
+                <input type="text" placeholder="Filtrar por nome..." value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} className="w-full md:w-64 border p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
               </div>
-              <div className="overflow-x-auto border rounded-xl">
+              <div className="overflow-x-auto rounded-xl">
                 <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 text-gray-400 uppercase text-[10px] font-black tracking-widest">
+                  <thead className="bg-gray-50">
+                    <tr className="text-gray-400 uppercase text-[10px] font-black tracking-widest border-b">
                       <th className="p-4 text-left">Fornecedor</th>
-                      <th className="p-4 text-left">CPF/CNPJ</th>
+                      <th className="p-4 text-left">Documento</th>
                       <th className="p-4 text-right">Contratado</th>
                       <th className="p-4 text-center">Ações</th>
                     </tr>
@@ -160,11 +160,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                   <tbody className="divide-y divide-gray-100">
                     {filteredSuppliers.map(s => (
                       <tr key={s.cpf} className="hover:bg-gray-50 transition-colors">
-                        <td className="p-4 font-bold text-gray-800 uppercase">{s.name}</td>
+                        <td className="p-4 font-bold text-gray-800 uppercase text-xs">{s.name}</td>
                         <td className="p-4 font-mono text-gray-500 text-xs">{s.cpf}</td>
                         <td className="p-4 text-right font-black text-green-600">{formatCurrency(s.initialValue)}</td>
                         <td className="p-4 text-center">
-                          <button onClick={() => setEditingSupplier(s)} className="text-blue-500 hover:underline font-bold text-xs uppercase">Editar</button>
+                          <button onClick={() => setEditingSupplier(s)} className="text-blue-500 hover:bg-blue-50 px-3 py-1 rounded font-bold text-[10px] uppercase">Editar</button>
                         </td>
                       </tr>
                     ))}
@@ -174,7 +174,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             </div>
           </div>
         );
-      case 'contracts': return <div className="p-10 text-center font-bold">Gestão de Contratos (Vincular Itens)</div>;
+      case 'contracts': return <div className="p-20 text-center text-gray-400 font-black uppercase">Gerenciamento de Itens Individuais</div>;
       case 'invoices': return <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} onDeleteInvoice={onDeleteInvoice} onUpdateInvoiceItems={onUpdateInvoiceItems} onManualInvoiceEntry={onManualInvoiceEntry} />;
       case 'schedule': return <AdminScheduleView suppliers={suppliers} onCancelDeliveries={onCancelDeliveries} />;
       case 'directorPerCapita': return <AdminDirectorPerCapita suppliers={suppliers} logs={directorWithdrawals} onRegister={onRegisterDirectorWithdrawal} onDelete={onDeleteDirectorWithdrawal} />;
@@ -184,39 +184,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'graphs': return <AdminGraphs suppliers={suppliers} />;
       case 'perCapita': return <AdminPerCapita suppliers={suppliers} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={onUpdatePerCapitaConfig} />;
       case 'menu': return <AdminStandardMenu suppliers={suppliers} template={standardMenu} dailyMenus={dailyMenus} onUpdateDailyMenus={onUpdateDailyMenu} inmateCount={perCapitaConfig.inmateCount || 0} />;
-      case 'info': return <div className="p-20 text-center space-y-4"><h2 className="text-3xl font-black text-red-600">Zona Crítica</h2><button onClick={onResetData} className="bg-red-600 text-white px-10 py-4 rounded-xl font-black uppercase">Apagar Todo o Banco de Dados</button></div>;
+      case 'info': return <div className="p-20 text-center space-y-4"><h2 className="text-3xl font-black text-red-600 uppercase tracking-tighter italic">Zona Crítica</h2><button onClick={onResetData} className="bg-red-600 text-white px-10 py-4 rounded-xl font-black uppercase shadow-xl hover:scale-105 transition-all">Formatar Banco de Dados</button></div>;
       default: return null;
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row">
-      <aside className="w-full md:w-72 bg-white md:min-h-screen border-r shadow-xl z-30">
-        <div className="p-6 border-b">
-            <h1 className="text-xl font-black text-green-800 uppercase italic tracking-tighter">Admin v4.0</h1>
-            <p className="text-[10px] text-gray-400 font-bold uppercase">Gestão 1º Quadr. 2026</p>
+      <aside className="w-full md:w-72 bg-white md:min-h-screen border-r shadow-2xl z-50 sticky top-0 md:h-screen">
+        <div className="p-6 border-b bg-green-800 text-white">
+            <h1 className="text-xl font-black uppercase italic tracking-tighter">SISTEMA PPAIS</h1>
+            <p className="text-[10px] text-green-300 font-bold uppercase tracking-widest leading-none mt-1">Administrador 2026</p>
         </div>
-        <nav className="p-4 overflow-y-auto max-h-[calc(100vh-100px)]">
+        <nav className="p-4 overflow-y-auto h-[calc(100vh-100px)] custom-scrollbar">
           <ul className="space-y-1">
             {tabs.map(tab => (
               <li key={tab.id}>
                 <button 
-                    onClick={() => setActiveTab(tab.id)} 
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl text-sm font-black uppercase tracking-tighter transition-all ${activeTab === tab.id ? 'bg-green-600 text-white shadow-lg translate-x-2' : 'text-gray-500 hover:bg-gray-50'}`}
+                    onClick={(e) => handleTabClick(e, tab.id)} 
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl text-xs font-black uppercase tracking-tighter transition-all ${activeTab === tab.id ? 'bg-green-600 text-white shadow-lg translate-x-1' : 'text-gray-500 hover:bg-gray-100'}`}
                 >
-                    {tab.icon}
+                    <span className={activeTab === tab.id ? 'text-white' : 'text-green-600'}>{tab.icon}</span>
                     {tab.name}
                 </button>
               </li>
             ))}
           </ul>
-          <button onClick={onLogout} className="w-full mt-10 p-3 bg-red-50 text-red-600 font-black rounded-xl uppercase text-xs hover:bg-red-100 transition-colors">Sair do Sistema</button>
+          <div className="mt-8 pt-6 border-t">
+              <button onClick={onLogout} className="w-full p-4 bg-red-50 text-red-600 font-black rounded-2xl uppercase text-[10px] tracking-widest hover:bg-red-100 transition-colors border border-red-100">Encerrar Sessão</button>
+          </div>
         </nav>
       </aside>
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto bg-gray-50 min-h-screen">
+      <main className="flex-1 p-4 md:p-10 overflow-y-auto bg-gray-50">
           {renderContent()}
       </main>
       {editingSupplier && (<EditSupplierModal supplier={editingSupplier} suppliers={suppliers} onClose={() => setEditingSupplier(null)} onSave={async (old, name, cpf, weeks) => { const err = await onUpdateSupplier(old, name, cpf, weeks); if (!err) setEditingSupplier(null); return err; }} />)}
+      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }`}</style>
     </div>
   );
 };

@@ -41,8 +41,8 @@ const cleanNumericValue = (val: any): number => {
 };
 
 /**
- * PADRONIZADOR DE DATA 2026 - VERSÃO NUCLEAR
- * Garante que Janeiro seja sempre interpretado como 01.
+ * PADRONIZADOR DE DATA 2026 - VERSÃO SUPREMA
+ * Garante que Janeiro seja 01 em qualquer circunstância.
  */
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
@@ -58,26 +58,26 @@ const standardizeDate = (rawDate: any): string => {
         return `2026-${m}-${d}`;
     }
 
-    // Detecção de mês por texto
+    // Detecção Manual de Janeiro
     if (s.includes('jan')) return `2026-01-${s.replace(/[^0-9]/g, '').slice(0,2).padStart(2,'0')}`;
 
-    // Limpeza de separadores
+    // Normalização de Separadores
     s = s.split(' ')[0].split('t')[0].replace(/[\.\/]/g, '-');
-    const parts = s.split('-');
+    const parts = s.split('-').filter(p => p.length > 0);
     
     if (parts.length === 2) {
         // Assume DD-MM -> 2026-MM-DD
-        const d = parts[0].padStart(2, '0');
-        const m = parts[1].padStart(2, '0');
-        return `2026-${m}-${d}`;
+        return `2026-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
     }
 
     if (parts.length === 3) {
         let d, m, y = "2026";
-        if (parts[0].length === 4) { // ISO YYYY-MM-DD
+        // Se o primeiro é ano (YYYY-MM-DD)
+        if (parts[0].length === 4) {
             m = parts[1].padStart(2, '0');
             d = parts[2].padStart(2, '0');
-        } else { // BR DD-MM-YYYY
+        } else {
+            // Se o último é ano (DD-MM-YYYY)
             d = parts[0].padStart(2, '0');
             m = parts[1].padStart(2, '0');
         }
@@ -162,7 +162,7 @@ const App: React.FC = () => {
     try { await set(dbRef, data); } finally { setTimeout(() => setIsSaving(false), 500); }
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800 animate-pulse">SISTEMA INICIALIZANDO...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800 italic animate-pulse tracking-tighter">CARREGANDO DADOS...</div>;
 
   return (
     <>
