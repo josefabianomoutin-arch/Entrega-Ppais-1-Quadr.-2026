@@ -41,40 +41,41 @@ const cleanNumericValue = (val: any): number => {
 };
 
 /**
- * PADRONIZADOR DE DATA ANTI-FALHA 2026
- * Garante que 01/01/2026 ou 2026-01-01 sejam tratados exatamente como Janeiro.
+ * PADRONIZADOR DE DATA 2026 - VERSÃO 4.0 (ULTRA-ROBUSTA)
+ * Garante que qualquer entrada de Janeiro (01) vire 2026-01-XX.
  */
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
     let s = String(rawDate).trim();
 
-    // Caso Excel Serial
+    // Excel Serial
     if (!isNaN(Number(s)) && Number(s) > 40000) {
         const excelDate = parseFloat(s);
         const date = new Date(Date.UTC(1899, 11, 30)); 
         date.setUTCDate(date.getUTCDate() + Math.floor(excelDate));
-        return `2026-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+        const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(date.getUTCDate()).padStart(2, '0');
+        return `2026-${m}-${d}`;
     }
 
-    // Normalização de separadores
     s = s.split(' ')[0].split('T')[0].replace(/[\.\/]/g, '-');
     const parts = s.split('-');
     
     if (parts.length === 2) {
-        // Trata DD-MM e assume 2026
+        // Assume DD-MM -> 2026-MM-DD
         return `2026-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
     }
 
     if (parts.length === 3) {
-        let day, month, year = "2026";
-        if (parts[0].length === 4) { // ISO: YYYY-MM-DD
-            month = parts[1].padStart(2, '0');
-            day = parts[2].padStart(2, '0');
-        } else { // BR: DD-MM-YYYY
-            day = parts[0].padStart(2, '0');
-            month = parts[1].padStart(2, '0');
+        let d, m, y = "2026";
+        if (parts[0].length === 4) { // ISO YYYY-MM-DD
+            m = parts[1].padStart(2, '0');
+            d = parts[2].padStart(2, '0');
+        } else { // BR DD-MM-YYYY
+            d = parts[0].padStart(2, '0');
+            m = parts[1].padStart(2, '0');
         }
-        return `${year}-${month}-${day}`;
+        return `${y}-${m}-${d}`;
     }
     return s;
 };
@@ -141,8 +142,10 @@ const App: React.FC = () => {
 
   const handleLogin = (n: string, c: string): boolean => {
     const inputNameNorm = superNormalize(n);
+    
     // LOGIN SOLICITADO: NOME DO PAINDA
     if (inputNameNorm === 'nomedopainda' && c === 'itesp2026') { setIsItespLoggedIn(true); return true; }
+    
     if (inputNameNorm === 'administrador' && c === '15210361870') { setIsAdminLoggedIn(true); return true; }
     if (inputNameNorm === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
     if (inputNameNorm === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
@@ -157,11 +160,11 @@ const App: React.FC = () => {
     try { await set(dbRef, data); } finally { setTimeout(() => setIsSaving(false), 500); }
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800">SINCRONIZANDO...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800 animate-pulse">CARREGANDO SISTEMA...</div>;
 
   return (
     <>
-      <div className={`fixed top-4 right-4 z-50 p-2 bg-blue-600 text-white text-[10px] font-bold rounded shadow-lg transition-opacity ${isSaving ? 'opacity-100' : 'opacity-0'}`}>SALVANDO...</div>
+      <div className={`fixed top-4 right-4 z-50 p-2 bg-blue-600 text-white text-[10px] font-bold rounded shadow-lg transition-opacity ${isSaving ? 'opacity-100' : 'opacity-0'}`}>SINC...</div>
       {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={async () => {}} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async () => null} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async () => true} activeTab={'register'} onTabChange={() => {}} registrationStatus={null} onClearRegistrationStatus={() => {}} onReopenInvoice={async () => {}} onDeleteInvoice={async () => {}} onUpdateInvoiceItems={async () => ({success: true})} onManualInvoiceEntry={async () => ({success: true})} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={async (c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={async () => ({success: true, message: ''})} onRegisterCleaningLog={async () => ({success: true, message: ''})} onDeleteCleaningLog={async () => {}} onRegisterDirectorWithdrawal={async () => ({success: true, message: ''})} onDeleteDirectorWithdrawal={async () => {}} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={async (m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={async (m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={async () => ({success: true, message: ''})} onRegisterWithdrawal={async () => ({success: true, message: ''})} onCancelDeliveries={() => {}} />
       : isItespLoggedIn ? <ItespDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsItespLoggedIn(false)} />
       : isAlmoxarifadoLoggedIn ? <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={async () => ({success: true, message: ''})} onRegisterWithdrawal={async () => ({success: true, message: ''})} />

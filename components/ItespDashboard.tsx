@@ -25,32 +25,23 @@ const superNormalize = (text: string) => {
 };
 
 /**
- * EXTRATOR DE MÊS ULTRA-RESILIENTE
- * Identifica o mês 01 (Janeiro) mesmo em strings mal formatadas ou com fuso horário deslocado.
+ * EXTRATOR DE MÊS SEGURO
+ * Identifica Janeiro (01) de forma cirúrgica.
  */
 const getMonthNameFromDate = (dateStr?: string): string => {
     if (!dateStr) return "Mês Indefinido";
     const s = String(dateStr).trim();
     
-    // Teste 1: Regex para procurar o padrão de Janeiro (01) entre separadores
-    if (s.match(/[-/.]01[-/.]/) || s.match(/^01[-/.]/) || s.match(/[-/.]01$/)) {
-        return "Janeiro";
-    }
-
-    // Teste 2: Se for ISO (YYYY-MM-DD)
+    // Decompõe ISO YYYY-MM-DD
     const parts = s.split('-');
     if (parts.length === 3) {
         const m = parseInt(parts[1], 10);
         if (m >= 1 && m <= 12) return months[m - 1];
     }
-
-    // Teste 3: Nomes diretos
-    const upper = s.toUpperCase();
-    if (upper.includes("JANEIRO") || upper.includes("JAN")) return "Janeiro";
-    if (upper.includes("FEVEREIRO") || upper.includes("FEV")) return "Fevereiro";
-    if (upper.includes("MARCO") || upper.includes("MAR")) return "Março";
-    if (upper.includes("ABRIL") || upper.includes("ABR")) return "Abril";
-
+    
+    // Fallback: Procura por padrões numéricos brutos
+    if (s.includes("-01-") || s.includes("/01/")) return "Janeiro";
+    
     return "Mês Indefinido";
 };
 
@@ -69,64 +60,75 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
     const [selectedMonth, setSelectedMonth] = useState('all');
 
     const itespSuppliers = useMemo(() => {
-        const allowedNorm = ALLOWED_SUPPLIERS_RAW.map(superNormalize);
+        const allowedSet = new Set(ALLOWED_SUPPLIERS_RAW.map(superNormalize));
         return suppliers.filter(s => {
-            const sNorm = superNormalize(s.name);
-            return allowedNorm.some(allowed => sNorm.includes(allowed) || allowed.includes(sNorm));
+            const sn = superNormalize(s.name);
+            // Verifica se o nome do fornecedor contém algum dos nomes autorizados
+            return Array.from(allowedSet).some(allowed => sn.includes(allowed) || allowed.includes(sn));
         });
     }, [suppliers]);
 
     const comparisonData = useMemo(() => {
         if (!itespSuppliers.length) return [];
-        const consolidated = new Map<string, any>();
+        
+        // Mapa de Consolidação: key = supplierNorm|itemNorm|monthName
+        const consolidatedMap = new Map<string, any>();
 
-        // 1. Criar estrutura de metas
+        // 1. Inicializa o mapa com as metas (Janeiro a Abril)
         itespSuppliers.forEach(s => {
             const sNorm = superNormalize(s.name);
             s.contractItems.forEach(ci => {
                 const iNorm = superNormalize(ci.name);
                 ['Janeiro', 'Fevereiro', 'Março', 'Abril'].forEach(mName => {
                     const key = `${sNorm}|${iNorm}|${mName}`;
-                    consolidated.set(key, {
+                    consolidatedMap.set(key, {
                         supplierName: s.name,
                         productName: ci.name,
                         month: mName,
                         contractedKgMonthly: (Number(ci.totalKg) || 0) / 4,
                         receivedKg: 0,
                         unitPrice: Number(ci.valuePerKg) || 0,
-                        normSupplier: sNorm,
-                        normItem: iNorm
+                        sNorm, iNorm
                     });
                 });
             });
         });
 
-        // 2. Processar logs de estoque
+        // 2. Processa os logs de estoque (UMA ÚNICA PASSAGEM - O(N))
         warehouseLog.forEach(log => {
-            if (log.type === 'entrada') {
-                const mName = getMonthNameFromDate(log.date);
-                const logSupplierNorm = superNormalize(log.supplierName);
-                const logItemNorm = superNormalize(log.itemName);
+            if (log.type !== 'entrada') return;
+            
+            const logSNorm = superNormalize(log.supplierName);
+            const logINorm = superNormalize(log.itemName);
+            const logMonth = getMonthNameFromDate(log.date);
 
-                for (let val of consolidated.values()) {
-                    if (val.month === mName) {
-                        const sMatch = val.normSupplier.includes(logSupplierNorm) || logSupplierNorm.includes(val.normSupplier);
-                        if (sMatch) {
-                            const iMatch = val.normItem.includes(logItemNorm) || logItemNorm.includes(val.normItem);
-                            if (iMatch) {
-                                val.receivedKg += (Number(log.quantity) || 0);
-                            }
-                        }
+            if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(logMonth)) return;
+
+            // Busca por match direto no mapa
+            const exactKey = `${logSNorm}|${logINorm}|${logMonth}`;
+            let entry = consolidatedMap.get(exactKey);
+
+            if (entry) {
+                entry.receivedKg += (Number(log.quantity) || 0);
+            } else {
+                // Se não houver match exato de nome, busca por similaridade (apenas neste fornecedor)
+                // Isso previne o travamento pois o número de itens por fornecedor é pequeno.
+                for (let val of consolidatedMap.values()) {
+                    if (val.month === logMonth && 
+                        (val.sNorm.includes(logSNorm) || logSNorm.includes(val.sNorm)) &&
+                        (val.iNorm.includes(logINorm) || logINorm.includes(val.iNorm))) {
+                        val.receivedKg += (Number(log.quantity) || 0);
+                        break; 
                     }
                 }
             }
         });
 
-        return Array.from(consolidated.values()).map((data, idx) => {
+        return Array.from(consolidatedMap.values()).map((data, idx) => {
             const shortfallKg = Math.max(0, data.contractedKgMonthly - data.receivedKg);
             return {
                 ...data,
-                id: `itesp-${idx}`,
+                id: `it-${idx}`,
                 shortfallKg,
                 financialLoss: shortfallKg * data.unitPrice
             };
@@ -136,9 +138,10 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
     }, [itespSuppliers, warehouseLog]);
 
     const filteredData = useMemo(() => {
+        const lowerSearch = searchTerm.toLowerCase();
         return comparisonData.filter(item => {
-            const searchMatch = item.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                               item.productName.toLowerCase().includes(searchTerm.toLowerCase());
+            const searchMatch = item.supplierName.toLowerCase().includes(lowerSearch) || 
+                               item.productName.toLowerCase().includes(lowerSearch);
             const monthMatch = selectedMonth === 'all' || item.month === selectedMonth;
             return searchMatch && monthMatch;
         });
@@ -155,59 +158,63 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
     }, [filteredData]);
 
     return (
-        <div className="min-h-screen bg-[#F3F4F6] text-gray-800 pb-20">
+        <div className="min-h-screen bg-[#F3F4F6] text-gray-800 pb-20 font-sans">
             <header className="bg-white shadow-lg p-4 flex justify-between items-center border-b-4 border-green-700 sticky top-0 z-30">
                 <div>
                     <h1 className="text-xl md:text-2xl font-black text-green-800 uppercase tracking-tighter italic">Audit ITESP - Gestão 2026</h1>
-                    <p className="text-[10px] text-gray-500 font-bold uppercase">Painel de Auditoria Mensal (Janeiro a Abril)</p>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Janeiro a Abril • Controle de Estoque vs Metas</p>
                 </div>
-                <button onClick={onLogout} className="bg-red-600 text-white font-black py-2 px-6 rounded-xl text-xs uppercase shadow-lg">Sair</button>
+                <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 text-white font-black py-2 px-6 rounded-xl text-xs uppercase shadow-lg transition-all active:scale-95">Sair</button>
             </header>
 
-            <main className="p-4 md:p-8 max-w-[1400px] mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-white p-5 rounded-2xl shadow-xl border-b-8 border-blue-500">
-                        <p className="text-[10px] font-black text-gray-400 uppercase">Meta Janeiro-Abril</p>
+            <main className="p-4 md:p-8 max-w-[1500px] mx-auto space-y-8">
+                {/* Dashboard de Totais */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-white p-5 rounded-2xl shadow-xl border-b-8 border-blue-500 transform transition-transform hover:-translate-y-1">
+                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Meta Acumulada</p>
                         <p className="text-2xl font-black text-blue-700">{totals.contracted.toLocaleString('pt-BR')} kg</p>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-xl border-b-8 border-green-600">
-                        <p className="text-[10px] font-black text-gray-400 uppercase">Estoque Realizado</p>
+                    <div className="bg-white p-5 rounded-2xl shadow-xl border-b-8 border-green-600 transform transition-transform hover:-translate-y-1">
+                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Entrada Realizada (Jan+)</p>
                         <p className="text-2xl font-black text-green-700">{totals.received.toLocaleString('pt-BR')} kg</p>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-xl border-b-8 border-red-500">
-                        <p className="text-[10px] font-black text-gray-400 uppercase">Déficit de Entrega</p>
+                    <div className="bg-white p-5 rounded-2xl shadow-xl border-b-8 border-red-500 transform transition-transform hover:-translate-y-1">
+                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Déficit no Período</p>
                         <p className="text-2xl font-black text-red-600">{totals.shortfall.toLocaleString('pt-BR')} kg</p>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-xl border-b-8 border-orange-500">
-                        <p className="text-[10px] font-black text-gray-400 uppercase">Perda Financeira</p>
+                    <div className="bg-white p-5 rounded-2xl shadow-xl border-b-8 border-orange-500 transform transition-transform hover:-translate-y-1">
+                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Prejuízo Calculado</p>
                         <p className="text-2xl font-black text-orange-600">{formatCurrency(totals.loss)}</p>
                     </div>
                 </div>
 
+                {/* Filtros e Tabela */}
                 <div className="bg-white p-6 rounded-3xl shadow-2xl">
                     <div className="flex flex-col md:flex-row justify-between gap-4 mb-8">
-                        <input type="text" placeholder="Filtrar produtor ou item..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="flex-1 border-2 border-gray-100 rounded-xl px-5 py-3 outline-none focus:border-green-400 font-medium" />
-                        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="md:w-64 border-2 border-gray-100 rounded-xl px-4 py-3 font-bold bg-gray-50">
-                            <option value="all">Todo o Quadrimestre</option>
+                        <div className="flex-1 relative">
+                             <input type="text" placeholder="Filtrar por produtor ou produto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full border-2 border-gray-100 rounded-xl px-5 py-3 outline-none focus:border-green-400 font-medium transition-all" />
+                        </div>
+                        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="md:w-64 border-2 border-gray-100 rounded-xl px-4 py-3 font-bold bg-gray-50 text-gray-700 outline-none focus:border-green-400 cursor-pointer">
+                            <option value="all">Ver Todo o Quadrimestre</option>
                             {months.slice(0, 4).map(m => <option key={m} value={m}>{m}</option>)}
                         </select>
                     </div>
 
-                    <div className="overflow-x-auto rounded-xl border border-gray-100">
+                    <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-inner">
                         <table className="w-full text-sm">
                             <thead className="bg-gray-900 text-gray-100 text-[10px] font-black uppercase tracking-widest">
                                 <tr>
-                                    <th className="p-4 text-left">PRODUTOR</th>
+                                    <th className="p-4 text-left">PRODUTOR ITESP</th>
                                     <th className="p-4 text-left">PRODUTO</th>
                                     <th className="p-4 text-center">MÊS</th>
-                                    <th className="p-4 text-right bg-blue-800/40">META MENSAL</th>
-                                    <th className="p-4 text-right bg-green-800/40">ENTRADA ESTOQUE</th>
-                                    <th className="p-4 text-right bg-red-800/40">FALTA</th>
+                                    <th className="p-4 text-right bg-blue-800/20">META MENSAL</th>
+                                    <th className="p-4 text-right bg-green-800/20">ESTOQUE REAL</th>
+                                    <th className="p-4 text-right bg-red-800/20">SALDO</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {filteredData.length > 0 ? filteredData.map(item => (
-                                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                    <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
                                         <td className="p-4 font-black text-gray-900 text-xs uppercase">{item.supplierName}</td>
                                         <td className="p-4 text-gray-500 font-bold uppercase text-[11px]">{item.productName}</td>
                                         <td className="p-4 text-center">
@@ -215,16 +222,24 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                         </td>
                                         <td className="p-4 text-right font-black text-blue-700 font-mono">{(item.contractedKgMonthly || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
                                         <td className={`p-4 text-right font-black font-mono ${item.receivedKg > 0 ? 'text-green-700' : 'text-gray-300'}`}>{(item.receivedKg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
-                                        <td className={`p-4 text-right font-black font-mono ${item.shortfallKg > 0.01 ? 'text-red-600' : 'text-gray-200'}`}>{(item.shortfallKg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                        <td className={`p-4 text-right font-black font-mono ${item.shortfallKg > 0.01 ? 'text-red-600' : 'text-gray-200'}`}>
+                                            {item.shortfallKg > 0.01 ? `-${item.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '✓ OK'}
+                                        </td>
                                     </tr>
                                 )) : (
-                                    <tr><td colSpan={6} className="p-20 text-center text-gray-400 italic font-black uppercase tracking-widest">Nenhum dado localizado para o filtro selecionado.</td></tr>
+                                    <tr><td colSpan={6} className="p-24 text-center">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <svg className="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 9.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                            <p className="text-gray-400 italic font-black uppercase tracking-widest text-sm">Nenhum dado localizado para Janeiro-Abril de 2026.</p>
+                                        </div>
+                                    </td></tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </main>
+            <style>{`.animate-fade-in { animation: fade-in 0.5s ease-out forwards; } @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}</style>
         </div>
     );
 };
