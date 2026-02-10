@@ -13,6 +13,7 @@ interface AlmoxarifadoDashboardProps {
 // Normalização absoluta para comparação de strings (usada na importação)
 const superNormalize = (text: string) => {
     return (text || "")
+        .toString()
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "") 
@@ -76,10 +77,11 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
                 try {
                     let res;
+                    const documentDate = data || new Date().toISOString().split('T')[0];
                     if (isEntrada) {
-                        res = await onRegisterEntry({ supplierCpf: supplier.cpf, itemName: officialItem.name, invoiceNumber: nf, invoiceDate: data || new Date().toISOString().split('T')[0], lotNumber: lote, quantity: qtyVal, expirationDate: venc || '' });
+                        res = await onRegisterEntry({ supplierCpf: supplier.cpf, itemName: officialItem.name, invoiceNumber: nf, invoiceDate: documentDate, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '' });
                     } else {
-                        res = await onRegisterWithdrawal({ supplierCpf: supplier.cpf, itemName: officialItem.name, outboundInvoice: nf, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '' });
+                        res = await onRegisterWithdrawal({ supplierCpf: supplier.cpf, itemName: officialItem.name, outboundInvoice: nf, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '', date: documentDate });
                     }
 
                     if (res.success) successCount++;

@@ -13,6 +13,7 @@ interface AdminWarehouseLogProps {
 // Normalização absoluta para comparação de strings
 const superNormalize = (text: string) => {
     return (text || "")
+        .toString()
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "") 
@@ -85,10 +86,11 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
 
                 try {
                     let res;
+                    const documentDate = data || new Date().toISOString().split('T')[0];
                     if (isEntrada) {
-                        res = await onRegisterEntry({ supplierCpf: supplier.cpf, itemName: officialItem.name, invoiceNumber: nf, invoiceDate: data || new Date().toISOString().split('T')[0], lotNumber: lote, quantity: qtyVal, expirationDate: venc || '' });
+                        res = await onRegisterEntry({ supplierCpf: supplier.cpf, itemName: officialItem.name, invoiceNumber: nf, invoiceDate: documentDate, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '' });
                     } else {
-                        res = await onRegisterWithdrawal({ supplierCpf: supplier.cpf, itemName: officialItem.name, outboundInvoice: nf, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '' });
+                        res = await onRegisterWithdrawal({ supplierCpf: supplier.cpf, itemName: officialItem.name, outboundInvoice: nf, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '', date: documentDate });
                     }
 
                     if (res.success) successCount++;
@@ -155,7 +157,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     <thead className="bg-gray-100 sticky top-0 z-10 border-b">
                         <tr>
                             <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Tipo</th>
-                            <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Data</th>
+                            <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Data Doc.</th>
                             <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Produto</th>
                             <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Lote</th>
                             <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Fornecedor</th>
@@ -170,7 +172,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                                 <td className="p-3">
                                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${log.type === 'entrada' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{log.type}</span>
                                 </td>
-                                <td className="p-3 font-mono text-gray-600 text-xs">{new Date(log.timestamp).toLocaleDateString('pt-BR')}</td>
+                                <td className="p-3 font-mono text-gray-600 text-xs">{(log.date || log.timestamp.split('T')[0]).split('-').reverse().join('/')}</td>
                                 <td className="p-3 font-bold text-gray-800 uppercase text-xs">{log.itemName}</td>
                                 <td className="p-3 font-mono text-xs">{log.lotNumber}</td>
                                 <td className="p-3 text-gray-600 text-xs font-semibold">{log.supplierName}</td>
@@ -258,7 +260,8 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
             lotNumber: lotNumber,
             quantity: qtyVal,
             outboundInvoice: documentNumber,
-            expirationDate: expirationDate
+            expirationDate: expirationDate,
+            date: date // Passando data real para saída manual
         };
 
         await onSave(type, payload);

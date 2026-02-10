@@ -116,7 +116,10 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             if (log.type === 'entrada') {
                 const sNorm = superNormalize(log.supplierName);
                 const iNorm = superNormalize(log.itemName);
-                const dateObj = new Date(log.timestamp);
+                
+                // CRÍTICO: Usa log.date (data real informada) em vez de log.timestamp (data de sistema)
+                const documentDate = log.date || log.timestamp.split('T')[0];
+                const dateObj = new Date(documentDate + 'T00:00:00');
                 const mName = months[dateObj.getMonth()];
                 const key = `${sNorm}|${iNorm}|${mName}`;
 

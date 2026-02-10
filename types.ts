@@ -46,7 +46,8 @@ export interface Supplier {
 export interface WarehouseMovement {
   id: string;
   type: 'entrada' | 'saída';
-  timestamp: string;
+  timestamp: string; // Registro do sistema
+  date: string;      // Data real do documento (YYYY-MM-DD)
   lotId: string;
   lotNumber: string;
   itemName: string;

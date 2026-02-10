@@ -164,7 +164,20 @@ const App: React.FC = () => {
 
       if (result.committed) {
         const logEntryRef = push(warehouseLogRef);
-        const newLog: WarehouseMovement = { id: logEntryRef.key || `mov-${Date.now()}`, type: 'entrada', timestamp: new Date().toISOString(), lotId: lotId, lotNumber: normalizedLotNumber, itemName: normalizedItemName, supplierName: result.snapshot.val().name, deliveryId: 'various', inboundInvoice: payload.invoiceNumber, quantity: payload.quantity, expirationDate: payload.expirationDate };
+        const newLog: WarehouseMovement = { 
+            id: logEntryRef.key || `mov-${Date.now()}`, 
+            type: 'entrada', 
+            timestamp: new Date().toISOString(), 
+            date: payload.invoiceDate, // DATA REAL
+            lotId: lotId, 
+            lotNumber: normalizedLotNumber, 
+            itemName: normalizedItemName, 
+            supplierName: result.snapshot.val().name, 
+            deliveryId: 'various', 
+            inboundInvoice: payload.invoiceNumber, 
+            quantity: payload.quantity, 
+            expirationDate: payload.expirationDate 
+        };
         await set(logEntryRef, newLog);
         setIsSaving(false);
         return { success: true, message: "Entrada registrada!" };
@@ -180,6 +193,7 @@ const App: React.FC = () => {
     quantity: number;
     outboundInvoice: string;
     expirationDate: string;
+    date: string; // Adicionado data real para saídas
   }) => {
     setIsSaving(true);
     const supplierRef = ref(database, `suppliers/${payload.supplierCpf}`);
@@ -230,7 +244,20 @@ const App: React.FC = () => {
 
       if (result.committed) {
         const logEntryRef = push(warehouseLogRef);
-        const newLog: WarehouseMovement = { id: logEntryRef.key || `mov-out-${Date.now()}`, type: 'saída', timestamp: new Date().toISOString(), lotId: 'various', lotNumber: payload.lotNumber.toUpperCase().trim(), itemName: payload.itemName.toUpperCase().trim(), supplierName: result.snapshot.val().name, deliveryId: 'various', outboundInvoice: payload.outboundInvoice, quantity: payload.quantity, expirationDate: payload.expirationDate };
+        const newLog: WarehouseMovement = { 
+            id: logEntryRef.key || `mov-out-${Date.now()}`, 
+            type: 'saída', 
+            timestamp: new Date().toISOString(), 
+            date: payload.date, // DATA REAL
+            lotId: 'various', 
+            lotNumber: payload.lotNumber.toUpperCase().trim(), 
+            itemName: payload.itemName.toUpperCase().trim(), 
+            supplierName: result.snapshot.val().name, 
+            deliveryId: 'various', 
+            outboundInvoice: payload.outboundInvoice, 
+            quantity: payload.quantity, 
+            expirationDate: payload.expirationDate 
+        };
         await set(logEntryRef, newLog);
         setIsSaving(false);
         return { success: true, message: "Saída registrada!" };
@@ -492,7 +519,20 @@ const App: React.FC = () => {
             lot.remainingQuantity = Number((Number(lot.remainingQuantity) - take).toFixed(4));
             need -= take;
             const logRef = push(warehouseLogRef);
-            await set(logRef, { id: logRef.key, type: 'saída', timestamp: ts, lotId: lot.id, lotNumber: lot.lotNumber, itemName: req.name.toUpperCase(), supplierName: entry.s.name, deliveryId: entry.d.id, outboundInvoice: `DIR-${log.recipient.substring(0,3).toUpperCase()}`, quantity: take, expirationDate: lot.expirationDate });
+            await set(logRef, { 
+                id: logRef.key, 
+                type: 'saída', 
+                timestamp: ts, 
+                date: log.date, // DATA REAL DO DOCUMENTO
+                lotId: lot.id, 
+                lotNumber: lot.lotNumber, 
+                itemName: req.name.toUpperCase(), 
+                supplierName: entry.s.name, 
+                deliveryId: entry.d.id, 
+                outboundInvoice: `DIR-${log.recipient.substring(0,3).toUpperCase()}`, 
+                quantity: take, 
+                expirationDate: lot.expirationDate 
+            });
           }
         }
       }
