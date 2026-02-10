@@ -39,36 +39,41 @@ const cleanNumericValue = (val: any): number => {
     let s = String(val).trim().replace(/\s/g, '');
     
     if (s.includes(',')) {
-        // Formato BR: remove pontos de milhar e troca vírgula por ponto
         s = s.replace(/\./g, '').replace(',', '.');
     }
     return parseFloat(s) || 0;
 };
 
-// Conversor Universal de Datas para ISO (YYYY-MM-DD) - Reforçado para Janeiro
+// Conversor Universal de Datas para ISO (YYYY-MM-DD) - FIX: Jan/2026 UTC Shift
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
     let s = String(rawDate).trim();
 
-    // 1. Caso seja Excel Serial (ex: 46022)
+    // 1. Caso seja Excel Serial (ex: 46022) - Conversão Robusta Anti-Shift
     if (!isNaN(Number(s)) && Number(s) > 40000) {
-        const d = new Date((Number(s) - 25569) * 86400 * 1000);
-        return d.toISOString().split('T')[0];
+        // Excel inicia em 30/12/1899. Adicionamos 0.1 para forçar o horário para o início do dia
+        const d = new Date(Math.round((Number(s) - 25569) * 86400 * 1000));
+        const year = d.getUTCFullYear();
+        const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(d.getUTCDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
-    // 2. Normaliza separadores para "/"
+    // 2. Remove hora se houver (ex: 2026-01-01 08:00:00 -> 2026-01-01)
+    s = s.split(' ')[0];
+
+    // 3. Normaliza separadores
     s = s.replace(/[\.\-]/g, '/');
 
     if (s.includes('/')) {
         const parts = s.split('/');
         if (parts.length === 3) {
             let day, month, year;
-            // Detecta se é ISO (YYYY/MM/DD) ou BR (DD/MM/YYYY)
-            if (parts[0].length === 4) {
+            if (parts[0].length === 4) { // YYYY/MM/DD
                 year = parts[0];
                 month = parts[1].padStart(2, '0');
                 day = parts[2].padStart(2, '0');
-            } else {
+            } else { // DD/MM/YYYY
                 day = parts[0].padStart(2, '0');
                 month = parts[1].padStart(2, '0');
                 year = parts[2];
@@ -78,7 +83,7 @@ const standardizeDate = (rawDate: any): string => {
         }
     }
 
-    // 3. Caso já esteja em ISO (YYYY-MM-DD)
+    // 4. Fallback ISO
     if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
         return s.substring(0, 10);
     }

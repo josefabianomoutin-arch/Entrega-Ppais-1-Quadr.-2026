@@ -26,9 +26,8 @@ const superNormalize = (text: string) => {
 };
 
 /**
- * Extrator de mês Ultra-Resiliente: 
- * Tenta capturar o mês independentemente do separador (/ ou - ou .) 
- * e da ordem dos campos.
+ * Extrator de mês e ano Ultra-Resiliente: 
+ * Retorna o nome do mês APENAS se o ano for 2026.
  */
 const getMonthNameFromDate = (dateStr?: string): string => {
     if (!dateStr) return "Mês Indefinido";
@@ -39,18 +38,25 @@ const getMonthNameFromDate = (dateStr?: string): string => {
 
     if (parts.length === 3) {
         let mIdx = -1;
-        // Se for ISO (2026-01-01), o mês é o segundo [1]
+        let year = "";
+
+        // Se for ISO (2026-01-01)
         if (parts[0].length === 4) {
+            year = parts[0];
             mIdx = parseInt(parts[1], 10) - 1;
         } else {
-            // Se for BR (01-01-2026), o mês é o segundo [1]
+            // Se for BR (01-01-2026)
+            year = parts[2];
+            if (year.length === 2) year = '20' + year;
             mIdx = parseInt(parts[1], 10) - 1;
         }
 
+        // TRAVA DE SEGURANÇA: Apenas dados de 2026
+        if (year !== "2026") return "Mês Indefinido";
         if (mIdx >= 0 && mIdx < 12) return months[mIdx];
     }
     
-    // Fallback: Busca por nomes de meses por extenso na string
+    // Fallback: Busca por nomes de meses por extenso
     const upper = dateStr.toUpperCase();
     if (upper.includes("JANEIRO") || upper.includes("JAN")) return "Janeiro";
     if (upper.includes("FEVEREIRO") || upper.includes("FEV")) return "Fevereiro";
@@ -116,15 +122,17 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                 const iNorm = superNormalize(log.itemName);
                 const mName = getMonthNameFromDate(log.date);
                 
-                // Filtro estrito para o 1º quadrimestre
+                // Filtro estrito para o 1º quadrimestre de 2026
                 if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(mName)) return;
 
-                // Loop nas metas para encontrar o par correspondente
+                // Match inteligente: Procura por nome do fornecedor e item
+                let matched = false;
                 for (let val of consolidated.values()) {
                     if (val.month === mName && (val.normSupplier.includes(sNorm) || sNorm.includes(val.normSupplier))) {
                         // Verifica o item (Fuzzy Match)
                         if (val.normItem.includes(iNorm) || iNorm.includes(val.normItem)) {
                             val.receivedKg += (Number(log.quantity) || 0);
+                            matched = true;
                             break;
                         }
                     }
@@ -169,7 +177,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         <div className="min-h-screen bg-[#F3F4F6] text-gray-800 pb-20">
             <header className="bg-white shadow-lg p-4 flex justify-between items-center sticky top-0 z-30 border-b-4 border-green-700">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-black text-green-800 uppercase tracking-tighter">Audit ITESP - Gestão 1º Quadr.</h1>
+                    <h1 className="text-xl md:text-2xl font-black text-green-800 uppercase tracking-tighter">Audit ITESP - Gestão 1º Quadr. 2026</h1>
                     <p className="text-[10px] text-gray-500 font-bold uppercase">Consolidação de Entradas Físicas vs. Metas Contratuais</p>
                 </div>
                 <button onClick={onLogout} className="bg-red-500 text-white font-black py-2 px-6 rounded-xl text-xs uppercase tracking-widest active:scale-95 transition-all shadow-md">Sair</button>
@@ -178,11 +186,11 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             <main className="p-4 md:p-8 max-w-[1700px] mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-blue-500">
-                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Meta Acumulada</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Meta Acumulada (2026)</p>
                         <p className="text-3xl font-black text-blue-700">{totals.contracted.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-green-600">
-                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Entrada Real (Estoque)</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Entrada Real (Janeiro+)</p>
                         <p className="text-3xl font-black text-green-700">{totals.received.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-red-500">
@@ -237,7 +245,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                         <td className={`p-5 text-right font-black ${item.financialLoss > 0.01 ? 'text-red-700' : 'text-gray-200'}`}>{item.financialLoss > 0.01 ? formatCurrency(item.financialLoss) : 'R$ 0,00'}</td>
                                     </tr>
                                 )) : (
-                                    <tr><td colSpan={7} className="p-32 text-center text-gray-400 font-black uppercase tracking-widest italic bg-gray-50">Dados de Janeiro não localizados.</td></tr>
+                                    <tr><td colSpan={7} className="p-32 text-center text-gray-400 font-black uppercase tracking-widest italic bg-gray-50">Dados de Janeiro (2026) não localizados ou erro de fuso horário.</td></tr>
                                 )}
                             </tbody>
                             <tfoot className="bg-gray-900 text-white font-black text-xs border-t-4 border-green-800">
