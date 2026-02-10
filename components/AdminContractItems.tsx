@@ -41,7 +41,12 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
 
                 existing.totalContracted += Number(ci.totalKg) || 0;
                 existing.suppliersCount += 1;
-                existing.details.push({ supplierName: s.name, supplierCpf: s.cpf, amount: Number(ci.totalKg), price: Number(ci.valuePerKg) });
+                existing.details.push({ 
+                    supplierName: s.name, 
+                    supplierCpf: s.cpf, 
+                    amount: Number(ci.totalKg), 
+                    price: Number(ci.valuePerKg) 
+                });
                 
                 map.set(normName, existing);
             });
@@ -132,8 +137,14 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                                 return (
                                     <tr key={idx} className="hover:bg-green-50/30 transition-colors">
                                         <td className="p-4">
-                                            <p className="font-black text-gray-800 uppercase text-xs">{item.name}</p>
-                                            <p className="text-[9px] text-gray-400 font-bold uppercase">{item.suppliersCount} Fornecedor(es) vinculado(s)</p>
+                                            <p className="font-black text-gray-800 uppercase text-xs mb-1.5">{item.name}</p>
+                                            <div className="flex flex-wrap gap-1">
+                                                {item.details.map((det: any, dIdx: number) => (
+                                                    <span key={dIdx} className="inline-block bg-gray-100 text-gray-500 text-[8px] font-black uppercase px-2 py-0.5 rounded border border-gray-200">
+                                                        {det.supplierName}
+                                                    </span>
+                                                ))}
+                                            </div>
                                         </td>
                                         <td className="p-4 text-center">
                                             <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold uppercase">{item.unit.split('-')[0]}</span>
