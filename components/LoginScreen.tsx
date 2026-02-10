@@ -23,18 +23,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     const value = e.target.value;
     const name = loginName.toLowerCase();
     
-    // LIBERAR LETRAS: Somente para ITESP e Almoxarifado (devido às senhas alfanuméricas)
-    if (name === 'itesp' || name === 'almoxarifado') {
+    // LIBERAR LETRAS: Para ITESP, Almoxarifado e Financeiro (senhas alfanuméricas)
+    if (['itesp', 'almoxarifado', 'financeiro'].includes(name)) {
       setLoginCpf(value);
     } else {
-      // MANTÉM RESTRIÇÃO: Apenas números para Fornecedores e Administrador (senhas baseadas em CPF)
+      // MANTÉM RESTRIÇÃO: Apenas números para Fornecedores e Administrador
       setLoginCpf(value.replace(/[^\d]/g, ''));
     }
   };
   
   const isStringLogin = useMemo(() => {
     const name = loginName.toLowerCase();
-    return name === 'itesp' || name === 'almoxarifado';
+    return ['itesp', 'almoxarifado', 'financeiro'].includes(name);
   }, [loginName]);
 
   const passwordPlaceholder = useMemo(() => {
@@ -59,7 +59,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         </div>
         
         <div className="mt-4 text-center text-sm text-yellow-800 bg-yellow-100 p-3 rounded-lg border border-yellow-300">
-            <p><strong>Atenção:</strong> Fornecedores utilizam o <strong>CPF/CNPJ</strong> como senha. O ITESP utiliza senha alfanumérica.</p>
+            <p><strong>Atenção:</strong> Fornecedores utilizam o <strong>CPF/CNPJ</strong>. ITESP e FINANCEIRO utilizam senhas alfanuméricas.</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLoginSubmit}>
@@ -73,12 +73,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   onChange={(e) => {
                     const val = e.target.value.toUpperCase();
                     setLoginName(val);
-                    // Se mudar de ITESP para outro, limpa a senha se ela contiver letras
-                    if (val !== 'ITESP' && val !== 'ALMOXARIFADO') {
+                    if (!['ITESP', 'ALMOXARIFADO', 'FINANCEIRO'].includes(val)) {
                         setLoginCpf(prev => prev.replace(/[^\d]/g, ''));
                     }
                   }} 
-                  placeholder="Usuário (Ex: ITESP ou Nome do Fornecedor)" 
+                  placeholder="Usuário (Ex: ITESP, FINANCEIRO ou Nome)" 
                   className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                 />
             </div>

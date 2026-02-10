@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem } from './types';
+import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem, FinancialRecord } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AlmoxarifadoDashboard from './components/AlmoxarifadoDashboard';
 import ItespDashboard from './components/ItespDashboard';
+import FinanceDashboard from './components/FinanceDashboard';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set, runTransaction, push, child, update } from 'firebase/database';
+import { getDatabase, ref, onValue, set, runTransaction, push, child, update, remove } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
 
 const app = initializeApp(firebaseConfig);
@@ -19,6 +20,7 @@ const cleaningLogsRef = ref(database, 'cleaningLogs');
 const directorWithdrawalsRef = ref(database, 'directorWithdrawals');
 const standardMenuRef = ref(database, 'standardMenu');
 const dailyMenusRef = ref(database, 'dailyMenus');
+const financialRecordsRef = ref(database, 'financialRecords');
 
 const superNormalize = (text: string) => {
     return (text || "")
@@ -79,11 +81,13 @@ const App: React.FC = () => {
   const [perCapitaConfig, setPerCapitaConfig] = useState<PerCapitaConfig>({});
   const [standardMenu, setStandardMenu] = useState<StandardMenu>({});
   const [dailyMenus, setDailyMenus] = useState<DailyMenus>({});
+  const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [loggedInCpf, setLoggedInCpf] = useState<string | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isAlmoxarifadoLoggedIn, setIsAlmoxarifadoLoggedIn] = useState(false);
   const [isItespLoggedIn, setIsItespLoggedIn] = useState(false);
+  const [isFinanceLoggedIn, setIsFinanceLoggedIn] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -100,7 +104,6 @@ const App: React.FC = () => {
           allowedWeeks: normalizeArray<number>(p.allowedWeeks),
           initialValue: cleanNumericValue(p.initialValue),
       })));
-      setLoading(false);
     });
 
     const unsubLog = onValue(warehouseLogRef, (snapshot) => {
@@ -121,6 +124,13 @@ const App: React.FC = () => {
     onValue(perCapitaConfigRef, (snapshot) => setPerCapitaConfig(snapshot.val() || {}));
     onValue(standardMenuRef, (snapshot) => setStandardMenu(snapshot.val() || {}));
     onValue(dailyMenusRef, (snapshot) => setDailyMenus(snapshot.val() || {}));
+    onValue(financialRecordsRef, (snapshot) => {
+        const data = snapshot.val();
+        if (!data) { setFinancialRecords([]); return; }
+        setFinancialRecords(Object.entries(data).map(([key, val]: [string, any]) => ({ ...val, id: key })));
+    });
+
+    setLoading(false);
     return () => {};
   }, []);
 
@@ -130,6 +140,7 @@ const App: React.FC = () => {
     if (inputNameNorm === 'administrador' && c === '15210361870') { setIsAdminLoggedIn(true); return true; }
     if (inputNameNorm === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
     if (inputNameNorm === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
+    if (inputNameNorm === 'financeiro' && c === 'taiuvafinanceiro2026') { setIsFinanceLoggedIn(true); return true; }
     const u = suppliers.find(p => superNormalize(p.name) === inputNameNorm && p.cpf === c.replace(/[^\d]/g, ''));
     if (u) { setLoggedInCpf(u.cpf); return true; }
     return false;
@@ -139,6 +150,32 @@ const App: React.FC = () => {
     setIsSaving(true);
     try { await set(dbRef, data); } finally { setTimeout(() => setIsSaving(false), 500); }
   }, []);
+
+  const handleFinancialOperation = {
+      save: async (record: Omit<FinancialRecord, 'id'> & { id?: string }) => {
+          setIsSaving(true);
+          try {
+              if (record.id) {
+                  await update(ref(database, `financialRecords/${record.id}`), record);
+              } else {
+                  await push(financialRecordsRef, record);
+              }
+              return { success: true };
+          } catch (e: any) {
+              return { success: false, message: e.message };
+          } finally {
+              setIsSaving(false);
+          }
+      },
+      delete: async (id: string) => {
+          setIsSaving(true);
+          try {
+              await remove(ref(database, `financialRecords/${id}`));
+          } finally {
+              setIsSaving(false);
+          }
+      }
+  };
 
   const handleUpdateWarehouseEntry = useCallback(async (updatedEntry: WarehouseMovement) => {
     setIsSaving(true);
@@ -177,13 +214,11 @@ const App: React.FC = () => {
                       currentItems.push({ name: itemName.toUpperCase(), totalKg: assignment.totalKg, valuePerKg: assignment.valuePerKg, unit: assignment.unit || 'kg-1' });
                   }
               } else {
-                  // Remove o item se ele existia e não está mais nas atribuições
                   const filtered = currentItems.filter(ci => superNormalize(ci.name) !== normTarget);
                   s.contractItems = filtered;
                   return;
               }
               s.contractItems = currentItems;
-              // Recalcula valor inicial do contrato do fornecedor
               s.initialValue = s.contractItems.reduce((sum, item) => sum + (item.totalKg * item.valuePerKg), 0);
           });
 
@@ -232,7 +267,12 @@ const App: React.FC = () => {
             onRegisterEntry={async () => ({success: true, message: ''})}
             onRegisterWithdrawal={async () => ({success: true, message: ''})}
             onCancelDeliveries={() => {}}
+            financialRecords={financialRecords}
+            onSaveFinancialRecord={handleFinancialOperation.save}
+            onDeleteFinancialRecord={handleFinancialOperation.delete}
         />
+      ) : isFinanceLoggedIn ? (
+        <FinanceDashboard records={financialRecords} onLogout={() => setIsFinanceLoggedIn(false)} />
       ) : isItespLoggedIn ? (
         <ItespDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsItespLoggedIn(false)} />
       ) : isAlmoxarifadoLoggedIn ? (

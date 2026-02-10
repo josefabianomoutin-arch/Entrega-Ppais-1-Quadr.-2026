@@ -111,3 +111,21 @@ export interface StandardMenu {
 export interface DailyMenus {
   [date: string]: MenuRow[];
 }
+
+export interface FinancialRecord {
+  id: string;
+  ptres: '380302' | '380303' | '380304' | '38038' | '380328';
+  selecao: string;
+  natureza: '33903' | '339039';
+  dataSolicitacao: string;
+  valorSolicitado: number;
+  dataRecebimento: string;
+  valorRecebido: number;
+  justificativa: string;
+  descricao: string;
+  localUtilizado: string;
+  valorUtilizado: number;
+  numeroProcesso: string;
+  dataPagamento: string;
+  status: string;
+}
