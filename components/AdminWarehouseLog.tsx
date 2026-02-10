@@ -6,6 +6,7 @@ interface AdminWarehouseLogProps {
     warehouseLog: WarehouseMovement[];
     suppliers: Supplier[];
     onDeleteEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
+    onUpdateWarehouseEntry: (updatedEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
     onRegisterEntry: (payload: any) => Promise<{ success: boolean; message: string }>;
     onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
 }
@@ -21,12 +22,13 @@ const superNormalize = (text: string) => {
         .trim();
 };
 
-const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, suppliers, onDeleteEntry, onRegisterEntry, onRegisterWithdrawal }) => {
+const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, suppliers, onDeleteEntry, onUpdateWarehouseEntry, onRegisterEntry, onRegisterWithdrawal }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'entrada' | 'saída'>('all');
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [isImporting, setIsImporting] = useState(false);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+    const [editingLog, setEditingLog] = useState<WarehouseMovement | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const filteredLog = useMemo(() => {
@@ -181,14 +183,23 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                                 </td>
                                 <td className="p-3 font-mono text-xs text-gray-500">{log.inboundInvoice || log.outboundInvoice || '-'}</td>
                                 <td className="p-3 text-center">
-                                    <button 
-                                        onClick={() => handleDelete(log)} 
-                                        disabled={isDeleting === log.id}
-                                        className="text-red-400 hover:text-red-700 p-2 rounded-full transition-colors disabled:opacity-50"
-                                        title="Excluir Registro"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                    </button>
+                                    <div className="flex justify-center gap-1">
+                                        <button 
+                                            onClick={() => setEditingLog(log)}
+                                            className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
+                                            title="Editar Registro"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDelete(log)} 
+                                            disabled={isDeleting === log.id}
+                                            className="text-red-400 hover:text-red-700 p-2 rounded-full transition-colors disabled:opacity-50"
+                                            title="Excluir Registro"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -211,7 +222,141 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 />
             )}
 
+            {editingLog && (
+                <EditWarehouseMovementModal 
+                    suppliers={suppliers} 
+                    logEntry={editingLog}
+                    onClose={() => setEditingLog(null)}
+                    onSave={async (updated) => {
+                        const res = await onUpdateWarehouseEntry(updated);
+                        if (res.success) setEditingLog(null);
+                        else alert(res.message);
+                    }}
+                />
+            )}
+
             <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }`}</style>
+        </div>
+    );
+};
+
+// --- Modal de Edição de Registro ---
+interface EditWarehouseMovementModalProps {
+    suppliers: Supplier[];
+    logEntry: WarehouseMovement;
+    onClose: () => void;
+    onSave: (updated: WarehouseMovement) => Promise<void>;
+}
+
+const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({ suppliers, logEntry, onClose, onSave }) => {
+    const [type, setType] = useState<'entrada' | 'saída'>(logEntry.type);
+    const [selectedCpf, setSelectedCpf] = useState(() => {
+        const found = suppliers.find(s => superNormalize(s.name) === superNormalize(logEntry.supplierName));
+        return found ? found.cpf : '';
+    });
+    const [itemName, setItemName] = useState(logEntry.itemName);
+    const [lotNumber, setLotNumber] = useState(logEntry.lotNumber);
+    const [quantity, setQuantity] = useState(String(logEntry.quantity || 0).replace('.', ','));
+    const [documentNumber, setDocumentNumber] = useState(logEntry.inboundInvoice || logEntry.outboundInvoice || '');
+    const [date, setDate] = useState(logEntry.date || '');
+    const [expirationDate, setExpirationDate] = useState(logEntry.expirationDate || '');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const selectedSupplier = useMemo(() => suppliers.find(s => s.cpf === selectedCpf), [suppliers, selectedCpf]);
+    const availableItems = useMemo(() => selectedSupplier ? (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)) : [], [selectedSupplier]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const qtyVal = parseFloat(quantity.replace(',', '.'));
+        if (!selectedCpf || !itemName || isNaN(qtyVal) || qtyVal <= 0 || !lotNumber) {
+            alert('Preencha todos os campos obrigatórios corretamente.');
+            return;
+        }
+
+        setIsSaving(true);
+        const updated: WarehouseMovement = {
+            ...logEntry,
+            type,
+            date,
+            lotNumber,
+            itemName,
+            supplierName: selectedSupplier?.name || logEntry.supplierName,
+            quantity: qtyVal,
+            inboundInvoice: type === 'entrada' ? documentNumber : '',
+            outboundInvoice: type === 'saída' ? documentNumber : '',
+            expirationDate
+        };
+
+        await onSave(updated);
+        setIsSaving(false);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-[200] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 animate-fade-in-up">
+                <div className="flex justify-between items-center mb-6 border-b pb-4">
+                    <div>
+                        <h2 className="text-2xl font-black text-blue-800 uppercase tracking-tighter">Editar Registro de Estoque</h2>
+                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">ID do Registro: {logEntry.id}</p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-3xl font-light">&times;</button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="flex p-1 bg-gray-100 rounded-xl">
+                        <button type="button" onClick={() => setType('entrada')} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${type === 'entrada' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400'}`}>Entrada</button>
+                        <button type="button" onClick={() => setType('saída')} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${type === 'saída' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400'}`}>Saída</button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Fornecedor</label>
+                            <select value={selectedCpf} onChange={e => { setSelectedCpf(e.target.value); setItemName(''); }} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400 bg-white" required>
+                                <option value="">-- SELECIONE O FORNECEDOR --</option>
+                                {suppliers.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Item do Contrato</label>
+                            <select value={itemName} onChange={e => setItemName(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400 bg-white" required disabled={!selectedCpf}>
+                                <option value="">-- SELECIONE O ITEM --</option>
+                                {availableItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Data Doc.</label>
+                            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" required />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">NF/Documento</label>
+                            <input type="text" value={documentNumber} onChange={e => setDocumentNumber(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" required />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Lote</label>
+                            <input type="text" value={lotNumber} onChange={e => setLotNumber(e.target.value.toUpperCase())} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400 font-mono" required />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Quantidade (kg)</label>
+                            <input type="text" value={quantity} onChange={e => setQuantity(e.target.value.replace(/[^0-9,]/g, ''))} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400 font-mono" required />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Data de Validade</label>
+                            <input type="date" value={expirationDate} onChange={e => setExpirationDate(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-6 border-t">
+                        <button type="button" onClick={onClose} className="bg-gray-200 text-gray-700 px-8 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-colors">Cancelar</button>
+                        <button 
+                            type="submit" 
+                            disabled={isSaving || !selectedCpf || !itemName} 
+                            className="px-10 py-3 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg transition-all active:scale-95 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300"
+                        >
+                            {isSaving ? 'Salvando...' : 'Atualizar Registro'}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 };
@@ -261,7 +406,7 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
             quantity: qtyVal,
             outboundInvoice: documentNumber,
             expirationDate: expirationDate,
-            date: date // Passando data real para saída manual
+            date: date 
         };
 
         await onSave(type, payload);

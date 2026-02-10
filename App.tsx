@@ -162,6 +162,25 @@ const App: React.FC = () => {
     try { await set(dbRef, data); } finally { setTimeout(() => setIsSaving(false), 500); }
   }, []);
 
+  const handleUpdateWarehouseEntry = useCallback(async (updatedEntry: WarehouseMovement) => {
+    setIsSaving(true);
+    try {
+        const entryRef = ref(database, `warehouseLog/${updatedEntry.id}`);
+        await update(entryRef, {
+            ...updatedEntry,
+            itemName: updatedEntry.itemName.toUpperCase().trim(),
+            supplierName: updatedEntry.supplierName.toUpperCase().trim(),
+            lotNumber: updatedEntry.lotNumber.toUpperCase().trim(),
+            date: standardizeDate(updatedEntry.date)
+        });
+        return { success: true, message: 'Registro atualizado com sucesso.' };
+    } catch (error: any) {
+        return { success: false, message: error.message };
+    } finally {
+        setTimeout(() => setIsSaving(false), 500);
+    }
+  }, []);
+
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800 italic animate-pulse tracking-tighter">CARREGANDO DADOS...</div>;
 
   return (
@@ -188,6 +207,7 @@ const App: React.FC = () => {
             onUpdateInvoiceItems={async () => ({success: true})}
             onManualInvoiceEntry={async () => ({success: true})}
             onDeleteWarehouseEntry={async () => ({success: true, message: ''})}
+            onUpdateWarehouseEntry={handleUpdateWarehouseEntry}
             onRegisterCleaningLog={async () => ({success: true, message: ''})}
             onDeleteCleaningLog={async () => {}}
             onRegisterDirectorWithdrawal={async () => ({success: true, message: ''})}

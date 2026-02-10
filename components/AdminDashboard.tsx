@@ -35,6 +35,7 @@ interface AdminDashboardProps {
   perCapitaConfig: PerCapitaConfig;
   onUpdatePerCapitaConfig: (config: PerCapitaConfig) => Promise<void>;
   onDeleteWarehouseEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
+  onUpdateWarehouseEntry: (updatedEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
   onRegisterCleaningLog: (log: Omit<CleaningLog, 'id'>) => Promise<{ success: boolean; message: string }>;
   onDeleteCleaningLog: (id: string) => Promise<void>;
   onRegisterDirectorWithdrawal: (log: Omit<DirectorPerCapitaLog, 'id'>) => Promise<{ success: boolean; message: string }>;
@@ -72,6 +73,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     onUpdatePerCapitaConfig,
     warehouseLog = [],
     onDeleteWarehouseEntry,
+    onUpdateWarehouseEntry,
     onReopenInvoice,
     onDeleteInvoice,
     onUpdateInvoiceItems,
@@ -179,7 +181,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'schedule': return <AdminScheduleView suppliers={suppliers} onCancelDeliveries={onCancelDeliveries} />;
       case 'directorPerCapita': return <AdminDirectorPerCapita suppliers={suppliers} logs={directorWithdrawals} onRegister={onRegisterDirectorWithdrawal} onDelete={onDeleteDirectorWithdrawal} />;
       case 'cleaning': return <AdminCleaningLog logs={cleaningLogs} onRegister={onRegisterCleaningLog} onDelete={onDeleteCleaningLog} />;
-      case 'warehouse': return <AdminWarehouseLog suppliers={suppliers} warehouseLog={warehouseLog} onDeleteEntry={onDeleteWarehouseEntry} onRegisterEntry={onRegisterEntry} onRegisterWithdrawal={onRegisterWithdrawal} />;
+      case 'warehouse': return <AdminWarehouseLog suppliers={suppliers} warehouseLog={warehouseLog} onDeleteEntry={onDeleteWarehouseEntry} onUpdateWarehouseEntry={onUpdateWarehouseEntry} onRegisterEntry={onRegisterEntry} onRegisterWithdrawal={onRegisterWithdrawal} />;
       case 'analytics': return <AdminAnalytics suppliers={suppliers} warehouseLog={warehouseLog} />;
       case 'graphs': return <AdminGraphs suppliers={suppliers} />;
       case 'perCapita': return <AdminPerCapita suppliers={suppliers} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={onUpdatePerCapitaConfig} />;
