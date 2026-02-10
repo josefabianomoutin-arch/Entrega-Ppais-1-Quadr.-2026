@@ -144,8 +144,8 @@ const App: React.FC = () => {
     if (inputNameNorm === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
     if (inputNameNorm === 'financeiro' && c === 'taiuvafinanceiro2026') { setIsFinanceLoggedIn(true); return true; }
     
-    // Novo login Douglas (Financeiro Externo)
-    if (inputNameNorm === superNormalize('DOUGLAS FERNANDO SEMENZIN GALDION') && passwordClean === '29099022859') {
+    // Novo login Douglas (Financeiro Externo) - Nome corrigido para GALDINO
+    if (inputNameNorm === superNormalize('DOUGLAS FERNANDO SEMENZIN GALDINO') && passwordClean === '29099022859') {
         setIsFinanceLoggedIn(true);
         return true;
     }
