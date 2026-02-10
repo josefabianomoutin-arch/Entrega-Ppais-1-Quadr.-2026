@@ -30,22 +30,27 @@ const superNormalize = (text: string) => {
 };
 
 /**
- * Extrator de mês universal (Versão Janeiro-Fix):
- * Identifica Janeiro se encontrar '01', '/1/', '-1-', 'Jan' ou similar.
+ * Extrator de mês universal (Versão Hardened):
+ * Suporta Excel Serial Dates (ex: 46022), Formatos BR, ISO e Abreviaturas.
  */
-const getMonthNameFromDate = (dateStr?: string, timestamp?: string): string => {
-    const raw = (dateStr || (timestamp ? timestamp.split('T')[0] : "")).trim();
-    if (!raw) return "Mês Indefinido";
+const getMonthNameFromDate = (dateStr?: any): string => {
+    const raw = String(dateStr || "").trim();
+    if (!raw || raw === "undefined") return "Mês Indefinido";
 
-    // 1. Check for string month names
-    const lowerRaw = raw.toLowerCase();
-    if (lowerRaw.includes("janeiro") || lowerRaw.includes("jan/")) return "Janeiro";
-    if (lowerRaw.includes("fevereiro") || lowerRaw.includes("fev/")) return "Fevereiro";
-    if (lowerRaw.includes("marco") || lowerRaw.includes("mar/")) return "Março";
-    if (lowerRaw.includes("abril") || lowerRaw.includes("abr/")) return "Abril";
+    // 1. Caso seja Número Serial do Excel (Dias desde 30/12/1899)
+    if (!isNaN(Number(raw)) && Number(raw) > 40000) {
+        const excelDate = new Date((Number(raw) - 25569) * 86400 * 1000);
+        if (!isNaN(excelDate.getTime())) return months[excelDate.getUTCMonth()];
+    }
 
-    // 2. Procura padrões numéricos (/01/ ou -01- ou 01/ ou -01)
-    // Tenta identificar o mês em DD/MM/YYYY ou YYYY-MM-DD
+    // 2. Busca por nomes de meses por extenso ou abreviados
+    const lower = raw.toLowerCase();
+    if (lower.includes("janeiro") || lower.includes("jan")) return "Janeiro";
+    if (lower.includes("fevereiro") || lower.includes("fev")) return "Fevereiro";
+    if (lower.includes("marco") || lower.includes("mar")) return "Março";
+    if (lower.includes("abril") || lower.includes("abr")) return "Abril";
+
+    // 3. Regex para capturar o mês em formatos numéricos (DD/MM/YYYY, YYYY-MM-DD, M/D/YY)
     const parts = raw.split(/[/\-.]/);
     if (parts.length >= 2) {
         let mStr = "";
@@ -61,7 +66,7 @@ const getMonthNameFromDate = (dateStr?: string, timestamp?: string): string => {
     return "Mês Indefinido";
 };
 
-// Lista de produtores ITESP com normalização interna para evitar erros de digitação
+// Lista de produtores ITESP com normalização interna
 const ALLOWED_SUPPLIERS_RAW = [
     'BENEDITO OSMAR RAVAZZI',
     'ADAO MAXIMO DA FONSECA',
@@ -90,9 +95,13 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
     const [selectedSupplierName, setSelectedSupplierName] = useState('all'); 
     const [selectedMonth, setSelectedMonth] = useState('all');
 
+    // Filtra fornecedores ITESP de forma flexível (por similaridade de nome)
     const itespSuppliers = useMemo(() => {
         const allowedNorm = ALLOWED_SUPPLIERS_RAW.map(superNormalize);
-        return suppliers.filter(s => allowedNorm.includes(superNormalize(s.name)));
+        return suppliers.filter(s => {
+            const sNorm = superNormalize(s.name);
+            return allowedNorm.some(allowed => sNorm.includes(allowed) || allowed.includes(sNorm));
+        });
     }, [suppliers]);
 
     const comparisonData = useMemo(() => {
@@ -136,23 +145,21 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             if (log.type === 'entrada') {
                 const sNorm = superNormalize(log.supplierName);
                 const iNorm = superNormalize(log.itemName);
-                const mName = getMonthNameFromDate(log.date, log.timestamp);
+                const mName = getMonthNameFromDate(log.date);
                 
-                if (mName === "Mês Indefinido") return;
+                if (mName === "Mês Indefinido" || !['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(mName)) return;
 
-                // Tenta encontrar a chave exata
-                const exactKey = `${sNorm}|${iNorm}|${mName}`;
-                const entry = consolidated.get(exactKey);
-                
-                if (entry) {
-                    entry.receivedKg += (Number(log.quantity) || 0);
-                } else {
-                    // Se não achou exato, busca por proximidade (Fuzzy)
-                    for (let item of consolidated.values()) {
-                        if (item.normSupplier === sNorm && item.month === mName) {
-                            if (item.normItem.includes(iNorm) || iNorm.includes(item.normItem)) {
-                                item.receivedKg += (Number(log.quantity) || 0);
-                            }
+                // Procura a entrada correta no mapa com Match Inteligente
+                let matched = false;
+                for (let [key, val] of consolidated.entries()) {
+                    if (val.month === mName && 
+                        (val.normSupplier.includes(sNorm) || sNorm.includes(val.normSupplier))) {
+                        
+                        // Verifica o item (Fuzzy Match)
+                        if (val.normItem.includes(iNorm) || iNorm.includes(val.normItem)) {
+                            val.receivedKg += (Number(log.quantity) || 0);
+                            matched = true;
+                            break;
                         }
                     }
                 }
@@ -206,7 +213,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         <div className="min-h-screen bg-[#F3F4F6] text-gray-800 pb-20">
             <header className="bg-white/95 backdrop-blur-md shadow-lg p-4 flex justify-between items-center sticky top-0 z-30 border-b border-green-100">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-black text-green-800 uppercase tracking-tighter">Auditoria ITESP - Monitoramento do 1º Quadr.</h1>
+                    <h1 className="text-xl md:text-2xl font-black text-green-800 uppercase tracking-tighter">Auditoria ITESP - Monitoramento 1º Quadr.</h1>
                     <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Saldo Contratual vs. Realidade Física de Janeiro a Abril</p>
                 </div>
                 <button onClick={onLogout} className="bg-red-500 hover:bg-red-600 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 text-xs uppercase tracking-widest">Sair</button>
@@ -215,11 +222,11 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             <main className="p-4 md:p-8 max-w-[1700px] mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-blue-500 transform transition-transform hover:translate-y-[-4px]">
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Meta de Contrato (Período)</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Meta Acumulada no Filtro</p>
                         <p className="text-3xl font-black text-blue-700">{totals.contractedKgMonthly.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-green-600 transform transition-transform hover:translate-y-[-4px]">
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Entrada Real (Físico)</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Físico Entregue (Jan-Abr)</p>
                         <p className="text-3xl font-black text-green-700">{totals.receivedKg.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-red-500 transform transition-transform hover:translate-y-[-4px]">
@@ -305,7 +312,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                         <td className={`p-5 text-right font-black font-mono bg-green-50/20 ${item.receivedKg > 0 ? 'text-green-700' : 'text-gray-300'}`}>
                                             {item.receivedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
                                         </td>
-                                        <td className={`p-5 text-right font-black font-mono bg-red-50/50 ${item.shortfallKg > 0.01 ? 'text-red-600' : 'text-gray-200'}`}>
+                                        <td className={`p-5 text-right font-black font-mono bg-red-50/50 ${item.shortfallKg > 0.01 ? 'text-red-600 animate-pulse' : 'text-gray-200'}`}>
                                             {item.shortfallKg > 0.01 ? item.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
                                         </td>
                                         <td className={`p-5 text-right font-black ${item.financialLoss > 0.01 ? 'text-red-700' : 'text-gray-200'}`}>
@@ -319,8 +326,8 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                                 <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                                 </div>
-                                                <p className="text-gray-400 font-black uppercase tracking-widest text-sm">Nenhum dado localizado para Janeiro.</p>
-                                                <p className="text-xs text-gray-400 mt-2 italic">Certifique-se de que a planilha de estoque importada contém as colunas de "Data" corretas para o ano de 2026.</p>
+                                                <p className="text-gray-400 font-black uppercase tracking-widest text-sm">Nenhum registro de estoque em Janeiro localizado.</p>
+                                                <p className="text-xs text-gray-400 mt-2 italic">Dica: Verifique se a planilha importada pelo almoxarifado contém a data correta para o ano de 2026.</p>
                                             </div>
                                         </td>
                                     </tr>
@@ -328,7 +335,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                             </tbody>
                             <tfoot className="bg-gray-900 font-black text-xs border-t-4 border-green-800 text-white">
                                 <tr>
-                                    <td colSpan={3} className="p-5 text-left uppercase tracking-tighter">Resumo Consolidado da Auditoria ITESP</td>
+                                    <td colSpan={3} className="p-5 text-left uppercase tracking-tighter">Consolidação de Auditoria Consumada</td>
                                     <td className="p-5 text-right text-blue-400 font-mono text-lg">{totals.contractedKgMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
                                     <td className="p-5 text-right text-green-400 font-mono text-lg">{totals.receivedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
                                     <td className="p-5 text-right text-red-400 font-mono text-lg">{totals.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
