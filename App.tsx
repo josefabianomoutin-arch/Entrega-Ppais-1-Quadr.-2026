@@ -103,10 +103,10 @@ const App: React.FC = () => {
         setWarehouseLog([]);
         return;
       }
-      // Garante que o log seja sempre tratado como um array de objetos válidos
-      const logsArray = normalizeArray<any>(data).map((val: any, index) => ({
+      // Mapeamento robusto para lidar com objetos ou arrays do Firebase
+      const logsArray = Object.entries(data).map(([key, val]: [string, any]) => ({
         ...val,
-        id: val.id || `log-idx-${index}`
+        id: val.id || key
       }));
       setWarehouseLog(logsArray);
     });
@@ -567,7 +567,7 @@ const App: React.FC = () => {
     setRegistrationStatus({ success: true, message: `Cadastrado!` });
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="animate-pulse">Sincronizando...</p></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="animate-pulse font-black text-green-800 uppercase tracking-widest">Sincronizando Banco de Dados...</p></div>;
 
   return (
     <>

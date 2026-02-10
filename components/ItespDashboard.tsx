@@ -25,31 +25,32 @@ const superNormalize = (text: string) => {
         .trim();
 };
 
+/**
+ * Extrator de mês resiliente: entende DD/MM/YYYY, YYYY-MM-DD e variações.
+ * Prioriza a data real do documento salva no log.
+ */
 const getMonthNameFromDate = (dateStr?: string, timestamp?: string): string => {
-    const d = dateStr || (timestamp ? timestamp.split('T')[0] : "");
-    if (!d) return "Mês Indefinido";
+    const raw = (dateStr || (timestamp ? timestamp.split('T')[0] : "")).trim();
+    if (!raw) return "Mês Indefinido";
 
-    // Formato ISO: YYYY-MM-DD
-    let parts = d.split('-');
-    if (parts.length === 3 && parts[0].length === 4) {
-        const monthIndex = parseInt(parts[1], 10) - 1;
-        return months[monthIndex] || "Mês Indefinido";
-    }
+    // Detecta o separador (pode ser / ou -)
+    const sep = raw.includes('/') ? '/' : '-';
+    const parts = raw.split(sep);
 
-    // Formato Brasileiro: DD/MM/YYYY
-    parts = d.split('/');
     if (parts.length === 3) {
-        const monthIndex = parseInt(parts[1], 10) - 1;
-        return months[monthIndex] || "Mês Indefinido";
-    }
-
-    // Fallback: Tentativa via construtor nativo (menos confiável para BR)
-    try {
-        const dateObj = new Date(d);
-        if (!isNaN(dateObj.getTime())) {
-            return months[dateObj.getMonth()];
+        let monthIdx = -1;
+        // Se a primeira parte tiver 4 dígitos, é ISO: YYYY-MM-DD
+        if (parts[0].length === 4) {
+            monthIdx = parseInt(parts[1], 10) - 1;
+        } else {
+            // Caso contrário, assume BR: DD/MM/YYYY
+            monthIdx = parseInt(parts[1], 10) - 1;
         }
-    } catch (e) {}
+
+        if (monthIdx >= 0 && monthIdx < 12) {
+            return months[monthIdx];
+        }
+    }
 
     return "Mês Indefinido";
 };
@@ -101,7 +102,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             unitPrice: number
         }>();
 
-        // 1. Base: Metas Contratuais
+        // 1. Inicializar Metas do Contrato (Filtro Jan a Abr)
         itespSuppliers.forEach(s => {
             const supplierNorm = superNormalize(s.name);
             s.contractItems.forEach(ci => {
@@ -122,24 +123,23 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             });
         });
 
-        // 2. Agregação de Faturamento (Deliveries)
+        // 2. Somar Peso nas Notas Fiscais (Informação vinda dos Agendamentos)
         itespSuppliers.forEach(s => {
             const supplierNorm = superNormalize(s.name);
             (s.deliveries || []).forEach(d => {
-                if (d.invoiceUploaded && d.invoiceNumber && d.item && d.item !== 'AGENDAMENTO PENDENTE') {
+                if (d.invoiceUploaded && d.item && d.item !== 'AGENDAMENTO PENDENTE') {
                     const mName = getMonthNameFromDate(d.date);
                     const key = `${supplierNorm}|${superNormalize(d.item)}|${mName}`;
-                    
                     const entry = consolidated.get(key);
                     if (entry) {
                         entry.billedKg += (d.kg || 0);
-                        entry.invoices.add(d.invoiceNumber);
+                        if (d.invoiceNumber) entry.invoices.add(d.invoiceNumber);
                     }
                 }
             });
         });
 
-        // 3. Agregação de Estoque Real (WarehouseLog)
+        // 3. Somar Peso Real no Estoque (Crítico: O que o Almoxarifado registrou)
         warehouseLog.forEach(log => {
             if (log.type === 'entrada') {
                 const sNorm = superNormalize(log.supplierName);
@@ -148,18 +148,20 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                 
                 const key = `${sNorm}|${iNorm}|${mName}`;
                 const entry = consolidated.get(key);
+                
                 if (entry) {
-                    entry.receivedKg += (log.quantity || 0);
+                    entry.receivedKg += (Number(log.quantity) || 0);
+                    if (log.inboundInvoice) entry.invoices.add(log.inboundInvoice);
                 }
             }
         });
 
-        // 4. Transformação Final
+        // 4. Calcular Auditoria Final
         return Array.from(consolidated.values()).map((data, idx) => {
             const shortfallKg = Math.max(0, data.contractedKgMonthly - data.receivedKg);
             return {
                 ...data,
-                id: `itesp-item-${idx}`,
+                id: `itesp-row-${idx}`,
                 invoiceList: Array.from(data.invoices).join(', ') || 'Nenhuma NF',
                 shortfallKg: shortfallKg,
                 financialLoss: shortfallKg * data.unitPrice
@@ -172,7 +174,6 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
     const filteredData = useMemo(() => {
         return comparisonData.filter(item => {
             const searchMatch = item.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                               item.invoiceList.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                item.productName.toLowerCase().includes(searchTerm.toLowerCase());
             const monthMatch = selectedMonth === 'all' || item.month === selectedMonth;
             const supplierMatch = selectedSupplierName === 'all' || item.supplierName === selectedSupplierName;
@@ -204,17 +205,12 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
 
     return (
         <div className="min-h-screen bg-[#F3F4F6] text-gray-800 pb-20">
-            <header className="bg-white/80 backdrop-blur-sm shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
+            <header className="bg-white/90 backdrop-blur-sm shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-green-800">Módulo ITESP - Auditoria Estratégica</h1>
-                    <p className="text-sm text-gray-500 font-medium">Comparativo de Meta Contratual vs. Entrega Real</p>
+                    <h1 className="text-xl md:text-2xl font-black text-green-800 uppercase tracking-tighter">Módulo ITESP - Auditoria Estratégica</h1>
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Contrato vs. Realidade Física do Almoxarifado</p>
                 </div>
-                <button
-                    onClick={onLogout}
-                    className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-sm text-sm"
-                >
-                    Sair
-                </button>
+                <button onClick={onLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-sm text-sm">Sair</button>
             </header>
 
             <main className="p-4 md:p-8 max-w-[1600px] mx-auto">
@@ -222,18 +218,18 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-blue-500">
                         <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Meta de Contrato (Mês)</p>
-                        <p className="text-2xl font-black text-blue-700">{totals.contractedKgMonthly.toLocaleString('pt-BR')} kg</p>
+                        <p className="text-2xl font-black text-blue-700">{totals.contractedKgMonthly.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-green-600">
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Estoque Realizado</p>
-                        <p className="text-2xl font-black text-green-700">{totals.receivedKg.toLocaleString('pt-BR')} kg</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Físico em Almoxarifado</p>
+                        <p className="text-2xl font-black text-green-700">{totals.receivedKg.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-red-500">
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Falta p/ o Contrato</p>
-                        <p className="text-2xl font-black text-red-600">{totals.shortfallKg.toLocaleString('pt-BR')} kg</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Déficit de Entrega</p>
+                        <p className="text-2xl font-black text-red-600">{totals.shortfallKg.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-orange-500">
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Prejuízo Calculado</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Prejuízo p/ o Estado</p>
                         <p className="text-2xl font-black text-orange-600">{formatCurrency(totals.financialLoss)}</p>
                     </div>
                 </div>
@@ -253,7 +249,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                             <select 
                                 value={selectedSupplierName} 
                                 onChange={(e) => setSelectedSupplierName(e.target.value)}
-                                className="w-full md:w-64 border-2 border-indigo-500 rounded-lg px-4 py-2.5 text-sm font-bold outline-none text-gray-700 bg-white cursor-pointer"
+                                className="w-full md:w-64 border-2 border-indigo-500 rounded-lg px-4 py-2.5 text-sm font-bold outline-none text-gray-700 bg-white cursor-pointer shadow-sm"
                             >
                                 <option value="all">Todos os produtores ITESP</option>
                                 {supplierOptions.map(opt => (
@@ -265,7 +261,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                 onChange={(e) => setSelectedMonth(e.target.value)}
                                 className="w-full md:w-48 border border-gray-200 rounded-lg px-4 py-2.5 text-sm font-medium outline-none text-gray-700 bg-white cursor-pointer"
                             >
-                                <option value="all">Todos os Meses</option>
+                                <option value="all">Todos os Meses (Jan-Abr)</option>
                                 {months.slice(0, 4).map(m => <option key={m} value={m}>{m}</option>)}
                             </select>
                         </div>
@@ -278,11 +274,11 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                     <th className="p-4 text-left border-b min-w-[250px]">PRODUTOR</th>
                                     <th className="p-4 text-left border-b">PRODUTO</th>
                                     <th className="p-4 text-left border-b">MÊS</th>
-                                    <th className="p-4 text-right border-b bg-blue-50/30 text-blue-600">PESO CONTRATO (MÊS)</th>
-                                    <th className="p-4 text-right border-b italic opacity-60">Peso na Nota (Informativo)</th>
-                                    <th className="p-4 text-right border-b bg-green-50/30 text-green-700">PESO NO ESTOQUE</th>
-                                    <th className="p-4 text-right border-b bg-red-50 text-red-600">FALTA REAL (META - ESTOQUE)</th>
-                                    <th className="p-4 text-right border-b font-black">PREJUÍZO ACUMULADO</th>
+                                    <th className="p-4 text-right border-b bg-blue-50/30 text-blue-600">META CONTRATO</th>
+                                    <th className="p-4 text-right border-b italic opacity-40">PESO NF (INFO)</th>
+                                    <th className="p-4 text-right border-b bg-green-50/30 text-green-700">PESO REAL (ALMOX)</th>
+                                    <th className="p-4 text-right border-b bg-red-50 text-red-600">FALTA REAL</th>
+                                    <th className="p-4 text-right border-b font-black text-gray-700">PREJUÍZO ACUM.</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -300,30 +296,30 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                         <td className="p-4 text-right font-black text-blue-700 font-mono bg-blue-50/10">
                                             {item.contractedKgMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
                                         </td>
-                                        <td className="p-4 text-right font-medium text-gray-400 font-mono">
+                                        <td className="p-4 text-right font-medium text-gray-300 font-mono italic">
                                             {item.billedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
                                         </td>
                                         <td className="p-4 text-right font-black text-green-700 font-mono bg-green-50/10">
                                             {item.receivedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
                                         </td>
-                                        <td className={`p-4 text-right font-black font-mono bg-red-50 ${item.shortfallKg > 0.01 ? 'text-red-600' : 'text-gray-300'}`}>
+                                        <td className={`p-4 text-right font-black font-mono bg-red-50 ${item.shortfallKg > 0.01 ? 'text-red-600' : 'text-gray-200'}`}>
                                             {item.shortfallKg > 0.01 ? item.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
                                         </td>
-                                        <td className={`p-4 text-right font-black ${item.financialLoss > 0.01 ? 'text-red-700' : 'text-gray-300'}`}>
+                                        <td className={`p-4 text-right font-black ${item.financialLoss > 0.01 ? 'text-red-700' : 'text-gray-200'}`}>
                                             {item.financialLoss > 0.01 ? formatCurrency(item.financialLoss) : 'R$ 0,00'}
                                         </td>
                                     </tr>
                                 )) : (
                                     <tr>
                                         <td colSpan={8} className="p-20 text-center text-gray-400 italic font-medium uppercase tracking-widest bg-gray-50/50">
-                                            Nenhum registro encontrado para os filtros selecionados.
+                                            Nenhuma movimentação localizada para os critérios selecionados.
                                         </td>
                                     </tr>
                                 )}
                             </tbody>
-                            <tfoot className="bg-gray-50 font-black text-xs border-t-2">
+                            <tfoot className="bg-gray-100 font-black text-xs border-t-2">
                                 <tr>
-                                    <td colSpan={3} className="p-4 text-left text-gray-600 uppercase">Totais da Auditoria</td>
+                                    <td colSpan={3} className="p-4 text-left text-gray-600 uppercase">Totais da Auditoria (Mês Corrente)</td>
                                     <td className="p-4 text-right text-blue-800 font-mono">{totals.contractedKgMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
                                     <td className="p-4 text-right text-gray-400 font-mono">{totals.billedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
                                     <td className="p-4 text-right text-green-800 font-mono">{totals.receivedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
