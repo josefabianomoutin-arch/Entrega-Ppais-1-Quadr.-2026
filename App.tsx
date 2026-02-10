@@ -21,7 +21,7 @@ const directorWithdrawalsRef = ref(database, 'directorWithdrawals');
 const standardMenuRef = ref(database, 'standardMenu');
 const dailyMenusRef = ref(database, 'dailyMenus');
 
-// Helper de normalização absoluta (remove acentos, espaços, símbolos e pontuação)
+// Normalização absoluta para comparação de dados
 const superNormalize = (text: string) => {
     return (text || "")
         .toString()
@@ -103,10 +103,13 @@ const App: React.FC = () => {
         setWarehouseLog([]);
         return;
       }
-      // Conversão robusta de objeto/array para lista plana de movimentações
+      // Conversão ultra-segura para garantir que entradas de qualquer mês (Jan-Abr) sejam capturadas
       const logsArray = Object.entries(data).map(([key, val]: [string, any]) => ({
         ...val,
-        id: val.id || key
+        id: val.id || key,
+        quantity: Number(val.quantity) || 0,
+        itemName: (val.itemName || "").toUpperCase().trim(),
+        supplierName: (val.supplierName || "").toUpperCase().trim()
       }));
       setWarehouseLog(logsArray);
     });
@@ -169,7 +172,7 @@ const App: React.FC = () => {
             id: logEntryRef.key || `mov-${Date.now()}`, 
             type: 'entrada', 
             timestamp: new Date().toISOString(), 
-            date: payload.invoiceDate, // DATA REAL
+            date: payload.invoiceDate, 
             lotId: lotId, 
             lotNumber: normalizedLotNumber, 
             itemName: normalizedItemName, 
@@ -194,7 +197,7 @@ const App: React.FC = () => {
     quantity: number;
     outboundInvoice: string;
     expirationDate: string;
-    date: string; // Adicionado data real para saídas
+    date: string; 
   }) => {
     setIsSaving(true);
     const supplierRef = ref(database, `suppliers/${payload.supplierCpf}`);
@@ -249,7 +252,7 @@ const App: React.FC = () => {
             id: logEntryRef.key || `mov-out-${Date.now()}`, 
             type: 'saída', 
             timestamp: new Date().toISOString(), 
-            date: payload.date, // DATA REAL
+            date: payload.date, 
             lotId: 'various', 
             lotNumber: payload.lotNumber.toUpperCase().trim(), 
             itemName: payload.itemName.toUpperCase().trim(), 
@@ -324,9 +327,6 @@ const App: React.FC = () => {
     try {
         await set(ref(database, `warehouseLog/${logEntry.id}`), null);
         setIsSaving(false);
-        if (!estornoSucesso && logEntry.type === 'saída') {
-            return { success: true, message: "Registro removido do histórico, mas o saldo não pôde ser estornado (lote não encontrado)." };
-        }
         return { success: true, message: "Registro removido com sucesso." };
     } catch (e) {
         setIsSaving(false);
@@ -452,13 +452,12 @@ const App: React.FC = () => {
         await runTransaction(supplierRef, (current) => {
             if (!current) return null;
             let deliveries = normalizeArray<any>(current.deliveries);
-            // Filtro rigoroso: mantém apenas quem NÃO está na lista de IDs a remover
             current.deliveries = deliveries.filter(d => !ids.includes(d.id));
             return current;
         });
     } catch (e) { 
         console.error("Falha ao cancelar entregas:", e); 
-        alert("Erro ao remover registro. Tente novamente.");
+        alert("Erro ao remover registro.");
     } finally { 
         setIsSaving(false); 
     }
@@ -507,7 +506,6 @@ const App: React.FC = () => {
     for (const req of log.items) {
       let need = Number(req.quantity);
       const nReqName = superNormalize(req.name);
-      // BUG FIX: Correctly access the date property via b.d.date in the sort comparison
       const lots = tempS.flatMap(s => s.deliveries.filter(d => superNormalize(d.item) === nReqName && d.lots).map(d => ({ s, d })))
                         .sort((a, b) => a.d.date.localeCompare(b.d.date));
 
@@ -524,7 +522,7 @@ const App: React.FC = () => {
                 id: logRef.key, 
                 type: 'saída', 
                 timestamp: ts, 
-                date: log.date, // DATA REAL DO DOCUMENTO
+                date: log.date, 
                 lotId: lot.id, 
                 lotNumber: lot.lotNumber, 
                 itemName: req.name.toUpperCase(), 
@@ -545,13 +543,12 @@ const App: React.FC = () => {
 
   const handleLogin = (n: string, c: string): boolean => {
     const nl = n.toLowerCase();
-    const cl = c; // ITESP uses alphanumeric password
+    const cl = c; 
     
     if (nl === 'administrador' && cl === '15210361870') { setIsAdminLoggedIn(true); return true; }
     if (nl === 'almoxarifado' && cl === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
     if (nl === 'itesp' && cl === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
     
-    // Fornecedores - CPF apenas números
     const cleanCpf = c.replace(/[^\d]/g, '');
     const u = suppliers.find(p => p.name === n.toUpperCase() && p.cpf === cleanCpf);
     if (u) { 

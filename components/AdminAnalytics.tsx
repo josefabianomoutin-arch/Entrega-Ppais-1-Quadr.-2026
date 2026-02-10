@@ -25,21 +25,23 @@ const superNormalize = (text: string) => {
 };
 
 const getMonthNameFromDate = (dateStr?: string, timestamp?: string): string => {
-    const d = dateStr || (timestamp ? timestamp.split('T')[0] : "");
-    if (!d) return "Mês Indefinido";
+    const raw = (dateStr || (timestamp ? timestamp.split('T')[0] : "")).trim();
+    if (!raw) return "Mês Indefinido";
 
-    // ISO: YYYY-MM-DD
-    let parts = d.split('-');
-    if (parts.length === 3 && parts[0].length === 4) {
-        const monthIndex = parseInt(parts[1], 10) - 1;
-        return months[monthIndex] || "Mês Indefinido";
+    const lowerRaw = raw.toLowerCase();
+    for (let i = 0; i < months.length; i++) {
+        if (lowerRaw.includes(months[i].toLowerCase())) return months[i];
     }
 
-    // BR: DD/MM/YYYY
-    parts = d.split('/');
+    const sep = raw.includes('/') ? '/' : '-';
+    const parts = raw.split(sep);
+
     if (parts.length === 3) {
-        const monthIndex = parseInt(parts[1], 10) - 1;
-        return months[monthIndex] || "Mês Indefinido";
+        let mIdx = -1;
+        if (parts[0].length === 4) mIdx = parseInt(parts[1], 10) - 1;
+        else if (parts[2].length === 4 || parts[2].length === 2) mIdx = parseInt(parts[1], 10) - 1;
+
+        if (mIdx >= 0 && mIdx < 12) return months[mIdx];
     }
 
     return "Mês Indefinido";
@@ -67,16 +69,18 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
             contractedKgMonthly: number,
             billedKg: number, 
             receivedKg: number,
-            price: number 
+            price: number,
+            normSupplier: string,
+            normItem: string
         }>();
 
-        // 1. Inicializar com Meta de Contrato Mensal
+        // 1. Inicializar Metas
         suppliers.forEach(s => {
-            const supplierNorm = superNormalize(s.name);
+            const sNorm = superNormalize(s.name);
             s.contractItems.forEach(ci => {
-                const itemNorm = superNormalize(ci.name);
+                const iNorm = superNormalize(ci.name);
                 ['Janeiro', 'Fevereiro', 'Março', 'Abril'].forEach(mName => {
-                    const key = `${supplierNorm}|${itemNorm}|${mName}`;
+                    const key = `${sNorm}|${iNorm}|${mName}`;
                     consolidated.set(key, {
                         supplierReal: s.name,
                         itemReal: ci.name,
@@ -84,26 +88,15 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                         contractedKgMonthly: (ci.totalKg || 0) / 4,
                         billedKg: 0,
                         receivedKg: 0,
-                        price: ci.valuePerKg || 0
+                        price: ci.valuePerKg || 0,
+                        normSupplier: sNorm,
+                        normItem: iNorm
                     });
                 });
             });
         });
 
-        // 2. Somar Faturamento (Informação da Delivery)
-        suppliers.forEach(s => {
-            const supplierNorm = superNormalize(s.name);
-            (s.deliveries || []).forEach(d => {
-                if (d.invoiceUploaded && d.item && d.item !== 'AGENDAMENTO PENDENTE') {
-                    const mName = getMonthNameFromDate(d.date);
-                    const key = `${supplierNorm}|${superNormalize(d.item)}|${mName}`;
-                    const entry = consolidated.get(key);
-                    if (entry) entry.billedKg += (d.kg || 0);
-                }
-            });
-        });
-
-        // 3. Somar Estoque Real (WarehouseLog)
+        // 2. Acumular Estoque
         warehouseLog.forEach(log => {
             if (log.type === 'entrada') {
                 const sNorm = superNormalize(log.supplierName);
@@ -112,11 +105,20 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                 
                 const key = `${sNorm}|${iNorm}|${mName}`;
                 const entry = consolidated.get(key);
-                if (entry) entry.receivedKg += (log.quantity || 0);
+                if (entry) {
+                    entry.receivedKg += (Number(log.quantity) || 0);
+                } else {
+                    for (let ent of consolidated.values()) {
+                        if (ent.normSupplier === sNorm && ent.month === mName) {
+                            if (ent.normItem.includes(iNorm) || iNorm.includes(ent.normItem)) {
+                                ent.receivedKg += (Number(log.quantity) || 0);
+                            }
+                        }
+                    }
+                }
             }
         });
 
-        // 4. Cálculo final
         return Array.from(consolidated.values()).map((data, idx) => {
             const shortfallKg = Math.max(0, data.contractedKgMonthly - data.receivedKg);
             return {
@@ -140,31 +142,39 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
         });
     }, [auditData, selectedSupplierName, selectedMonthFilter, searchTerm]);
 
-    const totalLoss = useMemo(() => filteredData.reduce((sum, item) => sum + item.financialLoss, 0), [filteredData]);
+    const totals = useMemo(() => {
+        return filteredData.reduce((acc, item) => {
+            acc.contracted += item.contractedKgMonthly;
+            acc.received += item.receivedKg;
+            acc.loss += item.financialLoss;
+            acc.shortfall += item.shortfallKg;
+            return acc;
+        }, { contracted: 0, received: 0, loss: 0, shortfall: 0 });
+    }, [filteredData]);
 
     return (
         <div className="space-y-8 animate-fade-in pb-12">
-            <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-indigo-500">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Auditoria Institucional: Meta vs. Estoque</h2>
-                <p className="text-sm text-gray-500 font-medium">A falta é calculada comparando a meta contratual mensal do fornecedor contra o que efetivamente entrou no almoxarifado.</p>
+            <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-indigo-500">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Auditoria Analítica: Meta Mensal vs. Estoque</h2>
+                <p className="text-sm text-gray-500 font-medium">Cruzamento profundo de dados para identificar déficits de entrega em qualquer período (Jan-Abr).</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-blue-500 text-center">
-                    <p className="text-[10px] text-gray-400 font-black uppercase">Meta Contratual (Filtro)</p>
-                    <p className="text-xl font-black">{filteredData.reduce((a, b) => a + b.contractedKgMonthly, 0).toLocaleString('pt-BR')} kg</p>
+                    <p className="text-[10px] text-gray-400 font-black uppercase">Meta do Período</p>
+                    <p className="text-xl font-black">{totals.contracted.toLocaleString('pt-BR')} kg</p>
                 </div>
                 <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-green-500 text-center">
-                    <p className="text-[10px] text-gray-400 font-black uppercase">Estoque Real (Filtro)</p>
-                    <p className="text-xl font-black text-green-600">{filteredData.reduce((a, b) => a + b.receivedKg, 0).toLocaleString('pt-BR')} kg</p>
+                    <p className="text-[10px] text-gray-400 font-black uppercase">Entrada Realizada</p>
+                    <p className="text-xl font-black text-green-600">{totals.received.toLocaleString('pt-BR')} kg</p>
                 </div>
                 <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-red-500 text-center">
-                    <p className="text-[10px] text-gray-400 font-black uppercase">Prejuízo p/ Falta de Entrega</p>
-                    <p className="text-xl font-black text-red-600">{formatCurrency(totalLoss)}</p>
+                    <p className="text-[10px] text-gray-400 font-black uppercase">Prejuízo por Déficit</p>
+                    <p className="text-xl font-black text-red-600">{formatCurrency(totals.loss)}</p>
                 </div>
                 <div className="bg-white p-5 rounded-xl shadow-lg border-b-4 border-indigo-500 text-center">
-                    <p className="text-[10px] text-gray-400 font-black uppercase">Déficit Total (Kg)</p>
-                    <p className="text-xl font-black text-indigo-800">{filteredData.reduce((a, b) => a + b.shortfallKg, 0).toLocaleString('pt-BR')} kg</p>
+                    <p className="text-[10px] text-gray-400 font-black uppercase">Falta Total (Kg)</p>
+                    <p className="text-xl font-black text-indigo-800">{totals.shortfall.toLocaleString('pt-BR')} kg</p>
                 </div>
             </div>
 
@@ -178,7 +188,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                         className="w-full lg:w-64 border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400"
                     />
                     <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-                         <select value={selectedSupplierName} onChange={(e) => setSelectedSupplierName(e.target.value)} className="border rounded-lg px-3 py-2 text-sm bg-white font-bold text-gray-700">
+                        <select value={selectedSupplierName} onChange={(e) => setSelectedSupplierName(e.target.value)} className="border rounded-lg px-3 py-2 text-sm bg-white font-bold text-gray-700">
                             <option value="all">Todos os Fornecedores</option>
                             {supplierOptions.map(option => <option key={option.value} value={option.value}>{option.displayName}</option>)}
                         </select>
@@ -195,48 +205,35 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                             <tr>
                                 <th className="p-4 text-left">Fornecedor</th>
                                 <th className="p-4 text-left">Produto</th>
-                                <th className="p-4 text-left">Mês</th>
-                                <th className="p-4 text-right bg-blue-50/30 text-blue-700">Meta (Contrato)</th>
-                                <th className="p-4 text-right italic opacity-50">Peso NF (Info)</th>
-                                <th className="p-4 text-right bg-green-50/30 text-green-700">Peso Estoque</th>
-                                <th className="p-4 text-right bg-red-50 text-red-600">Falta Real</th>
-                                <th className="p-4 text-right font-black">Prejuízo Estimado</th>
+                                <th className="p-4 text-center">Mês</th>
+                                <th className="p-4 text-right bg-blue-50/30 text-blue-700">Meta Contratual</th>
+                                <th className="p-4 text-right bg-green-50/30 text-green-700">Estoque Almox.</th>
+                                <th className="p-4 text-right bg-red-50 text-red-600">Diferença (Falta)</th>
+                                <th className="p-4 text-right font-black">Prejuízo</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {filteredData.length > 0 ? filteredData.map((item) => (
+                            {filteredData.map((item) => (
                                 <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${item.shortfallKg > 0.001 ? 'bg-red-50/10' : ''}`}>
-                                    <td className="p-4 font-bold text-gray-800 uppercase">{item.supplierReal}</td>
-                                    <td className="p-4 text-gray-600 uppercase text-xs font-medium">{item.itemReal}</td>
-                                    <td className="p-4 font-medium text-gray-500">{item.month}</td>
-                                    <td className="p-4 text-right font-mono font-bold text-blue-700 bg-blue-50/5">
-                                        {item.contractedKgMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
+                                    <td className="p-4 font-bold text-gray-800 uppercase text-xs">{item.supplierReal}</td>
+                                    <td className="p-4 text-gray-600 uppercase text-[10px] font-medium">{item.itemReal}</td>
+                                    <td className="p-4 text-center">
+                                        <span className="bg-gray-100 px-2 py-1 rounded text-[10px] font-bold uppercase">{item.month}</span>
                                     </td>
-                                    <td className="p-4 text-right font-mono text-gray-400">
-                                        {item.billedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
-                                    </td>
-                                    <td className={`p-4 text-right font-mono font-bold bg-green-50/5 ${item.receivedKg > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                                        {item.receivedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
-                                    </td>
-                                    <td className={`p-4 text-right font-mono font-black bg-red-50 ${item.shortfallKg > 0.001 ? 'text-red-600' : 'text-gray-300'}`}>
+                                    <td className="p-4 text-right font-mono font-bold text-blue-700">{item.contractedKgMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
+                                    <td className="p-4 text-right font-mono font-bold text-green-700">{item.receivedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
+                                    <td className={`p-4 text-right font-mono font-black ${item.shortfallKg > 0.001 ? 'text-red-600' : 'text-gray-300'}`}>
                                         {item.shortfallKg > 0.001 ? item.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : "0,00"}
                                     </td>
                                     <td className={`p-4 text-right font-black ${item.financialLoss > 0 ? 'text-red-700' : 'text-gray-300'}`}>
                                         {item.financialLoss > 0 ? formatCurrency(item.financialLoss) : "R$ 0,00"}
                                     </td>
                                 </tr>
-                            )) : (
-                                <tr><td colSpan={8} className="p-20 text-center text-gray-400 italic font-medium uppercase tracking-widest bg-gray-50">Nenhuma divergência de contrato localizada.</td></tr>
-                            )}
+                            ))}
                         </tbody>
                     </table>
                 </div>
             </div>
-
-            <style>{`
-              @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-              .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
-            `}</style>
         </div>
     );
 };
