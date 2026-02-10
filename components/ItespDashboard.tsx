@@ -15,6 +15,10 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+/**
+ * Normalização Ultra-Resiliente: 
+ * Remove acentos, símbolos e espaços para comparação cruzada.
+ */
 const superNormalize = (text: string) => {
     return (text || "")
         .toString()
@@ -26,26 +30,24 @@ const superNormalize = (text: string) => {
 };
 
 /**
- * Extrator de mês resiliente: entende DD/MM/YYYY, YYYY-MM-DD e variações.
- * Prioriza a data real do documento salva no log.
+ * Extrator de mês resiliente: entende DD/MM/YYYY, YYYY-MM-DD e variações de 2 a 4 dígitos para o ano.
  */
 const getMonthNameFromDate = (dateStr?: string, timestamp?: string): string => {
     const raw = (dateStr || (timestamp ? timestamp.split('T')[0] : "")).trim();
     if (!raw) return "Mês Indefinido";
 
-    // Detecta o separador (pode ser / ou -)
+    // Detecta separadores (aceita - ou /)
     const sep = raw.includes('/') ? '/' : '-';
     const parts = raw.split(sep);
 
     if (parts.length === 3) {
         let monthIdx = -1;
-        // Se a primeira parte tiver 4 dígitos, é ISO: YYYY-MM-DD
-        if (parts[0].length === 4) {
-            monthIdx = parseInt(parts[1], 10) - 1;
-        } else {
-            // Caso contrário, assume BR: DD/MM/YYYY
-            monthIdx = parseInt(parts[1], 10) - 1;
-        }
+        // Estratégia de Identificação:
+        // ISO: parts[0] é o ano (4 dígitos) -> Mês é parts[1]
+        // BR: parts[2] é o ano (2 ou 4 dígitos) -> Mês é parts[1]
+        
+        // Em ambos os casos comuns para este app, o mês está na posição central [1]
+        monthIdx = parseInt(parts[1], 10) - 1;
 
         if (monthIdx >= 0 && monthIdx < 12) {
             return months[monthIdx];
@@ -89,7 +91,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
     }, [suppliers]);
 
     const comparisonData = useMemo(() => {
-        if (!itespSuppliers) return [];
+        if (!itespSuppliers || itespSuppliers.length === 0) return [];
 
         const consolidated = new Map<string, {
             supplierName: string,
@@ -99,7 +101,10 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             billedKg: number,
             receivedKg: number,
             invoices: Set<string>,
-            unitPrice: number
+            unitPrice: number,
+            // Armazena chaves normalizadas para cruzamento inteligente
+            normSupplier: string,
+            normItem: string
         }>();
 
         // 1. Inicializar Metas do Contrato (Filtro Jan a Abr)
@@ -117,41 +122,67 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                         billedKg: 0,
                         receivedKg: 0,
                         invoices: new Set(),
-                        unitPrice: ci.valuePerKg || 0
+                        unitPrice: ci.valuePerKg || 0,
+                        normSupplier: supplierNorm,
+                        normItem: itemNorm
                     });
                 });
             });
         });
 
-        // 2. Somar Peso nas Notas Fiscais (Informação vinda dos Agendamentos)
+        // 2. Somar Peso nas Notas Fiscais (Deliveries do Agendamento)
         itespSuppliers.forEach(s => {
-            const supplierNorm = superNormalize(s.name);
+            const sNorm = superNormalize(s.name);
             (s.deliveries || []).forEach(d => {
                 if (d.invoiceUploaded && d.item && d.item !== 'AGENDAMENTO PENDENTE') {
                     const mName = getMonthNameFromDate(d.date);
-                    const key = `${supplierNorm}|${superNormalize(d.item)}|${mName}`;
+                    const dItemNorm = superNormalize(d.item);
+                    
+                    // Busca exata primeiro
+                    const key = `${sNorm}|${dItemNorm}|${mName}`;
                     const entry = consolidated.get(key);
                     if (entry) {
                         entry.billedKg += (d.kg || 0);
                         if (d.invoiceNumber) entry.invoices.add(d.invoiceNumber);
+                    } else {
+                        // Busca Fuzzy (Se o item da nota contém o termo do contrato ou vice-versa)
+                        for (let ent of consolidated.values()) {
+                            if (ent.normSupplier === sNorm && ent.month === mName) {
+                                if (ent.normItem.includes(dItemNorm) || dItemNorm.includes(ent.normItem)) {
+                                    ent.billedKg += (d.kg || 0);
+                                    if (d.invoiceNumber) ent.invoices.add(d.invoiceNumber);
+                                }
+                            }
+                        }
                     }
                 }
             });
         });
 
-        // 3. Somar Peso Real no Estoque (Crítico: O que o Almoxarifado registrou)
+        // 3. Somar Peso Real no Estoque (WarehouseLog do Almoxarifado)
         warehouseLog.forEach(log => {
             if (log.type === 'entrada') {
                 const sNorm = superNormalize(log.supplierName);
                 const iNorm = superNormalize(log.itemName);
                 const mName = getMonthNameFromDate(log.date, log.timestamp);
                 
+                // Busca exata
                 const key = `${sNorm}|${iNorm}|${mName}`;
                 const entry = consolidated.get(key);
                 
                 if (entry) {
                     entry.receivedKg += (Number(log.quantity) || 0);
                     if (log.inboundInvoice) entry.invoices.add(log.inboundInvoice);
+                } else {
+                    // Busca Fuzzy para estoque
+                    for (let ent of consolidated.values()) {
+                        if (ent.normSupplier === sNorm && ent.month === mName) {
+                            if (ent.normItem.includes(iNorm) || iNorm.includes(ent.normItem)) {
+                                ent.receivedKg += (Number(log.quantity) || 0);
+                                if (log.inboundInvoice) entry?.invoices.add(log.inboundInvoice);
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -312,7 +343,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                 )) : (
                                     <tr>
                                         <td colSpan={8} className="p-20 text-center text-gray-400 italic font-medium uppercase tracking-widest bg-gray-50/50">
-                                            Nenhuma movimentação localizada para os critérios selecionados.
+                                            Nenhuma movimentação localizada para os critérios selecionados. Verifique se os nomes dos itens na planilha de estoque coincidem com o contrato.
                                         </td>
                                     </tr>
                                 )}

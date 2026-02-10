@@ -103,7 +103,7 @@ const App: React.FC = () => {
         setWarehouseLog([]);
         return;
       }
-      // Mapeamento robusto para lidar com objetos ou arrays do Firebase
+      // Conversão robusta de objeto/array para lista plana de movimentações
       const logsArray = Object.entries(data).map(([key, val]: [string, any]) => ({
         ...val,
         id: val.id || key
