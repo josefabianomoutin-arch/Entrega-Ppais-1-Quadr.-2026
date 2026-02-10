@@ -37,6 +37,7 @@ interface AdminDashboardProps {
   onUpdatePerCapitaConfig: (config: PerCapitaConfig) => Promise<void>;
   onDeleteWarehouseEntry: (logEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
   onUpdateWarehouseEntry: (updatedEntry: WarehouseMovement) => Promise<{ success: boolean; message: string }>;
+  onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string }[]) => Promise<{ success: boolean, message: string }>;
   onRegisterCleaningLog: (log: Omit<CleaningLog, 'id'>) => Promise<{ success: boolean; message: string }>;
   onDeleteCleaningLog: (id: string) => Promise<void>;
   onRegisterDirectorWithdrawal: (log: Omit<DirectorPerCapitaLog, 'id'>) => Promise<{ success: boolean; message: string }>;
@@ -75,6 +76,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     warehouseLog = [],
     onDeleteWarehouseEntry,
     onUpdateWarehouseEntry,
+    onUpdateContractForItem,
     onReopenInvoice,
     onDeleteInvoice,
     onUpdateInvoiceItems,
@@ -177,7 +179,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             </div>
           </div>
         );
-      case 'contracts': return <AdminContractItems suppliers={suppliers} warehouseLog={warehouseLog} />;
+      case 'contracts': return <AdminContractItems suppliers={suppliers} warehouseLog={warehouseLog} onUpdateContractForItem={onUpdateContractForItem} />;
       case 'invoices': return <AdminInvoices suppliers={suppliers} onReopenInvoice={onReopenInvoice} onDeleteInvoice={onDeleteInvoice} onUpdateInvoiceItems={onUpdateInvoiceItems} onManualInvoiceEntry={onManualInvoiceEntry} />;
       case 'schedule': return <AdminScheduleView suppliers={suppliers} onCancelDeliveries={onCancelDeliveries} />;
       case 'directorPerCapita': return <AdminDirectorPerCapita suppliers={suppliers} logs={directorWithdrawals} onRegister={onRegisterDirectorWithdrawal} onDelete={onDeleteDirectorWithdrawal} />;

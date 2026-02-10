@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow } from './types';
+import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -40,15 +40,9 @@ const cleanNumericValue = (val: any): number => {
     return parseFloat(s) || 0;
 };
 
-/**
- * PADRONIZADOR DE DATA 2026 - VERSÃO SUPREMA
- * Garante que Janeiro seja 01 em qualquer circunstância.
- */
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
     let s = String(rawDate).trim().toLowerCase();
-
-    // Caso Excel Serial
     if (!isNaN(Number(s)) && Number(s) > 40000) {
         const excelDate = parseFloat(s);
         const date = new Date(Date.UTC(1899, 11, 30)); 
@@ -57,30 +51,14 @@ const standardizeDate = (rawDate: any): string => {
         const d = String(date.getUTCDate()).padStart(2, '0');
         return `2026-${m}-${d}`;
     }
-
-    // Detecção Manual de Janeiro
     if (s.includes('jan')) return `2026-01-${s.replace(/[^0-9]/g, '').slice(0,2).padStart(2,'0')}`;
-
-    // Normalização de Separadores
     s = s.split(' ')[0].split('t')[0].replace(/[\.\/]/g, '-');
     const parts = s.split('-').filter(p => p.length > 0);
-    
-    if (parts.length === 2) {
-        // Assume DD-MM -> 2026-MM-DD
-        return `2026-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-    }
-
+    if (parts.length === 2) return `2026-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
     if (parts.length === 3) {
         let d, m, y = "2026";
-        // Se o primeiro é ano (YYYY-MM-DD)
-        if (parts[0].length === 4) {
-            m = parts[1].padStart(2, '0');
-            d = parts[2].padStart(2, '0');
-        } else {
-            // Se o último é ano (DD-MM-YYYY)
-            d = parts[0].padStart(2, '0');
-            m = parts[1].padStart(2, '0');
-        }
+        if (parts[0].length === 4) { m = parts[1].padStart(2, '0'); d = parts[2].padStart(2, '0'); }
+        else { d = parts[0].padStart(2, '0'); m = parts[1].padStart(2, '0'); }
         return `2026-${m}-${d}`;
     }
     return s;
@@ -181,6 +159,43 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const handleUpdateContractForItem = useCallback(async (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string }[]) => {
+      setIsSaving(true);
+      try {
+          const normTarget = superNormalize(itemName);
+          const newSuppliers = [...suppliers];
+          
+          newSuppliers.forEach(s => {
+              const currentItems = [...(s.contractItems || [])];
+              const assignment = assignments.find(a => a.supplierCpf === s.cpf);
+              
+              if (assignment) {
+                  const idx = currentItems.findIndex(ci => superNormalize(ci.name) === normTarget);
+                  if (idx >= 0) {
+                      currentItems[idx] = { ...currentItems[idx], totalKg: assignment.totalKg, valuePerKg: assignment.valuePerKg, unit: assignment.unit || currentItems[idx].unit };
+                  } else {
+                      currentItems.push({ name: itemName.toUpperCase(), totalKg: assignment.totalKg, valuePerKg: assignment.valuePerKg, unit: assignment.unit || 'kg-1' });
+                  }
+              } else {
+                  // Remove o item se ele existia e não está mais nas atribuições
+                  const filtered = currentItems.filter(ci => superNormalize(ci.name) !== normTarget);
+                  s.contractItems = filtered;
+                  return;
+              }
+              s.contractItems = currentItems;
+              // Recalcula valor inicial do contrato do fornecedor
+              s.initialValue = s.contractItems.reduce((sum, item) => sum + (item.totalKg * item.valuePerKg), 0);
+          });
+
+          await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
+          return { success: true, message: 'Contratos atualizados com sucesso.' };
+      } catch (error: any) {
+          return { success: false, message: error.message };
+      } finally {
+          setIsSaving(false);
+      }
+  }, [suppliers, writeToDatabase]);
+
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800 italic animate-pulse tracking-tighter">CARREGANDO DADOS...</div>;
 
   return (
@@ -208,6 +223,7 @@ const App: React.FC = () => {
             onManualInvoiceEntry={async () => ({success: true})}
             onDeleteWarehouseEntry={async () => ({success: true, message: ''})}
             onUpdateWarehouseEntry={handleUpdateWarehouseEntry}
+            onUpdateContractForItem={handleUpdateContractForItem}
             onRegisterCleaningLog={async () => ({success: true, message: ''})}
             onDeleteCleaningLog={async () => {}}
             onRegisterDirectorWithdrawal={async () => ({success: true, message: ''})}
