@@ -45,10 +45,9 @@ const cleanNumericValue = (val: any): number => {
 };
 
 /**
- * CONVERSOR DE DATA ANTI-FUSO HORÁRIO
- * O JavaScript costuma subtrair horas de datas ISO puras, 
- * transformando 01/01/2026 em 31/12/2025. 
- * Esta função força o tratamento como texto puro (YYYY-MM-DD).
+ * CONVERSOR DE DATA ULTRA-ROBUSTO 2026
+ * Força que 01/01 ou 01/01/26 se tornem 2026-01-01.
+ * Ignora fusos horários tratando tudo como string pura.
  */
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
@@ -57,7 +56,6 @@ const standardizeDate = (rawDate: any): string => {
     // 1. Caso seja Excel Serial (ex: 46022)
     if (!isNaN(Number(s)) && Number(s) > 40000) {
         const excelDate = parseFloat(s);
-        // Usar UTC explicitamente para evitar que o fuso horário mude o dia
         const date = new Date(Date.UTC(1899, 11, 30)); 
         date.setUTCDate(date.getUTCDate() + Math.floor(excelDate));
         
@@ -67,14 +65,19 @@ const standardizeDate = (rawDate: any): string => {
         return `${year}-${month}-${day}`;
     }
 
-    // 2. Remover horas ou timestamps (T00:00:00)
-    s = s.split(' ')[0].split('T')[0];
-    
-    // Normalizar separadores
+    // 2. Limpeza e Normalização de Separadores
+    s = s.split(' ')[0].split('T')[0]; // Remove horas
     s = s.replace(/[\.\/]/g, '-');
 
     const parts = s.split('-');
     
+    if (parts.length === 2) {
+        // Formato DD-MM (Injeta 2026)
+        const day = parts[0].padStart(2, '0');
+        const month = parts[1].padStart(2, '0');
+        return `2026-${month}-${day}`;
+    }
+
     if (parts.length === 3) {
         let day, month, year;
         
@@ -86,8 +89,14 @@ const standardizeDate = (rawDate: any): string => {
             day = parts[0].padStart(2, '0');
             month = parts[1].padStart(2, '0');
             year = parts[2];
-            if (year.length === 2) year = '20' + year;
+            
+            if (year.length === 2) {
+                year = '20' + year;
+            }
         }
+        // Forçar 2026 se estiver em outro ano (Contexto do App)
+        if (year !== '2026') year = '2026';
+        
         return `${year}-${month}-${day}`;
     }
 

@@ -26,32 +26,29 @@ const superNormalize = (text: string) => {
 };
 
 /**
- * Extrator de mês Ultra-Resiliente: 
- * Agora ele prioriza a detecção de "-01-" ou "/01/" em qualquer lugar da string, 
- * ignorando o ano se necessário, para garantir que Janeiro de 2026 nunca seja perdido.
+ * EXTRATOR DE MÊS DEFINITIVO
+ * Procura por padrões numéricos de Janeiro (01) antes de qualquer lógica complexa.
  */
 const getMonthNameFromDate = (dateStr?: string): string => {
     if (!dateStr) return "Mês Indefinido";
     
     const s = String(dateStr).trim();
     
-    // Se a string contiver o padrão de Janeiro em ISO ou BR
-    if (s.includes("-01-") || s.includes("/01/") || s.includes("JANEIRO") || s.toUpperCase().includes("JAN")) {
+    // Teste direto para Janeiro (Mais comum em CSVs brasileiros e ISOs)
+    if (s.includes("-01-") || s.includes("/01/") || s.match(/[-/]01[-/]/) || s.toUpperCase().includes("JANEIRO") || s.toUpperCase().includes("JAN")) {
         return "Janeiro";
     }
 
-    // Processamento padrão para outros meses
+    // Normalização para outros meses
     const cleanStr = s.replace(/[\.\/]/g, '-');
     const parts = cleanStr.split('-');
 
     if (parts.length >= 2) {
         let mIdx = -1;
-        // Se for ISO (YYYY-MM-DD)
-        if (parts[0].length === 4) {
-            mIdx = parseInt(parts[1], 10) - 1;
-        } else {
-            // Se for BR (DD-MM-YYYY)
-            mIdx = parseInt(parts[1], 10) - 1;
+        // Tenta detectar posição do mês (ISO: part[1], BR: part[1])
+        const candidate = parseInt(parts[1], 10);
+        if (!isNaN(candidate)) {
+            mIdx = candidate - 1;
         }
 
         if (mIdx >= 0 && mIdx < 12) return months[mIdx];
@@ -109,7 +106,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             });
         });
 
-        // 2. Acumular Entradas do Almoxarifado com Match Inteligente de Nomes e Meses
+        // 2. Acumular Entradas do Almoxarifado com Match Inteligente
         warehouseLog.forEach(log => {
             if (log.type === 'entrada') {
                 const logSupplierNorm = superNormalize(log.supplierName);
@@ -119,14 +116,11 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                 // Filtro para o 1º quadrimestre
                 if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(mName)) return;
 
-                // Match flexível: Verifica se algum registro consolidado "contém" o nome do log
-                for (let [key, val] of consolidated.entries()) {
+                // Match flexível (Busca por nomes aproximados em todas as entradas consolidadas do mês)
+                for (let val of consolidated.values()) {
                     if (val.month === mName) {
-                        // Se o fornecedor no log está contido ou contém o nome do fornecedor no contrato
                         const supplierMatch = val.normSupplier.includes(logSupplierNorm) || logSupplierNorm.includes(val.normSupplier);
-                        
                         if (supplierMatch) {
-                            // Se o item no log está contido ou contém o nome do item no contrato
                             const itemMatch = val.normItem.includes(logItemNorm) || logItemNorm.includes(val.normItem);
                             if (itemMatch) {
                                 val.receivedKg += (Number(log.quantity) || 0);
@@ -242,7 +236,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                         <td className={`p-5 text-right font-black ${item.financialLoss > 0.01 ? 'text-red-700' : 'text-gray-200'}`}>{item.financialLoss > 0.01 ? formatCurrency(item.financialLoss) : 'R$ 0,00'}</td>
                                     </tr>
                                 )) : (
-                                    <tr><td colSpan={7} className="p-32 text-center text-gray-400 font-black uppercase tracking-widest italic bg-gray-50">Nenhum dado de estoque localizado para o período selecionado.</td></tr>
+                                    <tr><td colSpan={7} className="p-32 text-center text-gray-400 font-black uppercase tracking-widest italic bg-gray-50">Nenhum dado de estoque localizado para Janeiro a Abril de 2026. Verifique o ano na planilha importada.</td></tr>
                                 )}
                             </tbody>
                             <tfoot className="bg-gray-900 text-white font-black text-xs border-t-4 border-green-800">

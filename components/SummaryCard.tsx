@@ -99,11 +99,11 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
                 const deliveredInMonth = supplier.deliveries.filter(d => {
                     if (d.item !== item.name) return false;
                     
-                    // EXTRAÇÃO SEGURA DE MÊS (YYYY-MM-DD -> [YYYY, MM, DD])
-                    // Ignora fuso horário ao olhar diretamente para a string
+                    // EXTRAÇÃO SEGURA DE MÊS DA STRING ISO (YYYY-MM-DD)
                     const parts = d.date.split('-');
                     if (parts.length < 2) return false;
-                    const monthNumber = parseInt(parts[1], 10);
+                    
+                    const monthNumber = parseInt(parts[1], 10); // Janeiro = 1
                     
                     // Janeiro é 01, mas no constants.ts Janeiro é 0 (index).
                     return (monthNumber - 1) === month.number;
