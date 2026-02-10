@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import type { Supplier, WarehouseMovement } from '../types';
 
@@ -12,6 +13,7 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+// Normalização absoluta para comparação de strings (remove acentos e espaços)
 const superNormalize = (text: string) => {
     return (text || "")
         .toString()
@@ -60,11 +62,13 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
     const [selectedSupplierName, setSelectedSupplierName] = useState('all'); 
     const [selectedMonth, setSelectedMonth] = useState('all');
 
-    const itespSuppliers = useMemo(() => {
-        return suppliers.filter(s => ALLOWED_SUPPLIERS.includes(s.name.toUpperCase()));
-    }, [suppliers]);
-
     const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+    // Lógica de filtragem robusta para os fornecedores do ITESP
+    const itespSuppliers = useMemo(() => {
+        const normalizedAllowed = ALLOWED_SUPPLIERS.map(superNormalize);
+        return suppliers.filter(s => normalizedAllowed.includes(superNormalize(s.name)));
+    }, [suppliers]);
 
     const comparisonData = useMemo(() => {
         if (!itespSuppliers) return [];
@@ -109,7 +113,9 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         warehouseLog.forEach(log => {
             if (log.type === 'entrada' && log.inboundInvoice) {
                 const sNorm = superNormalize(log.supplierName);
-                if (!ALLOWED_SUPPLIERS.map(superNormalize).includes(sNorm)) return;
+                const normalizedAllowed = ALLOWED_SUPPLIERS.map(superNormalize);
+                
+                if (!normalizedAllowed.includes(sNorm)) return;
 
                 const iNorm = superNormalize(log.itemName);
                 const nfNorm = normalizeInvoice(log.inboundInvoice);
@@ -215,7 +221,6 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
 
             <main className="p-4 md:p-8 max-w-[1600px] mx-auto">
                 <div className="bg-white p-6 rounded-2xl shadow-xl animate-fade-in border border-gray-100">
-                    {/* Barra de Filtros conforme Imagem */}
                     <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                         <div className="w-full md:w-80">
                             <input 
@@ -248,7 +253,6 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                         </div>
                     </div>
 
-                    {/* Tabela com cabeçalhos e cores da imagem */}
                     <div className="overflow-x-auto rounded-xl border border-gray-100">
                         <table className="w-full text-sm">
                             <thead className="bg-[#F9FAFB] text-[#9CA3AF] text-[10px] uppercase font-black tracking-widest border-b">
