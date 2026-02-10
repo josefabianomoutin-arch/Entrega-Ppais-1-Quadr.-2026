@@ -21,7 +21,7 @@ const directorWithdrawalsRef = ref(database, 'directorWithdrawals');
 const standardMenuRef = ref(database, 'standardMenu');
 const dailyMenusRef = ref(database, 'dailyMenus');
 
-// Normalização absoluta para comparação de dados
+// Normalização absoluta para comparação de dados (remove tudo que não for letra ou número)
 const superNormalize = (text: string) => {
     return (text || "")
         .toString()
@@ -62,7 +62,7 @@ const App: React.FC = () => {
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
   const [emailModalData, setEmailModalData] = useState<{ recipient: string; cc: string; subject: string; body: string; mailtoLink: string; } | null>(null);
 
-  // Deriva o usuário atual da lista global que é atualizada em tempo real pelo Firebase
+  // Deriva o usuário atual da lista global
   const currentUser = useMemo(() => {
     if (!loggedInCpf) return null;
     return suppliers.find(s => s.cpf === loggedInCpf) || null;
@@ -103,14 +103,20 @@ const App: React.FC = () => {
         setWarehouseLog([]);
         return;
       }
-      // Conversão ultra-segura para garantir que entradas de qualquer mês (Jan-Abr) sejam capturadas
-      const logsArray = Object.entries(data).map(([key, val]: [string, any]) => ({
-        ...val,
-        id: val.id || key,
-        quantity: Number(val.quantity) || 0,
-        itemName: (val.itemName || "").toUpperCase().trim(),
-        supplierName: (val.supplierName || "").toUpperCase().trim()
-      }));
+      // Captura profunda de dados históricos
+      const logsArray = Object.entries(data).map(([key, val]: [string, any]) => {
+        // Normalização de data para garantir reconhecimento de Janeiro
+        let rawDate = val.date || val.invoiceDate || (val.timestamp ? val.timestamp.split('T')[0] : "");
+        
+        return {
+            ...val,
+            id: val.id || key,
+            date: rawDate,
+            quantity: Number(val.quantity) || 0,
+            itemName: (val.itemName || "").toUpperCase().trim(),
+            supplierName: (val.supplierName || "").toUpperCase().trim()
+        };
+      });
       setWarehouseLog(logsArray);
     });
 
