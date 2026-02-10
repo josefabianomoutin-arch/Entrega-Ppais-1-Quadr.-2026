@@ -103,15 +103,14 @@ const App: React.FC = () => {
         setWarehouseLog([]);
         return;
       }
-      // Captura profunda e resiliente de dados
+      // Captura profunda e resiliente de dados com limpeza de espaços
       const logsArray = Object.entries(data).map(([key, val]: [string, any]) => {
-        // Normalização de data para suportar números (Excel) e strings
-        let rawDate = val.date || val.invoiceDate || (val.timestamp ? String(val.timestamp).split('T')[0] : "");
+        let rawDate = (val.date || val.invoiceDate || (val.timestamp ? String(val.timestamp).split('T')[0] : "")).toString().trim();
         
         return {
             ...val,
             id: val.id || key,
-            date: String(rawDate),
+            date: rawDate,
             quantity: Number(val.quantity) || 0,
             itemName: (val.itemName || "").toUpperCase().trim(),
             supplierName: (val.supplierName || "").toUpperCase().trim()
