@@ -36,18 +36,16 @@ const superNormalize = (text: string) => {
 const cleanNumericValue = (val: any): number => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
-    let s = String(val).trim();
-    // Se tem ponto e vírgula, assume formato BR (1.234,56)
-    if (s.includes('.') && s.includes(',')) {
+    let s = String(val).trim().replace(/\s/g, '');
+    
+    if (s.includes(',')) {
+        // Formato BR: remove pontos de milhar e troca vírgula por ponto
         s = s.replace(/\./g, '').replace(',', '.');
-    } else if (s.includes(',')) {
-        // Se tem só vírgula, assume decimal BR (1234,56)
-        s = s.replace(',', '.');
     }
     return parseFloat(s) || 0;
 };
 
-// Conversor Universal de Datas para ISO (YYYY-MM-DD)
+// Conversor Universal de Datas para ISO (YYYY-MM-DD) - Reforçado para Janeiro
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
     let s = String(rawDate).trim();
@@ -58,14 +56,24 @@ const standardizeDate = (rawDate: any): string => {
         return d.toISOString().split('T')[0];
     }
 
-    // 2. Trata formato BR (DD/MM/YYYY ou DD/MM/YY)
+    // 2. Normaliza separadores para "/"
+    s = s.replace(/[\.\-]/g, '/');
+
     if (s.includes('/')) {
         const parts = s.split('/');
         if (parts.length === 3) {
-            let day = parts[0].padStart(2, '0');
-            let month = parts[1].padStart(2, '0');
-            let year = parts[2];
-            if (year.length === 2) year = '20' + year;
+            let day, month, year;
+            // Detecta se é ISO (YYYY/MM/DD) ou BR (DD/MM/YYYY)
+            if (parts[0].length === 4) {
+                year = parts[0];
+                month = parts[1].padStart(2, '0');
+                day = parts[2].padStart(2, '0');
+            } else {
+                day = parts[0].padStart(2, '0');
+                month = parts[1].padStart(2, '0');
+                year = parts[2];
+                if (year.length === 2) year = '20' + year;
+            }
             return `${year}-${month}-${day}`;
         }
     }

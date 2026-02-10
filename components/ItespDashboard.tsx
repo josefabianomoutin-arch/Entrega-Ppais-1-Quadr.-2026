@@ -26,19 +26,31 @@ const superNormalize = (text: string) => {
 };
 
 /**
- * Extrator de mês aprimorado para datas normalizadas ISO (YYYY-MM-DD)
+ * Extrator de mês Ultra-Resiliente: 
+ * Tenta capturar o mês independentemente do separador (/ ou - ou .) 
+ * e da ordem dos campos.
  */
 const getMonthNameFromDate = (dateStr?: string): string => {
     if (!dateStr) return "Mês Indefinido";
     
-    // Tenta formato ISO: 2026-01-10
-    const parts = dateStr.split('-');
-    if (parts.length === 3 && parts[0].length === 4) {
-        const mIdx = parseInt(parts[1], 10) - 1;
+    // Normaliza separadores
+    const cleanStr = dateStr.replace(/[\.\/]/g, '-');
+    const parts = cleanStr.split('-');
+
+    if (parts.length === 3) {
+        let mIdx = -1;
+        // Se for ISO (2026-01-01), o mês é o segundo [1]
+        if (parts[0].length === 4) {
+            mIdx = parseInt(parts[1], 10) - 1;
+        } else {
+            // Se for BR (01-01-2026), o mês é o segundo [1]
+            mIdx = parseInt(parts[1], 10) - 1;
+        }
+
         if (mIdx >= 0 && mIdx < 12) return months[mIdx];
     }
     
-    // Fallback para strings que contêm o nome do mês
+    // Fallback: Busca por nomes de meses por extenso na string
     const upper = dateStr.toUpperCase();
     if (upper.includes("JANEIRO") || upper.includes("JAN")) return "Janeiro";
     if (upper.includes("FEVEREIRO") || upper.includes("FEV")) return "Fevereiro";
@@ -104,11 +116,13 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                 const iNorm = superNormalize(log.itemName);
                 const mName = getMonthNameFromDate(log.date);
                 
+                // Filtro estrito para o 1º quadrimestre
                 if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(mName)) return;
 
-                // Match inteligente: Procura por nome do fornecedor e item
+                // Loop nas metas para encontrar o par correspondente
                 for (let val of consolidated.values()) {
                     if (val.month === mName && (val.normSupplier.includes(sNorm) || sNorm.includes(val.normSupplier))) {
+                        // Verifica o item (Fuzzy Match)
                         if (val.normItem.includes(iNorm) || iNorm.includes(val.normItem)) {
                             val.receivedKg += (Number(log.quantity) || 0);
                             break;
