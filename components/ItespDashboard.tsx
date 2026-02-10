@@ -8,6 +8,8 @@ interface ItespDashboardProps {
   onLogout: () => void;
 }
 
+const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
 const formatCurrency = (value: number) => {
     if (isNaN(value)) return 'R$ 0,00';
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -21,6 +23,35 @@ const superNormalize = (text: string) => {
         .replace(/[\u0300-\u036f]/g, "") 
         .replace(/[^a-z0-9]/g, "") 
         .trim();
+};
+
+const getMonthNameFromDate = (dateStr?: string, timestamp?: string): string => {
+    const d = dateStr || (timestamp ? timestamp.split('T')[0] : "");
+    if (!d) return "Mês Indefinido";
+
+    // Formato ISO: YYYY-MM-DD
+    let parts = d.split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+        const monthIndex = parseInt(parts[1], 10) - 1;
+        return months[monthIndex] || "Mês Indefinido";
+    }
+
+    // Formato Brasileiro: DD/MM/YYYY
+    parts = d.split('/');
+    if (parts.length === 3) {
+        const monthIndex = parseInt(parts[1], 10) - 1;
+        return months[monthIndex] || "Mês Indefinido";
+    }
+
+    // Fallback: Tentativa via construtor nativo (menos confiável para BR)
+    try {
+        const dateObj = new Date(d);
+        if (!isNaN(dateObj.getTime())) {
+            return months[dateObj.getMonth()];
+        }
+    } catch (e) {}
+
+    return "Mês Indefinido";
 };
 
 const ALLOWED_SUPPLIERS = [
@@ -51,8 +82,6 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
     const [selectedSupplierName, setSelectedSupplierName] = useState('all'); 
     const [selectedMonth, setSelectedMonth] = useState('all');
 
-    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-
     const itespSuppliers = useMemo(() => {
         const normalizedAllowed = ALLOWED_SUPPLIERS.map(superNormalize);
         return suppliers.filter(s => normalizedAllowed.includes(superNormalize(s.name)));
@@ -72,13 +101,13 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             unitPrice: number
         }>();
 
-        // 1. Base: Metas Contratuais (Anchor principal)
+        // 1. Base: Metas Contratuais
         itespSuppliers.forEach(s => {
+            const supplierNorm = superNormalize(s.name);
             s.contractItems.forEach(ci => {
                 const itemNorm = superNormalize(ci.name);
-                // Auditoria do 1º Quadrimestre
                 ['Janeiro', 'Fevereiro', 'Março', 'Abril'].forEach(mName => {
-                    const key = `${superNormalize(s.name)}|${itemNorm}|${mName}`;
+                    const key = `${supplierNorm}|${itemNorm}|${mName}`;
                     consolidated.set(key, {
                         supplierName: s.name,
                         productName: ci.name,
@@ -93,13 +122,12 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             });
         });
 
-        // 2. Agregação de Faturamento (Apenas informativo)
+        // 2. Agregação de Faturamento (Deliveries)
         itespSuppliers.forEach(s => {
             const supplierNorm = superNormalize(s.name);
             (s.deliveries || []).forEach(d => {
                 if (d.invoiceUploaded && d.invoiceNumber && d.item && d.item !== 'AGENDAMENTO PENDENTE') {
-                    const dateObj = new Date(d.date + 'T00:00:00');
-                    const mName = months[dateObj.getMonth()];
+                    const mName = getMonthNameFromDate(d.date);
                     const key = `${supplierNorm}|${superNormalize(d.item)}|${mName}`;
                     
                     const entry = consolidated.get(key);
@@ -111,18 +139,14 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             });
         });
 
-        // 3. Agregação de Estoque Real (O que realmente chegou)
+        // 3. Agregação de Estoque Real (WarehouseLog)
         warehouseLog.forEach(log => {
             if (log.type === 'entrada') {
                 const sNorm = superNormalize(log.supplierName);
                 const iNorm = superNormalize(log.itemName);
+                const mName = getMonthNameFromDate(log.date, log.timestamp);
                 
-                // CRÍTICO: Usa log.date (data real informada) em vez de log.timestamp (data de sistema)
-                const documentDate = log.date || log.timestamp.split('T')[0];
-                const dateObj = new Date(documentDate + 'T00:00:00');
-                const mName = months[dateObj.getMonth()];
                 const key = `${sNorm}|${iNorm}|${mName}`;
-
                 const entry = consolidated.get(key);
                 if (entry) {
                     entry.receivedKg += (log.quantity || 0);
@@ -130,12 +154,12 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             }
         });
 
-        // 4. Cálculo final: Meta vs. Estoque
-        return Array.from(consolidated.values()).map(data => {
-            // A falta é estritamente o que foi prometido no contrato menos o que está no estoque
+        // 4. Transformação Final
+        return Array.from(consolidated.values()).map((data, idx) => {
             const shortfallKg = Math.max(0, data.contractedKgMonthly - data.receivedKg);
             return {
                 ...data,
+                id: `itesp-item-${idx}`,
                 invoiceList: Array.from(data.invoices).join(', ') || 'Nenhuma NF',
                 shortfallKg: shortfallKg,
                 financialLoss: shortfallKg * data.unitPrice

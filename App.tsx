@@ -103,9 +103,10 @@ const App: React.FC = () => {
         setWarehouseLog([]);
         return;
       }
-      const logsArray = Object.entries(data).map(([key, val]: [string, any]) => ({
+      // Garante que o log seja sempre tratado como um array de objetos válidos
+      const logsArray = normalizeArray<any>(data).map((val: any, index) => ({
         ...val,
-        id: key 
+        id: val.id || `log-idx-${index}`
       }));
       setWarehouseLog(logsArray);
     });

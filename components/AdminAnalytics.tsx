@@ -7,6 +7,8 @@ interface AdminAnalyticsProps {
   warehouseLog: WarehouseMovement[];
 }
 
+const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
 const formatCurrency = (value: number) => {
     if (isNaN(value)) return 'R$ 0,00';
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -22,12 +24,31 @@ const superNormalize = (text: string) => {
         .trim();
 };
 
+const getMonthNameFromDate = (dateStr?: string, timestamp?: string): string => {
+    const d = dateStr || (timestamp ? timestamp.split('T')[0] : "");
+    if (!d) return "Mês Indefinido";
+
+    // ISO: YYYY-MM-DD
+    let parts = d.split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+        const monthIndex = parseInt(parts[1], 10) - 1;
+        return months[monthIndex] || "Mês Indefinido";
+    }
+
+    // BR: DD/MM/YYYY
+    parts = d.split('/');
+    if (parts.length === 3) {
+        const monthIndex = parseInt(parts[1], 10) - 1;
+        return months[monthIndex] || "Mês Indefinido";
+    }
+
+    return "Mês Indefinido";
+};
+
 const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehouseLog = [] }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedSupplierName, setSelectedSupplierName] = useState<string>('all');
     const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all');
-
-    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
     const supplierOptions = useMemo(() => {
         const uniqueNames = [...new Set(suppliers.map(s => s.name))];
@@ -69,43 +90,38 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
             });
         });
 
-        // 2. Somar Faturamento (Informativo)
+        // 2. Somar Faturamento (Informação da Delivery)
         suppliers.forEach(s => {
             const supplierNorm = superNormalize(s.name);
             (s.deliveries || []).forEach(d => {
                 if (d.invoiceUploaded && d.item && d.item !== 'AGENDAMENTO PENDENTE') {
-                    const dateObj = new Date(d.date + 'T00:00:00');
-                    const mName = months[dateObj.getMonth()];
+                    const mName = getMonthNameFromDate(d.date);
                     const key = `${supplierNorm}|${superNormalize(d.item)}|${mName}`;
-                    
                     const entry = consolidated.get(key);
                     if (entry) entry.billedKg += (d.kg || 0);
                 }
             });
         });
 
-        // 3. Somar Estoque Real (Crítico para Auditoria)
+        // 3. Somar Estoque Real (WarehouseLog)
         warehouseLog.forEach(log => {
             if (log.type === 'entrada') {
                 const sNorm = superNormalize(log.supplierName);
                 const iNorm = superNormalize(log.itemName);
+                const mName = getMonthNameFromDate(log.date, log.timestamp);
                 
-                // CRÍTICO: Usa a data informada no movimento
-                const documentDate = log.date || log.timestamp.split('T')[0];
-                const dateObj = new Date(documentDate + 'T00:00:00');
-                const mName = months[dateObj.getMonth()];
                 const key = `${sNorm}|${iNorm}|${mName}`;
-                
                 const entry = consolidated.get(key);
                 if (entry) entry.receivedKg += (log.quantity || 0);
             }
         });
 
-        // 4. Calcular Falta Real (Meta - Estoque)
-        return Array.from(consolidated.values()).map(data => {
+        // 4. Cálculo final
+        return Array.from(consolidated.values()).map((data, idx) => {
             const shortfallKg = Math.max(0, data.contractedKgMonthly - data.receivedKg);
             return {
                 ...data,
+                id: `audit-${idx}`,
                 shortfallKg,
                 financialLoss: shortfallKg * data.price
             };
@@ -188,8 +204,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {filteredData.length > 0 ? filteredData.map((item, idx) => (
-                                <tr key={idx} className={`hover:bg-gray-50 transition-colors ${item.shortfallKg > 0.001 ? 'bg-red-50/10' : ''}`}>
+                            {filteredData.length > 0 ? filteredData.map((item) => (
+                                <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${item.shortfallKg > 0.001 ? 'bg-red-50/10' : ''}`}>
                                     <td className="p-4 font-bold text-gray-800 uppercase">{item.supplierReal}</td>
                                     <td className="p-4 text-gray-600 uppercase text-xs font-medium">{item.itemReal}</td>
                                     <td className="p-4 font-medium text-gray-500">{item.month}</td>
