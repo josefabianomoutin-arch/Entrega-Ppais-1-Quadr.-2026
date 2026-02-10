@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-// Import types directly to ensure they are available for use in generic positions
 import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
@@ -21,7 +20,6 @@ const directorWithdrawalsRef = ref(database, 'directorWithdrawals');
 const standardMenuRef = ref(database, 'standardMenu');
 const dailyMenusRef = ref(database, 'dailyMenus');
 
-// Normalização absoluta para comparação de dados (Remove acentos, espaços e caracteres especiais)
 const superNormalize = (text: string) => {
     return (text || "")
         .toString()
@@ -32,47 +30,35 @@ const superNormalize = (text: string) => {
         .trim();
 };
 
-// Limpador de números inteligente (Trata 1.250,50 ou 1250.50)
 const cleanNumericValue = (val: any): number => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
     let s = String(val).trim().replace(/\s/g, '');
-    
     if (s.includes(',')) {
         s = s.replace(/\./g, '').replace(',', '.');
     }
     return parseFloat(s) || 0;
 };
 
-/**
- * CONVERSOR DE DATA ULTRA-ROBUSTO 2026
- * Força que 01/01 ou 01/01/26 se tornem 2026-01-01.
- * Ignora fusos horários tratando tudo como string pura.
- */
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
     let s = String(rawDate).trim();
 
-    // 1. Caso seja Excel Serial (ex: 46022)
     if (!isNaN(Number(s)) && Number(s) > 40000) {
         const excelDate = parseFloat(s);
         const date = new Date(Date.UTC(1899, 11, 30)); 
         date.setUTCDate(date.getUTCDate() + Math.floor(excelDate));
-        
-        const year = date.getUTCFullYear();
+        const year = "2026"; // Forçar 2026
         const month = String(date.getUTCMonth() + 1).padStart(2, '0');
         const day = String(date.getUTCDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     }
 
-    // 2. Limpeza e Normalização de Separadores
-    s = s.split(' ')[0].split('T')[0]; // Remove horas
+    s = s.split(' ')[0].split('T')[0];
     s = s.replace(/[\.\/]/g, '-');
-
     const parts = s.split('-');
     
     if (parts.length === 2) {
-        // Formato DD-MM (Injeta 2026)
         const day = parts[0].padStart(2, '0');
         const month = parts[1].padStart(2, '0');
         return `2026-${month}-${day}`;
@@ -80,26 +66,17 @@ const standardizeDate = (rawDate: any): string => {
 
     if (parts.length === 3) {
         let day, month, year;
-        
-        if (parts[0].length === 4) { // ISO YYYY-MM-DD
-            year = parts[0];
+        if (parts[0].length === 4) {
+            year = "2026"; // Forçar 2026
             month = parts[1].padStart(2, '0');
             day = parts[2].padStart(2, '0');
-        } else { // BR DD-MM-YYYY
+        } else {
             day = parts[0].padStart(2, '0');
             month = parts[1].padStart(2, '0');
-            year = parts[2];
-            
-            if (year.length === 2) {
-                year = '20' + year;
-            }
+            year = "2026"; // Forçar 2026
         }
-        // Forçar 2026 se estiver em outro ano (Contexto do App)
-        if (year !== '2026') year = '2026';
-        
         return `${year}-${month}-${day}`;
     }
-
     return s;
 };
 
@@ -121,7 +98,6 @@ const App: React.FC = () => {
   const [standardMenu, setStandardMenu] = useState<StandardMenu>({});
   const [dailyMenus, setDailyMenus] = useState<DailyMenus>({});
   const [loading, setLoading] = useState(true);
-  
   const [loggedInCpf, setLoggedInCpf] = useState<string | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isAlmoxarifadoLoggedIn, setIsAlmoxarifadoLoggedIn] = useState(false);
@@ -129,7 +105,6 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState<any>('register');
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
-  const [emailModalData, setEmailModalData] = useState<any>(null);
 
   const currentUser = useMemo(() => {
     if (!loggedInCpf) return null;
@@ -141,157 +116,46 @@ const App: React.FC = () => {
     const unsubSuppliers = onValue(suppliersRef, (snapshot) => {
       const data = snapshot.val();
       const raw = normalizeArray<any>(data);
-      const suppliersArray: Supplier[] = raw.map(p => ({
+      setSuppliers(raw.map(p => ({
           ...p,
           name: (p.name || 'SEM NOME').toUpperCase().trim(),
           cpf: p.cpf || String(Math.random()),
-          contractItems: normalizeArray(p.contractItems).map((ci: any) => ({ 
-              ...ci, 
-              name: (ci.name || '').toUpperCase().trim(),
-              totalKg: cleanNumericValue(ci.totalKg),
-              valuePerKg: cleanNumericValue(ci.valuePerKg)
-          })),
-          deliveries: normalizeArray<any>(p.deliveries).map((d: any) => ({ 
-              ...d, 
-              date: standardizeDate(d.date),
-              item: (d.item || '').toUpperCase().trim(),
-              kg: cleanNumericValue(d.kg),
-              value: cleanNumericValue(d.value),
-              lots: normalizeArray(d.lots).map((l: any) => ({ 
-                ...l, 
-                remainingQuantity: cleanNumericValue(l.remainingQuantity)
-              }))
-          })),
+          contractItems: normalizeArray(p.contractItems).map((ci: any) => ({ ...ci, name: (ci.name || '').toUpperCase().trim(), totalKg: cleanNumericValue(ci.totalKg), valuePerKg: cleanNumericValue(ci.valuePerKg) })),
+          deliveries: normalizeArray<any>(p.deliveries).map((d: any) => ({ ...d, date: standardizeDate(d.date), item: (d.item || '').toUpperCase().trim(), kg: cleanNumericValue(d.kg), value: cleanNumericValue(d.value) })),
           allowedWeeks: normalizeArray<number>(p.allowedWeeks),
           initialValue: cleanNumericValue(p.initialValue),
-      })).sort((a, b) => a.name.localeCompare(b.name));
-      
-      setSuppliers(suppliersArray);
+      })));
       setLoading(false);
     });
 
     const unsubLog = onValue(warehouseLogRef, (snapshot) => {
       const data = snapshot.val();
-      if (!data) {
-        setWarehouseLog([]);
-        return;
-      }
-      const logsArray = Object.entries(data).map(([key, val]: [string, any]) => {
-        return {
-            ...val,
-            id: val.id || key,
-            date: standardizeDate(val.date || val.invoiceDate || (val.timestamp ? val.timestamp.split('T')[0] : "")),
-            quantity: cleanNumericValue(val.quantity),
-            itemName: (val.itemName || "").toUpperCase().trim(),
-            supplierName: (val.supplierName || "").toUpperCase().trim()
-        };
-      });
-      setWarehouseLog(logsArray);
+      if (!data) { setWarehouseLog([]); return; }
+      setWarehouseLog(Object.entries(data).map(([key, val]: [string, any]) => ({
+          ...val,
+          id: val.id || key,
+          date: standardizeDate(val.date || val.invoiceDate || (val.timestamp ? val.timestamp.split('T')[0] : "")),
+          quantity: cleanNumericValue(val.quantity),
+          itemName: (val.itemName || "").toUpperCase().trim(),
+          supplierName: (val.supplierName || "").toUpperCase().trim()
+      })));
     });
 
-    const unsubClean = onValue(cleaningLogsRef, (snapshot) => setCleaningLogs(normalizeArray<CleaningLog>(snapshot.val())));
-    const unsubDir = onValue(directorWithdrawalsRef, (snapshot) => setDirectorWithdrawals(normalizeArray<DirectorPerCapitaLog>(snapshot.val())));
-    const unsubConfig = onValue(perCapitaConfigRef, (snapshot) => setPerCapitaConfig(snapshot.val() || {}));
-    const unsubMenu = onValue(standardMenuRef, (snapshot) => setStandardMenu(snapshot.val() || {}));
-    const unsubDailyMenus = onValue(dailyMenusRef, (snapshot) => setDailyMenus(snapshot.val() || {}));
-
-    return () => {
-      unsubSuppliers(); unsubLog(); unsubClean(); unsubDir(); unsubConfig(); unsubMenu(); unsubDailyMenus();
-    };
-  }, []);
-
-  const handleRegisterWarehouseEntry = async (payload: any) => {
-    setIsSaving(true);
-    const supplierRef = ref(database, `suppliers/${payload.supplierCpf}`);
-    const lotId = `lot-${Date.now()}-${Math.random()}`;
-    const isoDate = standardizeDate(payload.invoiceDate);
-    
-    try {
-      const result = await runTransaction(supplierRef, (currentSupplier) => {
-        if (!currentSupplier) return null;
-        const deliveries = normalizeArray<any>(currentSupplier.deliveries);
-        const qty = cleanNumericValue(payload.quantity);
-        const newLot = { id: lotId, lotNumber: payload.lotNumber.toUpperCase(), initialQuantity: qty, remainingQuantity: qty, expirationDate: payload.expirationDate };
-
-        let delivery = deliveries.find(d => d.invoiceNumber === payload.invoiceNumber && superNormalize(d.item) === superNormalize(payload.itemName));
-
-        if (delivery) {
-          delivery.lots = [...normalizeArray(delivery.lots), newLot];
-        } else {
-          deliveries.push({ id: `del-entry-${Date.now()}`, date: isoDate, time: '08:00', item: payload.itemName.toUpperCase(), kg: qty, invoiceUploaded: true, invoiceNumber: payload.invoiceNumber, lots: [newLot] });
-        }
-        currentSupplier.deliveries = deliveries;
-        return currentSupplier;
-      });
-
-      if (result.committed) {
-        const logEntryRef = push(warehouseLogRef);
-        await set(logEntryRef, { 
-            id: logEntryRef.key, type: 'entrada', timestamp: new Date().toISOString(), date: isoDate, 
-            lotId, lotNumber: payload.lotNumber.toUpperCase(), itemName: payload.itemName.toUpperCase(), 
-            supplierName: result.snapshot.val().name, inboundInvoice: payload.invoiceNumber, 
-            quantity: cleanNumericValue(payload.quantity), expirationDate: payload.expirationDate 
-        });
-        setIsSaving(false);
-        return { success: true, message: "Entrada registrada!" };
-      }
-      return { success: false, message: "Erro ao processar." };
-    } catch (e) { setIsSaving(false); return { success: false, message: "Erro ao salvar." }; }
-  };
-
-  const handleRegisterWarehouseWithdrawal = async (payload: any) => {
-    setIsSaving(true);
-    const supplierRef = ref(database, `suppliers/${payload.supplierCpf}`);
-    const isoDate = standardizeDate(payload.date);
-    try {
-      const result = await runTransaction(supplierRef, (currentSupplier) => {
-        if (!currentSupplier) return null;
-        let qtyToDeduct = cleanNumericValue(payload.quantity);
-        const deliveries = normalizeArray<any>(currentSupplier.deliveries);
-        for (const d of deliveries) {
-            if (superNormalize(d.item) !== superNormalize(payload.itemName)) continue;
-            const lots = normalizeArray<any>(d.lots);
-            for (const l of lots) {
-                if (superNormalize(l.lotNumber) === superNormalize(payload.lotNumber) && cleanNumericValue(l.remainingQuantity) > 0) {
-                    const avail = cleanNumericValue(l.remainingQuantity);
-                    const take = Math.min(avail, qtyToDeduct);
-                    l.remainingQuantity = Number((avail - take).toFixed(4));
-                    qtyToDeduct -= take;
-                    if (qtyToDeduct <= 0) break;
-                }
-            }
-            d.lots = lots;
-            if (qtyToDeduct <= 0) break;
-        }
-        currentSupplier.deliveries = deliveries;
-        return currentSupplier;
-      });
-
-      if (result.committed) {
-        const logEntryRef = push(warehouseLogRef);
-        await set(logEntryRef, { 
-            id: logEntryRef.key, type: 'saída', timestamp: new Date().toISOString(), date: isoDate, 
-            lotId: 'various', lotNumber: payload.lotNumber.toUpperCase(), itemName: payload.itemName.toUpperCase(), 
-            supplierName: result.snapshot.val().name, outboundInvoice: payload.outboundInvoice, 
-            quantity: cleanNumericValue(payload.quantity), expirationDate: payload.expirationDate 
-        });
-        setIsSaving(false);
-        return { success: true, message: "Saída registrada!" };
-      }
-      setIsSaving(false);
-      return { success: false, message: "Erro ou saldo insuficiente." };
-    } catch (e) { setIsSaving(false); return { success: false, message: "Erro no banco." }; }
-  };
-
-  const writeToDatabase = useCallback(async (dbRef: any, data: any) => {
-    setIsSaving(true);
-    try { await set(dbRef, data); } catch (e) { console.error(e); } finally { setTimeout(() => setIsSaving(false), 500); }
+    onValue(cleaningLogsRef, (snapshot) => setCleaningLogs(normalizeArray(snapshot.val())));
+    onValue(directorWithdrawalsRef, (snapshot) => setDirectorWithdrawals(normalizeArray(snapshot.val())));
+    onValue(perCapitaConfigRef, (snapshot) => setPerCapitaConfig(snapshot.val() || {}));
+    onValue(standardMenuRef, (snapshot) => setStandardMenu(snapshot.val() || {}));
+    onValue(dailyMenusRef, (snapshot) => setDailyMenus(snapshot.val() || {}));
+    return () => {};
   }, []);
 
   const handleLogin = (n: string, c: string): boolean => {
     const inputNameNorm = superNormalize(n);
     const cleanCpf = c.replace(/[^\d]/g, '');
 
+    // NOVO LOGIN SOLICITADO: NOME DO PAINDA
+    if (inputNameNorm === 'nomedopainda' && c === 'itesp2026') { setIsItespLoggedIn(true); return true; }
+    
     if (inputNameNorm === 'administrador' && cleanCpf === '15210361870') { setIsAdminLoggedIn(true); return true; }
     if (inputNameNorm === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
     if (inputNameNorm === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
@@ -301,20 +165,18 @@ const App: React.FC = () => {
     return false;
   };
 
-  const handleRegister = async (n: string, c: string, w: number[]) => {
-    const fn = n.trim().toUpperCase(); const fc = c.replace(/[^\d]/g, '');
-    await runTransaction(suppliersRef, (curr) => { const obj = curr || {}; if (obj[fc]) return; obj[fc] = { name: fn, cpf: fc, initialValue: 0, contractItems: [], deliveries: [], allowedWeeks: w }; return obj; });
-    setRegistrationStatus({ success: true, message: `Cadastrado!` });
-  };
+  const writeToDatabase = useCallback(async (dbRef: any, data: any) => {
+    setIsSaving(true);
+    try { await set(dbRef, data); } finally { setTimeout(() => setIsSaving(false), 500); }
+  }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="animate-pulse font-black text-green-800 tracking-widest uppercase">Sincronizando Dados...</p></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800">CARREGANDO...</div>;
 
   return (
     <>
-      <div className={`fixed bottom-4 right-4 z-50 transition-opacity ${isSaving ? 'opacity-100' : 'opacity-0'}`}><div className="bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold animate-pulse">Salvando Alterações...</div></div>
-      {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={handleRegister} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async (o, n, c, w) => { await runTransaction(suppliersRef, (curr) => { if(!curr || !curr[o]) return; const d = { ...curr[o], name: n.toUpperCase(), cpf: c, allowedWeeks: w }; if(o !== c) delete curr[o]; curr[c] = d; return curr; }); return null; }} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async (s) => { await writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {})); return true; }} activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={registrationStatus} onClearRegistrationStatus={() => setRegistrationStatus(null)} onReopenInvoice={async (s, i) => {}} onDeleteInvoice={async (s, i) => {}} onUpdateInvoiceItems={async (s, i, it) => ({success: true})} onManualInvoiceEntry={async (s, d, n, it) => ({success: true})} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={async (l) => ({success: true, message: 'OK'})} onRegisterCleaningLog={async (l) => ({success: true, message: 'OK'})} onDeleteCleaningLog={async (id) => {}} onRegisterDirectorWithdrawal={async (l) => ({success: true, message: 'OK'})} onDeleteDirectorWithdrawal={async (id) => {}} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} onCancelDeliveries={() => {}} />
-      : currentUser ? <Dashboard supplier={currentUser} onLogout={() => setLoggedInCpf(null)} onScheduleDelivery={async (s, d, t) => {}} onFulfillAndInvoice={async (s, p, i) => {}} onCancelDeliveries={() => {}} emailModalData={emailModalData} onCloseEmailModal={() => setEmailModalData(null)} />
-      : isAlmoxarifadoLoggedIn ? <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} />
+      {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={async (n,c,w) => {}} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async () => null} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async () => true} activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={registrationStatus} onClearRegistrationStatus={() => {}} onReopenInvoice={async () => {}} onDeleteInvoice={async () => {}} onUpdateInvoiceItems={async () => ({success: true})} onManualInvoiceEntry={async () => ({success: true})} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={async (c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={async () => ({success: true, message: ''})} onRegisterCleaningLog={async () => ({success: true, message: ''})} onDeleteCleaningLog={async () => {}} onRegisterDirectorWithdrawal={async () => ({success: true, message: ''})} onDeleteDirectorWithdrawal={async () => {}} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={async (m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={async (m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={async () => ({success: true, message: ''})} onRegisterWithdrawal={async () => ({success: true, message: ''})} onCancelDeliveries={() => {}} />
+      : currentUser ? <Dashboard supplier={currentUser} onLogout={() => setLoggedInCpf(null)} onScheduleDelivery={() => {}} onFulfillAndInvoice={() => {}} onCancelDeliveries={() => {}} emailModalData={null} onCloseEmailModal={() => {}} />
+      : isAlmoxarifadoLoggedIn ? <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={async () => ({success: true, message: ''})} onRegisterWithdrawal={async () => ({success: true, message: ''})} />
       : isItespLoggedIn ? <ItespDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsItespLoggedIn(false)} />
       : <LoginScreen onLogin={handleLogin} />}
     </>

@@ -25,35 +25,20 @@ const superNormalize = (text: string) => {
         .trim();
 };
 
-/**
- * EXTRATOR DE MÊS DEFINITIVO
- * Procura por padrões numéricos de Janeiro (01) antes de qualquer lógica complexa.
- */
 const getMonthNameFromDate = (dateStr?: string): string => {
     if (!dateStr) return "Mês Indefinido";
-    
     const s = String(dateStr).trim();
     
-    // Teste direto para Janeiro (Mais comum em CSVs brasileiros e ISOs)
-    if (s.includes("-01-") || s.includes("/01/") || s.match(/[-/]01[-/]/) || s.toUpperCase().includes("JANEIRO") || s.toUpperCase().includes("JAN")) {
-        return "Janeiro";
-    }
-
-    // Normalização para outros meses
-    const cleanStr = s.replace(/[\.\/]/g, '-');
-    const parts = cleanStr.split('-');
-
-    if (parts.length >= 2) {
-        let mIdx = -1;
-        // Tenta detectar posição do mês (ISO: part[1], BR: part[1])
-        const candidate = parseInt(parts[1], 10);
-        if (!isNaN(candidate)) {
-            mIdx = candidate - 1;
-        }
-
-        if (mIdx >= 0 && mIdx < 12) return months[mIdx];
+    // Verificação de segurança absoluta para Janeiro
+    // Datas no App são YYYY-MM-DD
+    const parts = s.split('-');
+    if (parts.length === 3) {
+        const monthNum = parseInt(parts[1], 10);
+        if (monthNum === 1) return "Janeiro";
+        if (monthNum > 0 && monthNum <= 12) return months[monthNum - 1];
     }
     
+    if (s.includes("-01-") || s.includes("/01/") || s.toUpperCase().includes("JAN")) return "Janeiro";
     return "Mês Indefinido";
 };
 
@@ -82,10 +67,8 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
 
     const comparisonData = useMemo(() => {
         if (!itespSuppliers.length) return [];
-
         const consolidated = new Map<string, any>();
 
-        // 1. Inicializar Metas (Janeiro a Abril de 2026)
         itespSuppliers.forEach(s => {
             const sNorm = superNormalize(s.name);
             s.contractItems.forEach(ci => {
@@ -106,17 +89,14 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             });
         });
 
-        // 2. Acumular Entradas do Almoxarifado com Match Inteligente
         warehouseLog.forEach(log => {
             if (log.type === 'entrada') {
                 const logSupplierNorm = superNormalize(log.supplierName);
                 const logItemNorm = superNormalize(log.itemName);
                 const mName = getMonthNameFromDate(log.date);
                 
-                // Filtro para o 1º quadrimestre
                 if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(mName)) return;
 
-                // Match flexível (Busca por nomes aproximados em todas as entradas consolidadas do mês)
                 for (let val of consolidated.values()) {
                     if (val.month === mName) {
                         const supplierMatch = val.normSupplier.includes(logSupplierNorm) || logSupplierNorm.includes(val.normSupplier);
@@ -166,88 +146,73 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
 
     return (
         <div className="min-h-screen bg-[#F3F4F6] text-gray-800 pb-20">
-            <header className="bg-white shadow-lg p-4 flex justify-between items-center sticky top-0 z-30 border-b-4 border-green-700">
+            <header className="bg-white shadow-lg p-4 flex justify-between items-center border-b-4 border-green-700">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-black text-green-800 uppercase tracking-tighter">Audit ITESP - Gestão 1º Quadr. 2026</h1>
-                    <p className="text-[10px] text-gray-500 font-bold uppercase">Consolidação de Entradas Físicas vs. Metas Contratuais</p>
+                    <h1 className="text-xl md:text-2xl font-black text-green-800 uppercase tracking-tighter">Audit ITESP - Painel Administrativo</h1>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase">Consolidado Janeiro a Abril de 2026</p>
                 </div>
-                <button onClick={onLogout} className="bg-red-500 text-white font-black py-2 px-6 rounded-xl text-xs uppercase tracking-widest active:scale-95 transition-all shadow-md">Sair</button>
+                <button onClick={onLogout} className="bg-red-500 text-white font-black py-2 px-6 rounded-xl text-xs uppercase tracking-widest shadow-md">Sair</button>
             </header>
 
             <main className="p-4 md:p-8 max-w-[1700px] mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-blue-500">
-                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Meta Acumulada (Jan a Abr)</p>
-                        <p className="text-3xl font-black text-blue-700">{totals.contracted.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase">Meta do Período</p>
+                        <p className="text-3xl font-black text-blue-700">{totals.contracted.toLocaleString('pt-BR')} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-green-600">
-                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Entrada Real (Janeiro+)</p>
-                        <p className="text-3xl font-black text-green-700">{totals.received.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase">Recebido (Estoque)</p>
+                        <p className="text-3xl font-black text-green-700">{totals.received.toLocaleString('pt-BR')} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-red-500">
-                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Déficit de Entrega</p>
-                        <p className="text-3xl font-black text-red-600">{totals.shortfall.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase">Déficit Total</p>
+                        <p className="text-3xl font-black text-red-600">{totals.shortfall.toLocaleString('pt-BR')} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-orange-500">
-                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Prejuízo Financeiro</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase">Prejuízo Financeiro</p>
                         <p className="text-3xl font-black text-orange-600">{formatCurrency(totals.loss)}</p>
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-3xl shadow-2xl animate-fade-in">
+                <div className="bg-white p-6 rounded-3xl shadow-2xl">
                     <div className="flex flex-col lg:flex-row justify-between items-center mb-8 gap-4">
-                        <input type="text" placeholder="Produtor ou Produto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full lg:w-96 border-2 border-gray-100 rounded-2xl px-5 py-3 text-sm outline-none focus:border-green-400 bg-gray-50 transition-all" />
+                        <input type="text" placeholder="Filtrar produtor ou produto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full lg:w-96 border-2 border-gray-100 rounded-2xl px-5 py-3 text-sm outline-none focus:border-green-400" />
                         <div className="flex gap-3 w-full lg:w-auto">
-                            <select value={selectedSupplierName} onChange={(e) => setSelectedSupplierName(e.target.value)} className="flex-1 lg:w-80 border-2 border-gray-100 rounded-2xl px-4 py-3 text-sm font-black text-indigo-900 bg-indigo-50">
-                                <option value="all">Todos os Produtores ITESP</option>
-                                {[...new Set(itespSuppliers.map(s => s.name))].sort().map(name => <option key={name} value={name}>{name}</option>)}
-                            </select>
-                            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="w-48 border-2 border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold text-gray-600 bg-gray-50">
-                                <option value="all">Jan - Abr</option>
+                            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="w-48 border-2 border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold bg-gray-50">
+                                <option value="all">Jan - Abr 2026</option>
                                 {months.slice(0, 4).map(m => <option key={m} value={m}>{m}</option>)}
                             </select>
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm">
+                    <div className="overflow-x-auto rounded-2xl border border-gray-100">
                         <table className="w-full text-sm">
                             <thead className="bg-gray-900 text-gray-200 text-[10px] uppercase font-black tracking-widest">
                                 <tr>
-                                    <th className="p-5 text-left border-b border-gray-800">PRODUTOR</th>
-                                    <th className="p-5 text-left border-b border-gray-800">PRODUTO</th>
-                                    <th className="p-5 text-center border-b border-gray-800">MÊS</th>
-                                    <th className="p-5 text-right border-b border-gray-800 bg-blue-900/50">META</th>
-                                    <th className="p-5 text-right border-b border-gray-800 bg-green-900/50">REALIZADO</th>
-                                    <th className="p-5 text-right border-b border-gray-800 bg-red-900/50">FALTA</th>
-                                    <th className="p-5 text-right border-b border-gray-800">PREJUÍZO</th>
+                                    <th className="p-5 text-left">PRODUTOR ITESP</th>
+                                    <th className="p-5 text-left">PRODUTO</th>
+                                    <th className="p-5 text-center">MÊS</th>
+                                    <th className="p-5 text-right bg-blue-900/50">META</th>
+                                    <th className="p-5 text-right bg-green-900/50">ESTOQUE REAL</th>
+                                    <th className="p-5 text-right bg-red-900/50">DIFERENÇA</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {filteredData.length > 0 ? filteredData.map(item => (
-                                    <tr key={item.id} className="hover:bg-green-50 transition-colors group">
+                                    <tr key={item.id} className="hover:bg-green-50 transition-colors">
                                         <td className="p-5 font-black text-gray-900 uppercase text-xs">{item.supplierName}</td>
                                         <td className="p-5 text-gray-500 uppercase text-[11px] font-bold">{item.productName}</td>
                                         <td className="p-5 text-center">
                                             <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${item.month === 'Janeiro' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>{item.month}</span>
                                         </td>
-                                        <td className="p-5 text-right font-black text-blue-700 font-mono bg-blue-50/20">{item.contractedKgMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
-                                        <td className={`p-5 text-right font-black font-mono bg-green-50/20 ${item.receivedKg > 0 ? 'text-green-700' : 'text-gray-300'}`}>{item.receivedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
-                                        <td className={`p-5 text-right font-black font-mono bg-red-50/20 ${item.shortfallKg > 0.01 ? 'text-red-600 animate-pulse' : 'text-gray-200'}`}>{item.shortfallKg > 0.01 ? item.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}</td>
-                                        <td className={`p-5 text-right font-black ${item.financialLoss > 0.01 ? 'text-red-700' : 'text-gray-200'}`}>{item.financialLoss > 0.01 ? formatCurrency(item.financialLoss) : 'R$ 0,00'}</td>
+                                        <td className="p-5 text-right font-black text-blue-700 font-mono">{(item.contractedKgMonthly || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
+                                        <td className={`p-5 text-right font-black font-mono ${item.receivedKg > 0 ? 'text-green-700' : 'text-gray-300'}`}>{(item.receivedKg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
+                                        <td className={`p-5 text-right font-black font-mono ${item.shortfallKg > 0.01 ? 'text-red-600' : 'text-gray-200'}`}>{(item.shortfallKg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                                     </tr>
                                 )) : (
-                                    <tr><td colSpan={7} className="p-32 text-center text-gray-400 font-black uppercase tracking-widest italic bg-gray-50">Nenhum dado de estoque localizado para Janeiro a Abril de 2026. Verifique o ano na planilha importada.</td></tr>
+                                    <tr><td colSpan={6} className="p-32 text-center text-gray-400 font-black uppercase italic bg-gray-50">Dados de Janeiro a Abril não encontrados. Verifique as datas nas planilhas importadas (Devem ser 2026).</td></tr>
                                 )}
                             </tbody>
-                            <tfoot className="bg-gray-900 text-white font-black text-xs border-t-4 border-green-800">
-                                <tr>
-                                    <td colSpan={3} className="p-5 text-left uppercase">Consolidação Geral de Auditoria</td>
-                                    <td className="p-5 text-right text-blue-400 font-mono text-lg">{totals.contracted.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
-                                    <td className="p-5 text-right text-green-400 font-mono text-lg">{totals.received.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
-                                    <td className="p-5 text-right text-red-400 font-mono text-lg">{totals.shortfall.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
-                                    <td className="p-5 text-right text-orange-400 text-xl">{formatCurrency(totals.loss)}</td>
-                                </tr>
-                            </tfoot>
                         </table>
                     </div>
                 </div>
