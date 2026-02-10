@@ -21,7 +21,7 @@ const directorWithdrawalsRef = ref(database, 'directorWithdrawals');
 const standardMenuRef = ref(database, 'standardMenu');
 const dailyMenusRef = ref(database, 'dailyMenus');
 
-// Normalização absoluta para comparação de dados (remove tudo que não for letra ou número)
+// Normalização absoluta para comparação de dados
 const superNormalize = (text: string) => {
     return (text || "")
         .toString()
@@ -32,22 +32,50 @@ const superNormalize = (text: string) => {
         .trim();
 };
 
-// Limpador de números (Trata 1.250,50 -> 1250.5)
+// Limpador de números inteligente (Trata 1.250,50 ou 1250.50)
 const cleanNumericValue = (val: any): number => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
-    const cleanStr = String(val).replace(/[^\d.,-]/g, '').replace(/\./g, '').replace(',', '.');
-    return parseFloat(cleanStr) || 0;
+    let s = String(val).trim();
+    // Se tem ponto e vírgula, assume formato BR (1.234,56)
+    if (s.includes('.') && s.includes(',')) {
+        s = s.replace(/\./g, '').replace(',', '.');
+    } else if (s.includes(',')) {
+        // Se tem só vírgula, assume decimal BR (1234,56)
+        s = s.replace(',', '.');
+    }
+    return parseFloat(s) || 0;
 };
 
-// Função para converter data serial do Excel (ex: 46022) para string ISO (YYYY-MM-DD)
-const excelSerialToDate = (serial: number): string => {
-    try {
-        const date = new Date((serial - 25569) * 86400 * 1000);
-        return date.toISOString().split('T')[0];
-    } catch (e) {
-        return "";
+// Conversor Universal de Datas para ISO (YYYY-MM-DD)
+const standardizeDate = (rawDate: any): string => {
+    if (!rawDate) return "";
+    let s = String(rawDate).trim();
+
+    // 1. Caso seja Excel Serial (ex: 46022)
+    if (!isNaN(Number(s)) && Number(s) > 40000) {
+        const d = new Date((Number(s) - 25569) * 86400 * 1000);
+        return d.toISOString().split('T')[0];
     }
+
+    // 2. Trata formato BR (DD/MM/YYYY ou DD/MM/YY)
+    if (s.includes('/')) {
+        const parts = s.split('/');
+        if (parts.length === 3) {
+            let day = parts[0].padStart(2, '0');
+            let month = parts[1].padStart(2, '0');
+            let year = parts[2];
+            if (year.length === 2) year = '20' + year;
+            return `${year}-${month}-${day}`;
+        }
+    }
+
+    // 3. Caso já esteja em ISO (YYYY-MM-DD)
+    if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
+        return s.substring(0, 10);
+    }
+
+    return s;
 };
 
 function normalizeArray<T>(data: any): T[] {
@@ -69,24 +97,20 @@ const App: React.FC = () => {
   const [dailyMenus, setDailyMenus] = useState<DailyMenus>({});
   const [loading, setLoading] = useState(true);
   
-  // LOGIN STATE
   const [loggedInCpf, setLoggedInCpf] = useState<string | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isAlmoxarifadoLoggedIn, setIsAlmoxarifadoLoggedIn] = useState(false);
   const [isItespLoggedIn, setIsItespLoggedIn] = useState(false);
-  
   const [isSaving, setIsSaving] = useState(false);
-  const [adminActiveTab, setAdminActiveTab] = useState<'info' | 'register' | 'contracts' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'warehouse' | 'cleaning' | 'directorPerCapita' | 'menu'>('register');
+  const [adminActiveTab, setAdminActiveTab] = useState<any>('register');
   const [registrationStatus, setRegistrationStatus] = useState<{success: boolean; message: string} | null>(null);
-  const [emailModalData, setEmailModalData] = useState<{ recipient: string; cc: string; subject: string; body: string; mailtoLink: string; } | null>(null);
+  const [emailModalData, setEmailModalData] = useState<any>(null);
 
-  // Deriva o usuário atual da lista global
   const currentUser = useMemo(() => {
     if (!loggedInCpf) return null;
     return suppliers.find(s => s.cpf === loggedInCpf) || null;
   }, [suppliers, loggedInCpf]);
 
-  // Global Sync Effect
   useEffect(() => {
     setLoading(true);
     const unsubSuppliers = onValue(suppliersRef, (snapshot) => {
@@ -96,19 +120,25 @@ const App: React.FC = () => {
           ...p,
           name: (p.name || 'SEM NOME').toUpperCase().trim(),
           cpf: p.cpf || String(Math.random()),
-          contractItems: normalizeArray(p.contractItems).map((ci: any) => ({ ...ci, name: (ci.name || '').toUpperCase().trim() })),
+          contractItems: normalizeArray(p.contractItems).map((ci: any) => ({ 
+              ...ci, 
+              name: (ci.name || '').toUpperCase().trim(),
+              totalKg: cleanNumericValue(ci.totalKg),
+              valuePerKg: cleanNumericValue(ci.valuePerKg)
+          })),
           deliveries: normalizeArray<any>(p.deliveries).map((d: any) => ({ 
               ...d, 
+              date: standardizeDate(d.date),
               item: (d.item || '').toUpperCase().trim(),
+              kg: cleanNumericValue(d.kg),
+              value: cleanNumericValue(d.value),
               lots: normalizeArray(d.lots).map((l: any) => ({ 
                 ...l, 
-                lotNumber: (l.lotNumber || '').toUpperCase().trim(),
                 remainingQuantity: cleanNumericValue(l.remainingQuantity)
-              })), 
-              withdrawals: normalizeArray(d.withdrawals) 
+              }))
           })),
           allowedWeeks: normalizeArray<number>(p.allowedWeeks),
-          initialValue: p.initialValue || 0,
+          initialValue: cleanNumericValue(p.initialValue),
       })).sort((a, b) => a.name.localeCompare(b.name));
       
       setSuppliers(suppliersArray);
@@ -121,19 +151,11 @@ const App: React.FC = () => {
         setWarehouseLog([]);
         return;
       }
-      // Captura resiliente de dados com conversão de datas numéricas (Excel)
       const logsArray = Object.entries(data).map(([key, val]: [string, any]) => {
-        let rawDate = val.date || val.invoiceDate || (val.timestamp ? String(val.timestamp).split('T')[0] : "");
-        
-        // Se a data for um número (vinda do Excel), converte
-        if (!isNaN(Number(rawDate)) && Number(rawDate) > 40000) {
-            rawDate = excelSerialToDate(Number(rawDate));
-        }
-
         return {
             ...val,
             id: val.id || key,
-            date: String(rawDate).trim(),
+            date: standardizeDate(val.date || val.invoiceDate || (val.timestamp ? val.timestamp.split('T')[0] : "")),
             quantity: cleanNumericValue(val.quantity),
             itemName: (val.itemName || "").toUpperCase().trim(),
             supplierName: (val.supplierName || "").toUpperCase().trim()
@@ -145,13 +167,7 @@ const App: React.FC = () => {
     const unsubClean = onValue(cleaningLogsRef, (snapshot) => setCleaningLogs(normalizeArray<CleaningLog>(snapshot.val())));
     const unsubDir = onValue(directorWithdrawalsRef, (snapshot) => setDirectorWithdrawals(normalizeArray<DirectorPerCapitaLog>(snapshot.val())));
     const unsubConfig = onValue(perCapitaConfigRef, (snapshot) => setPerCapitaConfig(snapshot.val() || {}));
-    const unsubMenu = onValue(standardMenuRef, (snapshot) => {
-      const menuData = snapshot.val() || {};
-      for (const day in menuData) {
-        if (Object.prototype.hasOwnProperty.call(menuData, day)) menuData[day] = normalizeArray<MenuRow>(menuData[day]);
-      }
-      setStandardMenu(menuData);
-    });
+    const unsubMenu = onValue(standardMenuRef, (snapshot) => setStandardMenu(snapshot.val() || {}));
     const unsubDailyMenus = onValue(dailyMenusRef, (snapshot) => setDailyMenus(snapshot.val() || {}));
 
     return () => {
@@ -159,37 +175,25 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const handleRegisterWarehouseEntry = async (payload: {
-    supplierCpf: string;
-    itemName: string;
-    invoiceNumber: string;
-    invoiceDate: string;
-    lotNumber: string;
-    quantity: number;
-    expirationDate: string;
-  }) => {
+  const handleRegisterWarehouseEntry = async (payload: any) => {
     setIsSaving(true);
     const supplierRef = ref(database, `suppliers/${payload.supplierCpf}`);
-    const normalizedItemName = payload.itemName.toUpperCase().trim();
-    const normalizedLotNumber = payload.lotNumber.toUpperCase().trim();
     const lotId = `lot-${Date.now()}-${Math.random()}`;
+    const isoDate = standardizeDate(payload.invoiceDate);
     
     try {
       const result = await runTransaction(supplierRef, (currentSupplier) => {
         if (!currentSupplier) return null;
         const deliveries = normalizeArray<any>(currentSupplier.deliveries);
         const qty = cleanNumericValue(payload.quantity);
-        const newLot = { id: lotId, lotNumber: normalizedLotNumber, initialQuantity: qty, remainingQuantity: qty, expirationDate: payload.expirationDate };
+        const newLot = { id: lotId, lotNumber: payload.lotNumber.toUpperCase(), initialQuantity: qty, remainingQuantity: qty, expirationDate: payload.expirationDate };
 
-        let delivery = deliveries.find(d => 
-          d.invoiceNumber === payload.invoiceNumber && 
-          superNormalize(d.item) === superNormalize(normalizedItemName)
-        );
+        let delivery = deliveries.find(d => d.invoiceNumber === payload.invoiceNumber && superNormalize(d.item) === superNormalize(payload.itemName));
 
         if (delivery) {
           delivery.lots = [...normalizeArray(delivery.lots), newLot];
         } else {
-          deliveries.push({ id: `del-entry-${Date.now()}`, date: payload.invoiceDate, time: '08:00', item: normalizedItemName, kg: qty, invoiceUploaded: true, invoiceNumber: payload.invoiceNumber, lots: [newLot] });
+          deliveries.push({ id: `del-entry-${Date.now()}`, date: isoDate, time: '08:00', item: payload.itemName.toUpperCase(), kg: qty, invoiceUploaded: true, invoiceNumber: payload.invoiceNumber, lots: [newLot] });
         }
         currentSupplier.deliveries = deliveries;
         return currentSupplier;
@@ -197,108 +201,61 @@ const App: React.FC = () => {
 
       if (result.committed) {
         const logEntryRef = push(warehouseLogRef);
-        const newLog: WarehouseMovement = { 
-            id: logEntryRef.key || `mov-${Date.now()}`, 
-            type: 'entrada', 
-            timestamp: new Date().toISOString(), 
-            date: payload.invoiceDate, 
-            lotId: lotId, 
-            lotNumber: normalizedLotNumber, 
-            itemName: normalizedItemName, 
-            supplierName: result.snapshot.val().name, 
-            deliveryId: 'various', 
-            inboundInvoice: payload.invoiceNumber, 
-            quantity: cleanNumericValue(payload.quantity), 
-            expirationDate: payload.expirationDate 
-        };
-        await set(logEntryRef, newLog);
+        await set(logEntryRef, { 
+            id: logEntryRef.key, type: 'entrada', timestamp: new Date().toISOString(), date: isoDate, 
+            lotId, lotNumber: payload.lotNumber.toUpperCase(), itemName: payload.itemName.toUpperCase(), 
+            supplierName: result.snapshot.val().name, inboundInvoice: payload.invoiceNumber, 
+            quantity: cleanNumericValue(payload.quantity), expirationDate: payload.expirationDate 
+        });
         setIsSaving(false);
         return { success: true, message: "Entrada registrada!" };
       }
-      return { success: false, message: "Erro ao processar transação." };
+      return { success: false, message: "Erro ao processar." };
     } catch (e) { setIsSaving(false); return { success: false, message: "Erro ao salvar." }; }
   };
 
-  const handleRegisterWarehouseWithdrawal = async (payload: {
-    supplierCpf: string;
-    itemName: string;
-    lotNumber: string;
-    quantity: number;
-    outboundInvoice: string;
-    expirationDate: string;
-    date: string; 
-  }) => {
+  const handleRegisterWarehouseWithdrawal = async (payload: any) => {
     setIsSaving(true);
     const supplierRef = ref(database, `suppliers/${payload.supplierCpf}`);
-    const normReqItem = superNormalize(payload.itemName);
-    const normReqLot = superNormalize(payload.lotNumber);
-    const EPSILON = 0.0001;
-    let errorDetail = "";
-
+    const isoDate = standardizeDate(payload.date);
     try {
       const result = await runTransaction(supplierRef, (currentSupplier) => {
         if (!currentSupplier) return null;
         let qtyToDeduct = cleanNumericValue(payload.quantity);
         const deliveries = normalizeArray<any>(currentSupplier.deliveries);
-
-        let totalAvail = 0;
-        deliveries.forEach(d => {
-            if (superNormalize(d.item) !== normReqItem) return;
-            normalizeArray<any>(d.lots).forEach(l => {
-                if (superNormalize(l.lotNumber) === normReqLot) {
-                    totalAvail += cleanNumericValue(l.remainingQuantity);
-                }
-            });
-        });
-
-        if (totalAvail < (qtyToDeduct - EPSILON)) {
-            errorDetail = `Saldo insuficiente (Encontrado: ${totalAvail.toFixed(2)} kg, Requerido: ${qtyToDeduct.toFixed(2)} kg).`;
-            return undefined; 
-        }
-
         for (const d of deliveries) {
-            if (superNormalize(d.item) !== normReqItem) continue;
+            if (superNormalize(d.item) !== superNormalize(payload.itemName)) continue;
             const lots = normalizeArray<any>(d.lots);
             for (const l of lots) {
-                if (superNormalize(l.lotNumber) === normReqLot && cleanNumericValue(l.remainingQuantity) > 0) {
+                if (superNormalize(l.lotNumber) === superNormalize(payload.lotNumber) && cleanNumericValue(l.remainingQuantity) > 0) {
                     const avail = cleanNumericValue(l.remainingQuantity);
                     const take = Math.min(avail, qtyToDeduct);
                     l.remainingQuantity = Number((avail - take).toFixed(4));
                     qtyToDeduct -= take;
-                    if (qtyToDeduct <= EPSILON) { qtyToDeduct = 0; break; }
+                    if (qtyToDeduct <= 0) break;
                 }
             }
             d.lots = lots;
             if (qtyToDeduct <= 0) break;
         }
-
         currentSupplier.deliveries = deliveries;
         return currentSupplier;
       });
 
       if (result.committed) {
         const logEntryRef = push(warehouseLogRef);
-        const newLog: WarehouseMovement = { 
-            id: logEntryRef.key || `mov-out-${Date.now()}`, 
-            type: 'saída', 
-            timestamp: new Date().toISOString(), 
-            date: payload.date, 
-            lotId: 'various', 
-            lotNumber: payload.lotNumber.toUpperCase().trim(), 
-            itemName: payload.itemName.toUpperCase().trim(), 
-            supplierName: result.snapshot.val().name, 
-            deliveryId: 'various', 
-            outboundInvoice: payload.outboundInvoice, 
-            quantity: cleanNumericValue(payload.quantity), 
-            expirationDate: payload.expirationDate 
-        };
-        await set(logEntryRef, newLog);
+        await set(logEntryRef, { 
+            id: logEntryRef.key, type: 'saída', timestamp: new Date().toISOString(), date: isoDate, 
+            lotId: 'various', lotNumber: payload.lotNumber.toUpperCase(), itemName: payload.itemName.toUpperCase(), 
+            supplierName: result.snapshot.val().name, outboundInvoice: payload.outboundInvoice, 
+            quantity: cleanNumericValue(payload.quantity), expirationDate: payload.expirationDate 
+        });
         setIsSaving(false);
         return { success: true, message: "Saída registrada!" };
       }
       setIsSaving(false);
-      return { success: false, message: errorDetail || `Lote '${payload.lotNumber}' não localizado.` };
-    } catch (e) { setIsSaving(false); return { success: false, message: "Falha técnica no banco de dados." }; }
+      return { success: false, message: "Erro ou saldo insuficiente." };
+    } catch (e) { setIsSaving(false); return { success: false, message: "Erro no banco." }; }
   };
 
   const writeToDatabase = useCallback(async (dbRef: any, data: any) => {
@@ -306,286 +263,14 @@ const App: React.FC = () => {
     try { await set(dbRef, data); } catch (e) { console.error(e); } finally { setTimeout(() => setIsSaving(false), 500); }
   }, []);
 
-  const handleDeleteWarehouseEntry = async (logEntry: WarehouseMovement) => {
-    setIsSaving(true);
-    const supplierCpf = suppliers.find(s => superNormalize(s.name) === superNormalize(logEntry.supplierName))?.cpf;
-    let estornoSucesso = true;
-    
-    if (supplierCpf) {
-        try {
-            await runTransaction(ref(database, `suppliers/${supplierCpf}`), (current) => {
-                if (!current) return null;
-                const deliveries = normalizeArray<any>(current.deliveries);
-
-                if (logEntry.type === 'entrada') {
-                    for (const del of deliveries) {
-                        if (del.lots) {
-                            del.lots = normalizeArray<any>(del.lots).filter(l => 
-                                l.id !== logEntry.lotId && 
-                                (superNormalize(l.lotNumber) !== superNormalize(logEntry.lotNumber))
-                            );
-                        }
-                    }
-                } else if (logEntry.type === 'saída') {
-                    let qtyToRestore = cleanNumericValue(logEntry.quantity);
-                    const normReqItem = superNormalize(logEntry.itemName);
-                    const normReqLot = superNormalize(logEntry.lotNumber);
-                    let found = false;
-
-                    for (const d of deliveries) {
-                        if (superNormalize(d.item) !== normReqItem) continue;
-                        const lots = normalizeArray<any>(d.lots);
-                        for (const l of lots) {
-                            if (superNormalize(l.lotNumber) === normReqLot) {
-                                l.remainingQuantity = Number((cleanNumericValue(l.remainingQuantity) + qtyToRestore).toFixed(4));
-                                qtyToRestore = 0;
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (qtyToRestore <= 0) break;
-                    }
-                    if (!found) estornoSucesso = false;
-                }
-
-                current.deliveries = deliveries;
-                return current;
-            });
-        } catch (e) { console.error("Erro no estorno:", e); estornoSucesso = false; }
-    }
-
-    try {
-        await set(ref(database, `warehouseLog/${logEntry.id}`), null);
-        setIsSaving(false);
-        return { success: true, message: "Registro removido com sucesso." };
-    } catch (e) {
-        setIsSaving(false);
-        return { success: false, message: "Erro ao comunicar com o banco de dados." };
-    }
-  };
-
-  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, newItems: { name: string; kg: number; value: number }[]) => {
-    setIsSaving(true);
-    const supplierRef = ref(database, `suppliers/${supplierCpf}`);
-    try {
-        await runTransaction(supplierRef, (current) => {
-            if (!current) return null;
-            let deliveries = normalizeArray<any>(current.deliveries);
-            const originalDate = deliveries.find(d => d.invoiceNumber === invoiceNumber)?.date || new Date().toISOString().split('T')[0];
-            deliveries = deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
-            const nDels: Delivery[] = newItems.map((it, idx) => ({ 
-                id: `del-edit-${Date.now()}-${idx}`, 
-                date: originalDate, 
-                time: '08:00', 
-                item: it.name.toUpperCase().trim(), 
-                kg: cleanNumericValue(it.kg), 
-                value: cleanNumericValue(it.value), 
-                invoiceUploaded: true, 
-                invoiceNumber: invoiceNumber 
-            }));
-            current.deliveries = [...deliveries, ...nDels];
-            return current;
-        });
-        setIsSaving(false);
-        return { success: true };
-    } catch (e) {
-        setIsSaving(false);
-        return { success: false, message: "Erro ao atualizar faturamento no servidor." };
-    }
-  };
-
-  const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => {
-    setIsSaving(true);
-    const supplierRef = ref(database, `suppliers/${supplierCpf}`);
-    try {
-        await runTransaction(supplierRef, (current) => {
-            if (!current) return null;
-            const deliveries = normalizeArray<any>(current.deliveries);
-            const nDels: Delivery[] = items.map((it, idx) => ({ 
-                id: `del-manual-${Date.now()}-${idx}`, 
-                date: date, 
-                time: '08:00', 
-                item: it.name.toUpperCase().trim(), 
-                kg: cleanNumericValue(it.kg), 
-                value: cleanNumericValue(it.value), 
-                invoiceUploaded: true, 
-                invoiceNumber: invoiceNumber 
-            }));
-            current.deliveries = [...deliveries, ...nDels];
-            return current;
-        });
-        setIsSaving(false);
-        return { success: true };
-    } catch (e) {
-        setIsSaving(false);
-        return { success: false, message: "Erro ao salvar faturamento manual." };
-    }
-  };
-
-  const handleScheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
-    setIsSaving(true);
-    const supplierRef = ref(database, `suppliers/${supplierCpf}`);
-    try {
-      await runTransaction(supplierRef, (current) => {
-        if (!current) return null;
-        const deliveries = normalizeArray<any>(current.deliveries);
-        deliveries.push({ id: `del-${Date.now()}`, date, time, item: 'AGENDAMENTO PENDENTE', invoiceUploaded: false });
-        current.deliveries = deliveries;
-        return current;
-      });
-    } catch (e) { console.error(e); } finally { setIsSaving(false); }
-  };
-
-  const handleFulfillAndInvoice = async (supplierCpf: string, placeholderIds: string[], inv: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }) => {
-    setIsSaving(true);
-    const supplierRef = ref(database, `suppliers/${supplierCpf}`);
-    let targetSupplierName = '';
-
-    try {
-      const result = await runTransaction(supplierRef, (current) => {
-        if (!current) return null;
-        targetSupplierName = current.name;
-        let deliveries = normalizeArray<any>(current.deliveries);
-        const originalPlaceholder = deliveries.find(d => placeholderIds.includes(d.id));
-        const date = originalPlaceholder?.date || new Date().toISOString().split('T')[0];
-        const remaining = deliveries.filter(d => !placeholderIds.includes(d.id));
-        const nDels: Delivery[] = inv.fulfilledItems.map((it, idx) => ({ 
-            id: `del-f-${Date.now()}-${idx}`, 
-            date, 
-            time: '08:00', 
-            item: it.name.toUpperCase().trim(), 
-            kg: cleanNumericValue(it.kg), 
-            value: cleanNumericValue(it.value), 
-            invoiceUploaded: true, 
-            invoiceNumber: inv.invoiceNumber 
-        }));
-        current.deliveries = [...remaining, ...nDels];
-        return current;
-      });
-
-      if (result.committed) {
-        const subj = `ENVIO DE NOTA FISCAL - ${targetSupplierName} - NF ${inv.invoiceNumber}`;
-        let b = `Olá,\n\nSegue em anexo a Nota Fiscal nº ${inv.invoiceNumber}.\n\nItens:\n`;
-        inv.fulfilledItems.forEach(i => b += `- ${i.name}: ${i.kg.toFixed(2)} Kg\n`);
-        const recipientEmail = "dg@ptaiuva.sap.gov.br";
-        const ccEmails = "almoxarifado@ptaiuva.sap.gov.br;financas@ptaiuva.sap.gov.br";
-        const mailto = `mailto:${recipientEmail}?cc=${ccEmails}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(b)}`;
-        setEmailModalData({ recipient: recipientEmail, cc: ccEmails, subject: subj, body: b, mailtoLink: mailto });
-      }
-    } catch (e) { console.error(e); } finally { setIsSaving(false); }
-  };
-
-  const handleCancelDeliveries = async (sCpf: string, ids: string[]) => {
-    setIsSaving(true);
-    const supplierRef = ref(database, `suppliers/${sCpf}`);
-    try {
-        await runTransaction(supplierRef, (current) => {
-            if (!current) return null;
-            let deliveries = normalizeArray<any>(current.deliveries);
-            current.deliveries = deliveries.filter(d => !ids.includes(d.id));
-            return current;
-        });
-    } catch (e) { 
-        console.error("Falha ao cancelar entregas:", e); 
-        alert("Erro ao remover registro.");
-    } finally { 
-        setIsSaving(false); 
-    }
-  };
-
-  const handleReopenInvoice = async (sCpf: string, invNum: string) => {
-    setIsSaving(true);
-    const supplierRef = ref(database, `suppliers/${sCpf}`);
-    try {
-        await runTransaction(supplierRef, (current) => {
-            if (!current) return null;
-            let deliveries = normalizeArray<any>(current.deliveries);
-            const dates = [...new Set(deliveries.filter(d => d.invoiceNumber === invNum).map(d => d.date))];
-            const remaining = deliveries.filter(d => d.invoiceNumber !== invNum);
-            const reAgendamentos = dates.map(dt => ({ 
-                id: `del-re-${Date.now()}-${Math.random()}`, 
-                date: dt, 
-                time: '08:00', 
-                item: 'AGENDAMENTO PENDENTE', 
-                invoiceUploaded: false 
-            }));
-            current.deliveries = [...remaining, ...reAgendamentos];
-            return current;
-        });
-    } catch (e) { console.error(e); } finally { setIsSaving(false); }
-  };
-
-  const handleDeleteInvoice = async (sCpf: string, invNum: string) => {
-    setIsSaving(true);
-    const supplierRef = ref(database, `suppliers/${sCpf}`);
-    try {
-        await runTransaction(supplierRef, (current) => {
-            if (!current) return null;
-            let deliveries = normalizeArray<any>(current.deliveries);
-            current.deliveries = deliveries.filter(d => d.invoiceNumber !== invNum);
-            return current;
-        });
-    } catch (e) { console.error(e); } finally { setIsSaving(false); }
-  };
-
-  const handleRegisterDirectorWithdrawal = async (log: Omit<DirectorPerCapitaLog, 'id'>) => {
-    const nLog: DirectorPerCapitaLog = { ...log, id: `dir-${Date.now()}` };
-    let tempS = JSON.parse(JSON.stringify(suppliers)) as Supplier[];
-    const ts = new Date().toISOString();
-
-    for (const req of log.items) {
-      let need = cleanNumericValue(req.quantity);
-      const nReqName = superNormalize(req.name);
-      const lots = tempS.flatMap(s => s.deliveries.filter(d => superNormalize(d.item) === nReqName && d.lots).map(d => ({ s, d })))
-                        .sort((a, b) => a.d.date.localeCompare(b.d.date));
-
-      for (const entry of lots) {
-        if (need <= 0) break;
-        for (const lot of (entry.d.lots || [])) {
-          if (need <= 0) break;
-          const avail = cleanNumericValue(lot.remainingQuantity);
-          if (avail > 0) {
-            const take = Math.min(avail, need);
-            lot.remainingQuantity = Number((avail - take).toFixed(4));
-            need -= take;
-            const logRef = push(warehouseLogRef);
-            await set(logRef, { 
-                id: logRef.key, 
-                type: 'saída', 
-                timestamp: ts, 
-                date: log.date, 
-                lotId: lot.id, 
-                lotNumber: lot.lotNumber, 
-                itemName: req.name.toUpperCase(), 
-                supplierName: entry.s.name, 
-                deliveryId: entry.d.id, 
-                outboundInvoice: `DIR-${log.recipient.substring(0,3).toUpperCase()}`, 
-                quantity: take, 
-                expirationDate: lot.expirationDate 
-            });
-          }
-        }
-      }
-    }
-    await writeToDatabase(directorWithdrawalsRef, [nLog, ...directorWithdrawals]);
-    await writeToDatabase(suppliersRef, tempS.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
-    return { success: true, message: 'OK' };
-  };
-
   const handleLogin = (n: string, c: string): boolean => {
     const nl = n.toLowerCase();
-    const cl = c; 
-    
-    if (nl === 'administrador' && cl === '15210361870') { setIsAdminLoggedIn(true); return true; }
-    if (nl === 'almoxarifado' && cl === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
-    if (nl === 'itesp' && cl === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
-    
+    if (nl === 'administrador' && c === '15210361870') { setIsAdminLoggedIn(true); return true; }
+    if (nl === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
+    if (nl === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
     const cleanCpf = c.replace(/[^\d]/g, '');
-    const u = suppliers.find(p => p.name === n.toUpperCase() && p.cpf === cleanCpf);
-    if (u) { 
-        setLoggedInCpf(cleanCpf); 
-        return true; 
-    }
+    const u = suppliers.find(p => superNormalize(p.name) === superNormalize(n) && p.cpf === cleanCpf);
+    if (u) { setLoggedInCpf(cleanCpf); return true; }
     return false;
   };
 
@@ -595,13 +280,13 @@ const App: React.FC = () => {
     setRegistrationStatus({ success: true, message: `Cadastrado!` });
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="animate-pulse font-black text-green-800 uppercase tracking-widest">Sincronizando Banco de Dados...</p></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="animate-pulse font-black text-green-800 tracking-widest uppercase">Sincronizando Dados...</p></div>;
 
   return (
     <>
-      <div className={`fixed bottom-4 right-4 z-50 ${isSaving ? 'opacity-100' : 'opacity-0'}`}><div className="bg-blue-600 text-white px-3 py-2 rounded-full shadow text-xs font-bold animate-pulse">Gravando...</div></div>
-      {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={handleRegister} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async (o, n, c, w) => { await runTransaction(suppliersRef, (curr) => { if(!curr || !curr[o]) return; const d = { ...curr[o], name: n.toUpperCase(), cpf: c, allowedWeeks: w }; if(o !== c) delete curr[o]; curr[c] = d; return curr; }); return null; }} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async (s) => { await writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {})); return true; }} activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={registrationStatus} onClearRegistrationStatus={() => setRegistrationStatus(null)} onReopenInvoice={handleReopenInvoice} onDeleteInvoice={handleDeleteInvoice} onUpdateInvoiceItems={handleUpdateInvoiceItems} onManualInvoiceEntry={handleManualInvoiceEntry} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={handleDeleteWarehouseEntry} onRegisterCleaningLog={async (l) => { await set(ref(database, `cleaningLogs/${Date.now()}`), { ...l, id: String(Date.now()) }); return {success: true, message: 'OK'}; }} onDeleteCleaningLog={async (id) => set(ref(database, `cleaningLogs/${id}`), null)} onRegisterDirectorWithdrawal={handleRegisterDirectorWithdrawal} onDeleteDirectorWithdrawal={async (id) => set(ref(database, `directorWithdrawals/${id}`), null)} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} onCancelDeliveries={handleCancelDeliveries} />
-      : currentUser ? <Dashboard supplier={currentUser} onLogout={() => setLoggedInCpf(null)} onScheduleDelivery={handleScheduleDelivery} onFulfillAndInvoice={handleFulfillAndInvoice} onCancelDeliveries={handleCancelDeliveries} emailModalData={emailModalData} onCloseEmailModal={() => setEmailModalData(null)} />
+      <div className={`fixed bottom-4 right-4 z-50 transition-opacity ${isSaving ? 'opacity-100' : 'opacity-0'}`}><div className="bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold animate-pulse">Salvando Alterações...</div></div>
+      {isAdminLoggedIn ? <AdminDashboard suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals} onRegister={handleRegister} onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} onUpdateSupplier={async (o, n, c, w) => { await runTransaction(suppliersRef, (curr) => { if(!curr || !curr[o]) return; const d = { ...curr[o], name: n.toUpperCase(), cpf: c, allowedWeeks: w }; if(o !== c) delete curr[o]; curr[c] = d; return curr; }); return null; }} onLogout={() => setIsAdminLoggedIn(false)} onResetData={() => writeToDatabase(suppliersRef, {})} onRestoreData={async (s) => { await writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {})); return true; }} activeTab={adminActiveTab} onTabChange={setAdminActiveTab} registrationStatus={registrationStatus} onClearRegistrationStatus={() => setRegistrationStatus(null)} onReopenInvoice={async (s, i) => {}} onDeleteInvoice={async (s, i) => {}} onUpdateInvoiceItems={async (s, i, it) => ({success: true})} onManualInvoiceEntry={async (s, d, n, it) => ({success: true})} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)} onDeleteWarehouseEntry={async (l) => ({success: true, message: 'OK'})} onRegisterCleaningLog={async (l) => ({success: true, message: 'OK'})} onDeleteCleaningLog={async (id) => {}} onRegisterDirectorWithdrawal={async (l) => ({success: true, message: 'OK'})} onDeleteDirectorWithdrawal={async (id) => {}} standardMenu={standardMenu} dailyMenus={dailyMenus} onUpdateStandardMenu={(m) => writeToDatabase(standardMenuRef, m)} onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} onCancelDeliveries={() => {}} />
+      : currentUser ? <Dashboard supplier={currentUser} onLogout={() => setLoggedInCpf(null)} onScheduleDelivery={async (s, d, t) => {}} onFulfillAndInvoice={async (s, p, i) => {}} onCancelDeliveries={() => {}} emailModalData={emailModalData} onCloseEmailModal={() => setEmailModalData(null)} />
       : isAlmoxarifadoLoggedIn ? <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={handleRegisterWarehouseEntry} onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} />
       : isItespLoggedIn ? <ItespDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsItespLoggedIn(false)} />
       : <LoginScreen onLogin={handleLogin} />}
