@@ -8,14 +8,14 @@ interface AdminFinancialManagerProps {
   onDelete: (id: string) => Promise<void>;
 }
 
-const PTRES_OPTIONS = ['380302', '380303', '380304', '38038', '380328'] as const;
+const PTRES_OPTIONS = ['380302', '380303', '380304', '380308', '380328'] as const;
 const NATUREZA_OPTIONS = ['339030', '339039'] as const;
 
 const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
 const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, onSave, onDelete }) => {
-  const [formData, setFormData] = useState<Partial<FinancialRecord>>({
+  const initialFormState: Partial<FinancialRecord> = {
     tipo: 'DESPESA',
     ptres: '380302',
     natureza: '339030',
@@ -23,9 +23,20 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
     valorSolicitado: 0,
     valorRecebido: 0,
     valorUtilizado: 0,
-    status: 'PENDENTE'
-  });
+    status: 'PENDENTE',
+    selecao: '',
+    dataRecebimento: '',
+    justificativa: '',
+    descricao: '',
+    localUtilizado: '',
+    numeroProcesso: '',
+    dataPagamento: ''
+  };
+
+  const [formData, setFormData] = useState<Partial<FinancialRecord>>(initialFormState);
   const [isSaving, setIsSaving] = useState(false);
+
+  const isEditing = !!formData.id;
 
   // Cálculos de Soma e Saldo (Abatimento automático baseado nos totais de entrada vs despesa)
   const totalsByPtres = useMemo(() => {
@@ -43,6 +54,15 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
       return { natureza: n, recurso: rec, gasto: gast, saldo: rec - gast };
     });
   }, [records]);
+
+  const handleEdit = (record: FinancialRecord) => {
+    setFormData({ ...record });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setFormData(initialFormState);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,16 +84,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
 
     const res = await onSave(recordToSave as FinancialRecord);
     if (res.success) {
-      setFormData({
-        tipo: formData.tipo,
-        ptres: formData.ptres,
-        natureza: formData.natureza,
-        dataSolicitacao: new Date().toISOString().split('T')[0],
-        valorSolicitado: 0,
-        valorRecebido: 0,
-        valorUtilizado: 0,
-        status: 'PENDENTE'
-      });
+      setFormData(initialFormState);
     } else {
       alert(res.message);
     }
@@ -82,7 +93,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
-      {/* Sumário Superior - Saldos por PTRES e Natureza */}
+      {/* Sumário Superior */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-indigo-600">
             <h3 className="text-[10px] font-black text-gray-400 uppercase mb-4 tracking-widest flex justify-between items-center">
@@ -121,15 +132,33 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
       </div>
 
       {/* Formulário de Lançamento Dinâmico */}
-      <div className="bg-white p-8 rounded-3xl shadow-xl border-2 border-gray-50">
+      <div className={`bg-white p-8 rounded-3xl shadow-xl border-2 transition-all ${isEditing ? 'border-orange-400' : 'border-gray-50'}`}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
-            <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter italic">Lançamento Financeiro</h2>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Preencha os campos abaixo para registrar {formData.tipo === 'RECURSO' ? 'uma Entrada' : 'uma Despesa'}</p>
+            <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter italic">
+              {isEditing ? 'Editar Lançamento' : 'Lançamento Financeiro'}
+            </h2>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+              {isEditing ? 'Atualize as informações do registro selecionado' : `Preencha os campos abaixo para registrar ${formData.tipo === 'RECURSO' ? 'uma Entrada' : 'uma Despesa'}`}
+            </p>
           </div>
           <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner w-full sm:w-auto">
-             <button type="button" onClick={() => setFormData({...formData, tipo: 'RECURSO'})} className={`flex-1 sm:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${formData.tipo === 'RECURSO' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Entrada de Recurso</button>
-             <button type="button" onClick={() => setFormData({...formData, tipo: 'DESPESA'})} className={`flex-1 sm:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${formData.tipo === 'DESPESA' ? 'bg-white text-red-600 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Lançar Despesa</button>
+             <button 
+                type="button" 
+                onClick={() => !isEditing && setFormData({...formData, tipo: 'RECURSO'})} 
+                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${formData.tipo === 'RECURSO' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'} ${isEditing ? 'opacity-50 cursor-not-allowed' : 'hover:text-gray-600'}`}
+                disabled={isEditing}
+             >
+                Entrada de Recurso
+             </button>
+             <button 
+                type="button" 
+                onClick={() => !isEditing && setFormData({...formData, tipo: 'DESPESA'})} 
+                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${formData.tipo === 'DESPESA' ? 'bg-white text-red-600 shadow-md' : 'text-gray-400'} ${isEditing ? 'opacity-50 cursor-not-allowed' : 'hover:text-gray-600'}`}
+                disabled={isEditing}
+             >
+                Lançar Despesa
+             </button>
           </div>
         </div>
 
@@ -208,9 +237,22 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
             <input type="text" value={formData.status || ''} onChange={e => setFormData({...formData, status: e.target.value.toUpperCase()})} className="w-full p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-400 font-bold" placeholder="Ex: PAGO, PENDENTE..." />
           </div>
 
-          <div className="md:col-span-3 lg:col-span-4 flex justify-end pt-4">
-            <button type="submit" disabled={isSaving} className={`font-black px-16 py-4 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-sm text-white ${formData.tipo === 'RECURSO' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-red-600 hover:bg-red-700'}`}>
-                {isSaving ? 'Gravando...' : `Registrar ${formData.tipo}`}
+          <div className="md:col-span-3 lg:col-span-4 flex justify-end pt-4 gap-3">
+            {isEditing && (
+              <button 
+                type="button" 
+                onClick={handleCancelEdit} 
+                className="font-black px-10 py-4 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-sm text-gray-600 bg-gray-200 hover:bg-gray-300"
+              >
+                Cancelar Edição
+              </button>
+            )}
+            <button 
+                type="submit" 
+                disabled={isSaving} 
+                className={`font-black px-16 py-4 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-sm text-white ${isEditing ? 'bg-orange-500 hover:bg-orange-600' : (formData.tipo === 'RECURSO' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-red-600 hover:bg-red-700')}`}
+            >
+                {isSaving ? 'Gravando...' : (isEditing ? 'Salvar Alterações' : `Registrar ${formData.tipo}`)}
             </button>
           </div>
         </form>
@@ -276,9 +318,22 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
                                 <span className={`px-2 py-1 rounded text-[9px] font-black uppercase border ${r.status === 'PAGO' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>{r.status}</span>
                             </td>
                             <td className="p-4 text-center">
-                                <button onClick={() => { if(window.confirm('Excluir este registro financeiro?')) onDelete(r.id); }} className="text-red-300 hover:text-red-600 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
+                                <div className="flex gap-2 justify-center">
+                                    <button 
+                                      onClick={() => handleEdit(r)} 
+                                      className="text-indigo-400 hover:text-indigo-600 transition-colors"
+                                      title="Editar registro"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                    </button>
+                                    <button 
+                                      onClick={() => { if(window.confirm('Excluir este registro financeiro?')) onDelete(r.id); }} 
+                                      className="text-red-300 hover:text-red-600 transition-colors"
+                                      title="Excluir registro"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     ))}
