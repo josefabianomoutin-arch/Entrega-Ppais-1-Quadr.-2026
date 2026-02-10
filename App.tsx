@@ -32,6 +32,14 @@ const superNormalize = (text: string) => {
         .trim();
 };
 
+// Limpador de números (Trata 1.250,50 -> 1250.5)
+const cleanNumericValue = (val: any): number => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const cleanStr = String(val).replace(/[^\d.,-]/g, '').replace(/\./g, '').replace(',', '.');
+    return parseFloat(cleanStr) || 0;
+};
+
 function normalizeArray<T>(data: any): T[] {
   if (!data) return [];
   if (Array.isArray(data)) return data.filter(i => i !== null) as T[];
@@ -85,7 +93,7 @@ const App: React.FC = () => {
               lots: normalizeArray(d.lots).map((l: any) => ({ 
                 ...l, 
                 lotNumber: (l.lotNumber || '').toUpperCase().trim(),
-                remainingQuantity: Number(l.remainingQuantity) || 0
+                remainingQuantity: cleanNumericValue(l.remainingQuantity)
               })), 
               withdrawals: normalizeArray(d.withdrawals) 
           })),
@@ -103,7 +111,7 @@ const App: React.FC = () => {
         setWarehouseLog([]);
         return;
       }
-      // Captura profunda e resiliente de dados com limpeza de espaços
+      // Captura resiliente de dados com limpeza de Janeiro
       const logsArray = Object.entries(data).map(([key, val]: [string, any]) => {
         let rawDate = (val.date || val.invoiceDate || (val.timestamp ? String(val.timestamp).split('T')[0] : "")).toString().trim();
         
@@ -111,7 +119,7 @@ const App: React.FC = () => {
             ...val,
             id: val.id || key,
             date: rawDate,
-            quantity: Number(val.quantity) || 0,
+            quantity: cleanNumericValue(val.quantity),
             itemName: (val.itemName || "").toUpperCase().trim(),
             supplierName: (val.supplierName || "").toUpperCase().trim()
         };
@@ -155,7 +163,8 @@ const App: React.FC = () => {
       const result = await runTransaction(supplierRef, (currentSupplier) => {
         if (!currentSupplier) return null;
         const deliveries = normalizeArray<any>(currentSupplier.deliveries);
-        const newLot = { id: lotId, lotNumber: normalizedLotNumber, initialQuantity: Number(payload.quantity), remainingQuantity: Number(payload.quantity), expirationDate: payload.expirationDate };
+        const qty = cleanNumericValue(payload.quantity);
+        const newLot = { id: lotId, lotNumber: normalizedLotNumber, initialQuantity: qty, remainingQuantity: qty, expirationDate: payload.expirationDate };
 
         let delivery = deliveries.find(d => 
           d.invoiceNumber === payload.invoiceNumber && 
@@ -165,7 +174,7 @@ const App: React.FC = () => {
         if (delivery) {
           delivery.lots = [...normalizeArray(delivery.lots), newLot];
         } else {
-          deliveries.push({ id: `del-entry-${Date.now()}`, date: payload.invoiceDate, time: '08:00', item: normalizedItemName, kg: Number(payload.quantity), invoiceUploaded: true, invoiceNumber: payload.invoiceNumber, lots: [newLot] });
+          deliveries.push({ id: `del-entry-${Date.now()}`, date: payload.invoiceDate, time: '08:00', item: normalizedItemName, kg: qty, invoiceUploaded: true, invoiceNumber: payload.invoiceNumber, lots: [newLot] });
         }
         currentSupplier.deliveries = deliveries;
         return currentSupplier;
@@ -184,7 +193,7 @@ const App: React.FC = () => {
             supplierName: result.snapshot.val().name, 
             deliveryId: 'various', 
             inboundInvoice: payload.invoiceNumber, 
-            quantity: payload.quantity, 
+            quantity: cleanNumericValue(payload.quantity), 
             expirationDate: payload.expirationDate 
         };
         await set(logEntryRef, newLog);
@@ -214,7 +223,7 @@ const App: React.FC = () => {
     try {
       const result = await runTransaction(supplierRef, (currentSupplier) => {
         if (!currentSupplier) return null;
-        let qtyToDeduct = Number(payload.quantity);
+        let qtyToDeduct = cleanNumericValue(payload.quantity);
         const deliveries = normalizeArray<any>(currentSupplier.deliveries);
 
         let totalAvail = 0;
@@ -222,7 +231,7 @@ const App: React.FC = () => {
             if (superNormalize(d.item) !== normReqItem) return;
             normalizeArray<any>(d.lots).forEach(l => {
                 if (superNormalize(l.lotNumber) === normReqLot) {
-                    totalAvail += Number(l.remainingQuantity || 0);
+                    totalAvail += cleanNumericValue(l.remainingQuantity);
                 }
             });
         });
@@ -236,9 +245,10 @@ const App: React.FC = () => {
             if (superNormalize(d.item) !== normReqItem) continue;
             const lots = normalizeArray<any>(d.lots);
             for (const l of lots) {
-                if (superNormalize(l.lotNumber) === normReqLot && Number(l.remainingQuantity) > 0) {
-                    const take = Math.min(Number(l.remainingQuantity), qtyToDeduct);
-                    l.remainingQuantity = Number((Number(l.remainingQuantity) - take).toFixed(4));
+                if (superNormalize(l.lotNumber) === normReqLot && cleanNumericValue(l.remainingQuantity) > 0) {
+                    const avail = cleanNumericValue(l.remainingQuantity);
+                    const take = Math.min(avail, qtyToDeduct);
+                    l.remainingQuantity = Number((avail - take).toFixed(4));
                     qtyToDeduct -= take;
                     if (qtyToDeduct <= EPSILON) { qtyToDeduct = 0; break; }
                 }
@@ -264,7 +274,7 @@ const App: React.FC = () => {
             supplierName: result.snapshot.val().name, 
             deliveryId: 'various', 
             outboundInvoice: payload.outboundInvoice, 
-            quantity: payload.quantity, 
+            quantity: cleanNumericValue(payload.quantity), 
             expirationDate: payload.expirationDate 
         };
         await set(logEntryRef, newLog);
@@ -302,7 +312,7 @@ const App: React.FC = () => {
                         }
                     }
                 } else if (logEntry.type === 'saída') {
-                    let qtyToRestore = Number(logEntry.quantity || 0);
+                    let qtyToRestore = cleanNumericValue(logEntry.quantity);
                     const normReqItem = superNormalize(logEntry.itemName);
                     const normReqLot = superNormalize(logEntry.lotNumber);
                     let found = false;
@@ -312,7 +322,7 @@ const App: React.FC = () => {
                         const lots = normalizeArray<any>(d.lots);
                         for (const l of lots) {
                             if (superNormalize(l.lotNumber) === normReqLot) {
-                                l.remainingQuantity = Number((Number(l.remainingQuantity || 0) + qtyToRestore).toFixed(4));
+                                l.remainingQuantity = Number((cleanNumericValue(l.remainingQuantity) + qtyToRestore).toFixed(4));
                                 qtyToRestore = 0;
                                 found = true;
                                 break;
@@ -353,8 +363,8 @@ const App: React.FC = () => {
                 date: originalDate, 
                 time: '08:00', 
                 item: it.name.toUpperCase().trim(), 
-                kg: Number(it.kg), 
-                value: Number(it.value), 
+                kg: cleanNumericValue(it.kg), 
+                value: cleanNumericValue(it.value), 
                 invoiceUploaded: true, 
                 invoiceNumber: invoiceNumber 
             }));
@@ -381,8 +391,8 @@ const App: React.FC = () => {
                 date: date, 
                 time: '08:00', 
                 item: it.name.toUpperCase().trim(), 
-                kg: Number(it.kg), 
-                value: Number(it.value), 
+                kg: cleanNumericValue(it.kg), 
+                value: cleanNumericValue(it.value), 
                 invoiceUploaded: true, 
                 invoiceNumber: invoiceNumber 
             }));
@@ -429,8 +439,8 @@ const App: React.FC = () => {
             date, 
             time: '08:00', 
             item: it.name.toUpperCase().trim(), 
-            kg: Number(it.kg), 
-            value: Number(it.value), 
+            kg: cleanNumericValue(it.kg), 
+            value: cleanNumericValue(it.value), 
             invoiceUploaded: true, 
             invoiceNumber: inv.invoiceNumber 
         }));
@@ -509,7 +519,7 @@ const App: React.FC = () => {
     const ts = new Date().toISOString();
 
     for (const req of log.items) {
-      let need = Number(req.quantity);
+      let need = cleanNumericValue(req.quantity);
       const nReqName = superNormalize(req.name);
       const lots = tempS.flatMap(s => s.deliveries.filter(d => superNormalize(d.item) === nReqName && d.lots).map(d => ({ s, d })))
                         .sort((a, b) => a.d.date.localeCompare(b.d.date));
@@ -518,9 +528,10 @@ const App: React.FC = () => {
         if (need <= 0) break;
         for (const lot of (entry.d.lots || [])) {
           if (need <= 0) break;
-          if (Number(lot.remainingQuantity) > 0) {
-            const take = Math.min(Number(lot.remainingQuantity), need);
-            lot.remainingQuantity = Number((Number(lot.remainingQuantity) - take).toFixed(4));
+          const avail = cleanNumericValue(lot.remainingQuantity);
+          if (avail > 0) {
+            const take = Math.min(avail, need);
+            lot.remainingQuantity = Number((avail - take).toFixed(4));
             need -= take;
             const logRef = push(warehouseLogRef);
             await set(logRef, { 
