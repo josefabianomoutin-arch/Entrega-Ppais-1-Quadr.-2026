@@ -41,12 +41,12 @@ const cleanNumericValue = (val: any): number => {
 };
 
 /**
- * PADRONIZADOR DE DATA 2026 - VERSÃO FINAL
- * Garante que qualquer entrada que represente Janeiro seja formatada como 2026-01-XX
+ * PADRONIZADOR DE DATA 2026 - VERSÃO NUCLEAR
+ * Garante que Janeiro seja sempre interpretado como 01.
  */
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
-    let s = String(rawDate).trim();
+    let s = String(rawDate).trim().toLowerCase();
 
     // Caso Excel Serial
     if (!isNaN(Number(s)) && Number(s) > 40000) {
@@ -58,11 +58,18 @@ const standardizeDate = (rawDate: any): string => {
         return `2026-${m}-${d}`;
     }
 
-    s = s.split(' ')[0].split('T')[0].replace(/[\.\/]/g, '-');
+    // Detecção de mês por texto
+    if (s.includes('jan')) return `2026-01-${s.replace(/[^0-9]/g, '').slice(0,2).padStart(2,'0')}`;
+
+    // Limpeza de separadores
+    s = s.split(' ')[0].split('t')[0].replace(/[\.\/]/g, '-');
     const parts = s.split('-');
     
     if (parts.length === 2) {
-        return `2026-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        // Assume DD-MM -> 2026-MM-DD
+        const d = parts[0].padStart(2, '0');
+        const m = parts[1].padStart(2, '0');
+        return `2026-${m}-${d}`;
     }
 
     if (parts.length === 3) {
@@ -144,6 +151,7 @@ const App: React.FC = () => {
     if (inputNameNorm === 'nomedopainda' && c === 'itesp2026') { setIsItespLoggedIn(true); return true; }
     if (inputNameNorm === 'administrador' && c === '15210361870') { setIsAdminLoggedIn(true); return true; }
     if (inputNameNorm === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
+    if (inputNameNorm === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
     const u = suppliers.find(p => superNormalize(p.name) === inputNameNorm && p.cpf === c.replace(/[^\d]/g, ''));
     if (u) { setLoggedInCpf(u.cpf); return true; }
     return false;
@@ -154,35 +162,22 @@ const App: React.FC = () => {
     try { await set(dbRef, data); } finally { setTimeout(() => setIsSaving(false), 500); }
   }, []);
 
-  // Handlers Memorizados para Evitar Travamento de UI
-  const handlePersistSuppliers = useCallback((s: Supplier[]) => {
-      writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
-  }, [writeToDatabase]);
-
-  const handleResetData = useCallback(() => {
-      if (window.confirm("APAGAR TUDO?")) writeToDatabase(suppliersRef, {});
-  }, [writeToDatabase]);
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800">SINCRONIZANDO...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800 animate-pulse">SISTEMA INICIALIZANDO...</div>;
 
   return (
     <>
-      <div className={`fixed top-4 right-4 z-[9999] p-2 bg-blue-600 text-white text-[10px] font-bold rounded shadow-lg transition-opacity ${isSaving ? 'opacity-100' : 'opacity-0'}`}>SALVANDO...</div>
+      <div className={`fixed top-4 right-4 z-[9999] p-2 bg-blue-600 text-white text-[10px] font-bold rounded shadow-lg transition-opacity ${isSaving ? 'opacity-100' : 'opacity-0'}`}>SINC...</div>
       {isAdminLoggedIn ? (
         <AdminDashboard 
-            suppliers={suppliers} 
-            warehouseLog={warehouseLog} 
-            cleaningLogs={cleaningLogs} 
-            directorWithdrawals={directorWithdrawals} 
-            onPersistSuppliers={handlePersistSuppliers} 
+            suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals}
+            onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} 
             onLogout={() => setIsAdminLoggedIn(false)} 
-            onResetData={handleResetData}
+            onResetData={() => writeToDatabase(suppliersRef, {})}
             perCapitaConfig={perCapitaConfig}
             onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)}
             standardMenu={standardMenu}
             dailyMenus={dailyMenus}
             onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)}
-            // Outros stubs necessários para manter o contrato
             onRegister={async () => {}}
             onUpdateSupplier={async () => null}
             onRestoreData={async () => true}
