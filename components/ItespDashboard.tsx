@@ -27,19 +27,20 @@ const superNormalize = (text: string) => {
 
 /**
  * Extrator de mês Ultra-Resiliente: 
- * Tenta capturar Janeiro mesmo que o ano esteja mal formatado ou fora da string.
+ * Agora ele prioriza a detecção de "-01-" ou "/01/" em qualquer lugar da string, 
+ * ignorando o ano se necessário, para garantir que Janeiro de 2026 nunca seja perdido.
  */
 const getMonthNameFromDate = (dateStr?: string): string => {
     if (!dateStr) return "Mês Indefinido";
     
     const s = String(dateStr).trim();
     
-    // Fallback prioritário: Se contiver "Janeiro" ou "-01-" ou "/01/"
-    if (s.toUpperCase().includes("JANEIRO") || s.includes("-01-") || s.includes("/01/") || s.match(/-01$/) || s.match(/\/01$/)) {
+    // Se a string contiver o padrão de Janeiro em ISO ou BR
+    if (s.includes("-01-") || s.includes("/01/") || s.includes("JANEIRO") || s.toUpperCase().includes("JAN")) {
         return "Janeiro";
     }
 
-    // Normaliza separadores
+    // Processamento padrão para outros meses
     const cleanStr = s.replace(/[\.\/]/g, '-');
     const parts = cleanStr.split('-');
 
@@ -56,12 +57,6 @@ const getMonthNameFromDate = (dateStr?: string): string => {
         if (mIdx >= 0 && mIdx < 12) return months[mIdx];
     }
     
-    // Busca exaustiva por nomes
-    const upper = s.toUpperCase();
-    if (upper.includes("FEV") || upper.includes("-02-")) return "Fevereiro";
-    if (upper.includes("MAR") || upper.includes("-03-")) return "Março";
-    if (upper.includes("ABR") || upper.includes("-04-")) return "Abril";
-
     return "Mês Indefinido";
 };
 
@@ -93,7 +88,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
 
         const consolidated = new Map<string, any>();
 
-        // 1. Inicializar Metas (Jan-Abr)
+        // 1. Inicializar Metas (Janeiro a Abril de 2026)
         itespSuppliers.forEach(s => {
             const sNorm = superNormalize(s.name);
             s.contractItems.forEach(ci => {
@@ -114,7 +109,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             });
         });
 
-        // 2. Acumular Entradas do Almoxarifado com Match Inteligente
+        // 2. Acumular Entradas do Almoxarifado com Match Inteligente de Nomes e Meses
         warehouseLog.forEach(log => {
             if (log.type === 'entrada') {
                 const logSupplierNorm = superNormalize(log.supplierName);
@@ -124,11 +119,14 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                 // Filtro para o 1º quadrimestre
                 if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(mName)) return;
 
-                // Match flexível (Substrings)
-                for (let val of consolidated.values()) {
+                // Match flexível: Verifica se algum registro consolidado "contém" o nome do log
+                for (let [key, val] of consolidated.entries()) {
                     if (val.month === mName) {
+                        // Se o fornecedor no log está contido ou contém o nome do fornecedor no contrato
                         const supplierMatch = val.normSupplier.includes(logSupplierNorm) || logSupplierNorm.includes(val.normSupplier);
+                        
                         if (supplierMatch) {
+                            // Se o item no log está contido ou contém o nome do item no contrato
                             const itemMatch = val.normItem.includes(logItemNorm) || logItemNorm.includes(val.normItem);
                             if (itemMatch) {
                                 val.receivedKg += (Number(log.quantity) || 0);
@@ -185,7 +183,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             <main className="p-4 md:p-8 max-w-[1700px] mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-blue-500">
-                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Meta Acumulada (2026)</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Meta Acumulada (Jan a Abr)</p>
                         <p className="text-3xl font-black text-blue-700">{totals.contracted.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-green-600">
@@ -197,7 +195,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                         <p className="text-3xl font-black text-red-600">{totals.shortfall.toLocaleString('pt-BR', {minimumFractionDigits: 2})} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl border-b-8 border-orange-500">
-                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Prejuízo Estimado</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Prejuízo Financeiro</p>
                         <p className="text-3xl font-black text-orange-600">{formatCurrency(totals.loss)}</p>
                     </div>
                 </div>
@@ -244,7 +242,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                         <td className={`p-5 text-right font-black ${item.financialLoss > 0.01 ? 'text-red-700' : 'text-gray-200'}`}>{item.financialLoss > 0.01 ? formatCurrency(item.financialLoss) : 'R$ 0,00'}</td>
                                     </tr>
                                 )) : (
-                                    <tr><td colSpan={7} className="p-32 text-center text-gray-400 font-black uppercase tracking-widest italic bg-gray-50">Dados de Janeiro (2026) não localizados ou erro de fuso horário.</td></tr>
+                                    <tr><td colSpan={7} className="p-32 text-center text-gray-400 font-black uppercase tracking-widest italic bg-gray-50">Nenhum dado de estoque localizado para o período selecionado.</td></tr>
                                 )}
                             </tbody>
                             <tfoot className="bg-gray-900 text-white font-black text-xs border-t-4 border-green-800">

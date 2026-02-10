@@ -98,11 +98,15 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
             for (const month of MONTHS_2026) {
                 const deliveredInMonth = supplier.deliveries.filter(d => {
                     if (d.item !== item.name) return false;
-                    // Extrator de mês via string (evita erros de Date object)
-                    const dateParts = d.date.split('-');
-                    if (dateParts.length < 2) return false;
-                    const monthIdx = parseInt(dateParts[1], 10) - 1;
-                    return monthIdx === month.number;
+                    
+                    // EXTRAÇÃO SEGURA DE MÊS (YYYY-MM-DD -> [YYYY, MM, DD])
+                    // Ignora fuso horário ao olhar diretamente para a string
+                    const parts = d.date.split('-');
+                    if (parts.length < 2) return false;
+                    const monthNumber = parseInt(parts[1], 10);
+                    
+                    // Janeiro é 01, mas no constants.ts Janeiro é 0 (index).
+                    return (monthNumber - 1) === month.number;
                 });
                 
                 const deliveredValue = deliveredInMonth.reduce((sum, d) => sum + (d.value || 0), 0);

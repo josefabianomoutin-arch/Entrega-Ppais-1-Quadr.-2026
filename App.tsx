@@ -21,7 +21,7 @@ const directorWithdrawalsRef = ref(database, 'directorWithdrawals');
 const standardMenuRef = ref(database, 'standardMenu');
 const dailyMenusRef = ref(database, 'dailyMenus');
 
-// Normalização absoluta para comparação de dados
+// Normalização absoluta para comparação de dados (Remove acentos, espaços e caracteres especiais)
 const superNormalize = (text: string) => {
     return (text || "")
         .toString()
@@ -45,8 +45,10 @@ const cleanNumericValue = (val: any): number => {
 };
 
 /**
- * CONVERSOR DE DATA ULTRA-ROBUSTO
- * Garante que 01/01/2026 seja sempre 2026-01-01 independente da origem (Excel, String, ISO)
+ * CONVERSOR DE DATA ANTI-FUSO HORÁRIO
+ * O JavaScript costuma subtrair horas de datas ISO puras, 
+ * transformando 01/01/2026 em 31/12/2025. 
+ * Esta função força o tratamento como texto puro (YYYY-MM-DD).
  */
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
@@ -55,6 +57,7 @@ const standardizeDate = (rawDate: any): string => {
     // 1. Caso seja Excel Serial (ex: 46022)
     if (!isNaN(Number(s)) && Number(s) > 40000) {
         const excelDate = parseFloat(s);
+        // Usar UTC explicitamente para evitar que o fuso horário mude o dia
         const date = new Date(Date.UTC(1899, 11, 30)); 
         date.setUTCDate(date.getUTCDate() + Math.floor(excelDate));
         
@@ -64,10 +67,10 @@ const standardizeDate = (rawDate: any): string => {
         return `${year}-${month}-${day}`;
     }
 
-    // 2. Limpeza de strings (remover horas/timestamps T00:00:00)
+    // 2. Remover horas ou timestamps (T00:00:00)
     s = s.split(' ')[0].split('T')[0];
     
-    // Normaliza separadores para traço
+    // Normalizar separadores
     s = s.replace(/[\.\/]/g, '-');
 
     const parts = s.split('-');
@@ -75,29 +78,17 @@ const standardizeDate = (rawDate: any): string => {
     if (parts.length === 3) {
         let day, month, year;
         
-        // Formato ISO (YYYY-MM-DD)
-        if (parts[0].length === 4) {
+        if (parts[0].length === 4) { // ISO YYYY-MM-DD
             year = parts[0];
             month = parts[1].padStart(2, '0');
             day = parts[2].padStart(2, '0');
-        } else { 
-            // Formato BR (DD-MM-YYYY)
+        } else { // BR DD-MM-YYYY
             day = parts[0].padStart(2, '0');
             month = parts[1].padStart(2, '0');
             year = parts[2];
-            
-            // Trata anos com 2 dígitos (26 -> 2026)
-            if (year.length === 2) {
-                const yNum = parseInt(year, 10);
-                year = yNum > 50 ? '19' + year : '20' + year;
-            }
+            if (year.length === 2) year = '20' + year;
         }
         return `${year}-${month}-${day}`;
-    }
-
-    // 3. Fallback para manter strings que já parecem ISO
-    if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
-        return s.substring(0, 10);
     }
 
     return s;
@@ -289,15 +280,14 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (n: string, c: string): boolean => {
-    // Normalização rigorosa para login
-    const normalizedInputName = superNormalize(n);
+    const inputNameNorm = superNormalize(n);
     const cleanCpf = c.replace(/[^\d]/g, '');
 
-    if (normalizedInputName === 'administrador' && cleanCpf === '15210361870') { setIsAdminLoggedIn(true); return true; }
-    if (normalizedInputName === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
-    if (normalizedInputName === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
+    if (inputNameNorm === 'administrador' && cleanCpf === '15210361870') { setIsAdminLoggedIn(true); return true; }
+    if (inputNameNorm === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
+    if (inputNameNorm === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
 
-    const u = suppliers.find(p => superNormalize(p.name) === normalizedInputName && p.cpf === cleanCpf);
+    const u = suppliers.find(p => superNormalize(p.name) === inputNameNorm && p.cpf === cleanCpf);
     if (u) { setLoggedInCpf(cleanCpf); return true; }
     return false;
   };
