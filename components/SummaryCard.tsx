@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import type { Supplier } from '../types';
 import { MONTHS_2026 } from '../constants';
@@ -95,8 +96,14 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
             const monthlyQuantityQuota = itemTotalQuantity / 4;
 
             for (const month of MONTHS_2026) {
-                const deliveredInMonth = supplier.deliveries
-                    .filter(d => d.item === item.name && new Date(d.date + 'T00:00:00').getMonth() === month.number);
+                const deliveredInMonth = supplier.deliveries.filter(d => {
+                    if (d.item !== item.name) return false;
+                    // Extrator de mês via string (evita erros de Date object)
+                    const dateParts = d.date.split('-');
+                    if (dateParts.length < 2) return false;
+                    const monthIdx = parseInt(dateParts[1], 10) - 1;
+                    return monthIdx === month.number;
+                });
                 
                 const deliveredValue = deliveredInMonth.reduce((sum, d) => sum + (d.value || 0), 0);
                 const deliveredQuantity = deliveredInMonth.reduce((sum, d) => sum + (d.kg || 0), 0);

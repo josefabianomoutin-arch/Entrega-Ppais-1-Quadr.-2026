@@ -36,7 +36,7 @@ const getMonthNameFromDate = (dateStr?: string): string => {
     const cleanStr = dateStr.replace(/[\.\/]/g, '-');
     const parts = cleanStr.split('-');
 
-    if (parts.length === 3) {
+    if (parts.length >= 2) {
         let mIdx = -1;
         let year = "";
 
@@ -44,24 +44,25 @@ const getMonthNameFromDate = (dateStr?: string): string => {
         if (parts[0].length === 4) {
             year = parts[0];
             mIdx = parseInt(parts[1], 10) - 1;
-        } else {
+        } else if (parts.length === 3) {
             // Se for BR (01-01-2026)
             year = parts[2];
             if (year.length === 2) year = '20' + year;
             mIdx = parseInt(parts[1], 10) - 1;
         }
 
-        // TRAVA DE SEGURANÇA: Apenas dados de 2026
-        if (year !== "2026") return "Mês Indefinido";
-        if (mIdx >= 0 && mIdx < 12) return months[mIdx];
+        // Se o ano for 2026 ou 26, valida o mês
+        if (year === "2026" || year === "26" || !year) {
+             if (mIdx >= 0 && mIdx < 12) return months[mIdx];
+        }
     }
     
     // Fallback: Busca por nomes de meses por extenso
     const upper = dateStr.toUpperCase();
-    if (upper.includes("JANEIRO") || upper.includes("JAN")) return "Janeiro";
-    if (upper.includes("FEVEREIRO") || upper.includes("FEV")) return "Fevereiro";
-    if (upper.includes("MARCO") || upper.includes("MAR")) return "Março";
-    if (upper.includes("ABRIL") || upper.includes("ABR")) return "Abril";
+    if (upper.includes("JANEIRO") || upper.includes("-01-") || upper.includes("/01/")) return "Janeiro";
+    if (upper.includes("FEVEREIRO") || upper.includes("-02-") || upper.includes("/02/")) return "Fevereiro";
+    if (upper.includes("MARCO") || upper.includes("-03-") || upper.includes("/03/")) return "Março";
+    if (upper.includes("ABRIL") || upper.includes("-04-") || upper.includes("/04/")) return "Abril";
 
     return "Mês Indefinido";
 };

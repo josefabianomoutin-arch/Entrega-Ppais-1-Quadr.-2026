@@ -44,25 +44,26 @@ const cleanNumericValue = (val: any): number => {
     return parseFloat(s) || 0;
 };
 
-// Conversor Universal de Datas para ISO (YYYY-MM-DD) - FIX: Jan/2026 UTC Shift
+// Conversor Universal de Datas para ISO (YYYY-MM-DD) - Versão Anti-Fuso Horário
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
     let s = String(rawDate).trim();
 
-    // 1. Caso seja Excel Serial (ex: 46022) - Conversão Robusta Anti-Shift
+    // 1. Caso seja Excel Serial (ex: 46022)
     if (!isNaN(Number(s)) && Number(s) > 40000) {
-        // Excel inicia em 30/12/1899. Adicionamos 0.1 para forçar o horário para o início do dia
-        const d = new Date(Math.round((Number(s) - 25569) * 86400 * 1000));
-        const year = d.getUTCFullYear();
-        const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(d.getUTCDate()).padStart(2, '0');
+        // Cálculo direto de data para evitar desvios UTC
+        const excelDate = parseFloat(s);
+        const date = new Date(Date.UTC(1899, 11, 30)); // Base Excel UTC
+        date.setUTCDate(date.getUTCDate() + Math.floor(excelDate));
+        
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(date.getUTCDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     }
 
-    // 2. Remove hora se houver (ex: 2026-01-01 08:00:00 -> 2026-01-01)
-    s = s.split(' ')[0];
-
-    // 3. Normaliza separadores
+    // 2. Limpeza de strings (remover horas se houver)
+    s = s.split(' ')[0].split('T')[0];
     s = s.replace(/[\.\-]/g, '/');
 
     if (s.includes('/')) {
@@ -83,7 +84,6 @@ const standardizeDate = (rawDate: any): string => {
         }
     }
 
-    // 4. Fallback ISO
     if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
         return s.substring(0, 10);
     }
