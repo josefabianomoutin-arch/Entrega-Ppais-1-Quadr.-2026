@@ -44,16 +44,18 @@ const cleanNumericValue = (val: any): number => {
     return parseFloat(s) || 0;
 };
 
-// Conversor Universal de Datas para ISO (YYYY-MM-DD) - Versão Anti-Fuso Horário
+/**
+ * CONVERSOR DE DATA ULTRA-ROBUSTO
+ * Garante que 01/01/2026 seja sempre 2026-01-01 independente da origem (Excel, String, ISO)
+ */
 const standardizeDate = (rawDate: any): string => {
     if (!rawDate) return "";
     let s = String(rawDate).trim();
 
     // 1. Caso seja Excel Serial (ex: 46022)
     if (!isNaN(Number(s)) && Number(s) > 40000) {
-        // Cálculo direto de data para evitar desvios UTC
         const excelDate = parseFloat(s);
-        const date = new Date(Date.UTC(1899, 11, 30)); // Base Excel UTC
+        const date = new Date(Date.UTC(1899, 11, 30)); 
         date.setUTCDate(date.getUTCDate() + Math.floor(excelDate));
         
         const year = date.getUTCFullYear();
@@ -62,28 +64,38 @@ const standardizeDate = (rawDate: any): string => {
         return `${year}-${month}-${day}`;
     }
 
-    // 2. Limpeza de strings (remover horas se houver)
+    // 2. Limpeza de strings (remover horas/timestamps T00:00:00)
     s = s.split(' ')[0].split('T')[0];
-    s = s.replace(/[\.\-]/g, '/');
+    
+    // Normaliza separadores para traço
+    s = s.replace(/[\.\/]/g, '-');
 
-    if (s.includes('/')) {
-        const parts = s.split('/');
-        if (parts.length === 3) {
-            let day, month, year;
-            if (parts[0].length === 4) { // YYYY/MM/DD
-                year = parts[0];
-                month = parts[1].padStart(2, '0');
-                day = parts[2].padStart(2, '0');
-            } else { // DD/MM/YYYY
-                day = parts[0].padStart(2, '0');
-                month = parts[1].padStart(2, '0');
-                year = parts[2];
-                if (year.length === 2) year = '20' + year;
+    const parts = s.split('-');
+    
+    if (parts.length === 3) {
+        let day, month, year;
+        
+        // Formato ISO (YYYY-MM-DD)
+        if (parts[0].length === 4) {
+            year = parts[0];
+            month = parts[1].padStart(2, '0');
+            day = parts[2].padStart(2, '0');
+        } else { 
+            // Formato BR (DD-MM-YYYY)
+            day = parts[0].padStart(2, '0');
+            month = parts[1].padStart(2, '0');
+            year = parts[2];
+            
+            // Trata anos com 2 dígitos (26 -> 2026)
+            if (year.length === 2) {
+                const yNum = parseInt(year, 10);
+                year = yNum > 50 ? '19' + year : '20' + year;
             }
-            return `${year}-${month}-${day}`;
         }
+        return `${year}-${month}-${day}`;
     }
 
+    // 3. Fallback para manter strings que já parecem ISO
     if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
         return s.substring(0, 10);
     }
@@ -277,12 +289,15 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (n: string, c: string): boolean => {
-    const nl = n.toLowerCase();
-    if (nl === 'administrador' && c === '15210361870') { setIsAdminLoggedIn(true); return true; }
-    if (nl === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
-    if (nl === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
+    // Normalização rigorosa para login
+    const normalizedInputName = superNormalize(n);
     const cleanCpf = c.replace(/[^\d]/g, '');
-    const u = suppliers.find(p => superNormalize(p.name) === superNormalize(n) && p.cpf === cleanCpf);
+
+    if (normalizedInputName === 'administrador' && cleanCpf === '15210361870') { setIsAdminLoggedIn(true); return true; }
+    if (normalizedInputName === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
+    if (normalizedInputName === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
+
+    const u = suppliers.find(p => superNormalize(p.name) === normalizedInputName && p.cpf === cleanCpf);
     if (u) { setLoggedInCpf(cleanCpf); return true; }
     return false;
   };

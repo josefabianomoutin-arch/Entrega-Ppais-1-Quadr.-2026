@@ -26,43 +26,41 @@ const superNormalize = (text: string) => {
 };
 
 /**
- * Extrator de mês e ano Ultra-Resiliente: 
- * Retorna o nome do mês APENAS se o ano for 2026.
+ * Extrator de mês Ultra-Resiliente: 
+ * Tenta capturar Janeiro mesmo que o ano esteja mal formatado ou fora da string.
  */
 const getMonthNameFromDate = (dateStr?: string): string => {
     if (!dateStr) return "Mês Indefinido";
     
+    const s = String(dateStr).trim();
+    
+    // Fallback prioritário: Se contiver "Janeiro" ou "-01-" ou "/01/"
+    if (s.toUpperCase().includes("JANEIRO") || s.includes("-01-") || s.includes("/01/") || s.match(/-01$/) || s.match(/\/01$/)) {
+        return "Janeiro";
+    }
+
     // Normaliza separadores
-    const cleanStr = dateStr.replace(/[\.\/]/g, '-');
+    const cleanStr = s.replace(/[\.\/]/g, '-');
     const parts = cleanStr.split('-');
 
     if (parts.length >= 2) {
         let mIdx = -1;
-        let year = "";
-
-        // Se for ISO (2026-01-01)
+        // Se for ISO (YYYY-MM-DD)
         if (parts[0].length === 4) {
-            year = parts[0];
             mIdx = parseInt(parts[1], 10) - 1;
-        } else if (parts.length === 3) {
-            // Se for BR (01-01-2026)
-            year = parts[2];
-            if (year.length === 2) year = '20' + year;
+        } else {
+            // Se for BR (DD-MM-YYYY)
             mIdx = parseInt(parts[1], 10) - 1;
         }
 
-        // Se o ano for 2026 ou 26, valida o mês
-        if (year === "2026" || year === "26" || !year) {
-             if (mIdx >= 0 && mIdx < 12) return months[mIdx];
-        }
+        if (mIdx >= 0 && mIdx < 12) return months[mIdx];
     }
     
-    // Fallback: Busca por nomes de meses por extenso
-    const upper = dateStr.toUpperCase();
-    if (upper.includes("JANEIRO") || upper.includes("-01-") || upper.includes("/01/")) return "Janeiro";
-    if (upper.includes("FEVEREIRO") || upper.includes("-02-") || upper.includes("/02/")) return "Fevereiro";
-    if (upper.includes("MARCO") || upper.includes("-03-") || upper.includes("/03/")) return "Março";
-    if (upper.includes("ABRIL") || upper.includes("-04-") || upper.includes("/04/")) return "Abril";
+    // Busca exaustiva por nomes
+    const upper = s.toUpperCase();
+    if (upper.includes("FEV") || upper.includes("-02-")) return "Fevereiro";
+    if (upper.includes("MAR") || upper.includes("-03-")) return "Março";
+    if (upper.includes("ABR") || upper.includes("-04-")) return "Abril";
 
     return "Mês Indefinido";
 };
@@ -116,25 +114,25 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             });
         });
 
-        // 2. Acumular Entradas do Almoxarifado
+        // 2. Acumular Entradas do Almoxarifado com Match Inteligente
         warehouseLog.forEach(log => {
             if (log.type === 'entrada') {
-                const sNorm = superNormalize(log.supplierName);
-                const iNorm = superNormalize(log.itemName);
+                const logSupplierNorm = superNormalize(log.supplierName);
+                const logItemNorm = superNormalize(log.itemName);
                 const mName = getMonthNameFromDate(log.date);
                 
-                // Filtro estrito para o 1º quadrimestre de 2026
+                // Filtro para o 1º quadrimestre
                 if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(mName)) return;
 
-                // Match inteligente: Procura por nome do fornecedor e item
-                let matched = false;
+                // Match flexível (Substrings)
                 for (let val of consolidated.values()) {
-                    if (val.month === mName && (val.normSupplier.includes(sNorm) || sNorm.includes(val.normSupplier))) {
-                        // Verifica o item (Fuzzy Match)
-                        if (val.normItem.includes(iNorm) || iNorm.includes(val.normItem)) {
-                            val.receivedKg += (Number(log.quantity) || 0);
-                            matched = true;
-                            break;
+                    if (val.month === mName) {
+                        const supplierMatch = val.normSupplier.includes(logSupplierNorm) || logSupplierNorm.includes(val.normSupplier);
+                        if (supplierMatch) {
+                            const itemMatch = val.normItem.includes(logItemNorm) || logItemNorm.includes(val.normItem);
+                            if (itemMatch) {
+                                val.receivedKg += (Number(log.quantity) || 0);
+                            }
                         }
                     }
                 }
