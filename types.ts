@@ -114,9 +114,10 @@ export interface DailyMenus {
 
 export interface FinancialRecord {
   id: string;
+  tipo: 'RECURSO' | 'DESPESA';
   ptres: '380302' | '380303' | '380304' | '38038' | '380328';
   selecao: string;
-  natureza: '33903' | '339039';
+  natureza: '339030' | '339039';
   dataSolicitacao: string;
   valorSolicitado: number;
   dataRecebimento: string;
