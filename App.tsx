@@ -40,6 +40,16 @@ const cleanNumericValue = (val: any): number => {
     return parseFloat(cleanStr) || 0;
 };
 
+// Função para converter data serial do Excel (ex: 46022) para string ISO (YYYY-MM-DD)
+const excelSerialToDate = (serial: number): string => {
+    try {
+        const date = new Date((serial - 25569) * 86400 * 1000);
+        return date.toISOString().split('T')[0];
+    } catch (e) {
+        return "";
+    }
+};
+
 function normalizeArray<T>(data: any): T[] {
   if (!data) return [];
   if (Array.isArray(data)) return data.filter(i => i !== null) as T[];
@@ -111,14 +121,19 @@ const App: React.FC = () => {
         setWarehouseLog([]);
         return;
       }
-      // Captura resiliente de dados com limpeza de Janeiro
+      // Captura resiliente de dados com conversão de datas numéricas (Excel)
       const logsArray = Object.entries(data).map(([key, val]: [string, any]) => {
-        let rawDate = (val.date || val.invoiceDate || (val.timestamp ? String(val.timestamp).split('T')[0] : "")).toString().trim();
+        let rawDate = val.date || val.invoiceDate || (val.timestamp ? String(val.timestamp).split('T')[0] : "");
         
+        // Se a data for um número (vinda do Excel), converte
+        if (!isNaN(Number(rawDate)) && Number(rawDate) > 40000) {
+            rawDate = excelSerialToDate(Number(rawDate));
+        }
+
         return {
             ...val,
             id: val.id || key,
-            date: rawDate,
+            date: String(rawDate).trim(),
             quantity: cleanNumericValue(val.quantity),
             itemName: (val.itemName || "").toUpperCase().trim(),
             supplierName: (val.supplierName || "").toUpperCase().trim()

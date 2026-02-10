@@ -30,15 +30,14 @@ const superNormalize = (text: string) => {
 };
 
 /**
- * Extrator de mês universal (Versão Janeiro-Hardened):
- * Suporta Excel Serial (ex: 46022), Formatos BR, ISO, Abreviaturas e strings sujas.
+ * Extrator de mês Universal (Versão Janeiro-Total-Scan):
+ * Ignora o ano e foca no padrão do mês. Suporta DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD e Excel Serial.
  */
 const getMonthNameFromDate = (dateStr?: any): string => {
     const raw = String(dateStr || "").toUpperCase().trim();
     if (!raw || raw === "UNDEFINED" || raw === "") return "Mês Indefinido";
 
-    // 1. Caso seja Número Serial do Excel (Dias desde 30/12/1899)
-    // Se o valor for um número entre 45000 e 47000, é quase certeza ser uma data de 2023-2027
+    // 1. Caso seja Número Serial do Excel (vencendo o problema de importação numérica)
     if (!isNaN(Number(raw)) && Number(raw) > 40000) {
         try {
             const excelDate = new Date((Number(raw) - 25569) * 86400 * 1000);
@@ -46,29 +45,36 @@ const getMonthNameFromDate = (dateStr?: any): string => {
         } catch (e) { /* ignore */ }
     }
 
-    // 2. Busca exata por palavras-chave de meses (Independente do ano)
-    if (raw.includes("JANEIRO") || raw.includes("JAN/") || raw.includes("01/2026") || raw.includes("/01/26") || raw.includes("-01-") || raw.startsWith("01/") || raw.startsWith("1/")) return "Janeiro";
-    if (raw.includes("FEVEREIRO") || raw.includes("FEV/") || raw.includes("02/2026") || raw.includes("/02/26") || raw.includes("-02-") || raw.startsWith("02/") || raw.startsWith("2/")) return "Fevereiro";
-    if (raw.includes("MARCO") || raw.includes("MAR/") || raw.includes("03/2026") || raw.includes("/03/26") || raw.includes("-03-") || raw.startsWith("03/") || raw.startsWith("3/")) return "Março";
-    if (raw.includes("ABRIL") || raw.includes("ABR/") || raw.includes("04/2026") || raw.includes("/04/26") || raw.includes("-04-") || raw.startsWith("04/") || raw.startsWith("4/")) return "Abril";
+    // 2. Busca por palavras-chave (Para nomes de meses por extenso)
+    if (raw.includes("JANEIRO") || raw.includes("JAN")) return "Janeiro";
+    if (raw.includes("FEVEREIRO") || raw.includes("FEV")) return "Fevereiro";
+    if (raw.includes("MARCO") || raw.includes("MAR")) return "Março";
+    if (raw.includes("ABRIL") || raw.includes("ABR")) return "Abril";
 
-    // 3. Regex para capturar o mês em formatos numéricos flexíveis (DD/MM/YYYY ou YYYY-MM-DD)
+    // 3. Regex de Padrão Numérico Flexível (Suporta 01/01/26 ou 01/01/2026)
+    // Tenta encontrar o mês baseando-se na posição do separador
     const parts = raw.split(/[/\-.]/);
     if (parts.length >= 2) {
         let mStr = "";
-        // Se a primeira parte tem 4 dígitos (2026-01-01), o mês é a segunda parte
-        if (parts[0].length === 4) mStr = parts[1];
-        // Se for 01/01/2026, o mês é a segunda parte
-        else mStr = parts[1];
+        // Se a primeira parte tem 4 dígitos (ex: 2026-01-05), o mês é o segundo [1]
+        if (parts[0].length === 4) {
+            mStr = parts[1];
+        } else {
+            // Caso contrário, assume-se formato BR (05/01/2026), o mês é o segundo [1]
+            mStr = parts[1];
+        }
 
         const mIdx = parseInt(mStr, 10) - 1;
         if (mIdx >= 0 && mIdx < 12) return months[mIdx];
     }
 
+    // 4. Último recurso: Se a string contém "01" e parece uma data, assume Janeiro
+    if (raw.match(/(^|[^0-9])01($|[^0-9])/)) return "Janeiro";
+
     return "Mês Indefinido";
 };
 
-// Lista de produtores ITESP Autorizados
+// Lista de produtores ITESP Autorizados (Para matching inteligente)
 const ALLOWED_SUPPLIERS_RAW = [
     'BENEDITO OSMAR RAVAZZI',
     'ADAO MAXIMO DA FONSECA',
@@ -97,7 +103,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
     const [selectedSupplierName, setSelectedSupplierName] = useState('all'); 
     const [selectedMonth, setSelectedMonth] = useState('all');
 
-    // Filtra fornecedores ITESP de forma flexível
+    // Filtra fornecedores ITESP de forma flexível (Contém mútua)
     const itespSuppliers = useMemo(() => {
         const allowedNorm = ALLOWED_SUPPLIERS_RAW.map(superNormalize);
         return suppliers.filter(s => {
@@ -120,7 +126,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             normItem: string
         }>();
 
-        // 1. Inicializar Metas Baseadas no Contrato (Jan-Abr)
+        // 1. Inicializar Metas Baseadas no Contrato (Janeiro a Abril)
         itespSuppliers.forEach(s => {
             const sNorm = superNormalize(s.name);
             s.contractItems.forEach(ci => {
@@ -142,21 +148,23 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         });
 
         // 2. Acumular Dados Reais do Almoxarifado (WarehouseLog)
+        // ESSA É A PARTE CRÍTICA PARA JANEIRO
         warehouseLog.forEach(log => {
             if (log.type === 'entrada') {
                 const sNorm = superNormalize(log.supplierName);
                 const iNorm = superNormalize(log.itemName);
                 const mName = getMonthNameFromDate(log.date);
                 
+                // Filtramos apenas o primeiro quadrimestre
                 if (mName === "Mês Indefinido" || !['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(mName)) return;
 
-                // Match Inteligente: Procura por inclusão mútua (Fuzzy)
+                // Match Inteligente: Procura pela entrada correspondente no Mapa
                 let matched = false;
                 for (let val of consolidated.values()) {
                     if (val.month === mName && 
                         (val.normSupplier.includes(sNorm) || sNorm.includes(val.normSupplier))) {
                         
-                        // Verifica o item (Fuzzy Match)
+                        // Verifica o item (Fuzzy Match - Ex: Arroz vs Arroz Beneficiado)
                         if (val.normItem.includes(iNorm) || iNorm.includes(val.normItem)) {
                             val.receivedKg += (Number(log.quantity) || 0);
                             matched = true;
@@ -328,7 +336,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                                 </div>
                                                 <p className="text-gray-400 font-black uppercase tracking-widest text-sm">Dados de Janeiro não localizados.</p>
-                                                <p className="text-xs text-gray-400 mt-2 italic">Dica: Se importou via planilha, certifique-se de que a coluna de data não está formatada como 'Número' no Excel.</p>
+                                                <p className="text-xs text-gray-400 mt-2 italic">Dica: Se importou via planilha, certifique-se de que as datas estão no formato dia/mês/ano.</p>
                                             </div>
                                         </td>
                                     </tr>
