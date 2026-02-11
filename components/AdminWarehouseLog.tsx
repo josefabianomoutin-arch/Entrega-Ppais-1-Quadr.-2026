@@ -11,7 +11,6 @@ interface AdminWarehouseLogProps {
     onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
 }
 
-// Normalização absoluta para comparação de strings
 const superNormalize = (text: string) => {
     return (text || "")
         .toString()
@@ -41,7 +40,12 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     log.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
                 return typeMatch && searchMatch;
             })
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            .sort((a, b) => {
+                // Ordenação principal por DATA DO DOCUMENTO (retroativos aparecem no lugar certo)
+                const dateA = new Date(a.date || a.timestamp).getTime();
+                const dateB = new Date(b.date || b.timestamp).getTime();
+                return dateB - dateA;
+            });
     }, [warehouseLog, searchTerm, filterType]);
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,7 +131,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
             <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
                 <div>
                     <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Histórico de Estoque</h2>
-                    <p className="text-gray-400 font-medium">Gerencie as movimentações e realize lançamentos pontuais.</p>
+                    <p className="text-gray-400 font-medium">Gerencie as movimentações e realize lançamentos retroativos usando a Data do Documento.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     <button 
@@ -174,7 +178,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                                 <td className="p-3">
                                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${log.type === 'entrada' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{log.type}</span>
                                 </td>
-                                <td className="p-3 font-mono text-gray-600 text-xs">{(log.date || log.timestamp.split('T')[0]).split('-').reverse().join('/')}</td>
+                                <td className="p-3 font-mono text-indigo-700 text-xs font-black">{(log.date || log.timestamp.split('T')[0]).split('-').reverse().join('/')}</td>
                                 <td className="p-3 font-bold text-gray-800 uppercase text-xs">{log.itemName}</td>
                                 <td className="p-3 font-mono text-xs">{log.lotNumber}</td>
                                 <td className="p-3 text-gray-600 text-xs font-semibold">{log.supplierName}</td>
@@ -324,8 +328,8 @@ const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Data Doc.</label>
-                            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" required />
+                            <label className="text-[10px] font-black text-indigo-600 uppercase ml-1">Data do Documento (Retroativa)</label>
+                            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border-2 border-indigo-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 bg-indigo-50/30" required />
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">NF/Documento</label>
@@ -419,7 +423,7 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
                 <div className="flex justify-between items-center mb-6 border-b pb-4">
                     <div>
                         <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">Movimentação Manual de Estoque</h2>
-                        <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Registrar entrada ou saída sem planilha</p>
+                        <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Registrar entrada ou saída retroativa</p>
                     </div>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-3xl font-light">&times;</button>
                 </div>
@@ -457,10 +461,16 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
                                 {availableItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
                             </select>
                         </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Data da Operação</label>
-                            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400" required />
+                        
+                        {/* DESTAQUE PARA A DATA DO DOCUMENTO - PERMITE RETROATIVOS */}
+                        <div className="space-y-1 md:col-span-2">
+                            <label className="text-[10px] font-black text-indigo-600 uppercase ml-1 flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg>
+                                Data do Documento (Retroativa)
+                            </label>
+                            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-3 border-2 border-indigo-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 font-bold bg-indigo-50/50" required />
                         </div>
+
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Nº NF ou Documento</label>
                             <input type="text" value={documentNumber} onChange={e => setDocumentNumber(e.target.value)} placeholder="000123" className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400" required />
@@ -473,7 +483,7 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Quantidade (kg)</label>
                             <input type="text" value={quantity} onChange={e => setQuantity(e.target.value.replace(/[^0-9,]/g, ''))} placeholder="0,00" className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 font-mono" required />
                         </div>
-                        <div className="space-y-1 md:col-span-2">
+                        <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Data de Validade (Opcional)</label>
                             <input type="date" value={expirationDate} onChange={e => setExpirationDate(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400" />
                         </div>

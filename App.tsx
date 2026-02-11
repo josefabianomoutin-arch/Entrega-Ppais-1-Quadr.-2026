@@ -315,7 +315,6 @@ const App: React.FC = () => {
   
   const handleRegisterFinancialRecord = async (record: any) => {
     try {
-        // Garantia de que o ID seja uma string válida e não cause crash no Firebase
         const id = (record.id && String(record.id).trim().length > 0) ? record.id : push(financialRecordsRef).key;
         const finalRecord = { ...record, id };
         await set(child(financialRecordsRef, id), finalRecord);
@@ -326,6 +325,75 @@ const App: React.FC = () => {
     }
   };
   const handleDeleteFinancialRecord = async (id: string) => remove(child(financialRecordsRef, id));
+
+  // --- FUNÇÕES DE ESTOQUE IMPLEMENTADAS PARA SUPORTAR DATAS RETROATIVAS ---
+  const handleRegisterWarehouseEntry = async (payload: any) => {
+    try {
+        const newRef = push(warehouseLogRef);
+        const supplier = suppliers.find(s => s.cpf === payload.supplierCpf);
+        const entry: WarehouseMovement = {
+            id: newRef.key || `ent-${Date.now()}`,
+            type: 'entrada',
+            timestamp: new Date().toISOString(),
+            date: payload.invoiceDate || new Date().toISOString().split('T')[0],
+            itemName: payload.itemName,
+            supplierName: supplier?.name || 'Desconhecido',
+            lotNumber: payload.lotNumber,
+            quantity: payload.quantity,
+            inboundInvoice: payload.invoiceNumber,
+            expirationDate: payload.expirationDate,
+            lotId: `lot-${Date.now()}`,
+            deliveryId: ''
+        };
+        await set(newRef, entry);
+        return { success: true, message: 'Entrada registrada' };
+    } catch (e) {
+        return { success: false, message: 'Falha na conexão' };
+    }
+  };
+
+  const handleRegisterWarehouseWithdrawal = async (payload: any) => {
+    try {
+        const newRef = push(warehouseLogRef);
+        const supplier = suppliers.find(s => s.cpf === payload.supplierCpf);
+        const exit: WarehouseMovement = {
+            id: newRef.key || `sai-${Date.now()}`,
+            type: 'saída',
+            timestamp: new Date().toISOString(),
+            date: payload.date || new Date().toISOString().split('T')[0],
+            itemName: payload.itemName,
+            supplierName: supplier?.name || 'Desconhecido',
+            lotNumber: payload.lotNumber || 'SAIDA_AVULSA',
+            quantity: payload.quantity,
+            outboundInvoice: payload.outboundInvoice,
+            expirationDate: payload.expirationDate,
+            lotId: '',
+            deliveryId: ''
+        };
+        await set(newRef, exit);
+        return { success: true, message: 'Saída registrada' };
+    } catch (e) {
+        return { success: false, message: 'Falha na conexão' };
+    }
+  };
+
+  const handleUpdateWarehouseEntry = async (updated: WarehouseMovement) => {
+    try {
+        await set(child(warehouseLogRef, updated.id), updated);
+        return { success: true, message: 'Registro atualizado' };
+    } catch (e) {
+        return { success: false, message: 'Erro ao atualizar' };
+    }
+  };
+
+  const handleDeleteWarehouseEntry = async (log: WarehouseMovement) => {
+    try {
+        await remove(child(warehouseLogRef, log.id));
+        return { success: true, message: 'Excluído' };
+    } catch (e) {
+        return { success: false, message: 'Erro ao excluir' };
+    }
+  };
 
   const handleUpdateContractForItem = async (itemName: string, assignments: any[]) => {
     for (const supplier of suppliers) {
@@ -383,14 +451,14 @@ const App: React.FC = () => {
         dailyMenus={dailyMenus}
         onUpdateStandardMenu={async (m) => set(standardMenuRef, m)}
         onUpdateDailyMenu={async (m) => set(dailyMenusRef, m)}
-        onRegisterEntry={async (p) => ({ success: true, message: 'Ok' })}
-        onRegisterWithdrawal={async (p) => ({ success: true, message: 'Ok' })}
+        onRegisterEntry={handleRegisterWarehouseEntry}
+        onRegisterWithdrawal={handleRegisterWarehouseWithdrawal}
         onReopenInvoice={handleReopenInvoice}
         onDeleteInvoice={handleDeleteInvoice}
         onUpdateInvoiceItems={handleUpdateInvoiceItems}
         onManualInvoiceEntry={handleManualInvoiceEntry}
-        onDeleteWarehouseEntry={async () => ({ success: true, message: 'Ok' })}
-        onUpdateWarehouseEntry={async () => ({ success: true, message: 'Ok' })}
+        onDeleteWarehouseEntry={handleDeleteWarehouseEntry}
+        onUpdateWarehouseEntry={handleUpdateWarehouseEntry}
         onPersistSuppliers={() => {}}
         onRestoreData={async () => true}
         onResetData={() => {}}
@@ -405,7 +473,13 @@ const App: React.FC = () => {
   }
 
   if (user.role === 'almoxarifado') {
-    return <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={handleLogout} onRegisterEntry={async (p) => ({ success: true, message: 'Ok' })} onRegisterWithdrawal={async (p) => ({ success: true, message: 'Ok' })} />;
+    return <AlmoxarifadoDashboard 
+             suppliers={suppliers} 
+             warehouseLog={warehouseLog} 
+             onLogout={handleLogout} 
+             onRegisterEntry={handleRegisterWarehouseEntry} 
+             onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} 
+           />;
   }
 
   if (user.role === 'itesp') {
