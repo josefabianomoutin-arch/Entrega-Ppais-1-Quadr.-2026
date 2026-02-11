@@ -77,29 +77,34 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (name: string, passwordInput: string) => {
-    // 1. NORMALIZAÇÃO RIGOROSA DE ENTRADA
     const cleanName = (name || '').trim().toUpperCase();
-    const cleanPassNumeric = (passwordInput || '').trim().replace(/\D/g, ''); // Apenas números para CPFs
-    const cleanPassFull = (passwordInput || '').trim().toLowerCase(); // Mantém letras para senhas de setores
+    const cleanPassNumeric = (passwordInput || '').trim().replace(/\D/g, ''); 
+    const cleanPassFull = (passwordInput || '').trim().toLowerCase();
 
-    // 2. LOGINS DE ADMINISTRADOR (DOUGLAS)
-    // Aceita qualquer um desses nomes com qualquer um desses CPFs
-    const isAdminName = [
-        'DOUGLAS', 
-        'ADMINISTRADOR', 
-        'ADM', 
-        'DOUGLAS FERNANDO SEMENZIN GALDINO',
-        'DOUGLAS GALDINO'
-    ].includes(cleanName);
-
-    const isAdminPass = [
-        '15210361870', // CPF da sua imagem
+    // CPFs autorizados para Admin/Douglas
+    const isAuthorizedCpf = [
+        '15210361870', 
         '29099022859', 
         '29462706821'
     ].includes(cleanPassNumeric);
 
-    if (isAdminName && isAdminPass) {
+    // 1. LOGIN ADMINISTRADOR (ACESO TOTAL)
+    const isAdminUser = ['ADMINISTRADOR', 'ADM'].includes(cleanName);
+    if (isAdminUser && isAuthorizedCpf) {
       setUser({ name: cleanName, cpf: cleanPassNumeric, role: 'admin' });
+      return true;
+    }
+
+    // 2. LOGIN DOUGLAS (RESTRITO À GESTÃO FINANCEIRA)
+    const isDouglasUser = [
+        'DOUGLAS', 
+        'DOUGLAS FERNANDO SEMENZIN GALDINO',
+        'DOUGLAS GALDINO'
+    ].includes(cleanName);
+
+    if (isDouglasUser && isAuthorizedCpf) {
+      // Douglas é mapeado para o papel 'financeiro' conforme solicitado
+      setUser({ name: cleanName, cpf: cleanPassNumeric, role: 'financeiro' });
       return true;
     }
 
@@ -117,8 +122,7 @@ const App: React.FC = () => {
       return true;
     }
 
-    // 4. LOGINS DE FORNECEDORES (BUSCA POR CPF/CNPJ EXATO)
-    // Compara o CPF digitado (sem pontos) com o CPF no banco (sem pontos)
+    // 4. LOGINS DE FORNECEDORES
     const supplier = suppliers.find(s => s.cpf.replace(/\D/g, '') === cleanPassNumeric);
     if (supplier) {
       setUser({ name: supplier.name, cpf: supplier.cpf, role: 'supplier' });
@@ -341,6 +345,7 @@ const App: React.FC = () => {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
+  // 1. Visão de Administrador Completo
   if (user.role === 'admin') {
     return (
       <AdminDashboard 
@@ -387,6 +392,12 @@ const App: React.FC = () => {
     );
   }
 
+  // 2. Visão de Financeiro / Douglas (Apenas visualização financeira)
+  if (user.role === 'financeiro') {
+    return <FinanceDashboard records={financialRecords} onLogout={handleLogout} />;
+  }
+
+  // 3. Demais Setores
   if (user.role === 'almoxarifado') {
     return <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={handleLogout} onRegisterEntry={async (p) => ({ success: true, message: 'Ok' })} onRegisterWithdrawal={async (p) => ({ success: true, message: 'Ok' })} />;
   }
@@ -395,10 +406,7 @@ const App: React.FC = () => {
     return <ItespDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={handleLogout} />;
   }
 
-  if (user.role === 'financeiro') {
-    return <FinanceDashboard records={financialRecords} onLogout={handleLogout} />;
-  }
-
+  // 4. Fornecedores
   const currentSupplier = suppliers.find(s => s.cpf === user.cpf);
   if (currentSupplier) {
     return (
