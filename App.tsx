@@ -116,8 +116,8 @@ const App: React.FC = () => {
       setUser({ name: 'ALMOXARIFADO', cpf: 'almox123', role: 'almoxarifado' });
       return true;
     }
-    if (cleanName === 'ITESP' && cleanPassFull === 'itesp2026') {
-      setUser({ name: 'ITESP', cpf: 'itesp2026', role: 'itesp' });
+    if (cleanName === 'ITESP' && cleanPassFull === 'taiuvaitesp2026') {
+      setUser({ name: 'ITESP', cpf: 'taiuvaitesp2026', role: 'itesp' });
       return true;
     }
     if (cleanName === 'FINANCEIRO' && cleanPassFull === 'financeiro123') {
