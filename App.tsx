@@ -78,10 +78,19 @@ const App: React.FC = () => {
 
   const handleLogin = (name: string, cpf: string) => {
     const upperName = name.toUpperCase();
+    
+    // LOGIN DO ADMINISTRADOR ATUALIZADO
+    if (upperName === 'DOUGLAS FERNANDO SEMENZIN GALDINO' && cpf === '29099022859') {
+      setUser({ name: upperName, cpf, role: 'admin' });
+      return true;
+    }
+    
+    // Fallback para login antigo (Administrador genérico) - Opcional
     if (upperName === 'ADMINISTRADOR' && cpf === '29462706821') {
       setUser({ name: upperName, cpf, role: 'admin' });
       return true;
     }
+
     if (upperName === 'ALMOXARIFADO' && cpf === 'almox123') {
       setUser({ name: upperName, cpf, role: 'almoxarifado' });
       return true;
@@ -129,7 +138,8 @@ const App: React.FC = () => {
       return currentData;
     });
     if (oldCpf !== newCpf) {
-      const oldData = (await (await ref(database, `suppliers/${oldCpf}`).get()).val());
+      const snapshot = await ref(database, `suppliers/${oldCpf}`).get();
+      const oldData = snapshot.val();
       await set(child(suppliersRef, newCpf), oldData);
       await remove(child(suppliersRef, oldCpf));
     }
@@ -168,14 +178,19 @@ const App: React.FC = () => {
     const supplierRef = child(suppliersRef, supplierCpf);
     await runTransaction(supplierRef, (currentData: Supplier) => {
       if (currentData) {
+        const sourceDelivery = (currentData.deliveries || []).find(d => placeholderIds.includes(d.id));
+        const date = sourceDelivery?.date || new Date().toISOString().split('T')[0];
+        const time = sourceDelivery?.time || '08:00';
+
         // Remove placeholders
         currentData.deliveries = (currentData.deliveries || []).filter(d => !placeholderIds.includes(d.id));
+        
         // Add real items
         invoiceData.fulfilledItems.forEach((item: any, idx: number) => {
           currentData.deliveries.push({
             id: `inv-${Date.now()}-${idx}`,
-            date: currentData.deliveries.find(d => placeholderIds.includes(d.id))?.date || new Date().toISOString().split('T')[0],
-            time: '08:00',
+            date: date,
+            time: time,
             item: item.name,
             kg: item.kg,
             value: item.value,
@@ -188,7 +203,89 @@ const App: React.FC = () => {
     });
   };
 
-  // Funções simplificadas para as outras abas administrativas
+  const handleReopenInvoice = async (supplierCpf: string, invoiceNumber: string) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    await runTransaction(supplierRef, (currentData: Supplier) => {
+        if (currentData && currentData.deliveries) {
+            const invoiceItems = currentData.deliveries.filter(d => d.invoiceNumber === invoiceNumber);
+            if (invoiceItems.length > 0) {
+                const date = invoiceItems[0].date;
+                const time = invoiceItems[0].time || '08:00';
+                currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+                currentData.deliveries.push({
+                    id: `del-reopen-${Date.now()}`,
+                    date,
+                    time,
+                    item: 'AGENDAMENTO PENDENTE',
+                    invoiceUploaded: false
+                });
+            }
+        }
+        return currentData;
+    });
+  };
+
+  const handleDeleteInvoice = async (supplierCpf: string, invoiceNumber: string) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    await runTransaction(supplierRef, (currentData: Supplier) => {
+        if (currentData && currentData.deliveries) {
+            currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+        }
+        return currentData;
+    });
+  };
+
+  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    await runTransaction(supplierRef, (currentData: Supplier) => {
+        if (currentData && currentData.deliveries) {
+            const originalItems = currentData.deliveries.filter(d => d.invoiceNumber === invoiceNumber);
+            if (originalItems.length > 0) {
+                const date = originalItems[0].date;
+                const time = originalItems[0].time || '08:00';
+                currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+                items.forEach((item, idx) => {
+                    currentData.deliveries.push({
+                        id: `inv-upd-${Date.now()}-${idx}`,
+                        date,
+                        time,
+                        item: item.name,
+                        kg: item.kg,
+                        value: item.value,
+                        invoiceUploaded: true,
+                        invoiceNumber: invoiceNumber
+                    });
+                });
+            }
+        }
+        return currentData;
+    });
+    return { success: true };
+  };
+
+  const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    await runTransaction(supplierRef, (currentData: Supplier) => {
+        if (currentData) {
+            if (!currentData.deliveries) currentData.deliveries = [];
+            items.forEach((item, idx) => {
+                currentData.deliveries.push({
+                    id: `inv-man-${Date.now()}-${idx}`,
+                    date,
+                    time: '08:00',
+                    item: item.name,
+                    kg: item.kg,
+                    value: item.value,
+                    invoiceUploaded: true,
+                    invoiceNumber: invoiceNumber
+                });
+            });
+        }
+        return currentData;
+    });
+    return { success: true };
+  };
+
   const handleUpdatePerCapitaConfig = async (config: PerCapitaConfig) => set(perCapitaConfigRef, config);
   const handleRegisterCleaningLog = async (log: any) => {
     const newRef = push(cleaningLogsRef);
@@ -206,7 +303,6 @@ const App: React.FC = () => {
   const handleDeleteFinancialRecord = async (id: string) => remove(child(financialRecordsRef, id));
 
   const handleUpdateContractForItem = async (itemName: string, assignments: any[]) => {
-    // Itera sobre todos os fornecedores para atualizar esse item específico
     for (const supplier of suppliers) {
       const assignment = assignments.find(a => a.supplierCpf === supplier.cpf);
       const supplierRef = child(suppliersRef, supplier.cpf);
@@ -264,10 +360,10 @@ const App: React.FC = () => {
         onUpdateDailyMenu={async (m) => set(dailyMenusRef, m)}
         onRegisterEntry={async (p) => ({ success: true, message: 'Ok' })}
         onRegisterWithdrawal={async (p) => ({ success: true, message: 'Ok' })}
-        onReopenInvoice={async () => {}}
-        onDeleteInvoice={async () => {}}
-        onUpdateInvoiceItems={async () => ({ success: true })}
-        onManualInvoiceEntry={async () => ({ success: true })}
+        onReopenInvoice={handleReopenInvoice}
+        onDeleteInvoice={handleDeleteInvoice}
+        onUpdateInvoiceItems={handleUpdateInvoiceItems}
+        onManualInvoiceEntry={handleManualInvoiceEntry}
         onDeleteWarehouseEntry={async () => ({ success: true, message: 'Ok' })}
         onUpdateWarehouseEntry={async () => ({ success: true, message: 'Ok' })}
         onPersistSuppliers={() => {}}

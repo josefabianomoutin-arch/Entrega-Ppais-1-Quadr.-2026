@@ -42,11 +42,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         return "Senha de acesso (letras e números)";
     }
     const name = loginName.toLowerCase();
-    if (name === 'administrador') {
-        return "Senha (CPF do administrador)";
-    }
-    if (name.includes('douglas')) {
-        return "Senha (Seu CPF)";
+    if (name.includes('douglas') || name === 'administrador') {
+        return "Senha (CPF cadastrado)";
     }
     return "Senha (CPF/CNPJ do fornecedor)";
   }, [loginName, isStringLogin]);
