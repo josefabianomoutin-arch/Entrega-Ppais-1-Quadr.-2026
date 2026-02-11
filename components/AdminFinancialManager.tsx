@@ -36,9 +36,10 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
 
   const [formData, setFormData] = useState<Partial<FinancialRecord>>(initialFormState);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // O ID é a chave mestra para saber se estamos editando ou criando
   const isEditing = !!formData.id;
 
-  // Cálculos de Soma e Saldo para os Cards do Topo
   const totalsByPtres = useMemo(() => {
     return PTRES_OPTIONS.map(p => {
       const rec = records.filter(r => r.ptres.trim() === p && r.tipo === 'RECURSO').reduce((acc, curr) => acc + (Number(curr.valorRecebido) || 0), 0);
@@ -48,6 +49,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
   }, [records]);
 
   const handleEdit = (record: FinancialRecord) => {
+    // Garantimos que o ID venha no corpo do formulário
     setFormData({ ...record });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -58,13 +60,14 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSaving) return; // Trava contra duplo clique
+    if (isSaving) return;
 
     setIsSaving(true);
     
-    // Limpeza rigorosa de strings para evitar duplicidade visual por espaços
+    // Preparação do objeto, PRESERVANDO o ID se ele existir
     const recordToSave: any = { 
         ...formData,
+        id: formData.id, // Explicitamente mantendo o ID para o onSave
         ptres: formData.ptres?.trim(),
         descricao: formData.descricao?.trim(),
         justificativa: formData.justificativa?.trim(),
@@ -72,6 +75,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
         modalidade: formData.modalidade?.trim()
     };
 
+    // Limpeza de campos específicos de tipo para não enviar lixo
     if (formData.tipo === 'RECURSO') {
       delete recordToSave.valorUtilizado;
       delete recordToSave.localUtilizado;
@@ -89,7 +93,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
     if (res.success) {
       setFormData(initialFormState);
     } else {
-      alert(res.message);
+      alert(res.message || 'Erro ao salvar o registro.');
     }
     setIsSaving(false);
   };
@@ -114,13 +118,20 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
       </div>
 
       {/* 2. FORMULÁRIO DE LANÇAMENTO */}
-      <div className={`bg-white p-8 rounded-3xl shadow-xl border-2 transition-all ${isEditing ? 'border-orange-400' : 'border-gray-100'}`}>
+      <div className={`bg-white p-8 rounded-3xl shadow-xl border-2 transition-all ${isEditing ? 'border-orange-500 ring-4 ring-orange-50' : 'border-gray-100'}`}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
-            <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter italic">
-              {isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}
-            </h2>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+            <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter italic">
+                    {isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}
+                </h2>
+                {isEditing && (
+                    <span className="bg-orange-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest animate-pulse">
+                        Modo Edição Ativo
+                    </span>
+                )}
+            </div>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">
               {formData.tipo === 'RECURSO' ? 'Entrada de Recurso / Cota' : 'Lançamento de Despesa / Gasto'}
             </p>
           </div>
@@ -133,13 +144,13 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">PTRES</label>
-            <select value={formData.ptres} onChange={e => setFormData({...formData, ptres: e.target.value as any})} className="w-full p-3 border rounded-xl bg-gray-50 font-bold outline-none focus:ring-2 focus:ring-indigo-400">
+            <select value={formData.ptres} onChange={e => setFormData({...formData, ptres: e.target.value as any})} className="w-full p-3 border rounded-xl bg-gray-50 font-bold outline-none focus:ring-2 focus:ring-indigo-400 transition-all">
                 {PTRES_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Natureza</label>
-            <select value={formData.natureza} onChange={e => setFormData({...formData, natureza: e.target.value as any})} className="w-full p-3 border rounded-xl bg-gray-50 font-bold outline-none focus:ring-2 focus:ring-indigo-400">
+            <select value={formData.natureza} onChange={e => setFormData({...formData, natureza: e.target.value as any})} className="w-full p-3 border rounded-xl bg-gray-50 font-bold outline-none focus:ring-2 focus:ring-indigo-400 transition-all">
                 {NATUREZA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
@@ -187,9 +198,13 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
 
           <div className="md:col-span-1 flex items-end">
             <div className="flex gap-2 w-full">
-              {isEditing && <button type="button" onClick={handleCancelEdit} className="flex-1 bg-gray-100 text-gray-500 font-black p-3 rounded-xl uppercase text-[10px]">Cancelar</button>}
-              <button type="submit" disabled={isSaving} className={`flex-[2] font-black p-3 rounded-xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-[10px] text-white ${isEditing ? 'bg-orange-500' : (formData.tipo === 'RECURSO' ? 'bg-indigo-600' : 'bg-red-600')}`}>
-                {isSaving ? 'Gravando...' : (isEditing ? 'Salvar Alteração' : 'Registrar')}
+              {isEditing && (
+                <button type="button" onClick={handleCancelEdit} className="flex-1 bg-gray-200 text-gray-600 font-black p-3 rounded-xl uppercase text-[10px] shadow-sm hover:bg-gray-300 transition-colors">
+                    Cancelar
+                </button>
+              )}
+              <button type="submit" disabled={isSaving} className={`flex-[2] font-black p-3 rounded-xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-[10px] text-white ${isEditing ? 'bg-orange-600 hover:bg-orange-700' : (formData.tipo === 'RECURSO' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-red-600 hover:bg-red-700')}`}>
+                {isSaving ? 'Gravando...' : (isEditing ? 'Salvar Alterações' : 'Registrar Lançamento')}
               </button>
             </div>
           </div>
@@ -211,7 +226,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
             <div key={ptres} className="animate-fade-in-up">
               <div className="flex items-center justify-between mb-4 border-b-2 border-gray-200 pb-2 px-2">
                 <div className="flex items-baseline gap-3">
-                  <h3 className="text-2xl font-black text-gray-800 tracking-tighter">PTRES {ptres}</h3>
+                  <h3 className="text-2xl font-black text-gray-800 tracking-tighter italic">PTRES {ptres}</h3>
                   <span className="text-[10px] font-black bg-gray-200 text-gray-600 px-3 py-1 rounded-full uppercase tracking-widest">
                     {ptresRecords.length} Movimentações
                   </span>
@@ -226,7 +241,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
 
               <div className="grid grid-cols-1 gap-4">
                 {ptresRecords.sort((a, b) => new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime()).map((r, index) => (
-                  <div key={r.id || `admin-rec-${index}`} className={`group bg-white p-6 rounded-3xl border-l-8 shadow-sm hover:shadow-md transition-all ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'}`}>
+                  <div key={r.id || `admin-rec-${index}`} className={`group bg-white p-6 rounded-3xl border-l-8 shadow-sm hover:shadow-md transition-all ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'} ${formData.id === r.id ? 'ring-4 ring-orange-300' : ''}`}>
                     <div className="flex flex-col lg:flex-row justify-between gap-6">
                       
                       {/* Coluna 1: Info Básica */}
@@ -239,7 +254,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
                             <span className="text-[10px] font-bold text-gray-400">NATUREZA: {r.natureza}</span>
                             {r.tipo === 'DESPESA' && <span className="text-[10px] font-black text-indigo-500 uppercase">{r.modalidade || 'SEM MODALIDADE'}</span>}
                             </div>
-                            <span className="text-[8px] font-mono text-gray-300 uppercase">UID: ...{r.id?.slice(-5)}</span>
+                            <span className="text-[8px] font-mono text-gray-300 uppercase">UID: ...{r.id?.slice(-5) || 'NEW'}</span>
                         </div>
                         
                         <div>
@@ -275,7 +290,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
 
                       {/* Coluna 3: Ações */}
                       <div className="lg:w-16 flex lg:flex-col justify-end lg:justify-center gap-2">
-                        <button onClick={() => handleEdit(r)} className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all">
+                        <button onClick={() => handleEdit(r)} className={`p-3 rounded-2xl transition-all ${formData.id === r.id ? 'bg-orange-500 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white'}`}>
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                         </button>
                         <button onClick={() => { if(window.confirm('Excluir este registro permanentemente?')) onDelete(r.id); }} className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all">

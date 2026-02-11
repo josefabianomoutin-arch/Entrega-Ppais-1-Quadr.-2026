@@ -70,9 +70,18 @@ const App: React.FC = () => {
       setDailyMenus(snapshot.val() || {});
     });
 
+    // CORREÇÃO: Recuperação segura de IDs para registros financeiros
     onValue(financialRecordsRef, (snapshot) => {
       const data = snapshot.val();
-      setFinancialRecords(data ? Object.values(data) : []);
+      if (data) {
+        const recordsWithIds = Object.entries(data).map(([key, value]: [string, any]) => ({
+          ...value,
+          id: value.id || key // Garante que o ID da chave do Firebase seja usado se não houver ID interno
+        }));
+        setFinancialRecords(recordsWithIds);
+      } else {
+        setFinancialRecords([]);
+      }
     });
   }, []);
 
@@ -81,21 +90,18 @@ const App: React.FC = () => {
     const cleanPassNumeric = (passwordInput || '').trim().replace(/\D/g, ''); 
     const cleanPassFull = (passwordInput || '').trim().toLowerCase();
 
-    // CPFs autorizados para Admin/Douglas
     const isAuthorizedCpf = [
         '15210361870', 
         '29099022859', 
         '29462706821'
     ].includes(cleanPassNumeric);
 
-    // 1. LOGIN ADMINISTRADOR (ACESO TOTAL)
     const isAdminUser = ['ADMINISTRADOR', 'ADM'].includes(cleanName);
     if (isAdminUser && isAuthorizedCpf) {
       setUser({ name: cleanName, cpf: cleanPassNumeric, role: 'admin' });
       return true;
     }
 
-    // 2. LOGIN DOUGLAS (RESTRITO À GESTÃO FINANCEIRA)
     const isDouglasUser = [
         'DOUGLAS', 
         'DOUGLAS FERNANDO SEMENZIN GALDINO',
@@ -103,12 +109,10 @@ const App: React.FC = () => {
     ].includes(cleanName);
 
     if (isDouglasUser && isAuthorizedCpf) {
-      // Douglas é mapeado para o papel 'financeiro' conforme solicitado
       setUser({ name: cleanName, cpf: cleanPassNumeric, role: 'financeiro' });
       return true;
     }
 
-    // 3. LOGINS DE SETORES (SENHAS DE TEXTO)
     if (cleanName === 'ALMOXARIFADO' && cleanPassFull === 'almox123') {
       setUser({ name: 'ALMOXARIFADO', cpf: 'almox123', role: 'almoxarifado' });
       return true;
@@ -122,7 +126,6 @@ const App: React.FC = () => {
       return true;
     }
 
-    // 4. LOGINS DE FORNECEDORES
     const supplier = suppliers.find(s => s.cpf.replace(/\D/g, '') === cleanPassNumeric);
     if (supplier) {
       setUser({ name: supplier.name, cpf: supplier.cpf, role: 'supplier' });
@@ -263,8 +266,8 @@ const App: React.FC = () => {
                 items.forEach((item, idx) => {
                     currentData.deliveries.push({
                         id: `inv-upd-${Date.now()}-${idx}`,
-                        date,
-                        time,
+                        date: date,
+                        time: time,
                         item: item.name,
                         kg: item.kg,
                         value: item.value,
@@ -287,7 +290,7 @@ const App: React.FC = () => {
             items.forEach((item, idx) => {
                 currentData.deliveries.push({
                     id: `inv-man-${Date.now()}-${idx}`,
-                    date,
+                    date: date,
                     time: '08:00',
                     item: item.name,
                     kg: item.kg,
@@ -311,9 +314,12 @@ const App: React.FC = () => {
   };
   const handleDeleteCleaningLog = async (id: string) => remove(child(cleaningLogsRef, id));
   
+  // CORREÇÃO: Função de salvaguarda financeira para garantir edição correta
   const handleRegisterFinancialRecord = async (record: any) => {
+    // Se já existe um ID, usamos ele para sobrescrever (editar). Caso contrário, criamos um novo (push).
     const id = record.id || push(financialRecordsRef).key;
-    await set(child(financialRecordsRef, id), { ...record, id });
+    const finalRecord = { ...record, id };
+    await set(child(financialRecordsRef, id), finalRecord);
     return { success: true };
   };
   const handleDeleteFinancialRecord = async (id: string) => remove(child(financialRecordsRef, id));
@@ -345,7 +351,6 @@ const App: React.FC = () => {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  // 1. Visão de Administrador Completo
   if (user.role === 'admin') {
     return (
       <AdminDashboard 
@@ -392,12 +397,10 @@ const App: React.FC = () => {
     );
   }
 
-  // 2. Visão de Financeiro / Douglas (Apenas visualização financeira)
   if (user.role === 'financeiro') {
     return <FinanceDashboard records={financialRecords} onLogout={handleLogout} />;
   }
 
-  // 3. Demais Setores
   if (user.role === 'almoxarifado') {
     return <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={handleLogout} onRegisterEntry={async (p) => ({ success: true, message: 'Ok' })} onRegisterWithdrawal={async (p) => ({ success: true, message: 'Ok' })} />;
   }
@@ -406,7 +409,6 @@ const App: React.FC = () => {
     return <ItespDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={handleLogout} />;
   }
 
-  // 4. Fornecedores
   const currentSupplier = suppliers.find(s => s.cpf === user.cpf);
   if (currentSupplier) {
     return (
