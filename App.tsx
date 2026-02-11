@@ -79,36 +79,41 @@ const App: React.FC = () => {
   const handleLogin = (name: string, cpf: string) => {
     const upperName = name.toUpperCase().trim();
     const cleanCpf = cpf.trim();
+    const lowerCpf = cleanCpf.toLowerCase();
     
-    // LOGIN DO ADMINISTRADOR ATUALIZADO
+    // 1. LOGIN ADMINISTRADOR (DOUGLAS)
     if (upperName === 'DOUGLAS FERNANDO SEMENZIN GALDINO' && cleanCpf === '29099022859') {
       setUser({ name: upperName, cpf: cleanCpf, role: 'admin' });
       return true;
     }
     
+    // Fallback Administrador Geral
     if (upperName === 'ADMINISTRADOR' && cleanCpf === '29462706821') {
       setUser({ name: upperName, cpf: cleanCpf, role: 'admin' });
       return true;
     }
 
-    if (upperName === 'ALMOXARIFADO' && cleanCpf === 'almox123') {
+    // 2. LOGINS DE SETORES (INSENSÍVEIS A MAIÚSCULAS NA SENHA)
+    if (upperName === 'ALMOXARIFADO' && lowerCpf === 'almox123') {
       setUser({ name: upperName, cpf: cleanCpf, role: 'almoxarifado' });
       return true;
     }
-    if (upperName === 'ITESP' && cleanCpf === 'itesp2026') {
+    if (upperName === 'ITESP' && lowerCpf === 'itesp2026') {
       setUser({ name: upperName, cpf: cleanCpf, role: 'itesp' });
       return true;
     }
-    if (upperName === 'FINANCEIRO' && cleanCpf === 'financeiro123') {
+    if (upperName === 'FINANCEIRO' && lowerCpf === 'financeiro123') {
       setUser({ name: upperName, cpf: cleanCpf, role: 'financeiro' });
       return true;
     }
 
+    // 3. LOGIN FORNECEDORES (BUSCA POR CPF/CNPJ EXATO)
     const supplier = suppliers.find(s => s.cpf === cleanCpf);
     if (supplier) {
       setUser({ name: supplier.name, cpf: supplier.cpf, role: 'supplier' });
       return true;
     }
+    
     return false;
   };
 
@@ -181,11 +186,7 @@ const App: React.FC = () => {
         const sourceDelivery = (currentData.deliveries || []).find(d => placeholderIds.includes(d.id));
         const date = sourceDelivery?.date || new Date().toISOString().split('T')[0];
         const time = sourceDelivery?.time || '08:00';
-
-        // Remove placeholders
         currentData.deliveries = (currentData.deliveries || []).filter(d => !placeholderIds.includes(d.id));
-        
-        // Add real items
         invoiceData.fulfilledItems.forEach((item: any, idx: number) => {
           currentData.deliveries.push({
             id: `inv-${Date.now()}-${idx}`,

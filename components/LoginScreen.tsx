@@ -20,17 +20,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   };
 
   const isStringLogin = useMemo(() => {
-    const name = loginName.trim().toUpperCase();
-    return ['ITESP', 'ALMOXARIFADO', 'FINANCEIRO'].includes(name);
+    const nameTrimmed = loginName.trim().toUpperCase();
+    return ['ITESP', 'ALMOXARIFADO', 'FINANCEIRO'].includes(nameTrimmed);
   }, [loginName]);
 
   const passwordPlaceholder = useMemo(() => {
     if (isStringLogin) {
-        return "Senha de acesso (letras e números)";
+        return "Senha de acesso (Ex: almox123)";
     }
     const name = loginName.toLowerCase();
     if (name.includes('douglas') || name === 'administrador') {
-        return "Sua Senha Pessoal";
+        return "Sua Senha (CPF)";
     }
     return "CPF/CNPJ (Apenas números)";
   }, [loginName, isStringLogin]);
@@ -39,14 +39,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-2xl shadow-lg">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-green-800">Gestão de Fornecedores 1º Quadr. 2026</h1>
+          <h1 className="text-3xl font-bold text-green-800 leading-tight">Gestão de Fornecedores 1º Quadr. 2026</h1>
           <p className="mt-2 text-gray-600">
             Acesso ao Sistema de Monitoramento
           </p>
         </div>
         
         <div className="mt-4 text-center text-xs text-yellow-800 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-            <p><strong>Dica:</strong> Fornecedores utilizam o <strong>CPF/CNPJ</strong> (apenas números). Setores administrativos utilizam suas senhas específicas.</p>
+            <p><strong>Dica:</strong> Fornecedores e Douglas utilizam <strong>CPF</strong> (apenas números). Setores administrativos utilizam suas senhas específicas.</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLoginSubmit}>
@@ -76,7 +76,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           </div>
           {loginError && <p className="text-red-500 text-sm text-center font-bold animate-pulse">{loginError}</p>}
           <div>
-            <button type="submit" className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">Entrar</button>
+            <button type="submit" className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all active:scale-95 shadow-md">Entrar</button>
           </div>
         </form>
       </div>
