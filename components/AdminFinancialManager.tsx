@@ -11,6 +11,15 @@ interface AdminFinancialManagerProps {
 const PTRES_OPTIONS = ['380302', '380303', '380304', '380308', '380328'] as const;
 const NATUREZA_OPTIONS = ['339030', '339039'] as const;
 
+// Mapeamento de descrições solicitado pelo usuário
+const PTRES_DESCRIPTIONS: Record<string, string> = {
+    '380302': 'Materiais para o Setor de Saúde',
+    '380303': 'Recurso para Atender peças e serviços de viaturas',
+    '380304': 'Recurso para atender despesas de materiais e serviços administrativos',
+    '380308': 'Recurso para atender peças e serviço para manutenção e conservação da Unidade',
+    '380328': 'Recurso para Diárias e Outras Despesas'
+};
+
 const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
@@ -63,7 +72,6 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
     setIsSaving(true);
     
     try {
-        // Sanitização de valores numéricos para evitar NaN (que trava o Firebase)
         const sanitizeNum = (val: any) => {
             const n = parseFloat(val);
             return isNaN(n) ? 0 : n;
@@ -80,7 +88,6 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
             status: formData.status?.trim() || 'PENDENTE'
         };
 
-        // Limpeza de campos e garantia de valores numéricos válidos
         if (formData.tipo === 'RECURSO') {
           recordToSave.valorRecebido = sanitizeNum(formData.valorRecebido);
           recordToSave.valorSolicitado = sanitizeNum(formData.valorSolicitado);
@@ -110,7 +117,6 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
         console.error("Erro crítico na gravação:", error);
         alert("Erro de conexão ou falha interna. O registro não foi salvo. Tente novamente.");
     } finally {
-        // CRITICAL: Garantir que o estado de salvamento seja resetado independente do resultado
         setIsSaving(false);
     }
   };
@@ -121,7 +127,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {totalsByPtres.map(t => (
           <div key={t.ptres} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
-            <p className="text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">{t.ptres}</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest" title={PTRES_DESCRIPTIONS[t.ptres]}>{t.ptres}</p>
             <div>
               <div className="flex justify-between text-[9px] font-bold text-gray-500 mb-1">
                 <span>REC: {formatCurrency(t.recurso)}</span>
@@ -162,7 +168,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">PTRES</label>
             <select value={formData.ptres} onChange={e => setFormData({...formData, ptres: e.target.value as any})} className="w-full p-3 border rounded-xl bg-gray-50 font-bold outline-none focus:ring-2 focus:ring-indigo-400 transition-all">
-                {PTRES_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                {PTRES_OPTIONS.map(o => <option key={o} value={o}>{o} - {PTRES_DESCRIPTIONS[o]?.slice(0,25)}...</option>)}
             </select>
           </div>
           <div className="space-y-1">
@@ -242,11 +248,16 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
           return (
             <div key={ptres} className="animate-fade-in-up">
               <div className="flex items-center justify-between mb-4 border-b-2 border-gray-200 pb-2 px-2">
-                <div className="flex items-baseline gap-3">
-                  <h3 className="text-2xl font-black text-gray-800 tracking-tighter italic">PTRES {ptres}</h3>
-                  <span className="text-[10px] font-black bg-gray-200 text-gray-600 px-3 py-1 rounded-full uppercase tracking-widest">
-                    {ptresRecords.length} Movimentações
-                  </span>
+                <div className="flex flex-col">
+                  <div className="flex items-baseline gap-3">
+                    <h3 className="text-2xl font-black text-gray-800 tracking-tighter italic">PTRES {ptres}</h3>
+                    <span className="text-[10px] font-black bg-gray-200 text-gray-600 px-3 py-1 rounded-full uppercase tracking-widest">
+                      {ptresRecords.length} Movimentações
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-black text-indigo-500 uppercase tracking-tight mt-1 italic">
+                    {PTRES_DESCRIPTIONS[ptres]}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-black text-gray-400 uppercase">Saldo do Grupo</p>
@@ -257,7 +268,12 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                {ptresRecords.sort((a, b) => new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime()).map((r, index) => (
+                {ptresRecords.sort((a, b) => {
+                  if (a.tipo !== b.tipo) {
+                    return a.tipo === 'RECURSO' ? -1 : 1;
+                  }
+                  return new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime();
+                }).map((r, index) => (
                   <div key={r.id || `admin-rec-${index}`} className={`group bg-white p-6 rounded-3xl border-l-8 shadow-sm hover:shadow-md transition-all ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'} ${formData.id === r.id ? 'ring-4 ring-orange-300' : ''}`}>
                     <div className="flex flex-col lg:flex-row justify-between gap-6">
                       

@@ -10,6 +10,15 @@ interface FinanceDashboardProps {
 const PTRES_OPTIONS = ['380302', '380303', '380304', '380308', '380328'] as const;
 const NATUREZA_OPTIONS = ['339030', '339039'] as const;
 
+// Mapeamento de descrições solicitado pelo usuário
+const PTRES_DESCRIPTIONS: Record<string, string> = {
+    '380302': 'Materiais para o Setor de Saúde',
+    '380303': 'Recurso para Atender peças e serviços de viaturas',
+    '380304': 'Recurso para atender despesas de materiais e serviços administrativos',
+    '380308': 'Recurso para atender peças e serviço para manutenção e conservação da Unidade',
+    '380328': 'Recurso para Diárias e Outras Despesas'
+};
+
 const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
@@ -66,7 +75,12 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
         if (activeSubTab === 'recursos') return matchesSearch && r.tipo === 'RECURSO';
         if (activeSubTab === 'pagamentos') return matchesSearch && r.tipo === 'DESPESA';
         return matchesSearch;
-    }).sort((a, b) => new Date(b.dataRecebimento || b.dataPagamento || '').getTime() - new Date(a.dataRecebimento || a.dataPagamento || '').getTime());
+    }).sort((a, b) => {
+        if (a.tipo !== b.tipo) {
+            return a.tipo === 'RECURSO' ? -1 : 1;
+        }
+        return new Date(b.dataRecebimento || b.dataPagamento || '').getTime() - new Date(a.dataRecebimento || a.dataPagamento || '').getTime();
+    });
   }, [records, searchTerm, activeSubTab]);
 
   return (
@@ -137,7 +151,6 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                         </div>
                     </div>
                 </div>
-                {/* IMPORTANTE: Passamos o 'records' original para o Grid calcular saldos reais mesmo filtrando a exibição */}
                 <MovementsGrid filteredRecords={filteredRecords} allRecords={records} />
             </div>
         )}
@@ -180,8 +193,13 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                         <div key={group.ptres} className="bg-white p-8 rounded-[2.5rem] shadow-2xl border-t-8 border-indigo-900 flex flex-col h-full">
                             <div className="flex justify-between items-center mb-8 border-b border-gray-100 pb-4">
                                 <div>
-                                    <h3 className="text-3xl font-black text-indigo-950 uppercase tracking-tighter italic">PTRES {group.ptres}</h3>
-                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Saldos Vinculados por Natureza</p>
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="text-3xl font-black text-indigo-950 uppercase tracking-tighter italic">PTRES {group.ptres}</h3>
+                                        <span className="bg-indigo-50 text-indigo-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tight">
+                                            {PTRES_DESCRIPTIONS[group.ptres] || 'Outros Recursos'}
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Saldos Vinculados por Natureza</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[9px] font-black text-gray-400 uppercase">Saldo Consolidado</p>
@@ -256,11 +274,9 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: 
     return (
         <div className="space-y-16">
             {PTRES_OPTIONS.map(ptres => {
-                // Filtramos os registros para EXIBIÇÃO baseados no filtro de aba (recurso ou despesa)
                 const groupDisplayRecords = filteredRecords.filter(r => r.ptres.trim() === ptres);
                 if (groupDisplayRecords.length === 0) return null;
 
-                // Calculamos o SALDO REAL do grupo usando TODOS os registros daquela PTRES (recurso - despesa)
                 const groupBalanceRecords = allRecords.filter(r => r.ptres.trim() === ptres);
                 const realBalance = groupBalanceRecords.reduce((acc, curr) => 
                     acc + (curr.tipo === 'RECURSO' ? Number(curr.valorRecebido || 0) : -Number(curr.valorUtilizado || 0)), 0);
@@ -268,11 +284,16 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: 
                 return (
                     <div key={ptres} className="space-y-6">
                         <div className="flex items-center justify-between px-4">
-                            <div className="flex items-baseline gap-4">
-                                <h3 className="text-4xl font-black text-indigo-900 tracking-tighter italic">PTRES {ptres}</h3>
-                                <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">
-                                    {groupDisplayRecords.length} Registros Exibidos
-                                </span>
+                            <div className="flex flex-col">
+                                <div className="flex items-baseline gap-4">
+                                    <h3 className="text-4xl font-black text-indigo-900 tracking-tighter italic">PTRES {ptres}</h3>
+                                    <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">
+                                        {groupDisplayRecords.length} Registros Exibidos
+                                    </span>
+                                </div>
+                                <p className="text-xs font-black text-gray-400 uppercase tracking-tighter mt-1 italic">
+                                    {PTRES_DESCRIPTIONS[ptres] || 'Outros Recursos'}
+                                </p>
                             </div>
                             <div className="text-right bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Saldo Líquido do Grupo</p>
@@ -283,8 +304,10 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: 
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {/* Verificação extra de duplicidade por ID na renderização */}
-                            {groupDisplayRecords.map((r, index) => (
+                            {groupDisplayRecords.sort((a,b) => {
+                                if (a.tipo !== b.tipo) return a.tipo === 'RECURSO' ? -1 : 1;
+                                return new Date(b.dataRecebimento || b.dataPagamento || '').getTime() - new Date(a.dataRecebimento || a.dataPagamento || '').getTime();
+                            }).map((r, index) => (
                                 <div key={r.id || `rec-${ptres}-${index}`} className={`bg-white p-6 rounded-[2.5rem] shadow-lg border-l-[12px] flex flex-col justify-between transition-all hover:shadow-2xl hover:-translate-y-1 ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'}`}>
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-start">
