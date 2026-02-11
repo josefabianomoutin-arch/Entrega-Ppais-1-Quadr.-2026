@@ -77,21 +77,21 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (name: string, cpf: string) => {
-    // Normalização rigorosa
+    // Normalização agressiva para evitar erros de espaço ou caracteres especiais
     const upperName = (name || '').toUpperCase().trim();
-    const cleanCpf = (cpf || '').trim();
-    const lowerCpf = cleanCpf.toLowerCase();
+    const cleanCpf = (cpf || '').trim().replace(/\D/g, ''); // Remove pontos e traços se houver
+    const lowerCpf = (cpf || '').trim().toLowerCase(); // Mantém texto para senhas como 'almox123'
     
-    // 1. LOGIN ADMINISTRADOR (FLEXÍVEL)
-    // Aceita o nome completo, apenas "DOUGLAS" ou o termo "ADMINISTRADOR"
+    // 1. LOGIN ADMINISTRADOR (DOUGLAS)
     const isAdminName = 
       upperName === 'DOUGLAS FERNANDO SEMENZIN GALDINO' || 
       upperName === 'ADMINISTRADOR' || 
       upperName === 'DOUGLAS' || 
       upperName === 'ADM';
 
-    // Aceita o CPF novo ou o antigo
+    // Lista de CPFs autorizados como senha de Admin
     const isAdminPassword = 
+      cleanCpf === '15210361870' || // CPF da sua imagem
       cleanCpf === '29099022859' || 
       cleanCpf === '29462706821';
 
@@ -102,20 +102,20 @@ const App: React.FC = () => {
 
     // 2. LOGINS DE SETORES (INSENSÍVEIS A MAIÚSCULAS)
     if (upperName === 'ALMOXARIFADO' && lowerCpf === 'almox123') {
-      setUser({ name: upperName, cpf: cleanCpf, role: 'almoxarifado' });
+      setUser({ name: upperName, cpf: lowerCpf, role: 'almoxarifado' });
       return true;
     }
     if (upperName === 'ITESP' && lowerCpf === 'itesp2026') {
-      setUser({ name: upperName, cpf: cleanCpf, role: 'itesp' });
+      setUser({ name: upperName, cpf: lowerCpf, role: 'itesp' });
       return true;
     }
     if (upperName === 'FINANCEIRO' && lowerCpf === 'financeiro123') {
-      setUser({ name: upperName, cpf: cleanCpf, role: 'financeiro' });
+      setUser({ name: upperName, cpf: lowerCpf, role: 'financeiro' });
       return true;
     }
 
-    // 3. LOGIN FORNECEDORES
-    const supplier = suppliers.find(s => s.cpf === cleanCpf);
+    // 3. LOGIN FORNECEDORES (PESQUISA PELO CPF LIMPO)
+    const supplier = suppliers.find(s => s.cpf.replace(/\D/g, '') === cleanCpf);
     if (supplier) {
       setUser({ name: supplier.name, cpf: supplier.cpf, role: 'supplier' });
       return true;

@@ -25,16 +25,20 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     return ['ITESP', 'ALMOXARIFADO', 'FINANCEIRO'].includes(nameTrimmed);
   }, [loginName]);
 
+  const isAdminLogin = useMemo(() => {
+    const name = loginName.trim().toUpperCase();
+    return name === 'ADMINISTRADOR' || name === 'DOUGLAS' || name === 'ADM' || name.includes('GALDINO');
+  }, [loginName]);
+
   const passwordPlaceholder = useMemo(() => {
     if (isStringLogin) {
         return "Sua Senha de Acesso";
     }
-    const name = loginName.trim().toLowerCase();
-    if (name.includes('douglas') || name === 'administrador' || name === 'adm') {
-        return "Sua Senha (CPF)";
+    if (isAdminLogin) {
+        return "Sua Senha (CPF apenas números)";
     }
     return "CPF/CNPJ do Fornecedor";
-  }, [loginName, isStringLogin]);
+  }, [loginName, isStringLogin, isAdminLogin]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gray-100">
@@ -52,7 +56,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         </div>
         
         <div className="mt-4 text-center text-[10px] text-yellow-800 bg-yellow-50 p-4 rounded-2xl border border-yellow-100 font-bold uppercase tracking-tight">
-            <p>Dica: Fornecedores e Douglas utilizam o CPF (apenas números). Setores administrativos usam senhas específicas.</p>
+            <p>Dica: Administradores e Fornecedores utilizam o CPF (apenas números). Setores administrativos usam senhas específicas.</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLoginSubmit}>
@@ -65,7 +69,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   required 
                   value={loginName} 
                   onChange={(e) => setLoginName(e.target.value.toUpperCase())} 
-                  placeholder="Seu Nome ou Setor" 
+                  placeholder="Seu Nome ou Usuário" 
                   className="appearance-none relative block w-full px-4 py-4 border-2 border-gray-200 placeholder-gray-400 text-gray-900 rounded-2xl focus:outline-none focus:ring-green-500 focus:border-green-500 font-bold transition-all"
                 />
             </div>
@@ -73,6 +77,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 <label className="absolute -top-2 left-4 bg-white px-2 text-[10px] font-black text-green-700 uppercase tracking-widest z-10">Senha / CPF</label>
                 <input 
                   type={showPassword ? "text" : (isStringLogin ? "text" : "password")} 
+                  inputMode={isStringLogin ? "text" : "numeric"}
                   autoComplete="current-password" 
                   required 
                   value={loginCpf} 
