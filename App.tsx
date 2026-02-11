@@ -76,46 +76,50 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const handleLogin = (name: string, cpf: string) => {
-    // Normalização agressiva para evitar erros de espaço ou caracteres especiais
-    const upperName = (name || '').toUpperCase().trim();
-    const cleanCpf = (cpf || '').trim().replace(/\D/g, ''); // Remove pontos e traços se houver
-    const lowerCpf = (cpf || '').trim().toLowerCase(); // Mantém texto para senhas como 'almox123'
-    
-    // 1. LOGIN ADMINISTRADOR (DOUGLAS)
-    const isAdminName = 
-      upperName === 'DOUGLAS FERNANDO SEMENZIN GALDINO' || 
-      upperName === 'ADMINISTRADOR' || 
-      upperName === 'DOUGLAS' || 
-      upperName === 'ADM';
+  const handleLogin = (name: string, passwordInput: string) => {
+    // 1. NORMALIZAÇÃO RIGOROSA DE ENTRADA
+    const cleanName = (name || '').trim().toUpperCase();
+    const cleanPassNumeric = (passwordInput || '').trim().replace(/\D/g, ''); // Apenas números para CPFs
+    const cleanPassFull = (passwordInput || '').trim().toLowerCase(); // Mantém letras para senhas de setores
 
-    // Lista de CPFs autorizados como senha de Admin
-    const isAdminPassword = 
-      cleanCpf === '15210361870' || // CPF da sua imagem
-      cleanCpf === '29099022859' || 
-      cleanCpf === '29462706821';
+    // 2. LOGINS DE ADMINISTRADOR (DOUGLAS)
+    // Aceita qualquer um desses nomes com qualquer um desses CPFs
+    const isAdminName = [
+        'DOUGLAS', 
+        'ADMINISTRADOR', 
+        'ADM', 
+        'DOUGLAS FERNANDO SEMENZIN GALDINO',
+        'DOUGLAS GALDINO'
+    ].includes(cleanName);
 
-    if (isAdminName && isAdminPassword) {
-      setUser({ name: upperName, cpf: cleanCpf, role: 'admin' });
+    const isAdminPass = [
+        '15210361870', // CPF da sua imagem
+        '29099022859', 
+        '29462706821'
+    ].includes(cleanPassNumeric);
+
+    if (isAdminName && isAdminPass) {
+      setUser({ name: cleanName, cpf: cleanPassNumeric, role: 'admin' });
       return true;
     }
 
-    // 2. LOGINS DE SETORES (INSENSÍVEIS A MAIÚSCULAS)
-    if (upperName === 'ALMOXARIFADO' && lowerCpf === 'almox123') {
-      setUser({ name: upperName, cpf: lowerCpf, role: 'almoxarifado' });
+    // 3. LOGINS DE SETORES (SENHAS DE TEXTO)
+    if (cleanName === 'ALMOXARIFADO' && cleanPassFull === 'almox123') {
+      setUser({ name: 'ALMOXARIFADO', cpf: 'almox123', role: 'almoxarifado' });
       return true;
     }
-    if (upperName === 'ITESP' && lowerCpf === 'itesp2026') {
-      setUser({ name: upperName, cpf: lowerCpf, role: 'itesp' });
+    if (cleanName === 'ITESP' && cleanPassFull === 'itesp2026') {
+      setUser({ name: 'ITESP', cpf: 'itesp2026', role: 'itesp' });
       return true;
     }
-    if (upperName === 'FINANCEIRO' && lowerCpf === 'financeiro123') {
-      setUser({ name: upperName, cpf: lowerCpf, role: 'financeiro' });
+    if (cleanName === 'FINANCEIRO' && cleanPassFull === 'financeiro123') {
+      setUser({ name: 'FINANCEIRO', cpf: 'financeiro123', role: 'financeiro' });
       return true;
     }
 
-    // 3. LOGIN FORNECEDORES (PESQUISA PELO CPF LIMPO)
-    const supplier = suppliers.find(s => s.cpf.replace(/\D/g, '') === cleanCpf);
+    // 4. LOGINS DE FORNECEDORES (BUSCA POR CPF/CNPJ EXATO)
+    // Compara o CPF digitado (sem pontos) com o CPF no banco (sem pontos)
+    const supplier = suppliers.find(s => s.cpf.replace(/\D/g, '') === cleanPassNumeric);
     if (supplier) {
       setUser({ name: supplier.name, cpf: supplier.cpf, role: 'supplier' });
       return true;
