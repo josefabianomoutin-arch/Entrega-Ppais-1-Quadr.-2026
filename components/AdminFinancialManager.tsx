@@ -37,7 +37,6 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
   const [formData, setFormData] = useState<Partial<FinancialRecord>>(initialFormState);
   const [isSaving, setIsSaving] = useState(false);
   
-  // O ID é a chave mestra para saber se estamos editando ou criando
   const isEditing = !!formData.id;
 
   const totalsByPtres = useMemo(() => {
@@ -49,7 +48,6 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
   }, [records]);
 
   const handleEdit = (record: FinancialRecord) => {
-    // Garantimos que o ID venha no corpo do formulário
     setFormData({ ...record });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -64,38 +62,57 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
 
     setIsSaving(true);
     
-    // Preparação do objeto, PRESERVANDO o ID se ele existir
-    const recordToSave: any = { 
-        ...formData,
-        id: formData.id, // Explicitamente mantendo o ID para o onSave
-        ptres: formData.ptres?.trim(),
-        descricao: formData.descricao?.trim(),
-        justificativa: formData.justificativa?.trim(),
-        numeroProcesso: formData.numeroProcesso?.trim(),
-        modalidade: formData.modalidade?.trim()
-    };
+    try {
+        // Sanitização de valores numéricos para evitar NaN (que trava o Firebase)
+        const sanitizeNum = (val: any) => {
+            const n = parseFloat(val);
+            return isNaN(n) ? 0 : n;
+        };
 
-    // Limpeza de campos específicos de tipo para não enviar lixo
-    if (formData.tipo === 'RECURSO') {
-      delete recordToSave.valorUtilizado;
-      delete recordToSave.localUtilizado;
-      delete recordToSave.numeroProcesso;
-      delete recordToSave.dataPagamento;
-      delete recordToSave.modalidade;
-    } else {
-      delete recordToSave.dataSolicitacao;
-      delete recordToSave.valorSolicitado;
-      delete recordToSave.dataRecebimento;
-      delete recordToSave.valorRecebido;
-    }
+        const recordToSave: any = { 
+            ...formData,
+            id: formData.id || null, 
+            ptres: formData.ptres?.trim(),
+            descricao: formData.descricao?.trim() || '',
+            justificativa: formData.justificativa?.trim() || '',
+            numeroProcesso: formData.numeroProcesso?.trim() || '',
+            modalidade: formData.modalidade?.trim() || '',
+            status: formData.status?.trim() || 'PENDENTE'
+        };
 
-    const res = await onSave(recordToSave as FinancialRecord);
-    if (res.success) {
-      setFormData(initialFormState);
-    } else {
-      alert(res.message || 'Erro ao salvar o registro.');
+        // Limpeza de campos e garantia de valores numéricos válidos
+        if (formData.tipo === 'RECURSO') {
+          recordToSave.valorRecebido = sanitizeNum(formData.valorRecebido);
+          recordToSave.valorSolicitado = sanitizeNum(formData.valorSolicitado);
+          
+          delete recordToSave.valorUtilizado;
+          delete recordToSave.localUtilizado;
+          delete recordToSave.numeroProcesso;
+          delete recordToSave.dataPagamento;
+          delete recordToSave.modalidade;
+        } else {
+          recordToSave.valorUtilizado = sanitizeNum(formData.valorUtilizado);
+          
+          delete recordToSave.dataSolicitacao;
+          delete recordToSave.valorSolicitado;
+          delete recordToSave.dataRecebimento;
+          delete recordToSave.valorRecebido;
+        }
+
+        const res = await onSave(recordToSave as FinancialRecord);
+        
+        if (res && res.success) {
+          setFormData(initialFormState);
+        } else {
+          alert(res?.message || 'O servidor recusou a gravação. Verifique os dados.');
+        }
+    } catch (error) {
+        console.error("Erro crítico na gravação:", error);
+        alert("Erro de conexão ou falha interna. O registro não foi salvo. Tente novamente.");
+    } finally {
+        // CRITICAL: Garantir que o estado de salvamento seja resetado independente do resultado
+        setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   return (
@@ -163,7 +180,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-indigo-600 uppercase ml-1">Valor Creditado (R$)</label>
-                <input type="number" step="0.01" value={formData.valorRecebido || ''} onChange={e => setFormData({...formData, valorRecebido: Number(e.target.value)})} className="w-full p-3 border rounded-xl bg-white border-indigo-100 font-black text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-400" />
+                <input type="number" step="0.01" value={formData.valorRecebido ?? ''} onChange={e => setFormData({...formData, valorRecebido: parseFloat(e.target.value)})} className="w-full p-3 border rounded-xl bg-white border-indigo-100 font-black text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
             </>
           ) : (
@@ -174,7 +191,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-red-600 uppercase ml-1">Valor Gasto (R$)</label>
-                <input type="number" step="0.01" value={formData.valorUtilizado || ''} onChange={e => setFormData({...formData, valorUtilizado: Number(e.target.value)})} className="w-full p-3 border rounded-xl bg-white border-red-100 font-black text-red-700 outline-none focus:ring-2 focus:ring-red-400" />
+                <input type="number" step="0.01" value={formData.valorUtilizado ?? ''} onChange={e => setFormData({...formData, valorUtilizado: parseFloat(e.target.value)})} className="w-full p-3 border rounded-xl bg-white border-red-100 font-black text-red-700 outline-none focus:ring-2 focus:ring-red-400" />
               </div>
             </>
           )}

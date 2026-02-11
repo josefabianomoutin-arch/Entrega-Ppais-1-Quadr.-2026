@@ -70,13 +70,12 @@ const App: React.FC = () => {
       setDailyMenus(snapshot.val() || {});
     });
 
-    // CORREÇÃO: Recuperação segura de IDs para registros financeiros
     onValue(financialRecordsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         const recordsWithIds = Object.entries(data).map(([key, value]: [string, any]) => ({
           ...value,
-          id: value.id || key // Garante que o ID da chave do Firebase seja usado se não houver ID interno
+          id: value.id || key
         }));
         setFinancialRecords(recordsWithIds);
       } else {
@@ -314,13 +313,17 @@ const App: React.FC = () => {
   };
   const handleDeleteCleaningLog = async (id: string) => remove(child(cleaningLogsRef, id));
   
-  // CORREÇÃO: Função de salvaguarda financeira para garantir edição correta
   const handleRegisterFinancialRecord = async (record: any) => {
-    // Se já existe um ID, usamos ele para sobrescrever (editar). Caso contrário, criamos um novo (push).
-    const id = record.id || push(financialRecordsRef).key;
-    const finalRecord = { ...record, id };
-    await set(child(financialRecordsRef, id), finalRecord);
-    return { success: true };
+    try {
+        // Garantia de que o ID seja uma string válida e não cause crash no Firebase
+        const id = (record.id && String(record.id).trim().length > 0) ? record.id : push(financialRecordsRef).key;
+        const finalRecord = { ...record, id };
+        await set(child(financialRecordsRef, id), finalRecord);
+        return { success: true };
+    } catch (e) {
+        console.error("Erro na gravação financeira (App.tsx):", e);
+        return { success: false, message: "Erro ao comunicar com o servidor." };
+    }
   };
   const handleDeleteFinancialRecord = async (id: string) => remove(child(financialRecordsRef, id));
 
