@@ -19,22 +19,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     }
   };
 
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const name = loginName.toLowerCase();
-    
-    // LIBERAR LETRAS: Para ITESP, Almoxarifado e Financeiro (senhas alfanuméricas)
-    if (['itesp', 'almoxarifado', 'financeiro'].includes(name)) {
-      setLoginCpf(value);
-    } else {
-      // MANTÉM RESTRIÇÃO: Apenas números para Fornecedores, Administrador e Douglas (que usa CPF numérico)
-      setLoginCpf(value.replace(/[^\d]/g, ''));
-    }
-  };
-  
   const isStringLogin = useMemo(() => {
-    const name = loginName.toLowerCase();
-    return ['itesp', 'almoxarifado', 'financeiro'].includes(name);
+    const name = loginName.trim().toUpperCase();
+    return ['ITESP', 'ALMOXARIFADO', 'FINANCEIRO'].includes(name);
   }, [loginName]);
 
   const passwordPlaceholder = useMemo(() => {
@@ -43,9 +30,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     }
     const name = loginName.toLowerCase();
     if (name.includes('douglas') || name === 'administrador') {
-        return "Senha (CPF cadastrado)";
+        return "Sua Senha Pessoal";
     }
-    return "Senha (CPF/CNPJ do fornecedor)";
+    return "CPF/CNPJ (Apenas números)";
   }, [loginName, isStringLogin]);
 
   return (
@@ -58,8 +45,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           </p>
         </div>
         
-        <div className="mt-4 text-center text-sm text-yellow-800 bg-yellow-100 p-3 rounded-lg border border-yellow-300">
-            <p><strong>Atenção:</strong> Fornecedores e Diretores utilizam o <strong>CPF/CNPJ</strong> (apenas números). ITESP e FINANCEIRO utilizam senhas alfanuméricas.</p>
+        <div className="mt-4 text-center text-xs text-yellow-800 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+            <p><strong>Dica:</strong> Fornecedores utilizam o <strong>CPF/CNPJ</strong> (apenas números). Setores administrativos utilizam suas senhas específicas.</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLoginSubmit}>
@@ -70,14 +57,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   autoComplete="username"
                   required 
                   value={loginName} 
-                  onChange={(e) => {
-                    const val = e.target.value.toUpperCase();
-                    setLoginName(val);
-                    // Se não for um dos logins de string, limpa a senha de caracteres não numéricos
-                    if (!['ITESP', 'ALMOXARIFADO', 'FINANCEIRO'].includes(val)) {
-                        setLoginCpf(prev => prev.replace(/[^\d]/g, ''));
-                    }
-                  }} 
+                  onChange={(e) => setLoginName(e.target.value.toUpperCase())} 
                   placeholder="Seu Nome Completo ou Usuário" 
                   className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                 />
@@ -88,8 +68,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   autoComplete="current-password" 
                   required 
                   value={loginCpf} 
-                  onChange={handlePasswordChange}
-                  maxLength={isStringLogin ? undefined : 14}
+                  onChange={(e) => setLoginCpf(e.target.value)}
                   placeholder={passwordPlaceholder} 
                   className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                 />

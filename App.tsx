@@ -77,34 +77,34 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (name: string, cpf: string) => {
-    const upperName = name.toUpperCase();
+    const upperName = name.toUpperCase().trim();
+    const cleanCpf = cpf.trim();
     
     // LOGIN DO ADMINISTRADOR ATUALIZADO
-    if (upperName === 'DOUGLAS FERNANDO SEMENZIN GALDINO' && cpf === '29099022859') {
-      setUser({ name: upperName, cpf, role: 'admin' });
+    if (upperName === 'DOUGLAS FERNANDO SEMENZIN GALDINO' && cleanCpf === '29099022859') {
+      setUser({ name: upperName, cpf: cleanCpf, role: 'admin' });
       return true;
     }
     
-    // Fallback para login antigo (Administrador genérico) - Opcional
-    if (upperName === 'ADMINISTRADOR' && cpf === '29462706821') {
-      setUser({ name: upperName, cpf, role: 'admin' });
+    if (upperName === 'ADMINISTRADOR' && cleanCpf === '29462706821') {
+      setUser({ name: upperName, cpf: cleanCpf, role: 'admin' });
       return true;
     }
 
-    if (upperName === 'ALMOXARIFADO' && cpf === 'almox123') {
-      setUser({ name: upperName, cpf, role: 'almoxarifado' });
+    if (upperName === 'ALMOXARIFADO' && cleanCpf === 'almox123') {
+      setUser({ name: upperName, cpf: cleanCpf, role: 'almoxarifado' });
       return true;
     }
-    if (upperName === 'ITESP' && cpf === 'itesp2026') {
-      setUser({ name: upperName, cpf, role: 'itesp' });
+    if (upperName === 'ITESP' && cleanCpf === 'itesp2026') {
+      setUser({ name: upperName, cpf: cleanCpf, role: 'itesp' });
       return true;
     }
-    if (upperName === 'FINANCEIRO' && cpf === 'financeiro123') {
-      setUser({ name: upperName, cpf, role: 'financeiro' });
+    if (upperName === 'FINANCEIRO' && cleanCpf === 'financeiro123') {
+      setUser({ name: upperName, cpf: cleanCpf, role: 'financeiro' });
       return true;
     }
 
-    const supplier = suppliers.find(s => s.cpf === cpf);
+    const supplier = suppliers.find(s => s.cpf === cleanCpf);
     if (supplier) {
       setUser({ name: supplier.name, cpf: supplier.cpf, role: 'supplier' });
       return true;
