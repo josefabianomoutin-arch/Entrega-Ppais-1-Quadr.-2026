@@ -22,277 +22,291 @@ const standardMenuRef = ref(database, 'standardMenu');
 const dailyMenusRef = ref(database, 'dailyMenus');
 const financialRecordsRef = ref(database, 'financialRecords');
 
-const superNormalize = (text: string) => {
-    return (text || "")
-        .toString()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") 
-        .replace(/[^a-z0-9]/g, "") 
-        .trim();
-};
-
-const cleanNumericValue = (val: any): number => {
-    if (typeof val === 'number') return val;
-    if (!val) return 0;
-    let s = String(val).trim().replace(/\s/g, '');
-    if (s.includes(',')) {
-        s = s.replace(/\./g, '').replace(',', '.');
-    }
-    return parseFloat(s) || 0;
-};
-
-const standardizeDate = (rawDate: any): string => {
-    if (!rawDate) return "";
-    let s = String(rawDate).trim().toLowerCase();
-    if (!isNaN(Number(s)) && Number(s) > 40000) {
-        const excelDate = parseFloat(s);
-        const date = new Date(Date.UTC(1899, 11, 30)); 
-        date.setUTCDate(date.getUTCDate() + Math.floor(excelDate));
-        const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const d = String(date.getUTCDate()).padStart(2, '0');
-        return `2026-${m}-${d}`;
-    }
-    if (s.includes('jan')) return `2026-01-${s.replace(/[^0-9]/g, '').slice(0,2).padStart(2,'0')}`;
-    s = s.split(' ')[0].split('t')[0].replace(/[\.\/]/g, '-');
-    const parts = s.split('-').filter(p => p.length > 0);
-    if (parts.length === 2) return `2026-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-    if (parts.length === 3) {
-        let d, m, y = "2026";
-        if (parts[0].length === 4) { m = parts[1].padStart(2, '0'); d = parts[2].padStart(2, '0'); }
-        else { d = parts[0].padStart(2, '0'); m = parts[1].padStart(2, '0'); }
-        return `2026-${m}-${d}`;
-    }
-    return s;
-};
-
-function normalizeArray<T>(data: any): T[] {
-  if (!data) return [];
-  if (Array.isArray(data)) return data.filter(i => i !== null) as T[];
-  if (typeof data === 'object') return Object.values(data).filter(i => i !== null) as T[];
-  return [];
-}
-
 const App: React.FC = () => {
+  const [user, setUser] = useState<{ name: string; cpf: string; role: 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' } | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [warehouseLog, setWarehouseLog] = useState<WarehouseMovement[]>([]);
+  const [perCapitaConfig, setPerCapitaConfig] = useState<PerCapitaConfig>({});
   const [cleaningLogs, setCleaningLogs] = useState<CleaningLog[]>([]);
   const [directorWithdrawals, setDirectorWithdrawals] = useState<DirectorPerCapitaLog[]>([]);
-  const [perCapitaConfig, setPerCapitaConfig] = useState<PerCapitaConfig>({});
   const [standardMenu, setStandardMenu] = useState<StandardMenu>({});
   const [dailyMenus, setDailyMenus] = useState<DailyMenus>({});
   const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loggedInCpf, setLoggedInCpf] = useState<string | null>(null);
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [isAlmoxarifadoLoggedIn, setIsAlmoxarifadoLoggedIn] = useState(false);
-  const [isItespLoggedIn, setIsItespLoggedIn] = useState(false);
-  const [isFinanceLoggedIn, setIsFinanceLoggedIn] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setLoading(true);
-    const unsubSuppliers = onValue(suppliersRef, (snapshot) => {
+    onValue(suppliersRef, (snapshot) => {
       const data = snapshot.val();
-      const raw = normalizeArray<any>(data);
-      setSuppliers(raw.map(p => ({
-          ...p,
-          name: (p.name || 'SEM NOME').toUpperCase().trim(),
-          cpf: p.cpf || String(Math.random()),
-          contractItems: normalizeArray(p.contractItems).map((ci: any) => ({ ...ci, name: (ci.name || '').toUpperCase().trim(), totalKg: cleanNumericValue(ci.totalKg), valuePerKg: cleanNumericValue(ci.valuePerKg) })),
-          deliveries: normalizeArray<any>(p.deliveries).map((d: any) => ({ ...d, date: standardizeDate(d.date), item: (d.item || '').toUpperCase().trim(), kg: cleanNumericValue(d.kg), value: cleanNumericValue(d.value) })),
-          allowedWeeks: normalizeArray<number>(p.allowedWeeks),
-          initialValue: cleanNumericValue(p.initialValue),
-      })));
+      if (data) {
+        setSuppliers(Object.values(data));
+      } else {
+        setSuppliers([]);
+      }
     });
 
-    const unsubLog = onValue(warehouseLogRef, (snapshot) => {
+    onValue(warehouseLogRef, (snapshot) => {
       const data = snapshot.val();
-      if (!data) { setWarehouseLog([]); return; }
-      setWarehouseLog(Object.entries(data).map(([key, val]: [string, any]) => ({
-          ...val,
-          id: val.id || key,
-          date: standardizeDate(val.date || val.invoiceDate || (val.timestamp ? val.timestamp.split('T')[0] : "")),
-          quantity: cleanNumericValue(val.quantity),
-          itemName: (val.itemName || "").toUpperCase().trim(),
-          supplierName: (val.supplierName || "").toUpperCase().trim()
-      })));
+      setWarehouseLog(data ? Object.values(data) : []);
     });
 
-    onValue(cleaningLogsRef, (snapshot) => setCleaningLogs(normalizeArray(snapshot.val())));
-    onValue(directorWithdrawalsRef, (snapshot) => setDirectorWithdrawals(normalizeArray(snapshot.val())));
-    onValue(perCapitaConfigRef, (snapshot) => setPerCapitaConfig(snapshot.val() || {}));
-    onValue(standardMenuRef, (snapshot) => setStandardMenu(snapshot.val() || {}));
-    onValue(dailyMenusRef, (snapshot) => setDailyMenus(snapshot.val() || {}));
+    onValue(perCapitaConfigRef, (snapshot) => {
+      setPerCapitaConfig(snapshot.val() || {});
+    });
+
+    onValue(cleaningLogsRef, (snapshot) => {
+      const data = snapshot.val();
+      setCleaningLogs(data ? Object.values(data) : []);
+    });
+
+    onValue(directorWithdrawalsRef, (snapshot) => {
+      const data = snapshot.val();
+      setDirectorWithdrawals(data ? Object.values(data) : []);
+    });
+
+    onValue(standardMenuRef, (snapshot) => {
+      setStandardMenu(snapshot.val() || {});
+    });
+
+    onValue(dailyMenusRef, (snapshot) => {
+      setDailyMenus(snapshot.val() || {});
+    });
+
     onValue(financialRecordsRef, (snapshot) => {
-        const data = snapshot.val();
-        if (!data) { setFinancialRecords([]); return; }
-        setFinancialRecords(Object.entries(data).map(([key, val]: [string, any]) => ({ ...val, id: key })));
+      const data = snapshot.val();
+      setFinancialRecords(data ? Object.values(data) : []);
     });
-
-    setLoading(false);
-    return () => {};
   }, []);
 
-  const handleLogin = (n: string, c: string): boolean => {
-    const inputNameNorm = superNormalize(n);
-    const passwordClean = c.replace(/[^\d]/g, '');
-
-    if (inputNameNorm === 'nomedopainda' && c === 'itesp2026') { setIsItespLoggedIn(true); return true; }
-    if (inputNameNorm === 'administrador' && c === '15210361870') { setIsAdminLoggedIn(true); return true; }
-    if (inputNameNorm === 'almoxarifado' && c === 'almoxarifado123') { setIsAlmoxarifadoLoggedIn(true); return true; }
-    if (inputNameNorm === 'itesp' && c === 'taiuvaitesp2026') { setIsItespLoggedIn(true); return true; }
-    if (inputNameNorm === 'financeiro' && c === 'taiuvafinanceiro2026') { setIsFinanceLoggedIn(true); return true; }
-    
-    // Novo login Douglas (Financeiro Externo) - Nome corrigido para GALDINO
-    if (inputNameNorm === superNormalize('DOUGLAS FERNANDO SEMENZIN GALDINO') && passwordClean === '29099022859') {
-        setIsFinanceLoggedIn(true);
-        return true;
+  const handleLogin = (name: string, cpf: string) => {
+    const upperName = name.toUpperCase();
+    if (upperName === 'ADMINISTRADOR' && cpf === '29462706821') {
+      setUser({ name: upperName, cpf, role: 'admin' });
+      return true;
+    }
+    if (upperName === 'ALMOXARIFADO' && cpf === 'almox123') {
+      setUser({ name: upperName, cpf, role: 'almoxarifado' });
+      return true;
+    }
+    if (upperName === 'ITESP' && cpf === 'itesp2026') {
+      setUser({ name: upperName, cpf, role: 'itesp' });
+      return true;
+    }
+    if (upperName === 'FINANCEIRO' && cpf === 'financeiro123') {
+      setUser({ name: upperName, cpf, role: 'financeiro' });
+      return true;
     }
 
-    const u = suppliers.find(p => superNormalize(p.name) === inputNameNorm && p.cpf === passwordClean);
-    if (u) { setLoggedInCpf(u.cpf); return true; }
+    const supplier = suppliers.find(s => s.cpf === cpf);
+    if (supplier) {
+      setUser({ name: supplier.name, cpf: supplier.cpf, role: 'supplier' });
+      return true;
+    }
     return false;
   };
 
-  const writeToDatabase = useCallback(async (dbRef: any, data: any) => {
-    setIsSaving(true);
-    try { await set(dbRef, data); } finally { setTimeout(() => setIsSaving(false), 500); }
-  }, []);
+  const handleLogout = () => setUser(null);
 
-  const handleFinancialOperation = {
-      save: async (record: Omit<FinancialRecord, 'id'> & { id?: string }) => {
-          setIsSaving(true);
-          try {
-              if (record.id) {
-                  await update(ref(database, `financialRecords/${record.id}`), record);
-              } else {
-                  await push(financialRecordsRef, record);
-              }
-              return { success: true };
-          } catch (e: any) {
-              return { success: false, message: e.message };
-          } finally {
-              setIsSaving(false);
-          }
-      },
-      delete: async (id: string) => {
-          setIsSaving(true);
-          try {
-              await remove(ref(database, `financialRecords/${id}`));
-          } finally {
-              setIsSaving(false);
-          }
-      }
+  const handleRegisterSupplier = async (name: string, cpf: string, allowedWeeks: number[]) => {
+    const newSupplier: Supplier = {
+      name,
+      cpf,
+      initialValue: 0,
+      contractItems: [],
+      deliveries: [],
+      allowedWeeks
+    };
+    await set(child(suppliersRef, cpf), newSupplier);
   };
 
-  const handleUpdateWarehouseEntry = useCallback(async (updatedEntry: WarehouseMovement) => {
-    setIsSaving(true);
-    try {
-        const entryRef = ref(database, `warehouseLog/${updatedEntry.id}`);
-        await update(entryRef, {
-            ...updatedEntry,
-            itemName: updatedEntry.itemName.toUpperCase().trim(),
-            supplierName: updatedEntry.supplierName.toUpperCase().trim(),
-            lotNumber: updatedEntry.lotNumber.toUpperCase().trim(),
-            date: standardizeDate(updatedEntry.date)
-        });
-        return { success: true, message: 'Registro atualizado com sucesso.' };
-    } catch (error: any) {
-        return { success: false, message: error.message };
-    } finally {
-        setTimeout(() => setIsSaving(false), 500);
+  const handleUpdateSupplier = async (oldCpf: string, newName: string, newCpf: string, newAllowedWeeks: number[]) => {
+    const supplierRef = child(suppliersRef, oldCpf);
+    let error: string | null = null;
+    await runTransaction(supplierRef, (currentData: Supplier) => {
+      if (currentData) {
+        currentData.name = newName;
+        currentData.cpf = newCpf;
+        currentData.allowedWeeks = newAllowedWeeks;
+      }
+      return currentData;
+    });
+    if (oldCpf !== newCpf) {
+      const oldData = (await (await ref(database, `suppliers/${oldCpf}`).get()).val());
+      await set(child(suppliersRef, newCpf), oldData);
+      await remove(child(suppliersRef, oldCpf));
     }
+    return error;
+  };
+
+  const handleScheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    await runTransaction(supplierRef, (currentData: Supplier) => {
+      if (currentData) {
+        const deliveries = currentData.deliveries || [];
+        deliveries.push({
+          id: `del-${Date.now()}`,
+          date,
+          time,
+          item: 'AGENDAMENTO PENDENTE',
+          invoiceUploaded: false
+        });
+        currentData.deliveries = deliveries;
+      }
+      return currentData;
+    });
+  };
+
+  const handleCancelDeliveries = useCallback(async (supplierCpf: string, deliveryIds: string[]) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    await runTransaction(supplierRef, (currentData: Supplier) => {
+      if (currentData) {
+        currentData.deliveries = (currentData.deliveries || []).filter(d => !deliveryIds.includes(d.id));
+      }
+      return currentData;
+    });
   }, []);
 
-  const handleUpdateContractForItem = useCallback(async (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string }[]) => {
-      setIsSaving(true);
-      try {
-          const normTarget = superNormalize(itemName);
-          const newSuppliers = [...suppliers];
-          
-          newSuppliers.forEach(s => {
-              const currentItems = [...(s.contractItems || [])];
-              const assignment = assignments.find(a => a.supplierCpf === s.cpf);
-              
-              if (assignment) {
-                  const idx = currentItems.findIndex(ci => superNormalize(ci.name) === normTarget);
-                  if (idx >= 0) {
-                      currentItems[idx] = { ...currentItems[idx], totalKg: assignment.totalKg, valuePerKg: assignment.valuePerKg, unit: assignment.unit || currentItems[idx].unit };
-                  } else {
-                      currentItems.push({ name: itemName.toUpperCase(), totalKg: assignment.totalKg, valuePerKg: assignment.valuePerKg, unit: assignment.unit || 'kg-1' });
-                  }
-              } else {
-                  const filtered = currentItems.filter(ci => superNormalize(ci.name) !== normTarget);
-                  s.contractItems = filtered;
-                  return;
-              }
-              s.contractItems = currentItems;
-              s.initialValue = s.contractItems.reduce((sum, item) => sum + (item.totalKg * item.valuePerKg), 0);
+  const handleFulfillAndInvoice = async (supplierCpf: string, placeholderIds: string[], invoiceData: any) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    await runTransaction(supplierRef, (currentData: Supplier) => {
+      if (currentData) {
+        // Remove placeholders
+        currentData.deliveries = (currentData.deliveries || []).filter(d => !placeholderIds.includes(d.id));
+        // Add real items
+        invoiceData.fulfilledItems.forEach((item: any, idx: number) => {
+          currentData.deliveries.push({
+            id: `inv-${Date.now()}-${idx}`,
+            date: currentData.deliveries.find(d => placeholderIds.includes(d.id))?.date || new Date().toISOString().split('T')[0],
+            time: '08:00',
+            item: item.name,
+            kg: item.kg,
+            value: item.value,
+            invoiceUploaded: true,
+            invoiceNumber: invoiceData.invoiceNumber
           });
-
-          await writeToDatabase(suppliersRef, newSuppliers.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}));
-          return { success: true, message: 'Contratos atualizados com sucesso.' };
-      } catch (error: any) {
-          return { success: false, message: error.message };
-      } finally {
-          setIsSaving(false);
+        });
       }
-  }, [suppliers, writeToDatabase]);
+      return currentData;
+    });
+  };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-800 italic animate-pulse tracking-tighter">CARREGANDO DADOS...</div>;
+  // Funções simplificadas para as outras abas administrativas
+  const handleUpdatePerCapitaConfig = async (config: PerCapitaConfig) => set(perCapitaConfigRef, config);
+  const handleRegisterCleaningLog = async (log: any) => {
+    const newRef = push(cleaningLogsRef);
+    const logWithId = { ...log, id: newRef.key };
+    await set(newRef, logWithId);
+    return { success: true, message: 'Registrado' };
+  };
+  const handleDeleteCleaningLog = async (id: string) => remove(child(cleaningLogsRef, id));
+  
+  const handleRegisterFinancialRecord = async (record: any) => {
+    const id = record.id || push(financialRecordsRef).key;
+    await set(child(financialRecordsRef, id), { ...record, id });
+    return { success: true };
+  };
+  const handleDeleteFinancialRecord = async (id: string) => remove(child(financialRecordsRef, id));
 
-  return (
-    <>
-      <div className={`fixed top-4 right-4 z-[9999] p-2 bg-blue-600 text-white text-[10px] font-bold rounded shadow-lg transition-opacity ${isSaving ? 'opacity-100' : 'opacity-0'}`}>SINC...</div>
-      {isAdminLoggedIn ? (
-        <AdminDashboard 
-            suppliers={suppliers} warehouseLog={warehouseLog} cleaningLogs={cleaningLogs} directorWithdrawals={directorWithdrawals}
-            onPersistSuppliers={(s) => writeToDatabase(suppliersRef, s.reduce((acc, p) => ({ ...acc, [p.cpf]: p }), {}))} 
-            onLogout={() => setIsAdminLoggedIn(false)} 
-            onResetData={() => writeToDatabase(suppliersRef, {})}
-            perCapitaConfig={perCapitaConfig}
-            onUpdatePerCapitaConfig={(c) => writeToDatabase(perCapitaConfigRef, c)}
-            standardMenu={standardMenu}
-            dailyMenus={dailyMenus}
-            onUpdateDailyMenu={(m) => writeToDatabase(dailyMenusRef, m)}
-            onRegister={async () => {}}
-            onUpdateSupplier={async () => null}
-            onRestoreData={async () => true}
-            registrationStatus={null}
-            onClearRegistrationStatus={() => {}}
-            onReopenInvoice={async () => {}}
-            onDeleteInvoice={async () => {}}
-            onUpdateInvoiceItems={async () => ({success: true})}
-            onManualInvoiceEntry={async () => ({success: true})}
-            onDeleteWarehouseEntry={async () => ({success: true, message: ''})}
-            onUpdateWarehouseEntry={handleUpdateWarehouseEntry}
-            onUpdateContractForItem={handleUpdateContractForItem}
-            onRegisterCleaningLog={async () => ({success: true, message: ''})}
-            onDeleteCleaningLog={async () => {}}
-            onRegisterDirectorWithdrawal={async () => ({success: true, message: ''})}
-            onDeleteDirectorWithdrawal={async () => {}}
-            onUpdateStandardMenu={async () => {}}
-            onRegisterEntry={async () => ({success: true, message: ''})}
-            onRegisterWithdrawal={async () => ({success: true, message: ''})}
-            onCancelDeliveries={() => {}}
-            financialRecords={financialRecords}
-            onSaveFinancialRecord={handleFinancialOperation.save}
-            onDeleteFinancialRecord={handleFinancialOperation.delete}
-        />
-      ) : isFinanceLoggedIn ? (
-        <FinanceDashboard records={financialRecords} onLogout={() => setIsFinanceLoggedIn(false)} />
-      ) : isItespLoggedIn ? (
-        <ItespDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsItespLoggedIn(false)} />
-      ) : isAlmoxarifadoLoggedIn ? (
-        <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={() => setIsAlmoxarifadoLoggedIn(false)} onRegisterEntry={async () => ({success: true, message: ''})} onRegisterWithdrawal={async () => ({success: true, message: ''})} />
-      ) : loggedInCpf ? (
-        <Dashboard supplier={suppliers.find(s => s.cpf === loggedInCpf)!} onLogout={() => setLoggedInCpf(null)} onScheduleDelivery={() => {}} onFulfillAndInvoice={() => {}} onCancelDeliveries={() => {}} emailModalData={null} onCloseEmailModal={() => {}} />
-      ) : (
-        <LoginScreen onLogin={handleLogin} />
-      )}
-    </>
-  );
+  const handleUpdateContractForItem = async (itemName: string, assignments: any[]) => {
+    // Itera sobre todos os fornecedores para atualizar esse item específico
+    for (const supplier of suppliers) {
+      const assignment = assignments.find(a => a.supplierCpf === supplier.cpf);
+      const supplierRef = child(suppliersRef, supplier.cpf);
+      await runTransaction(supplierRef, (data: Supplier) => {
+        if (data) {
+          data.contractItems = (data.contractItems || []).filter(ci => ci.name !== itemName);
+          if (assignment) {
+            data.contractItems.push({
+              name: itemName,
+              totalKg: assignment.totalKg,
+              valuePerKg: assignment.valuePerKg,
+              unit: assignment.unit
+            });
+          }
+          data.initialValue = data.contractItems.reduce((acc, curr) => acc + (curr.totalKg * curr.valuePerKg), 0);
+        }
+        return data;
+      });
+    }
+    return { success: true, message: 'Contratos atualizados' };
+  };
+
+  if (!user) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  if (user.role === 'admin') {
+    return (
+      <AdminDashboard 
+        suppliers={suppliers} 
+        onRegister={handleRegisterSupplier}
+        onUpdateSupplier={handleUpdateSupplier}
+        onLogout={handleLogout}
+        warehouseLog={warehouseLog}
+        perCapitaConfig={perCapitaConfig}
+        onUpdatePerCapitaConfig={handleUpdatePerCapitaConfig}
+        cleaningLogs={cleaningLogs}
+        onRegisterCleaningLog={handleRegisterCleaningLog}
+        onDeleteCleaningLog={handleDeleteCleaningLog}
+        financialRecords={financialRecords}
+        onSaveFinancialRecord={handleRegisterFinancialRecord}
+        onDeleteFinancialRecord={handleDeleteFinancialRecord}
+        onCancelDeliveries={handleCancelDeliveries}
+        onUpdateContractForItem={handleUpdateContractForItem}
+        directorWithdrawals={directorWithdrawals}
+        onRegisterDirectorWithdrawal={async (log) => {
+             const newRef = push(directorWithdrawalsRef);
+             await set(newRef, { ...log, id: newRef.key });
+             return { success: true, message: 'Ok' };
+        }}
+        onDeleteDirectorWithdrawal={async (id) => remove(child(directorWithdrawalsRef, id))}
+        standardMenu={standardMenu}
+        dailyMenus={dailyMenus}
+        onUpdateStandardMenu={async (m) => set(standardMenuRef, m)}
+        onUpdateDailyMenu={async (m) => set(dailyMenusRef, m)}
+        onRegisterEntry={async (p) => ({ success: true, message: 'Ok' })}
+        onRegisterWithdrawal={async (p) => ({ success: true, message: 'Ok' })}
+        onReopenInvoice={async () => {}}
+        onDeleteInvoice={async () => {}}
+        onUpdateInvoiceItems={async () => ({ success: true })}
+        onManualInvoiceEntry={async () => ({ success: true })}
+        onDeleteWarehouseEntry={async () => ({ success: true, message: 'Ok' })}
+        onUpdateWarehouseEntry={async () => ({ success: true, message: 'Ok' })}
+        onPersistSuppliers={() => {}}
+        onRestoreData={async () => true}
+        onResetData={() => {}}
+        registrationStatus={null}
+        onClearRegistrationStatus={() => {}}
+      />
+    );
+  }
+
+  if (user.role === 'almoxarifado') {
+    return <AlmoxarifadoDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={handleLogout} onRegisterEntry={async (p) => ({ success: true, message: 'Ok' })} onRegisterWithdrawal={async (p) => ({ success: true, message: 'Ok' })} />;
+  }
+
+  if (user.role === 'itesp') {
+    return <ItespDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={handleLogout} />;
+  }
+
+  if (user.role === 'financeiro') {
+    return <FinanceDashboard records={financialRecords} onLogout={handleLogout} />;
+  }
+
+  const currentSupplier = suppliers.find(s => s.cpf === user.cpf);
+  if (currentSupplier) {
+    return (
+      <Dashboard 
+        supplier={currentSupplier} 
+        onLogout={handleLogout} 
+        onScheduleDelivery={handleScheduleDelivery}
+        onFulfillAndInvoice={handleFulfillAndInvoice}
+        onCancelDeliveries={handleCancelDeliveries}
+        emailModalData={null}
+        onCloseEmailModal={() => {}}
+      />
+    );
+  }
+
+  return <div>Erro ao carregar dados do usuário.</div>;
 };
 
 export default App;

@@ -36,6 +36,17 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
         }
     };
 
+    const handleClearDayForSupplier = (supplierCpf: string, supplierName: string, date: string) => {
+        const p = suppliers.find(s => s.cpf === supplierCpf);
+        if (!p) return;
+        const deliveriesOnDate = (p.deliveries || []).filter(d => d.date === date);
+        if (deliveriesOnDate.length === 0) return;
+
+        if (window.confirm(`ATENÇÃO: Deseja excluir TODOS os registros (${deliveriesOnDate.length}) do fornecedor ${supplierName} no dia ${formatDate(date)}?`)) {
+            onCancelDeliveries(supplierCpf, deliveriesOnDate.map(d => d.id));
+        }
+    }
+
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-purple-600 animate-fade-in">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 border-b pb-6">
@@ -76,7 +87,6 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
 
             <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-3 custom-scrollbar">
                 {sortedSuppliers.length > 0 ? sortedSuppliers.map(supplier => {
-                    // Se houver filtro de data, mostrar apenas as entregas daquela data no card do fornecedor
                     const displayDeliveries = dateFilter 
                         ? (supplier.deliveries || []).filter(d => d.date === dateFilter)
                         : (supplier.deliveries || []);
@@ -92,7 +102,15 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
                                     <h3 className="font-black text-lg text-purple-900 uppercase">{supplier.name}</h3>
                                     <p className="text-[10px] font-mono text-gray-400">{supplier.cpf}</p>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right flex flex-col items-end gap-2">
+                                    {dateFilter && displayDeliveries.length > 0 && (
+                                        <button 
+                                            onClick={() => handleClearDayForSupplier(supplier.cpf, supplier.name, dateFilter)}
+                                            className="bg-red-50 text-red-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase border border-red-100 hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                                        >
+                                            Limpar este dia
+                                        </button>
+                                    )}
                                     <span className="text-[10px] font-black text-gray-400 uppercase block">Resultados no Filtro</span>
                                     <span className="font-mono font-bold text-purple-600">{sortedDeliveries.length} registro(s)</span>
                                 </div>
