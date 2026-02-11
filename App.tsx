@@ -77,23 +77,30 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (name: string, cpf: string) => {
-    const upperName = name.toUpperCase().trim();
-    const cleanCpf = cpf.trim();
+    // Normalização rigorosa
+    const upperName = (name || '').toUpperCase().trim();
+    const cleanCpf = (cpf || '').trim();
     const lowerCpf = cleanCpf.toLowerCase();
     
-    // 1. LOGIN ADMINISTRADOR (DOUGLAS)
-    if (upperName === 'DOUGLAS FERNANDO SEMENZIN GALDINO' && cleanCpf === '29099022859') {
-      setUser({ name: upperName, cpf: cleanCpf, role: 'admin' });
-      return true;
-    }
-    
-    // Fallback Administrador Geral
-    if (upperName === 'ADMINISTRADOR' && cleanCpf === '29462706821') {
+    // 1. LOGIN ADMINISTRADOR (FLEXÍVEL)
+    // Aceita o nome completo, apenas "DOUGLAS" ou o termo "ADMINISTRADOR"
+    const isAdminName = 
+      upperName === 'DOUGLAS FERNANDO SEMENZIN GALDINO' || 
+      upperName === 'ADMINISTRADOR' || 
+      upperName === 'DOUGLAS' || 
+      upperName === 'ADM';
+
+    // Aceita o CPF novo ou o antigo
+    const isAdminPassword = 
+      cleanCpf === '29099022859' || 
+      cleanCpf === '29462706821';
+
+    if (isAdminName && isAdminPassword) {
       setUser({ name: upperName, cpf: cleanCpf, role: 'admin' });
       return true;
     }
 
-    // 2. LOGINS DE SETORES (INSENSÍVEIS A MAIÚSCULAS NA SENHA)
+    // 2. LOGINS DE SETORES (INSENSÍVEIS A MAIÚSCULAS)
     if (upperName === 'ALMOXARIFADO' && lowerCpf === 'almox123') {
       setUser({ name: upperName, cpf: cleanCpf, role: 'almoxarifado' });
       return true;
@@ -107,7 +114,7 @@ const App: React.FC = () => {
       return true;
     }
 
-    // 3. LOGIN FORNECEDORES (BUSCA POR CPF/CNPJ EXATO)
+    // 3. LOGIN FORNECEDORES
     const supplier = suppliers.find(s => s.cpf === cleanCpf);
     if (supplier) {
       setUser({ name: supplier.name, cpf: supplier.cpf, role: 'supplier' });
