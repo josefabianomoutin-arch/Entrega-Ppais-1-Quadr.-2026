@@ -137,7 +137,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                         </div>
                     </div>
                 </div>
-                <MovementsGrid records={filteredRecords} />
+                {/* IMPORTANTE: Passamos o 'records' original para o Grid calcular saldos reais mesmo filtrando a exibição */}
+                <MovementsGrid filteredRecords={filteredRecords} allRecords={records} />
             </div>
         )}
 
@@ -155,11 +156,11 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                         </div>
                     </div>
                 </div>
-                <MovementsGrid records={filteredRecords} />
+                <MovementsGrid filteredRecords={filteredRecords} allRecords={records} />
             </div>
         )}
 
-        {/* CONTEÚDO DA SUBABA: SALDOS (O GRANDE DESTAQUE) */}
+        {/* CONTEÚDO DA SUBABA: SALDOS */}
         {activeSubTab === 'saldos' && (
             <div className="space-y-12 animate-fade-in-up">
                 <div className="max-w-md mx-auto">
@@ -251,15 +252,18 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
 };
 
 // Componente Interno para organizar a grade de movimentos agrupada por PTRES
-const MovementsGrid: React.FC<{ records: FinancialRecord[] }> = ({ records }) => {
+const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: FinancialRecord[] }> = ({ filteredRecords, allRecords }) => {
     return (
         <div className="space-y-16">
             {PTRES_OPTIONS.map(ptres => {
-                const ptresRecords = records.filter(r => r.ptres === ptres);
-                if (ptresRecords.length === 0) return null;
+                // Filtramos os registros para EXIBIÇÃO baseados no filtro de aba (recurso ou despesa)
+                const groupDisplayRecords = filteredRecords.filter(r => r.ptres.trim() === ptres);
+                if (groupDisplayRecords.length === 0) return null;
 
-                const balance = ptresRecords.reduce((acc, curr) => 
-                    acc + (curr.tipo === 'RECURSO' ? Number(curr.valorRecebido) : -Number(curr.valorUtilizado)), 0);
+                // Calculamos o SALDO REAL do grupo usando TODOS os registros daquela PTRES (recurso - despesa)
+                const groupBalanceRecords = allRecords.filter(r => r.ptres.trim() === ptres);
+                const realBalance = groupBalanceRecords.reduce((acc, curr) => 
+                    acc + (curr.tipo === 'RECURSO' ? Number(curr.valorRecebido || 0) : -Number(curr.valorUtilizado || 0)), 0);
 
                 return (
                     <div key={ptres} className="space-y-6">
@@ -267,25 +271,29 @@ const MovementsGrid: React.FC<{ records: FinancialRecord[] }> = ({ records }) =>
                             <div className="flex items-baseline gap-4">
                                 <h3 className="text-4xl font-black text-indigo-900 tracking-tighter italic">PTRES {ptres}</h3>
                                 <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">
-                                    {ptresRecords.length} Registros
+                                    {groupDisplayRecords.length} Registros Exibidos
                                 </span>
                             </div>
                             <div className="text-right bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Saldo Líquido do Grupo</p>
-                                <p className={`text-xl font-black ${balance >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
-                                    {formatCurrency(balance)}
+                                <p className={`text-xl font-black ${realBalance >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                                    {formatCurrency(realBalance)}
                                 </p>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {ptresRecords.map(r => (
-                                <div key={r.id} className={`bg-white p-6 rounded-[2.5rem] shadow-lg border-l-[12px] flex flex-col justify-between transition-all hover:shadow-2xl hover:-translate-y-1 ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'}`}>
+                            {/* Verificação extra de duplicidade por ID na renderização */}
+                            {groupDisplayRecords.map((r, index) => (
+                                <div key={r.id || `rec-${ptres}-${index}`} className={`bg-white p-6 rounded-[2.5rem] shadow-lg border-l-[12px] flex flex-col justify-between transition-all hover:shadow-2xl hover:-translate-y-1 ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'}`}>
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-start">
-                                            <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase border shadow-sm ${r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                                                {r.tipo}
-                                            </span>
+                                            <div className="flex flex-col gap-1">
+                                                <span className={`text-[9px] w-fit font-black px-3 py-1 rounded-full uppercase border shadow-sm ${r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                                    {r.tipo}
+                                                </span>
+                                                <span className="text-[8px] text-gray-300 font-mono uppercase">ID: ...{r.id?.slice(-4) || 'NOID'}</span>
+                                            </div>
                                             <span className="text-[10px] font-mono font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded">
                                                 {(r.dataRecebimento || r.dataPagamento || r.dataSolicitacao || '-').split('-').reverse().join('/')}
                                             </span>

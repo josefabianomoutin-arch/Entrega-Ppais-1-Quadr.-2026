@@ -41,8 +41,8 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
   // Cálculos de Soma e Saldo para os Cards do Topo
   const totalsByPtres = useMemo(() => {
     return PTRES_OPTIONS.map(p => {
-      const rec = records.filter(r => r.ptres === p && r.tipo === 'RECURSO').reduce((acc, curr) => acc + (Number(curr.valorRecebido) || 0), 0);
-      const gast = records.filter(r => r.ptres === p && r.tipo === 'DESPESA').reduce((acc, curr) => acc + Number(curr.valorUtilizado), 0);
+      const rec = records.filter(r => r.ptres.trim() === p && r.tipo === 'RECURSO').reduce((acc, curr) => acc + (Number(curr.valorRecebido) || 0), 0);
+      const gast = records.filter(r => r.ptres.trim() === p && r.tipo === 'DESPESA').reduce((acc, curr) => acc + Number(curr.valorUtilizado), 0);
       return { ptres: p, recurso: rec, gasto: gast, saldo: rec - gast };
     });
   }, [records]);
@@ -58,9 +58,20 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return; // Trava contra duplo clique
+
     setIsSaving(true);
     
-    const recordToSave = { ...formData };
+    // Limpeza rigorosa de strings para evitar duplicidade visual por espaços
+    const recordToSave: any = { 
+        ...formData,
+        ptres: formData.ptres?.trim(),
+        descricao: formData.descricao?.trim(),
+        justificativa: formData.justificativa?.trim(),
+        numeroProcesso: formData.numeroProcesso?.trim(),
+        modalidade: formData.modalidade?.trim()
+    };
+
     if (formData.tipo === 'RECURSO') {
       delete recordToSave.valorUtilizado;
       delete recordToSave.localUtilizado;
@@ -188,7 +199,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
       {/* 3. VISUALIZAÇÃO DOS GASTOS AGRUPADOS POR PTRES */}
       <div className="space-y-12">
         {PTRES_OPTIONS.map(ptres => {
-          const ptresRecords = records.filter(r => r.ptres === ptres);
+          const ptresRecords = records.filter(r => r.ptres.trim() === ptres);
           if (ptresRecords.length === 0) return null;
 
           const ptresTotals = ptresRecords.reduce((acc, r) => ({
@@ -214,18 +225,21 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                {ptresRecords.sort((a, b) => new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime()).map(r => (
-                  <div key={r.id} className={`group bg-white p-6 rounded-3xl border-l-8 shadow-sm hover:shadow-md transition-all ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'}`}>
+                {ptresRecords.sort((a, b) => new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime()).map((r, index) => (
+                  <div key={r.id || `admin-rec-${index}`} className={`group bg-white p-6 rounded-3xl border-l-8 shadow-sm hover:shadow-md transition-all ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'}`}>
                     <div className="flex flex-col lg:flex-row justify-between gap-6">
                       
                       {/* Coluna 1: Info Básica */}
                       <div className="flex-1 space-y-4">
-                        <div className="flex items-center gap-3">
-                          <span className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase border ${r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                            {r.tipo}
-                          </span>
-                          <span className="text-[10px] font-bold text-gray-400">NATUREZA: {r.natureza}</span>
-                          {r.tipo === 'DESPESA' && <span className="text-[10px] font-black text-indigo-500 uppercase">{r.modalidade || 'SEM MODALIDADE'}</span>}
+                        <div className="flex justify-between">
+                            <div className="flex items-center gap-3">
+                            <span className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase border ${r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                {r.tipo}
+                            </span>
+                            <span className="text-[10px] font-bold text-gray-400">NATUREZA: {r.natureza}</span>
+                            {r.tipo === 'DESPESA' && <span className="text-[10px] font-black text-indigo-500 uppercase">{r.modalidade || 'SEM MODALIDADE'}</span>}
+                            </div>
+                            <span className="text-[8px] font-mono text-gray-300 uppercase">UID: ...{r.id?.slice(-5)}</span>
                         </div>
                         
                         <div>
