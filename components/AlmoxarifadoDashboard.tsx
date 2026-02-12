@@ -38,6 +38,13 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     const [manualExp, setManualExp] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Efeito para auto-focar o campo de barras ao trocar de tipo ou carregar
+    useEffect(() => {
+        if (activeTab === 'manual') {
+            barcodeInputRef.current?.focus();
+        }
+    }, [activeTab, manualType]);
+
     const recentMovements = useMemo(() => {
         return warehouseLog
             .slice()
@@ -57,7 +64,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         e.preventDefault();
         const qtyVal = parseFloat(manualQuantity.replace(',', '.'));
         if (!selectedSupplierCpf || !selectedItemName || isNaN(qtyVal) || qtyVal <= 0) {
-            alert('Preencha os campos obrigatórios corretamente.');
+            alert('Preencha os campos obrigatórios (Fornecedor, Item e Quantidade).');
             return;
         }
 
@@ -69,7 +76,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                     itemName: selectedItemName,
                     invoiceNumber: manualNf,
                     invoiceDate: manualDate,
-                    lotNumber: manualLot || 'MANUAL',
+                    lotNumber: manualLot || 'UNICO',
                     quantity: qtyVal,
                     expirationDate: manualExp,
                     barcode: manualBarcode
@@ -78,7 +85,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                     supplierCpf: selectedSupplierCpf,
                     itemName: selectedItemName,
                     outboundInvoice: manualNf,
-                    lotNumber: manualLot || 'MANUAL',
+                    lotNumber: manualLot || 'UNICO',
                     quantity: qtyVal,
                     expirationDate: manualExp,
                     date: manualDate,
@@ -86,16 +93,16 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 });
 
             if (res.success) {
-                // Limpa apenas os campos de item/barcode/qtd para facilitar o próximo lançamento
-                setSelectedItemName('');
+                // Limpa campos específicos para facilitar bipagem sequencial
                 setManualBarcode('');
                 setManualQuantity('');
+                // Mantém Fornecedor, Data e NF para evitar redigitação se for a mesma carga
                 barcodeInputRef.current?.focus();
             } else {
                 alert(res.message);
             }
         } catch (err) {
-            alert('Erro ao processar lançamento.');
+            alert('Erro de conexão ao processar lançamento.');
         } finally {
             setIsSubmitting(false);
         }
@@ -134,7 +141,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
                 if (isNaN(qtyVal)) { 
                     errorCount++; 
-                    errorDetails.push(`Linha ${i+1}: Quantidade '${qtd}' inválida.`); 
+                    errorDetails.push(`Linha ${i+1}: Qtd '${qtd}' inválida.`); 
                     continue; 
                 }
 
@@ -167,15 +174,15 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
     return (
         <div className="min-h-screen bg-gray-100 text-gray-800 pb-20">
-            <header className="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-20 border-b-2 border-blue-100">
+            <header className="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-20 border-b-2 border-indigo-100">
                 <div>
-                    <h1 className="text-2xl font-bold text-blue-900 uppercase tracking-tighter">Módulo Almoxarifado</h1>
-                    <p className="text-xs text-gray-500 font-medium">Gestão de Estoque com Suporte a Bipagem.</p>
+                    <h1 className="text-xl font-bold text-indigo-900 uppercase tracking-tighter leading-none">Módulo de Estoque</h1>
+                    <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest mt-1">Controle de Dados Finanças 2026</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="flex bg-gray-100 p-1 rounded-xl">
-                        <button onClick={() => setActiveTab('manual')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'manual' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>Lançar Individual</button>
-                        <button onClick={() => setActiveTab('import')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'import' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>Importar CSV</button>
+                        <button onClick={() => setActiveTab('manual')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'manual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Bipagem / Manual</button>
+                        <button onClick={() => setActiveTab('import')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'import' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Importar CSV</button>
                     </div>
                     <button onClick={onLogout} className="bg-red-50 text-red-600 font-black py-2 px-6 rounded-xl text-xs uppercase border border-red-100 shadow-sm active:scale-95">Sair</button>
                 </div>
@@ -185,120 +192,124 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 
                 {activeTab === 'manual' ? (
                     <div className="bg-white p-8 rounded-3xl shadow-xl border-t-8 border-indigo-600 animate-fade-in">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b pb-6">
                             <div>
-                                <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Lançamento por Item / Bipagem</h2>
-                                <p className="text-gray-500 font-medium italic">Selecione o fornecedor e bipa o código de barras para registrar.</p>
+                                <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Lançamento por Código de Barras</h2>
+                                <p className="text-gray-500 font-medium italic text-xs">Vincule Itens, Notas Fiscais e Lotes através da bipagem rápida.</p>
                             </div>
-                            <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner">
-                                <button type="button" onClick={() => setManualType('entrada')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${manualType === 'entrada' ? 'bg-white text-green-600 shadow-md' : 'text-gray-400'}`}>Entrada</button>
-                                <button type="button" onClick={() => setManualType('saída')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${manualType === 'saída' ? 'bg-white text-red-600 shadow-md' : 'text-gray-400'}`}>Saída</button>
+                            <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner scale-90 sm:scale-100">
+                                <button type="button" onClick={() => setManualType('entrada')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${manualType === 'entrada' ? 'bg-white text-green-600 shadow-md' : 'text-gray-400'}`}>Entrada (Compra)</button>
+                                <button type="button" onClick={() => setManualType('saída')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${manualType === 'saída' ? 'bg-white text-red-600 shadow-md' : 'text-gray-400'}`}>Saída (Consumo)</button>
                             </div>
                         </div>
 
-                        <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Fornecedor</label>
-                                <select value={selectedSupplierCpf} onChange={e => { setSelectedSupplierCpf(e.target.value); setSelectedItemName(''); }} className="w-full p-3 border rounded-xl bg-gray-50 font-bold outline-none focus:ring-2 focus:ring-blue-400">
-                                    <option value="">-- SELECIONAR --</option>
-                                    {suppliers.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}
-                                </select>
+                        <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
+                            {/* Bloco 1: Identificação da Carga */}
+                            <div className="space-y-4 md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">1. Fornecedor / Origem</label>
+                                    <select value={selectedSupplierCpf} onChange={e => { setSelectedSupplierCpf(e.target.value); setSelectedItemName(''); }} className="w-full p-3 border rounded-xl bg-white font-bold outline-none focus:ring-2 focus:ring-indigo-400 text-sm">
+                                        <option value="">-- SELECIONE --</option>
+                                        {suppliers.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">2. Data do Documento</label>
+                                    <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="w-full p-3 border rounded-xl bg-white outline-none focus:ring-2 focus:ring-indigo-400 text-sm" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">3. Número da Nota Fiscal</label>
+                                    <input type="text" value={manualNf} onChange={e => setManualNf(e.target.value)} placeholder="Nº da Nota / Cupom" className="w-full p-3 border rounded-xl bg-white outline-none focus:ring-2 focus:ring-indigo-400 text-sm font-mono" />
+                                </div>
                             </div>
+
+                            {/* Bloco 2: O Item (Bipagem) */}
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Item do Contrato</label>
-                                <select value={selectedItemName} onChange={e => setSelectedItemName(e.target.value)} className="w-full p-3 border rounded-xl bg-gray-50 font-bold outline-none focus:ring-2 focus:ring-blue-400" disabled={!selectedSupplierCpf}>
-                                    <option value="">-- SELECIONAR --</option>
+                                <label className="text-[10px] font-black text-indigo-600 uppercase ml-1">4. Selecionar Item do Contrato</label>
+                                <select value={selectedItemName} onChange={e => setSelectedItemName(e.target.value)} className="w-full p-4 border-2 border-indigo-50 rounded-xl bg-white font-black outline-none focus:ring-2 focus:ring-indigo-400 text-sm disabled:opacity-50" disabled={!selectedSupplierCpf}>
+                                    <option value="">-- SELECIONAR PRODUTO --</option>
                                     {availableItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
                                 </select>
                             </div>
+
                             <div className="space-y-1">
                                 <label className="text-[10px] font-black text-blue-600 uppercase ml-1 flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 2V5h1v1H5zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm2 2v-1h1v1H5zM13 3a1 1 0 00-1 1v3a1 1 0 001 1h3a1 1 0 001-1V4a1 1 0 00-1-1h-3zm1 2h1v1h-1V5z" clipRule="evenodd" /><path d="M11 4a1 1 0 10-2 0v1a1 1 0 002 0V4zM10 7a1 1 0 011 1v1h2a1 1 0 110 2h-3a1 1 0 01-1-1V8a1 1 0 011-1zM16 9a1 1 0 100 2 1 1 0 000-2zM9 13a1 1 0 011-1h1a1 1 0 110 2H10a1 1 0 01-1-1zM7 11a1 1 0 100-2H4a1 1 0 100 2h3zM17 13a1 1 0 01-1 1h-2a1 1 0 110-2h2a1 1 0 011 1zM14 17a1 1 0 100-2h-3a1 1 0 100 2h3z" /></svg>
-                                    Código de Barras (Bipar)
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM13 3a1 1 0 00-1 1v3a1 1 0 001 1h3a1 1 0 001-1V4a1 1 0 00-1-1h-3zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zM11 4a1 1 0 10-2 0v1a1 1 0 002 0V4zM10 7a1 1 0 011 1v1h2a1 1 0 110 2h-3a1 1 0 01-1-1V8a1 1 0 011-1zM16 9a1 1 0 100 2 1 1 0 000-2zM9 13a1 1 0 011-1h1a1 1 0 110 2H10a1 1 0 01-1-1zM7 11a1 1 0 100-2H4a1 1 0 100 2h3z" /></svg>
+                                    5. Código de Barras (Bipar)
                                 </label>
-                                <input ref={barcodeInputRef} type="text" value={manualBarcode} onChange={e => setManualBarcode(e.target.value)} placeholder="Aguardando scanner..." className="w-full p-3 border rounded-xl bg-white border-blue-100 font-mono focus:ring-4 focus:ring-blue-100 outline-none" />
+                                <input ref={barcodeInputRef} type="text" value={manualBarcode} onChange={e => setManualBarcode(e.target.value)} placeholder="Passe o leitor de barras..." className="w-full p-4 border-2 border-indigo-50 rounded-xl bg-white font-mono focus:ring-4 focus:ring-indigo-100 outline-none text-sm placeholder:italic" />
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Quantidade</label>
-                                <input type="text" value={manualQuantity} onChange={e => setManualQuantity(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="0,00" className="w-full p-3 border rounded-xl bg-gray-50 font-black text-center text-lg outline-none focus:ring-2 focus:ring-blue-400" required />
+                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">6. Quantidade / Peso</label>
+                                <input type="text" value={manualQuantity} onChange={e => setManualQuantity(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="0,00" className="w-full p-4 border-2 border-indigo-50 rounded-xl bg-indigo-50 font-black text-center text-xl outline-none focus:ring-2 focus:ring-indigo-400" required />
                             </div>
+
+                            {/* Bloco 3: Dados Complementares */}
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">NF / Documento</label>
-                                <input type="text" value={manualNf} onChange={e => setManualNf(e.target.value)} placeholder="Nº da Nota" className="w-full p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-400" />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Lote</label>
-                                <input type="text" value={manualLot} onChange={e => setManualLot(e.target.value.toUpperCase())} placeholder="Opcional" className="w-full p-3 border rounded-xl bg-gray-50 font-mono outline-none focus:ring-2 focus:ring-blue-400" />
+                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">7. Lote (Se houver)</label>
+                                <input type="text" value={manualLot} onChange={e => setManualLot(e.target.value.toUpperCase())} placeholder="OPCIONAL" className="w-full p-3 border rounded-xl bg-gray-50 font-mono outline-none focus:ring-2 focus:ring-indigo-400 text-sm" />
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Data do Movimento</label>
-                                <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="w-full p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-400" />
+                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">8. Validade (Se houver)</label>
+                                <input type="date" value={manualExp} onChange={e => setManualExp(e.target.value)} className="w-full p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-400 text-sm" />
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Validade</label>
-                                <input type="date" value={manualExp} onChange={e => setManualExp(e.target.value)} className="w-full p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-400" />
-                            </div>
+
                             <div className="flex items-end">
                                 <button type="submit" disabled={isSubmitting || !selectedSupplierCpf || !selectedItemName} className={`w-full py-4 rounded-xl font-black uppercase text-sm tracking-widest shadow-lg transition-all active:scale-95 disabled:bg-gray-200 disabled:text-gray-400 text-white ${manualType === 'entrada' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>
-                                    {isSubmitting ? 'Registrando...' : `Confirmar ${manualType}`}
+                                    {isSubmitting ? 'Gravando...' : `Confirmar Lançamento`}
                                 </button>
                             </div>
                         </form>
                     </div>
                 ) : (
-                    <div className="bg-white p-8 rounded-3xl shadow-xl border-t-8 border-blue-600 text-center space-y-6 animate-fade-in">
-                        <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-600">
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border-t-8 border-indigo-900 text-center space-y-6 animate-fade-in">
+                        <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-indigo-600">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2a4 4 0 00-4-4H5a2 2 0 00-2 2v6a2 2 0 002 2h22a2 2 0 002-2v-6a2 2 0 00-2-2h-1a4 4 0 00-4 4v2m0-10l-4-4m0 0l-4 4m4-4v12" /></svg>
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Atualizar Estoque em Massa</h2>
-                            <p className="text-gray-500 font-medium">Selecione a planilha de histórico (CSV) para processar entradas e saídas.</p>
+                            <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Importação de Dados Finanças</h2>
+                            <p className="text-gray-500 font-medium text-xs">Atualize o saldo de estoque processando arquivos .CSV padronizados.</p>
                         </div>
                         
                         <button 
                             onClick={() => fileInputRef.current?.click()} 
                             disabled={isImporting}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-black py-4 px-12 rounded-2xl transition-all shadow-lg active:scale-95 disabled:bg-gray-400 flex items-center gap-3 mx-auto uppercase tracking-widest text-sm"
+                            className="bg-indigo-900 hover:bg-black text-white font-black py-4 px-12 rounded-2xl transition-all shadow-lg active:scale-95 disabled:bg-gray-400 flex items-center gap-3 mx-auto uppercase tracking-widest text-sm"
                         >
-                            {isImporting ? (
-                                <>
-                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                    Processando Arquivo...
-                                </>
-                            ) : 'Importar Planilha .CSV'}
+                            {isImporting ? 'Lendo Arquivo...' : 'Selecionar Planilha CSV'}
                         </button>
                         <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".csv" />
                         
-                        <div className="pt-4 text-left max-w-lg mx-auto bg-gray-50 p-4 rounded-xl border border-gray-100">
-                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-2">Formato da Planilha (9 colunas):</p>
-                            <code className="text-[9px] font-mono text-blue-700 leading-none">Tipo; Item; Fornecedor; NF; Lote; Quantidade; Data; Validade; CódigoBarras</code>
+                        <div className="pt-4 text-left max-w-lg mx-auto bg-gray-50 p-6 rounded-2xl border border-indigo-50">
+                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-3">Layout Requerido (9 colunas):</p>
+                            <code className="text-[9px] font-mono text-indigo-700 block break-all leading-relaxed bg-white p-3 rounded-lg border">Tipo; Item; Fornecedor; NF; Lote; Qtd; Data; Validade; CódigoBarras</code>
                         </div>
                     </div>
                 )}
 
                 {/* Tabela de Movimentações Recentes */}
-                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+                <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
                     <h3 className="text-xl font-black text-gray-800 uppercase mb-6 tracking-tight border-b pb-4 flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        Últimas 15 Movimentações
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
+                        Últimos Registros de Estoque
                     </h3>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto rounded-xl">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                                    <th className="p-4 text-left">Tipo</th>
-                                    <th className="p-4 text-left">Data do Doc</th>
-                                    <th className="p-4 text-left">Item</th>
-                                    <th className="p-4 text-left">Barras</th>
-                                    <th className="p-4 text-right">Quantidade</th>
-                                    <th className="p-4 text-left">NF/Documento</th>
+                                <tr className="bg-slate-900 text-[10px] font-black uppercase text-slate-100 tracking-widest">
+                                    <th className="p-4 text-left">Fluxo</th>
+                                    <th className="p-4 text-left">Documento</th>
+                                    <th className="p-4 text-left">Item / Fornecedor</th>
+                                    <th className="p-4 text-left">Cód. Barras</th>
+                                    <th className="p-4 text-right">Peso/Qtd</th>
+                                    <th className="p-4 text-left">NF/Cupom</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {recentMovements.length > 0 ? recentMovements.map(mov => (
-                                    <tr key={mov.id} className="hover:bg-gray-50 transition-colors">
+                                    <tr key={mov.id} className="hover:bg-indigo-50/30 transition-colors">
                                         <td className="p-4">
                                             {mov.type === 'entrada' ? (
                                                 <span className="bg-green-100 text-green-700 text-[10px] font-black uppercase px-2 py-1 rounded-lg">Entrada</span>
@@ -306,19 +317,19 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                                 <span className="bg-red-100 text-red-700 text-[10px] font-black uppercase px-2 py-1 rounded-lg">Saída</span>
                                             )}
                                         </td>
-                                        <td className="p-4 text-xs text-indigo-700 font-mono font-bold">{(mov.date || '').split('-').reverse().join('/')}</td>
+                                        <td className="p-4 text-xs text-slate-700 font-mono font-bold">{(mov.date || '').split('-').reverse().join('/')}</td>
                                         <td className="p-4">
-                                            <p className="font-bold text-gray-700 uppercase text-xs">{mov.itemName}</p>
-                                            <p className="text-[9px] text-gray-400 uppercase font-medium">{mov.supplierName}</p>
+                                            <p className="font-bold text-slate-900 uppercase text-xs">{mov.itemName}</p>
+                                            <p className="text-[9px] text-indigo-400 uppercase font-bold">{mov.supplierName}</p>
                                         </td>
-                                        <td className="p-4 text-xs font-mono text-gray-400">{mov.barcode || '-'}</td>
-                                        <td className="p-4 text-right font-mono font-black text-gray-800">
-                                            {(mov.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
+                                        <td className="p-4 text-xs font-mono text-indigo-800 font-black">{mov.barcode || '—'}</td>
+                                        <td className="p-4 text-right font-mono font-black text-slate-800">
+                                            {(mov.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                         </td>
-                                        <td className="p-4 text-xs text-gray-500 font-mono">{mov.inboundInvoice || mov.outboundInvoice || '-'}</td>
+                                        <td className="p-4 text-xs text-gray-500 font-mono">{mov.inboundInvoice || mov.outboundInvoice || 'N/A'}</td>
                                     </tr>
                                 )) : (
-                                    <tr><td colSpan={6} className="p-10 text-center text-gray-400 italic">Nenhuma movimentação para exibir.</td></tr>
+                                    <tr><td colSpan={6} className="p-10 text-center text-gray-400 italic">Aguardando novos lançamentos...</td></tr>
                                 )}
                             </tbody>
                         </table>

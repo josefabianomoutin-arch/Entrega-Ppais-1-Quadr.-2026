@@ -13,6 +13,7 @@ import { firebaseConfig } from './firebaseConfig';
 
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
+const rootRef = ref(database);
 const suppliersRef = ref(database, 'suppliers');
 const warehouseLogRef = ref(database, 'warehouseLog');
 const perCapitaConfigRef = ref(database, 'perCapitaConfig');
@@ -87,7 +88,7 @@ const App: React.FC = () => {
       }
     }
 
-    // 2. Setores com Senhas Fixas (Correção Almoxarifado aqui)
+    // 2. Setores com Senhas Fixas
     if (cleanName === 'ALMOXARIFADO' || cleanName === 'ALMOX') {
       if (rawPass.toLowerCase() === 'almox123') {
         setUser({ name: 'ALMOXARIFADO', cpf: 'almox123', role: 'almoxarifado' });
@@ -103,7 +104,7 @@ const App: React.FC = () => {
       return true;
     }
 
-    // 3. Fornecedores (Busca por CPF no Banco)
+    // 3. Fornecedores
     const supplier = suppliers.find(s => s.cpf.replace(/\D/g, '') === numericPass);
     if (supplier) {
       setUser({ name: supplier.name, cpf: supplier.cpf, role: 'supplier' });
@@ -114,6 +115,16 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => setUser(null);
+
+  const handleRestoreFullBackup = async (fullData: any) => {
+    try {
+        await set(rootRef, fullData);
+        return true;
+    } catch (e) {
+        console.error("Erro na restauração:", e);
+        return false;
+    }
+  };
 
   const handleRegisterSupplier = async (name: string, cpf: string, allowedWeeks: number[]) => {
     const newSupplier: Supplier = {
@@ -237,7 +248,7 @@ const App: React.FC = () => {
             quantity: payload.quantity,
             inboundInvoice: payload.invoiceNumber,
             expirationDate: payload.expirationDate,
-            barcode: payload.barcode || '', // Adicionado código de barras
+            barcode: payload.barcode || '',
             lotId: `lot-${Date.now()}`,
             deliveryId: ''
         };
@@ -263,7 +274,7 @@ const App: React.FC = () => {
             quantity: payload.quantity,
             outboundInvoice: payload.outboundInvoice,
             expirationDate: payload.expirationDate,
-            barcode: payload.barcode || '', // Adicionado código de barras
+            barcode: payload.barcode || '',
             lotId: '',
             deliveryId: ''
         };
@@ -317,12 +328,8 @@ const App: React.FC = () => {
         onUpdateDailyMenu={async (m) => set(dailyMenusRef, m)}
         onRegisterEntry={handleRegisterWarehouseEntry}
         onRegisterWithdrawal={handleRegisterWarehouseWithdrawal}
-        onReopenInvoice={async (cpf, nf) => {
-            // Lógica simplificada de reabertura para o exemplo
-        }}
-        onDeleteInvoice={async (cpf, nf) => {
-            // Lógica simplificada de exclusão
-        }}
+        onReopenInvoice={async (cpf, nf) => {}}
+        onDeleteInvoice={async (cpf, nf) => {}}
         onUpdateInvoiceItems={async () => ({ success: true })}
         onManualInvoiceEntry={async () => ({ success: true })}
         onDeleteWarehouseEntry={async (l) => {
@@ -335,7 +342,8 @@ const App: React.FC = () => {
         }}
         onPersistSuppliers={() => {}}
         onRestoreData={async () => true}
-        onResetData={() => {}}
+        onRestoreFullBackup={handleRestoreFullBackup}
+        onResetData={async () => { if(window.confirm('CUIDADO: Isso apagará tudo permanentemente. Continuar?')) await set(rootRef, null); }}
         registrationStatus={null}
         onClearRegistrationStatus={() => {}}
       />

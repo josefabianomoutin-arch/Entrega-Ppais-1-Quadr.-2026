@@ -33,32 +33,32 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   }, [loginName, isStringLogin]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-green-50 to-indigo-50">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-100 to-indigo-100">
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-[2.5rem] shadow-2xl border border-gray-100">
         <div className="text-center">
-          <div className="w-20 h-20 bg-green-600 rounded-3xl flex items-center justify-center mx-auto mb-6 text-white shadow-xl rotate-3">
+          <div className="w-20 h-20 bg-indigo-900 rounded-3xl flex items-center justify-center mx-auto mb-6 text-white shadow-xl rotate-3">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
           </div>
-          <h1 className="text-3xl font-black text-gray-900 leading-tight uppercase tracking-tighter italic">Sistema PPAIS</h1>
-          <p className="mt-2 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em]">
-            Monitoramento 2026 • Taiúva/SP
+          <h1 className="text-2xl font-black text-slate-900 leading-tight uppercase tracking-tighter italic">CONTROLE DE DADOS<br/>FINANÇAS 2026</h1>
+          <p className="mt-2 text-indigo-400 font-bold uppercase text-[9px] tracking-[0.3em]">
+            Monitoramento Institucional • Taiúva/SP
           </p>
         </div>
         
-        <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-            <p className="text-[10px] text-amber-700 font-bold uppercase text-center leading-tight">
+        <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+            <p className="text-[10px] text-indigo-700 font-bold uppercase text-center leading-tight">
                 {isStringLogin 
-                    ? "Você está acessando como SETOR. Use a senha de letras e números fornecida pelo TI." 
-                    : "Fornecedores e Admins utilizam o CPF (apenas números) como chave de acesso."}
+                    ? "Acesso por SETOR administrativo. Utilize a chave alfanumérica." 
+                    : "Acesso para PRODUTORES e ADMINS através do CPF/CNPJ."}
             </p>
         </div>
 
         <form className="space-y-5" onSubmit={handleLoginSubmit}>
           <div className="space-y-4">
             <div className="relative group">
-                <label className="absolute -top-2 left-4 bg-white px-2 text-[9px] font-black text-green-600 uppercase tracking-widest z-10">Nome ou Setor</label>
+                <label className="absolute -top-2 left-4 bg-white px-2 text-[9px] font-black text-indigo-600 uppercase tracking-widest z-10">Nome ou Setor</label>
                 <input 
                   type="text"
                   autoComplete="off"
@@ -68,11 +68,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   value={loginName} 
                   onChange={(e) => setLoginName(e.target.value.toUpperCase())} 
                   placeholder="EX: ALMOXARIFADO" 
-                  className="appearance-none relative block w-full px-5 py-4 border-2 border-gray-100 placeholder-gray-300 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent font-black transition-all"
+                  className="appearance-none relative block w-full px-5 py-4 border-2 border-gray-100 placeholder-gray-300 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-black transition-all"
                 />
             </div>
             <div className="relative group">
-                <label className="absolute -top-2 left-4 bg-white px-2 text-[9px] font-black text-green-600 uppercase tracking-widest z-10">Senha de Acesso</label>
+                <label className="absolute -top-2 left-4 bg-white px-2 text-[9px] font-black text-indigo-600 uppercase tracking-widest z-10">Senha de Segurança</label>
                 <input 
                   type={showPassword ? "text" : "password"} 
                   inputMode={isStringLogin ? "text" : "numeric"}
@@ -83,12 +83,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   value={loginCpf} 
                   onChange={(e) => setLoginCpf(e.target.value)}
                   placeholder={passwordPlaceholder} 
-                  className="appearance-none relative block w-full px-5 py-4 border-2 border-gray-100 placeholder-gray-300 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent font-bold transition-all pr-12"
+                  className="appearance-none relative block w-full px-5 py-4 border-2 border-gray-100 placeholder-gray-300 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold transition-all pr-12"
                 />
                 <button 
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-green-600 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600 transition-colors"
                 >
                     {showPassword ? (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" /><path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" /></svg>
@@ -105,14 +105,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             </div>
           )}
 
-          <button type="submit" className="w-full py-5 px-4 text-sm font-black rounded-3xl text-white bg-green-600 hover:bg-green-700 shadow-xl active:scale-95 transition-all uppercase tracking-widest">
-              Entrar no Painel
+          <button type="submit" className="w-full py-5 px-4 text-sm font-black rounded-3xl text-white bg-indigo-900 hover:bg-black shadow-xl active:scale-95 transition-all uppercase tracking-widest">
+              Acessar Painel 2026
           </button>
         </form>
 
-        <div className="pt-6 text-center">
-            <p className="text-[9px] text-gray-300 font-bold uppercase tracking-widest">
-                Penitenciária de Taiúva &copy; 2026
+        <div className="pt-6 text-center border-t border-gray-50">
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                CONTROLE DE DADOS &copy; 2026 • TAIÚVA
             </p>
         </div>
       </div>
