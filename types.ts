@@ -57,6 +57,7 @@ export interface WarehouseMovement {
   outboundInvoice?: string;
   quantity?: number;
   expirationDate?: string;
+  barcode?: string; // NOVO CAMPO
 }
 
 export interface PerCapitaConfig {

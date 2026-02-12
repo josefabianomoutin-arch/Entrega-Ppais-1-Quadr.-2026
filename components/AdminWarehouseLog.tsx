@@ -37,11 +37,11 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 const searchMatch = searchTerm === '' ||
                     log.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                     log.lotNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (log.barcode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                     log.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
                 return typeMatch && searchMatch;
             })
             .sort((a, b) => {
-                // Ordenação principal por DATA DO DOCUMENTO (retroativos aparecem no lugar certo)
                 const dateA = new Date(a.date || a.timestamp).getTime();
                 const dateB = new Date(b.date || b.timestamp).getTime();
                 return dateB - dateA;
@@ -71,7 +71,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 if (cols.length < 5) cols = line.split(",");
                 if (cols.length < 6) { errorCount++; continue; }
 
-                const [tipoRaw, csvItem, csvSupplier, nf, lote, qtd, data, venc] = cols.map(c => c.trim());
+                const [tipoRaw, csvItem, csvSupplier, nf, lote, qtd, data, venc, barras] = cols.map(c => c.trim());
                 const isEntrada = tipoRaw.toUpperCase().includes('ENTRADA');
                 
                 const cleanQtdStr = qtd.replace(/['"]/g, '').trim(); 
@@ -94,9 +94,9 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     let res;
                     const documentDate = data || new Date().toISOString().split('T')[0];
                     if (isEntrada) {
-                        res = await onRegisterEntry({ supplierCpf: supplier.cpf, itemName: officialItem.name, invoiceNumber: nf, invoiceDate: documentDate, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '' });
+                        res = await onRegisterEntry({ supplierCpf: supplier.cpf, itemName: officialItem.name, invoiceNumber: nf, invoiceDate: documentDate, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '', barcode: barras || '' });
                     } else {
-                        res = await onRegisterWithdrawal({ supplierCpf: supplier.cpf, itemName: officialItem.name, outboundInvoice: nf, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '', date: documentDate });
+                        res = await onRegisterWithdrawal({ supplierCpf: supplier.cpf, itemName: officialItem.name, outboundInvoice: nf, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '', date: documentDate, barcode: barras || '' });
                     }
 
                     if (res.success) successCount++;
@@ -150,8 +150,8 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
             </div>
 
             <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-64 border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all" />
-                <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all bg-white">
+                <input type="text" placeholder="Pesquisar (Nome, Lote, Código de Barras)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-80 border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all font-bold" />
+                <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all bg-white font-bold">
                     <option value="all">Todos</option>
                     <option value="entrada">Entradas</option>
                     <option value="saída">Saídas</option>
@@ -165,8 +165,8 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                             <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Tipo</th>
                             <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Data Doc.</th>
                             <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Produto</th>
+                            <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Barras</th>
                             <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Lote</th>
-                            <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Fornecedor</th>
                             <th className="p-3 text-right text-[10px] font-black uppercase text-gray-500 tracking-widest">Quantidade</th>
                             <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">NF/Doc</th>
                             <th className="p-3 text-center text-[10px] font-black uppercase text-gray-500 tracking-widest">Ações</th>
@@ -178,10 +178,13 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                                 <td className="p-3">
                                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${log.type === 'entrada' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{log.type}</span>
                                 </td>
-                                <td className="p-3 font-mono text-indigo-700 text-xs font-black">{(log.date || log.timestamp.split('T')[0]).split('-').reverse().join('/')}</td>
-                                <td className="p-3 font-bold text-gray-800 uppercase text-xs">{log.itemName}</td>
+                                <td className="p-3 font-mono text-indigo-700 text-xs font-black">{(log.date || '').split('-').reverse().join('/')}</td>
+                                <td className="p-3">
+                                    <p className="font-bold text-gray-800 uppercase text-xs">{log.itemName}</p>
+                                    <p className="text-[9px] text-gray-400 uppercase">{log.supplierName}</p>
+                                </td>
+                                <td className="p-3 font-mono text-xs text-blue-600 font-bold">{log.barcode || '-'}</td>
                                 <td className="p-3 font-mono text-xs">{log.lotNumber}</td>
-                                <td className="p-3 text-gray-600 text-xs font-semibold">{log.supplierName}</td>
                                 <td className="p-3 text-right font-mono font-black text-gray-800">
                                     {(log.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
                                 </td>
@@ -260,6 +263,7 @@ const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({
     });
     const [itemName, setItemName] = useState(logEntry.itemName);
     const [lotNumber, setLotNumber] = useState(logEntry.lotNumber);
+    const [barcode, setBarcode] = useState(logEntry.barcode || '');
     const [quantity, setQuantity] = useState(String(logEntry.quantity || 0).replace('.', ','));
     const [documentNumber, setDocumentNumber] = useState(logEntry.inboundInvoice || logEntry.outboundInvoice || '');
     const [date, setDate] = useState(logEntry.date || '');
@@ -272,7 +276,7 @@ const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const qtyVal = parseFloat(quantity.replace(',', '.'));
-        if (!selectedCpf || !itemName || isNaN(qtyVal) || qtyVal <= 0 || !lotNumber) {
+        if (!selectedCpf || !itemName || isNaN(qtyVal) || qtyVal <= 0) {
             alert('Preencha todos os campos obrigatórios corretamente.');
             return;
         }
@@ -284,6 +288,7 @@ const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({
             date,
             lotNumber,
             itemName,
+            barcode,
             supplierName: selectedSupplier?.name || logEntry.supplierName,
             quantity: qtyVal,
             inboundInvoice: type === 'entrada' ? documentNumber : '',
@@ -316,19 +321,23 @@ const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Fornecedor</label>
                             <select value={selectedCpf} onChange={e => { setSelectedCpf(e.target.value); setItemName(''); }} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400 bg-white" required>
-                                <option value="">-- SELECIONE O FORNECEDOR --</option>
+                                <option value="">-- SELECIONE --</option>
                                 {suppliers.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}
                             </select>
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Item do Contrato</label>
                             <select value={itemName} onChange={e => setItemName(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400 bg-white" required disabled={!selectedCpf}>
-                                <option value="">-- SELECIONE O ITEM --</option>
+                                <option value="">-- SELECIONE --</option>
                                 {availableItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-indigo-600 uppercase ml-1">Data do Documento (Retroativa)</label>
+                            <label className="text-[10px] font-black text-blue-600 uppercase ml-1">Código de Barras</label>
+                            <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} className="w-full p-2 border-2 border-blue-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-400 font-mono" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-indigo-600 uppercase ml-1">Data do Documento</label>
                             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border-2 border-indigo-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 bg-indigo-50/30" required />
                         </div>
                         <div className="space-y-1">
@@ -343,7 +352,7 @@ const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Quantidade (kg)</label>
                             <input type="text" value={quantity} onChange={e => setQuantity(e.target.value.replace(/[^0-9,]/g, ''))} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400 font-mono" required />
                         </div>
-                        <div className="space-y-1 md:col-span-2">
+                        <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Data de Validade</label>
                             <input type="date" value={expirationDate} onChange={e => setExpirationDate(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" />
                         </div>
@@ -377,6 +386,7 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
     const [selectedCpf, setSelectedCpf] = useState('');
     const [itemName, setItemName] = useState('');
     const [lotNumber, setLotNumber] = useState('');
+    const [barcode, setBarcode] = useState('');
     const [quantity, setQuantity] = useState('');
     const [documentNumber, setDocumentNumber] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -389,7 +399,7 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const qtyVal = parseFloat(quantity.replace(',', '.'));
-        if (!selectedCpf || !itemName || isNaN(qtyVal) || qtyVal <= 0 || !lotNumber) {
+        if (!selectedCpf || !itemName || isNaN(qtyVal) || qtyVal <= 0) {
             alert('Por favor, preencha todos os campos obrigatórios corretamente.');
             return;
         }
@@ -400,13 +410,15 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
             itemName: itemName,
             invoiceNumber: documentNumber,
             invoiceDate: date,
-            lotNumber: lotNumber,
+            lotNumber: lotNumber || 'MANUAL',
+            barcode: barcode,
             quantity: qtyVal,
             expirationDate: expirationDate
         } : {
             supplierCpf: selectedCpf,
             itemName: itemName,
-            lotNumber: lotNumber,
+            lotNumber: lotNumber || 'MANUAL',
+            barcode: barcode,
             quantity: qtyVal,
             outboundInvoice: documentNumber,
             expirationDate: expirationDate,
@@ -461,14 +473,13 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
                                 {availableItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
                             </select>
                         </div>
-                        
-                        {/* DESTAQUE PARA A DATA DO DOCUMENTO - PERMITE RETROATIVOS */}
-                        <div className="space-y-1 md:col-span-2">
-                            <label className="text-[10px] font-black text-indigo-600 uppercase ml-1 flex items-center gap-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg>
-                                Data do Documento (Retroativa)
-                            </label>
-                            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-3 border-2 border-indigo-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 font-bold bg-indigo-50/50" required />
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-blue-600 uppercase ml-1">Código de Barras (Bipar)</label>
+                            <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="Bipar Código" className="w-full p-2 border-2 border-blue-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-400 font-mono" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-indigo-600 uppercase ml-1">Data do Documento</label>
+                            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border-2 border-indigo-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 font-bold bg-indigo-50/50" required />
                         </div>
 
                         <div className="space-y-1">
@@ -477,14 +488,14 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Número do Lote</label>
-                            <input type="text" value={lotNumber} onChange={e => setLotNumber(e.target.value.toUpperCase())} placeholder="LOTE123" className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 font-mono" required />
+                            <input type="text" value={lotNumber} onChange={e => setLotNumber(e.target.value.toUpperCase())} placeholder="LOTE123" className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 font-mono" />
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Quantidade (kg)</label>
-                            <input type="text" value={quantity} onChange={e => setQuantity(e.target.value.replace(/[^0-9,]/g, ''))} placeholder="0,00" className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 font-mono" required />
+                            <input type="text" value={quantity} onChange={e => setQuantity(e.target.value.replace(/[^0-9,.]/g, ''))} placeholder="0,00" className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 font-mono" required />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Data de Validade (Opcional)</label>
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Data de Validade</label>
                             <input type="date" value={expirationDate} onChange={e => setExpirationDate(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400" />
                         </div>
                     </div>

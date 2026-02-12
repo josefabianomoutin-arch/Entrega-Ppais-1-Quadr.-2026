@@ -237,6 +237,7 @@ const App: React.FC = () => {
             quantity: payload.quantity,
             inboundInvoice: payload.invoiceNumber,
             expirationDate: payload.expirationDate,
+            barcode: payload.barcode || '', // Adicionado código de barras
             lotId: `lot-${Date.now()}`,
             deliveryId: ''
         };
@@ -262,6 +263,7 @@ const App: React.FC = () => {
             quantity: payload.quantity,
             outboundInvoice: payload.outboundInvoice,
             expirationDate: payload.expirationDate,
+            barcode: payload.barcode || '', // Adicionado código de barras
             lotId: '',
             deliveryId: ''
         };
