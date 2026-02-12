@@ -8,7 +8,7 @@ import AlmoxarifadoDashboard from './components/AlmoxarifadoDashboard';
 import ItespDashboard from './components/ItespDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set, runTransaction, push, child, update, remove } from 'firebase/database';
+import { getDatabase, ref, onValue, set, runTransaction, push, child, update, remove, get } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
 
 const app = initializeApp(firebaseConfig);
@@ -79,7 +79,6 @@ const App: React.FC = () => {
     const rawPass = (passwordInput || '').trim();
     const numericPass = rawPass.replace(/\D/g, '');
 
-    // 1. Logins Administrativos (Master)
     const adminCpfs = ['15210361870', '29099022859', '29462706821'];
     if (['ADMINISTRADOR', 'ADM', 'GALDINO', 'DOUGLAS'].some(n => cleanName.includes(n))) {
       if (adminCpfs.includes(numericPass)) {
@@ -88,7 +87,6 @@ const App: React.FC = () => {
       }
     }
 
-    // 2. Setores com Senhas Fixas
     if (cleanName === 'ALMOXARIFADO' || cleanName === 'ALMOX') {
       if (rawPass.toLowerCase() === 'almox123') {
         setUser({ name: 'ALMOXARIFADO', cpf: 'almox123', role: 'almoxarifado' });
@@ -104,7 +102,6 @@ const App: React.FC = () => {
       return true;
     }
 
-    // 3. Fornecedores
     const supplier = suppliers.find(s => s.cpf.replace(/\D/g, '') === numericPass);
     if (supplier) {
       setUser({ name: supplier.name, cpf: supplier.cpf, role: 'supplier' });
@@ -149,7 +146,7 @@ const App: React.FC = () => {
       return currentData;
     });
     if (oldCpf !== newCpf) {
-      const snapshot = await ref(database, `suppliers/${oldCpf}`).get();
+      const snapshot = await get(child(suppliersRef, oldCpf));
       const oldData = snapshot.val();
       await set(child(suppliersRef, newCpf), oldData);
       await remove(child(suppliersRef, oldCpf));
@@ -210,6 +207,110 @@ const App: React.FC = () => {
     });
   };
 
+  // --- GERENCIAMENTO DE NOTAS FISCAIS (ADMIN) ---
+
+  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    try {
+      await runTransaction(supplierRef, (currentData: Supplier) => {
+        if (currentData && currentData.deliveries) {
+          const existingForNf = currentData.deliveries.filter(d => d.invoiceNumber === invoiceNumber);
+          if (existingForNf.length === 0) return currentData;
+
+          const baseDate = existingForNf[0].date;
+          const baseTime = existingForNf[0].time;
+
+          // Remove itens antigos daquela nota
+          currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+
+          // Insere novos itens editados
+          items.forEach((item, idx) => {
+            currentData.deliveries.push({
+              id: `inv-edit-${Date.now()}-${idx}`,
+              date: baseDate,
+              time: baseTime,
+              item: item.name,
+              kg: item.kg,
+              value: item.value,
+              invoiceUploaded: true,
+              invoiceNumber: invoiceNumber
+            });
+          });
+        }
+        return currentData;
+      });
+      return { success: true };
+    } catch (e) {
+      return { success: false, message: 'Erro ao gravar no banco de dados.' };
+    }
+  };
+
+  const handleReopenInvoice = async (supplierCpf: string, invoiceNumber: string) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    await runTransaction(supplierRef, (currentData: Supplier) => {
+      if (currentData && currentData.deliveries) {
+        const entriesForNf = currentData.deliveries.filter(d => d.invoiceNumber === invoiceNumber);
+        if (entriesForNf.length === 0) return currentData;
+
+        const baseDate = entriesForNf[0].date;
+        const baseTime = entriesForNf[0].time;
+
+        // Remove itens faturados
+        currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+
+        // Volta para um agendamento pendente
+        currentData.deliveries.push({
+          id: `reopen-${Date.now()}`,
+          date: baseDate,
+          time: baseTime,
+          item: 'AGENDAMENTO PENDENTE',
+          invoiceUploaded: false
+        });
+      }
+      return currentData;
+    });
+  };
+
+  const handleDeleteInvoice = async (supplierCpf: string, invoiceNumber: string) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    await runTransaction(supplierRef, (currentData: Supplier) => {
+      if (currentData && currentData.deliveries) {
+        currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+      }
+      return currentData;
+    });
+  };
+
+  const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    try {
+      await runTransaction(supplierRef, (currentData: Supplier) => {
+        if (currentData) {
+          const deliveries = currentData.deliveries || [];
+          items.forEach((item, idx) => {
+            deliveries.push({
+              id: `manual-${Date.now()}-${idx}`,
+              date,
+              time: '08:00',
+              item: item.name,
+              kg: item.kg,
+              value: item.value,
+              invoiceUploaded: true,
+              invoiceNumber: invoiceNumber
+            });
+          });
+          currentData.deliveries = deliveries;
+        }
+        return currentData;
+      });
+      return { success: true };
+    } catch (e) {
+      return { success: false, message: 'Falha no lançamento manual.' };
+    }
+  };
+
+  // --- FIM GERENCIAMENTO NOTAS ---
+
   const handleUpdateContractForItem = async (itemName: string, assignments: any[]) => {
     for (const supplier of suppliers) {
       const assignment = assignments.find(a => a.supplierCpf === supplier.cpf);
@@ -225,7 +326,7 @@ const App: React.FC = () => {
               unit: assignment.unit
             });
           }
-          data.initialValue = data.contractItems.reduce((acc, curr) => acc + (curr.totalKg * curr.valuePerKg), 0);
+          data.initialValue = (data.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * curr.valuePerKg), 0);
         }
         return data;
       });
@@ -328,10 +429,10 @@ const App: React.FC = () => {
         onUpdateDailyMenu={async (m) => set(dailyMenusRef, m)}
         onRegisterEntry={handleRegisterWarehouseEntry}
         onRegisterWithdrawal={handleRegisterWarehouseWithdrawal}
-        onReopenInvoice={async (cpf, nf) => {}}
-        onDeleteInvoice={async (cpf, nf) => {}}
-        onUpdateInvoiceItems={async () => ({ success: true })}
-        onManualInvoiceEntry={async () => ({ success: true })}
+        onReopenInvoice={handleReopenInvoice}
+        onDeleteInvoice={handleDeleteInvoice}
+        onUpdateInvoiceItems={handleUpdateInvoiceItems}
+        onManualInvoiceEntry={handleManualInvoiceEntry}
         onDeleteWarehouseEntry={async (l) => {
             await remove(child(warehouseLogRef, l.id));
             return { success: true, message: 'Excluído' };
