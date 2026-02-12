@@ -134,3 +134,5 @@ export interface FinancialRecord {
   dataPagamento: string;
   status: string;
 }
+
+export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria';

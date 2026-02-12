@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem, FinancialRecord } from './types';
+import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem, FinancialRecord, UserRole } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AlmoxarifadoDashboard from './components/AlmoxarifadoDashboard';
 import ItespDashboard from './components/ItespDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
+import SubportariaDashboard from './components/SubportariaDashboard';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, onValue, set, runTransaction, push, child, update, remove, get } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
@@ -24,7 +25,7 @@ const dailyMenusRef = ref(database, 'dailyMenus');
 const financialRecordsRef = ref(database, 'financialRecords');
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<{ name: string; cpf: string; role: 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' } | null>(null);
+  const [user, setUser] = useState<{ name: string; cpf: string; role: UserRole } | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [warehouseLog, setWarehouseLog] = useState<WarehouseMovement[]>([]);
   const [perCapitaConfig, setPerCapitaConfig] = useState<PerCapitaConfig>({});
@@ -99,6 +100,10 @@ const App: React.FC = () => {
     }
     if (cleanName === 'FINANCEIRO' && rawPass.toLowerCase() === 'financeiro123') {
       setUser({ name: 'FINANCEIRO', cpf: 'financeiro123', role: 'financeiro' });
+      return true;
+    }
+    if (cleanName === 'SUBPORTARIA' && rawPass.toLowerCase() === 'subportaria2026') {
+      setUser({ name: 'SUBPORTARIA', cpf: 'subportaria2026', role: 'subportaria' });
       return true;
     }
 
@@ -467,6 +472,10 @@ const App: React.FC = () => {
 
   if (user.role === 'itesp') {
     return <ItespDashboard suppliers={suppliers} warehouseLog={warehouseLog} onLogout={handleLogout} />;
+  }
+
+  if (user.role === 'subportaria') {
+    return <SubportariaDashboard suppliers={suppliers} onLogout={handleLogout} />;
   }
 
   const currentSupplier = suppliers.find(s => s.cpf === user.cpf);
