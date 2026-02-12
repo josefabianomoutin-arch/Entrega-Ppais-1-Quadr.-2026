@@ -212,6 +212,24 @@ const App: React.FC = () => {
     });
   };
 
+  const handleMarkArrival = async (supplierCpf: string, deliveryId: string) => {
+    const supplierRef = child(suppliersRef, supplierCpf);
+    const now = new Date();
+    const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+    
+    await runTransaction(supplierRef, (currentData: Supplier) => {
+      if (currentData && currentData.deliveries) {
+        currentData.deliveries = currentData.deliveries.map(d => {
+          if (d.id === deliveryId) {
+            return { ...d, arrivalTime: currentTime };
+          }
+          return d;
+        });
+      }
+      return currentData;
+    });
+  };
+
   // --- GERENCIAMENTO DE NOTAS FISCAIS (ADMIN) ---
 
   const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => {
@@ -475,7 +493,7 @@ const App: React.FC = () => {
   }
 
   if (user.role === 'subportaria') {
-    return <SubportariaDashboard suppliers={suppliers} onLogout={handleLogout} />;
+    return <SubportariaDashboard suppliers={suppliers} onLogout={handleLogout} onMarkArrival={handleMarkArrival} />;
   }
 
   const currentSupplier = suppliers.find(s => s.cpf === user.cpf);

@@ -5,6 +5,7 @@ import type { Supplier, Delivery } from '../types';
 interface SubportariaDashboardProps {
   suppliers: Supplier[];
   onLogout: () => void;
+  onMarkArrival: (supplierCpf: string, deliveryId: string) => Promise<void>;
 }
 
 const formatDate = (dateString: string) => {
@@ -13,25 +14,28 @@ const formatDate = (dateString: string) => {
     return date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 };
 
-const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, onLogout }) => {
+const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, onLogout, onMarkArrival }) => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isUpdating, setIsUpdating] = useState<string | null>(null);
 
     const dailyDeliveries = useMemo(() => {
-        const list: { supplierName: string; time: string; status: 'AGENDADO' | 'FATURADO'; id: string }[] = [];
+        const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'FATURADO'; id: string }[] = [];
         
         suppliers.forEach(s => {
             (s.deliveries || []).forEach(d => {
                 if (d.date === selectedDate) {
                     const isFaturado = d.item !== 'AGENDAMENTO PENDENTE';
                     
-                    // Se for faturado, agrupamos por NF para não repetir o mesmo caminhão várias vezes se tiver 20 itens
+                    // Se for faturado, agrupamos por fornecedor/hora para visualização limpa
                     const existing = list.find(l => l.supplierName === s.name && l.time === d.time && l.status === (isFaturado ? 'FATURADO' : 'AGENDADO'));
                     
                     if (!existing) {
                         list.push({
                             id: d.id,
                             supplierName: s.name,
+                            supplierCpf: s.cpf,
                             time: d.time,
+                            arrivalTime: d.arrivalTime,
                             status: isFaturado ? 'FATURADO' : 'AGENDADO'
                         });
                     }
@@ -41,6 +45,12 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
 
         return list.sort((a, b) => a.time.localeCompare(b.time));
     }, [suppliers, selectedDate]);
+
+    const handleArrival = async (cpf: string, id: string) => {
+        setIsUpdating(id);
+        await onMarkArrival(cpf, id);
+        setIsUpdating(null);
+    };
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
@@ -78,22 +88,44 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
 
                     <div className="space-y-4">
                         {dailyDeliveries.length > 0 ? dailyDeliveries.map(item => (
-                            <div key={item.id} className={`flex flex-col sm:flex-row items-center justify-between p-6 rounded-3xl border-2 transition-all hover:scale-[1.02] ${item.status === 'FATURADO' ? 'bg-green-50 border-green-100' : 'bg-blue-50 border-blue-100'}`}>
+                            <div key={item.id} className={`flex flex-col sm:flex-row items-center justify-between p-6 rounded-3xl border-2 transition-all hover:shadow-md ${item.status === 'FATURADO' ? 'bg-indigo-50/50 border-indigo-100' : item.arrivalTime ? 'bg-green-50 border-green-100' : 'bg-white border-slate-100'}`}>
                                 <div className="flex items-center gap-6 mb-4 sm:mb-0">
-                                    <div className={`p-4 rounded-2xl text-xl font-black font-mono shadow-sm ${item.status === 'FATURADO' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white'}`}>
+                                    <div className={`p-4 rounded-2xl text-xl font-black font-mono shadow-sm ${item.status === 'FATURADO' ? 'bg-indigo-900 text-indigo-100' : item.arrivalTime ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
                                         {item.time}
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Produtor / Empresa</p>
                                         <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{item.supplierName}</p>
+                                        {item.arrivalTime && (
+                                            <div className="flex items-center gap-1 mt-1">
+                                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                                <p className="text-[11px] font-black text-green-700 uppercase">Chegada: {item.arrivalTime}</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="text-center sm:text-right">
-                                    <span className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${item.status === 'FATURADO' ? 'bg-white text-green-700' : 'bg-white text-blue-700'}`}>
-                                        {item.status === 'FATURADO' ? '✓ Descarregando / OK' : '○ Previsto p/ Hoje'}
-                                    </span>
-                                    {item.status === 'AGENDADO' && (
-                                        <p className="text-[9px] text-blue-400 font-bold mt-2 uppercase">Aguardando Chegada</p>
+                                
+                                <div className="text-center sm:text-right flex flex-col gap-2 min-w-[180px]">
+                                    {item.status === 'FATURADO' ? (
+                                        <span className="px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest bg-white text-indigo-800 border border-indigo-100 shadow-sm">
+                                            ✓ Descarregado / OK
+                                        </span>
+                                    ) : item.arrivalTime ? (
+                                        <span className="px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest bg-white text-green-700 border border-green-100 shadow-sm">
+                                            ● Já chegou na Unidade
+                                        </span>
+                                    ) : (
+                                        <button 
+                                            disabled={isUpdating === item.id}
+                                            onClick={() => handleArrival(item.supplierCpf, item.id)}
+                                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-6 rounded-2xl text-xs uppercase shadow-lg active:scale-95 transition-all disabled:bg-slate-200"
+                                        >
+                                            {isUpdating === item.id ? 'Gravando...' : 'Registrar Chegada'}
+                                        </button>
+                                    )}
+                                    
+                                    {!item.arrivalTime && item.status !== 'FATURADO' && (
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Aguardando veículo...</p>
                                     )}
                                 </div>
                             </div>
@@ -112,15 +144,15 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-indigo-900 p-6 rounded-3xl text-white shadow-xl">
                         <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Total do Dia</p>
-                        <p className="text-4xl font-black">{dailyDeliveries.length} <span className="text-lg font-bold opacity-50">Caminhões</span></p>
+                        <p className="text-4xl font-black">{dailyDeliveries.length} <span className="text-lg font-bold opacity-50">Veículos</span></p>
                     </div>
                     <div className="bg-white p-6 rounded-3xl border-2 border-green-100 shadow-xl">
-                        <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-2">Já Chegaram</p>
-                        <p className="text-4xl font-black text-green-700">{dailyDeliveries.filter(d => d.status === 'FATURADO').length}</p>
+                        <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-2">Chegadas Confirmadas</p>
+                        <p className="text-4xl font-black text-green-700">{dailyDeliveries.filter(d => d.arrivalTime || d.status === 'FATURADO').length}</p>
                     </div>
                     <div className="bg-white p-6 rounded-3xl border-2 border-blue-100 shadow-xl">
-                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">Aguardando</p>
-                        <p className="text-4xl font-black text-blue-700">{dailyDeliveries.filter(d => d.status === 'AGENDADO').length}</p>
+                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">Aguardando Agora</p>
+                        <p className="text-4xl font-black text-blue-700">{dailyDeliveries.filter(d => !d.arrivalTime && d.status === 'AGENDADO').length}</p>
                     </div>
                 </div>
 

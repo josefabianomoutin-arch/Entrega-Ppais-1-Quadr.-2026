@@ -3,6 +3,7 @@ export interface Delivery {
   id: string;
   date: string; // ISO string format: 'YYYY-MM-DD'
   time: string; // 'HH:MM'
+  arrivalTime?: string; // NOVO: Horário real de chegada na subportaria
   item?: string;
   kg?: number;
   value?: number;
