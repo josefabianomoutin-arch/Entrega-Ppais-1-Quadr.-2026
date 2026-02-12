@@ -35,8 +35,9 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
     const firstDayIndex = date.getDay();
     
     const grid = [];
+    // Espaços vazios antes do primeiro dia do mês
     for (let i = 0; i < firstDayIndex; i++) {
-      grid.push(<div key={`blank-${i}`} className="border-r border-b border-gray-200"></div>);
+      grid.push(<div key={`blank-${i}`} className="border-r border-b border-gray-200 bg-gray-50/30"></div>);
     }
     
     for (let day = 1; day <= daysInMonth; day++) {
@@ -50,42 +51,40 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
       const isWeekAllowed = !allowedWeeks || allowedWeeks.length === 0 || allowedWeeks.includes(weekNumber);
       
       const hasDeliveries = deliveriesOnThisDate.length > 0;
-      // REGRA: É clicável se a semana for permitida OU se já houver uma entrega agendada no dia
       const isClickable = (isWeekAllowed && !isWeekend) || hasDeliveries;
       
-      let dayClasses = "p-2 text-center border-r border-b border-gray-200 h-20 flex flex-col justify-center items-center relative";
+      let dayClasses = "p-2 text-center border-r border-b border-gray-200 h-20 flex flex-col justify-center items-center relative transition-all";
 
       if (!isClickable) {
-        dayClasses += " bg-gray-100 text-gray-400 cursor-not-allowed";
+        dayClasses += " bg-gray-100 text-gray-300 cursor-not-allowed";
       } else {
-        dayClasses += " cursor-pointer transition-colors";
+        dayClasses += " cursor-pointer";
         const isPast = currentDate < simulatedToday;
         
-        // Regra de cor priorizada:
         const needsInvoice = hasDeliveries && isPast && deliveriesOnThisDate.some(d => !d.invoiceUploaded);
         const allFulfilled = hasDeliveries && deliveriesOnThisDate.every(d => d.invoiceUploaded);
 
         if (needsInvoice) {
-          dayClasses += " bg-red-500 hover:bg-red-600 text-white font-bold";
+          dayClasses += " bg-red-500 hover:bg-red-600 text-white font-bold shadow-inner";
         } else if (allFulfilled) {
-          dayClasses += " bg-green-500 hover:bg-green-600 text-white font-bold";
+          dayClasses += " bg-green-600 hover:bg-green-700 text-white font-bold shadow-inner";
         } else if (hasDeliveries) {
-          dayClasses += " bg-green-200 hover:bg-green-300 text-green-900 font-bold";
+          dayClasses += " bg-green-100 hover:bg-green-200 text-green-900 font-bold border-2 border-green-400";
         } else {
-          dayClasses += " hover:bg-blue-100";
+          dayClasses += " bg-white hover:bg-blue-50";
         }
       }
 
       grid.push(
         <div key={day} className={dayClasses} onClick={() => isClickable && onDayClick(currentDate)}>
-          <span className="text-sm md:text-base">{day}</span>
+          <span className="text-xs md:text-sm font-mono">{day}</span>
           {hasDeliveries && (
-            <span className="text-[10px] mt-1 px-1 rounded bg-black bg-opacity-10 truncate max-w-full">
-              {deliveriesOnThisDate.some(d => d.invoiceUploaded) ? 'Faturado' : 'Entrega'}
+            <span className="text-[8px] mt-1 px-1 rounded bg-black/10 truncate max-w-full uppercase font-black">
+              {deliveriesOnThisDate.some(d => d.invoiceUploaded) ? 'Faturado' : 'Agendado'}
             </span>
           )}
           {hasDeliveries && deliveriesOnThisDate.some(d => !d.invoiceUploaded) && currentDate < simulatedToday && (
-            <span className="absolute top-1 right-1 text-[10px] bg-white text-red-600 px-1 rounded font-black shadow-sm animate-pulse">NF!</span>
+            <span className="absolute top-1 right-1 text-[8px] bg-yellow-400 text-black px-1 rounded font-black shadow-sm animate-pulse">NF!</span>
           )}
         </div>
       );
@@ -94,17 +93,49 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-12 pb-10">
       {MONTHS_2026.map(month => (
-        <div key={month.name}>
-          <h3 className="text-xl font-semibold text-center mb-3 text-gray-600">{month.name} 2026</h3>
-          <div className="grid grid-cols-7 border-t border-l border-gray-200 bg-white rounded-lg overflow-hidden shadow-sm">
+        <div key={month.name} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-gray-800 p-3 text-white flex justify-between items-center px-6">
+            <h3 className="text-lg font-black uppercase tracking-widest">{month.name} 2026</h3>
+            <span className="text-[10px] font-bold text-gray-400">PPAIS - TAIÚVA</span>
+          </div>
+          <div className="grid grid-cols-[50px_repeat(7,1fr)] border-l border-gray-200">
+            {/* Cabeçalho da Semana e Dias */}
+            <div className="p-2 text-center font-black text-[9px] text-gray-400 bg-gray-50 border-r border-b border-gray-200 flex items-center justify-center">SEM.</div>
             {WEEK_DAYS.map(day => (
-              <div key={day} className="p-2 text-center font-medium text-xs text-gray-500 bg-gray-50 border-r border-b border-gray-200">
-                {day}
+              <div key={day} className="p-2 text-center font-black text-[10px] text-gray-500 bg-gray-50 border-r border-b border-gray-200">
+                {day.toUpperCase()}
               </div>
             ))}
-            {generateMonthGrid(month.number, 2026)}
+            
+            {/* Gerar linhas com número da semana à esquerda */}
+            {(() => {
+                const rows = [];
+                const firstDay = new Date(2026, month.number, 1);
+                const lastDay = new Date(2026, month.number + 1, 0).getDate();
+                const totalDays = firstDay.getDay() + lastDay;
+                const totalRows = Math.ceil(totalDays / 7);
+                
+                const monthGrid = generateMonthGrid(month.number, 2026);
+                
+                for (let r = 0; r < totalRows; r++) {
+                    const rowDate = new Date(2026, month.number, (r * 7) + 1 - firstDay.getDay() + 3);
+                    const weekNum = getWeekNumber(rowDate);
+                    const isAllowed = !allowedWeeks || allowedWeeks.length === 0 || allowedWeeks.includes(weekNum);
+                    
+                    rows.push(
+                        <React.Fragment key={`row-${r}`}>
+                            <div className={`p-2 border-r border-b border-gray-200 flex flex-col items-center justify-center ${isAllowed ? 'bg-green-50' : 'bg-gray-50 opacity-40'}`}>
+                                <span className={`text-[10px] font-black ${isAllowed ? 'text-green-700' : 'text-gray-400'}`}>{weekNum}</span>
+                                {isAllowed && <div className="w-1.5 h-1.5 bg-green-500 rounded-full mt-1"></div>}
+                            </div>
+                            {monthGrid.slice(r * 7, (r + 1) * 7)}
+                        </React.Fragment>
+                    );
+                }
+                return rows;
+            })()}
           </div>
         </div>
       ))}
