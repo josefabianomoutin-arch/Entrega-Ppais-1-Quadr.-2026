@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, FinancialRecord } from '../types';
+import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, FinancialRecord, Delivery } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import AdminContractItems from './AdminContractItems';
 import WeekSelector from './WeekSelector';
@@ -68,6 +68,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const backupInputRef = useRef<HTMLInputElement>(null);
+
+  // Monitoramento de Pátio (Notificação para o ADM)
+  const vehiclesInUnit = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const inUnit: { supplierName: string, arrivalTime: string, scheduledTime: string }[] = [];
+    
+    suppliers.forEach(s => {
+        (s.deliveries || []).forEach(d => {
+            // Se chegou na portaria HOJE e ainda não faturou (ainda é 'AGENDAMENTO PENDENTE')
+            if (d.date === today && d.arrivalTime && d.item === 'AGENDAMENTO PENDENTE') {
+                inUnit.push({
+                    supplierName: s.name,
+                    arrivalTime: d.arrivalTime,
+                    scheduledTime: d.time
+                });
+            }
+        });
+    });
+    return inUnit;
+  }, [suppliers]);
 
   const handleExportFullBackup = () => {
     const fullBackup = {
@@ -284,9 +304,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           </div>
         </nav>
       </aside>
-      <main className="flex-1 p-4 md:p-10 overflow-y-auto bg-gray-100"> {renderContent()} </main>
+      
+      <main className="flex-1 p-4 md:p-10 overflow-y-auto bg-gray-100"> 
+        {/* NOTIFICAÇÃO DE CHEGADA (ABERTA PARA O ADM) */}
+        {vehiclesInUnit.length > 0 && (
+            <div className="mb-8 animate-bounce-short">
+                <div className="bg-green-600 text-white p-5 rounded-3xl shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 border-b-8 border-green-800">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-white/20 p-3 rounded-2xl">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-black uppercase tracking-tight leading-none">Atenção Admin: Veículos no Pátio</h2>
+                            <p className="text-xs font-bold text-green-100 mt-1 uppercase">A subportaria registrou a chegada física dos fornecedores abaixo:</p>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {vehiclesInUnit.map((v, i) => (
+                            <div key={i} className="bg-white text-green-800 px-4 py-2 rounded-xl text-[10px] font-black shadow-md border border-green-200">
+                                {v.supplierName} (Entrou às {v.arrivalTime})
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {renderContent()} 
+      </main>
+
       {editingSupplier && (<EditSupplierModal supplier={editingSupplier} suppliers={suppliers} onClose={() => setEditingSupplier(null)} onSave={async (old, name, cpf, weeks) => { const err = await props.onUpdateSupplier(old, name, cpf, weeks); if (!err) setEditingSupplier(null); return err; }} />)}
-      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }`}</style>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
+        @keyframes bounce-short { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        .animate-bounce-short { animation: bounce-short 2s ease-in-out infinite; }
+      `}</style>
     </div>
   );
 };
