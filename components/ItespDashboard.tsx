@@ -59,8 +59,8 @@ const getMonthNameFromDateString = (dateStr?: string): string => {
 
 const ALLOWED_SUPPLIERS_RAW = [
     'BENEDITO OSMAR RAVAZZI', 'ADAO MAXIMO DA FONSECA', 'ANTONIO JOAQUIM DE OLIVEIRA',
-    'CLAUDEMIR LUIZ TURRA', 'CONSUELO ALCANTARA FERREIRA GUIMARAES', 'DANILO ANTONIO MAXIMO',
-    'DOMINGO APARECIDO ANTONINO', 'LEONARDO FELIPE VELHO MARSOLA', 'LIDIA BERNARDES MONTEIRO BARBOSA',
+    'CLAUDEMIR LUIZ TURRA', 'CONSUELO ALCANTARA FERREIRA GUIMARARE', 'DANILO ANTONIO MAXIMO',
+    'DOMINGOS APARECIDO ANTONINO', 'LEONARDO FELIPE VELHO MARSOLA', 'LIDIA BERNARDES MONTEIRO BARBOSA',
     'LUCIMARA MARQUES PEREIRA', 'MARCELO GIBERTONI', 'MARCOS DONADON AGOSTINHO',
     'MICHEL JOSE RAVAZZI', 'MOISES PINHEIRO DE SA', 'PAULO HENRIQUE PUGLIERI',
     'PEDRO TEODORO RODRIGUES', 'ROSA MARIA GARBIN VELLONE', 'SAULO ANTONINO',
@@ -231,7 +231,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                 )) : (
                                     <tr><td colSpan={6} className="p-32 text-center">
                                         <div className="flex flex-col items-center gap-4 opacity-30">
-                                            <svg className="w-20 h-20 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                            <svg className="w-20 h-20 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                             <p className="text-gray-600 italic font-black uppercase tracking-widest text-lg text-center">Nenhum dado capturado para o período.<br/><span className="text-xs font-normal">Verifique o Histórico de Estoque do Almoxarifado.</span></p>
                                         </div>
                                     </td></tr>
