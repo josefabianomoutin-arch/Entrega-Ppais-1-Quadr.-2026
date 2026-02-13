@@ -90,7 +90,6 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
     }, 0);
   }, [items, contractItems]);
 
-  // TRAVA DE SEGURANÇA: Validação dos campos obrigatórios
   const isFormValid = useMemo(() => {
     const hasNf = invoiceNumber.trim().length > 0;
     const hasItems = items.length > 0;
@@ -134,103 +133,111 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-[100] p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-6 md:p-8 animate-fade-in-up border border-gray-100">
-        <div className="flex justify-between items-center mb-6">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-fade-in-up border border-gray-100 overflow-hidden">
+        
+        {/* Header Fixo */}
+        <div className="flex justify-between items-center p-6 md:p-8 border-b border-gray-50 flex-shrink-0">
           <div>
-            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic">Lançamento de Faturamento</h2>
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Obrigatório informar Pesos e Itens</p>
+            <h2 className="text-xl md:text-2xl font-black text-gray-900 uppercase tracking-tighter italic">Lançamento de Faturamento</h2>
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Obrigatório informar Pesos e Itens</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-900 transition-colors p-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 mb-6 flex items-start gap-3">
-            <div className="bg-orange-500 text-white p-2 rounded-xl">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            </div>
-            <div>
-                <p className="text-[10px] text-orange-800 font-black uppercase tracking-tight">Data da Entrega Agendada</p>
-                <p className="text-sm font-bold text-orange-950">{formattedDate} às {earliestTime}</p>
-            </div>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                    <label htmlFor="invoice-number" className="text-[10px] font-black text-gray-400 uppercase ml-1">Nº da Nota Fiscal (NF)</label>
-                    <input type="text" id="invoice-number" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} required placeholder="Ex: 001234" className="w-full px-4 py-3 border-2 border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800"/>
-                </div>
-                <div className="bg-gray-50 rounded-2xl p-3 flex flex-col justify-center border-2 border-dashed border-gray-200">
-                    <p className="text-[9px] text-gray-400 font-black uppercase text-center mb-1">Total da Nota Calculado</p>
-                    <p className="text-xl font-black text-indigo-700 text-center">{formatCurrency(totalValue)}</p>
-                </div>
-            </div>
-
-            <div className="space-y-3 pt-2 border-t">
-                <div className="flex justify-between items-center px-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trava: Informe Pesos e Itens Abaixo</label>
-                    <button type="button" onClick={handleAddItem} className="bg-indigo-50 text-indigo-600 p-2 rounded-xl hover:bg-indigo-600 hover:text-white transition-all">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
-                    </button>
-                </div>
-                
-                <div className="space-y-3 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
-                    {items.map((item, index) => {
-                        const contractItem = contractItems.find(ci => ci.name === item.name);
-                        const displayUnit = getDisplayUnit(contractItem);
-                        const isInvalid = item.kg !== '' && (parseFloat(item.kg.replace(',', '.')) <= 0 || isNaN(parseFloat(item.kg.replace(',', '.'))));
-
-                        return (
-                            <div key={item.id} className={`p-4 border-2 rounded-2xl transition-all ${isInvalid ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-white hover:border-indigo-100 shadow-sm'}`}>
-                                <div className="flex flex-col sm:flex-row items-center gap-3">
-                                    <select 
-                                        value={item.name} 
-                                        onChange={e => handleItemChange(item.id, 'name', e.target.value)}
-                                        className="w-full sm:flex-1 px-3 py-2.5 border border-gray-200 rounded-xl outline-none font-bold text-xs bg-white focus:ring-2 focus:ring-indigo-500"
-                                    >
-                                        <option value="">-- Selecione o Produto --</option>
-                                        {availableContractItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
-                                    </select>
-                                    <div className="flex items-center gap-2 w-full sm:w-40">
-                                        <input
-                                            type="text"
-                                            value={item.kg}
-                                            onChange={e => handleItemChange(item.id, 'kg', e.target.value)}
-                                            placeholder={`Peso (${displayUnit})`}
-                                            className={`w-full px-3 py-2.5 border-2 rounded-xl outline-none font-mono text-center font-black ${isInvalid ? 'border-red-300 text-red-600' : 'border-gray-100 text-gray-800 focus:border-indigo-500'}`}
-                                        />
-                                    </div>
-                                    <button type="button" onClick={() => handleRemoveItem(item.id)} className="text-red-300 hover:text-red-600 transition-colors p-1" title="Remover">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
-            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-4">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                    <div className="relative">
-                        <input 
-                            type="checkbox" 
-                            checked={confirmed} 
-                            onChange={e => setConfirmed(e.target.checked)}
-                            className="peer sr-only"
-                        />
-                        <div className="w-6 h-6 border-2 border-gray-300 rounded-md peer-checked:bg-orange-600 peer-checked:border-orange-600 transition-all flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white scale-0 peer-checked:scale-100 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg>
-                        </div>
-                    </div>
-                    <span className="text-[10px] font-black text-gray-600 uppercase tracking-tighter select-none group-hover:text-gray-900 transition-colors">
-                        Confirmo que os pesos e itens lançados acima conferem com o físico entregue na Unidade.
-                    </span>
-                </label>
-            </div>
+        {/* Formulário com Área de Rolagem Independente */}
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
             
-            <div className="pt-4 flex flex-col-reverse sm:flex-row gap-3">
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 custom-scrollbar pb-12">
+                <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex items-start gap-3">
+                    <div className="bg-orange-500 text-white p-2 rounded-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-orange-800 font-black uppercase tracking-tight">Data da Entrega Agendada</p>
+                        <p className="text-sm font-bold text-orange-950">{formattedDate} às {earliestTime}</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                        <label htmlFor="invoice-number" className="text-[10px] font-black text-gray-400 uppercase ml-1">Nº da Nota Fiscal (NF)</label>
+                        <input type="text" id="invoice-number" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} required placeholder="Ex: 001234" className="w-full px-4 py-3 border-2 border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800"/>
+                    </div>
+                    <div className="bg-gray-50 rounded-2xl p-3 flex flex-col justify-center border-2 border-dashed border-gray-200">
+                        <p className="text-[9px] text-gray-400 font-black uppercase text-center mb-1">Total da Nota Calculado</p>
+                        <p className="text-xl font-black text-indigo-700 text-center">{formatCurrency(totalValue)}</p>
+                    </div>
+                </div>
+
+                <div className="space-y-3 pt-2 border-t">
+                    <div className="flex justify-between items-center px-1">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Informe Pesos e Itens Abaixo</label>
+                        <button type="button" onClick={handleAddItem} className="bg-indigo-50 text-indigo-600 p-2 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                        </button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                        {items.map((item, index) => {
+                            const contractItem = contractItems.find(ci => ci.name === item.name);
+                            const displayUnit = getDisplayUnit(contractItem);
+                            const isInvalid = item.kg !== '' && (parseFloat(item.kg.replace(',', '.')) <= 0 || isNaN(parseFloat(item.kg.replace(',', '.'))));
+
+                            return (
+                                <div key={item.id} className={`p-4 border-2 rounded-2xl transition-all ${isInvalid ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-white hover:border-indigo-100 shadow-sm'}`}>
+                                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                                        <select 
+                                            value={item.name} 
+                                            onChange={e => handleItemChange(item.id, 'name', e.target.value)}
+                                            className="w-full sm:flex-1 px-3 py-2.5 border border-gray-200 rounded-xl outline-none font-bold text-xs bg-white focus:ring-2 focus:ring-indigo-500"
+                                        >
+                                            <option value="">-- Selecione o Produto --</option>
+                                            {availableContractItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
+                                        </select>
+                                        <div className="flex items-center gap-2 w-full sm:w-40">
+                                            <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={item.kg}
+                                                onChange={e => handleItemChange(item.id, 'kg', e.target.value)}
+                                                placeholder={`Peso (${displayUnit})`}
+                                                className={`w-full px-3 py-2.5 border-2 rounded-xl outline-none font-mono text-center font-black ${isInvalid ? 'border-red-300 text-red-600' : 'border-gray-100 text-gray-800 focus:border-indigo-500'}`}
+                                            />
+                                        </div>
+                                        <button type="button" onClick={() => handleRemoveItem(item.id)} className="text-red-300 hover:text-red-600 transition-colors p-2 self-end sm:self-center" title="Remover">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                        <div className="relative flex-shrink-0">
+                            <input 
+                                type="checkbox" 
+                                checked={confirmed} 
+                                onChange={e => setConfirmed(e.target.checked)}
+                                className="peer sr-only"
+                            />
+                            <div className="w-6 h-6 border-2 border-gray-300 rounded-md peer-checked:bg-orange-600 peer-checked:border-orange-600 transition-all flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white scale-0 peer-checked:scale-100 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                        </div>
+                        <span className="text-[10px] font-black text-gray-600 uppercase tracking-tighter select-none group-hover:text-gray-900 transition-colors">
+                            Confirmo que os pesos e itens lançados acima conferem com o físico entregue na Unidade.
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            {/* Rodapé Fixo com Botões de Ação */}
+            <div className="p-6 md:p-8 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row gap-3 flex-shrink-0">
                 <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-500 font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest hover:bg-gray-200 transition-all">Cancelar</button>
                 <button 
                     type="submit" 
