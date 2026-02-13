@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import type { FinancialRecord } from '../types';
 
@@ -233,7 +232,8 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-indigo-600 uppercase ml-1">Valor Creditado (R$)</label>
-                <input type="text" value={formData.valorRecebido ?? ''} onChange={e => setFormData({...formData, valorRecebido: e.target.value})} placeholder="0,00" className="w-full p-3 border rounded-xl bg-white border-indigo-100 font-black text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-400" />
+                {/* Fix: Cast e.target.value as any to assign string from input to number field in state. sanitizeNum handles conversion in handleSubmit. */}
+                <input type="text" value={formData.valorRecebido ?? ''} onChange={e => setFormData({...formData, valorRecebido: e.target.value as any})} placeholder="0,00" className="w-full p-3 border rounded-xl bg-white border-indigo-100 font-black text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
             </>
           ) : (
@@ -244,7 +244,8 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-red-600 uppercase ml-1">Valor Gasto (R$)</label>
-                <input type="text" value={formData.valorUtilizado ?? ''} onChange={e => setFormData({...formData, valorUtilizado: e.target.value})} placeholder="0,00" className="w-full p-3 border rounded-xl bg-white border-red-100 font-black text-red-700 outline-none focus:ring-2 focus:ring-red-400" />
+                {/* Fix: Cast e.target.value as any to assign string from input to number field in state. sanitizeNum handles conversion in handleSubmit. */}
+                <input type="text" value={formData.valorUtilizado ?? ''} onChange={e => setFormData({...formData, valorUtilizado: e.target.value as any})} placeholder="0,00" className="w-full p-3 border rounded-xl bg-white border-red-100 font-black text-red-700 outline-none focus:ring-2 focus:ring-red-400" />
               </div>
             </>
           )}
