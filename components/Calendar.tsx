@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import type { Delivery } from '../types';
-import { MONTHS_2026, WEEK_DAYS } from '../constants';
+import { MONTHS_2026, WEEK_DAYS, HOLIDAYS_2026 } from '../constants';
 
 interface CalendarProps {
   onDayClick: (date: Date) => void;
@@ -48,14 +48,20 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
       const weekNumber = getWeekNumber(currentDate);
       const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const holidayName = HOLIDAYS_2026[dateString];
+      const isHoliday = !!holidayName;
+      
       const isWeekAllowed = !allowedWeeks || allowedWeeks.length === 0 || allowedWeeks.includes(weekNumber);
       
       const hasDeliveries = deliveriesOnThisDate.length > 0;
-      const isClickable = (isWeekAllowed && !isWeekend) || hasDeliveries;
+      // Não permite agendar em feriados nem finais de semana, a menos que já existam entregas registradas (por admin)
+      const isClickable = ((isWeekAllowed && !isWeekend && !isHoliday) || hasDeliveries);
       
       let dayClasses = "p-2 text-center border-r border-b border-gray-200 h-20 flex flex-col justify-center items-center relative transition-all";
 
-      if (!isClickable) {
+      if (isHoliday) {
+        dayClasses += " bg-gray-200 text-gray-400 cursor-not-allowed overflow-hidden";
+      } else if (!isClickable) {
         dayClasses += " bg-gray-100 text-gray-300 cursor-not-allowed";
       } else {
         dayClasses += " cursor-pointer";
@@ -76,15 +82,23 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
       }
 
       grid.push(
-        <div key={day} className={dayClasses} onClick={() => isClickable && onDayClick(currentDate)}>
-          <span className="text-xs md:text-sm font-mono">{day}</span>
+        <div key={day} className={dayClasses} onClick={() => isClickable && !isHoliday && onDayClick(currentDate)}>
+          <span className="text-xs md:text-sm font-mono z-10">{day}</span>
+          
+          {isHoliday && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 select-none rotate-12">
+               <span className="text-[10px] font-black uppercase text-gray-500 border border-gray-400 px-1 rounded">{holidayName}</span>
+            </div>
+          )}
+
           {hasDeliveries && (
-            <span className="text-[8px] mt-1 px-1 rounded bg-black/10 truncate max-w-full uppercase font-black">
+            <span className="text-[8px] mt-1 px-1 rounded bg-black/10 truncate max-w-full uppercase font-black z-10">
               {deliveriesOnThisDate.some(d => d.invoiceUploaded) ? 'Faturado' : 'Agendado'}
             </span>
           )}
+          
           {hasDeliveries && deliveriesOnThisDate.some(d => !d.invoiceUploaded) && currentDate < simulatedToday && (
-            <span className="absolute top-1 right-1 text-[8px] bg-yellow-400 text-black px-1 rounded font-black shadow-sm animate-pulse">NF!</span>
+            <span className="absolute top-1 right-1 text-[8px] bg-yellow-400 text-black px-1 rounded font-black shadow-sm animate-pulse z-10">NF!</span>
           )}
         </div>
       );
