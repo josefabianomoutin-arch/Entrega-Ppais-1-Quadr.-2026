@@ -98,7 +98,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                 onClick={() => setActiveSubTab('pagamentos')}
                 className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'pagamentos' ? 'bg-white text-indigo-900 shadow-lg' : 'hover:bg-indigo-800 text-indigo-100'}`}
             >
-                Pagamentos Realizados
+                CONTROLE DE ADIANTAMENTOS
             </button>
             <button 
                 onClick={() => setActiveSubTab('saldos')}
@@ -119,7 +119,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                     </span>
                     <input 
                         type="text" 
-                        placeholder={`Filtrar ${activeSubTab === 'recursos' ? 'Recursos' : 'Pagamentos'}...`}
+                        placeholder={`Filtrar ${activeSubTab === 'recursos' ? 'Recursos' : 'Adiantamentos'}...`}
                         value={searchTerm} 
                         onChange={(e) => setSearchTerm(e.target.value)} 
                         className="w-full border-none rounded-3xl px-14 py-4 outline-none ring-4 ring-indigo-50 font-bold bg-white transition-all text-sm shadow-xl focus:ring-indigo-100" 
