@@ -265,28 +265,50 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: 
                 if (groupDisplayRecords.length === 0) return null;
 
                 const groupBalanceRecords = allRecords.filter(r => r.ptres.trim() === ptres);
-                const realBalance = groupBalanceRecords.reduce((acc, curr) => 
-                    acc + (curr.tipo === 'RECURSO' ? Number(curr.valorRecebido || 0) : -Number(curr.valorUtilizado || 0)), 0);
+                
+                // CÁLCULO DOS TRÊS VALORES SOLICITADOS NO CABEÇALHO DO PTRES
+                const totalEntrou = groupBalanceRecords
+                    .filter(r => r.tipo === 'RECURSO')
+                    .reduce((acc, curr) => acc + (Number(curr.valorRecebido) || 0), 0);
+                
+                const totalUtilizado = groupBalanceRecords
+                    .filter(r => r.tipo === 'DESPESA')
+                    .reduce((acc, curr) => acc + Number(curr.valorUtilizado || 0), 0);
+                
+                const realSaldo = totalEntrou - totalUtilizado;
 
                 return (
                     <div key={ptres} className="space-y-6">
-                        <div className="flex items-center justify-between px-4">
+                        {/* CABEÇALHO DE PTRES ATUALIZADO COM TRÍADE DE SALDO */}
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between px-4 gap-4">
                             <div className="flex flex-col">
                                 <div className="flex items-baseline gap-4">
                                     <h3 className="text-4xl font-black text-indigo-900 tracking-tighter italic">PTRES {ptres}</h3>
                                     <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">
-                                        {groupDisplayRecords.length} Registros
+                                        {groupDisplayRecords.length} Registros no Filtro
                                     </span>
                                 </div>
                                 <p className="text-xs font-black text-gray-400 uppercase tracking-tighter mt-1 italic">
                                     {PTRES_DESCRIPTIONS[ptres] || 'Outros Recursos'}
                                 </p>
                             </div>
-                            <div className="text-right bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Saldo Atual PTRES</p>
-                                <p className={`text-xl font-black ${realBalance >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
-                                    {formatCurrency(realBalance)}
-                                </p>
+
+                            {/* PAINEL DE SALDO CONSOLIDADO DO GRUPO (ENTROU, UTILIZADO, SALDO) */}
+                            <div className="grid grid-cols-3 gap-2 sm:gap-4 bg-white p-4 rounded-3xl shadow-xl border border-gray-100">
+                                <div className="text-center px-2 sm:px-4 border-r border-gray-100">
+                                    <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest mb-1">Entrou</p>
+                                    <p className="text-xs sm:text-sm font-black text-blue-700">{formatCurrency(totalEntrou)}</p>
+                                </div>
+                                <div className="text-center px-2 sm:px-4 border-r border-gray-100">
+                                    <p className="text-[8px] font-black text-red-500 uppercase tracking-widest mb-1">Utilizado</p>
+                                    <p className="text-xs sm:text-sm font-black text-red-600">{formatCurrency(totalUtilizado)}</p>
+                                </div>
+                                <div className="text-center px-2 sm:px-4">
+                                    <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mb-1">Saldo</p>
+                                    <p className={`text-xs sm:text-sm font-black ${realSaldo >= 0 ? 'text-indigo-700' : 'text-red-700'}`}>
+                                        {formatCurrency(realSaldo)}
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
@@ -306,7 +328,7 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: 
                                                         {natureza === '339030' ? 'Peças e Materiais (339030)' : 'Outros Serviços (339039)'}
                                                     </h4>
                                                 </div>
-                                                <span className="text-sm font-black text-red-600">Subtotal: {formatCurrency(natTotal)}</span>
+                                                <span className="text-sm font-black text-red-600">Subtotal Categoria: {formatCurrency(natTotal)}</span>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                                                 {natRecords.map((r, idx) => (
