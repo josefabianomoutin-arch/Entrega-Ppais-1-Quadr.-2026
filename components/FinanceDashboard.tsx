@@ -266,20 +266,18 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: 
 
                 const groupBalanceRecords = allRecords.filter(r => r.ptres.trim() === ptres);
                 
-                // CÁLCULO DOS TRÊS VALORES SOLICITADOS NO CABEÇALHO DO PTRES
-                const totalEntrou = groupBalanceRecords
+                const totalEntrouPtres = groupBalanceRecords
                     .filter(r => r.tipo === 'RECURSO')
                     .reduce((acc, curr) => acc + (Number(curr.valorRecebido) || 0), 0);
                 
-                const totalUtilizado = groupBalanceRecords
+                const totalUtilizadoPtres = groupBalanceRecords
                     .filter(r => r.tipo === 'DESPESA')
                     .reduce((acc, curr) => acc + Number(curr.valorUtilizado || 0), 0);
                 
-                const realSaldo = totalEntrou - totalUtilizado;
+                const realSaldoPtres = totalEntrouPtres - totalUtilizadoPtres;
 
                 return (
                     <div key={ptres} className="space-y-6">
-                        {/* CABEÇALHO DE PTRES ATUALIZADO COM TRÍADE DE SALDO */}
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between px-4 gap-4">
                             <div className="flex flex-col">
                                 <div className="flex items-baseline gap-4">
@@ -293,42 +291,66 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: 
                                 </p>
                             </div>
 
-                            {/* PAINEL DE SALDO CONSOLIDADO DO GRUPO (ENTROU, UTILIZADO, SALDO) */}
                             <div className="grid grid-cols-3 gap-2 sm:gap-4 bg-white p-4 rounded-3xl shadow-xl border border-gray-100">
                                 <div className="text-center px-2 sm:px-4 border-r border-gray-100">
                                     <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest mb-1">Entrou</p>
-                                    <p className="text-xs sm:text-sm font-black text-blue-700">{formatCurrency(totalEntrou)}</p>
+                                    <p className="text-xs sm:text-sm font-black text-blue-700">{formatCurrency(totalEntrouPtres)}</p>
                                 </div>
                                 <div className="text-center px-2 sm:px-4 border-r border-gray-100">
                                     <p className="text-[8px] font-black text-red-500 uppercase tracking-widest mb-1">Utilizado</p>
-                                    <p className="text-xs sm:text-sm font-black text-red-600">{formatCurrency(totalUtilizado)}</p>
+                                    <p className="text-xs sm:text-sm font-black text-red-600">{formatCurrency(totalUtilizadoPtres)}</p>
                                 </div>
                                 <div className="text-center px-2 sm:px-4">
                                     <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mb-1">Saldo</p>
-                                    <p className={`text-xs sm:text-sm font-black ${realSaldo >= 0 ? 'text-indigo-700' : 'text-red-700'}`}>
-                                        {formatCurrency(realSaldo)}
+                                    <p className={`text-xs sm:text-sm font-black ${realSaldoPtres >= 0 ? 'text-indigo-700' : 'text-red-700'}`}>
+                                        {formatCurrency(realSaldoPtres)}
                                     </p>
                                 </div>
                             </div>
                         </div>
 
                         {viewMode === 'pagamentos' ? (
-                            <div className="grid grid-cols-1 gap-10">
+                            <div className="grid grid-cols-1 gap-12">
                                 {NATUREZA_OPTIONS.map(natureza => {
                                     const natRecords = groupDisplayRecords.filter(r => r.natureza === natureza);
                                     if (natRecords.length === 0) return null;
-                                    const natTotal = natRecords.reduce((s, r) => s + Number(r.valorUtilizado), 0);
+
+                                    // CÁLCULO ESPECÍFICO POR NATUREZA (339030 ou 339039)
+                                    const natEntrou = groupBalanceRecords
+                                        .filter(r => r.natureza === natureza && r.tipo === 'RECURSO')
+                                        .reduce((acc, curr) => acc + (Number(curr.valorRecebido) || 0), 0);
+                                    
+                                    const natUtilizado = groupBalanceRecords
+                                        .filter(r => r.natureza === natureza && r.tipo === 'DESPESA')
+                                        .reduce((acc, curr) => acc + (Number(curr.valorUtilizado) || 0), 0);
+                                    
+                                    const natSaldo = natEntrou - natUtilizado;
 
                                     return (
-                                        <div key={natureza} className="space-y-4">
-                                            <div className="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2 mx-4">
+                                        <div key={natureza} className="space-y-6 bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-200/50">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-dashed border-gray-300 pb-4 mx-2">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-3 h-3 rounded-full ${natureza === '339030' ? 'bg-blue-500' : 'bg-purple-500'}`}></div>
-                                                    <h4 className="text-sm font-black text-gray-700 uppercase tracking-widest">
+                                                    <div className={`w-4 h-4 rounded-full ${natureza === '339030' ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]'}`}></div>
+                                                    <h4 className="text-lg font-black text-gray-800 uppercase tracking-widest italic">
                                                         {natureza === '339030' ? 'Peças e Materiais (339030)' : 'Outros Serviços (339039)'}
                                                     </h4>
                                                 </div>
-                                                <span className="text-sm font-black text-red-600">Subtotal Categoria: {formatCurrency(natTotal)}</span>
+                                                
+                                                {/* TRÍADE DE SALDO ESPECÍFICA DA CATEGORIA */}
+                                                <div className="flex items-center gap-4 bg-white/80 px-6 py-2 rounded-2xl shadow-sm border border-gray-100">
+                                                    <div className="text-center border-r pr-4 border-gray-100">
+                                                        <p className="text-[7px] font-black text-blue-400 uppercase leading-none mb-1">Entrou (Nat)</p>
+                                                        <p className="text-[11px] font-bold text-blue-600">{formatCurrency(natEntrou)}</p>
+                                                    </div>
+                                                    <div className="text-center border-r pr-4 border-gray-100">
+                                                        <p className="text-[7px] font-black text-red-400 uppercase leading-none mb-1">Gasto (Nat)</p>
+                                                        <p className="text-[11px] font-bold text-red-600">{formatCurrency(natUtilizado)}</p>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <p className="text-[7px] font-black text-indigo-400 uppercase leading-none mb-1">Saldo (Nat)</p>
+                                                        <p className={`text-[11px] font-black ${natSaldo >= 0 ? 'text-indigo-700' : 'text-red-700'}`}>{formatCurrency(natSaldo)}</p>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                                                 {natRecords.map((r, idx) => (
