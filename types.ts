@@ -117,11 +117,9 @@ export interface DailyMenus {
 export interface FinancialRecord {
   id: string;
   tipo: 'RECURSO' | 'DESPESA';
-  // Fix: PTRES code 38038 was a typo for 380308 to match PTRES_OPTIONS in AdminFinancialManager
   ptres: '380302' | '380303' | '380304' | '380308' | '380328';
   selecao: string;
   natureza: '339030' | '339039';
-  // Fix: Added missing 'modalidade' property used in AdminFinancialManager
   modalidade: string;
   dataSolicitacao: string;
   valorSolicitado: number;
@@ -134,6 +132,8 @@ export interface FinancialRecord {
   numeroProcesso: string;
   dataPagamento: string;
   status: string;
+  dataFinalizacaoProcesso: string; // NOVO
+  numeroEmpenho: string; // NOVO
 }
 
 export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria';

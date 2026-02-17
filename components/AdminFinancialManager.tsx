@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { FinancialRecord } from '../types';
 
@@ -38,7 +39,9 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
     descricao: '',
     localUtilizado: '',
     numeroProcesso: '',
-    dataPagamento: ''
+    dataPagamento: '',
+    dataFinalizacaoProcesso: '',
+    numeroEmpenho: ''
   };
 
   const [formData, setFormData] = useState<Partial<FinancialRecord>>(initialFormState);
@@ -46,7 +49,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
   
   const isEditing = !!formData.id;
 
-  // Cálculo detalhado para os quadros de saldo vinculados (Igual ao FinanceDashboard)
+  // Cálculo detalhado para os quadros de saldo vinculados
   const linkedBalances = useMemo(() => {
     return PTRES_OPTIONS.map(p => {
       const naturezas = NATUREZA_OPTIONS.map(n => {
@@ -99,6 +102,8 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
             descricao: formData.descricao?.trim() || '',
             justificativa: formData.justificativa?.trim() || '',
             numeroProcesso: formData.numeroProcesso?.trim() || '',
+            numeroEmpenho: formData.numeroEmpenho?.trim() || '',
+            dataFinalizacaoProcesso: formData.dataFinalizacaoProcesso || '',
             modalidade: formData.modalidade?.trim() || '',
             status: formData.status?.trim() || 'PENDENTE'
         };
@@ -108,6 +113,8 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
           delete recordToSave.valorUtilizado;
           delete recordToSave.localUtilizado;
           delete recordToSave.numeroProcesso;
+          delete recordToSave.numeroEmpenho;
+          delete recordToSave.dataFinalizacaoProcesso;
           delete recordToSave.dataPagamento;
           delete recordToSave.modalidade;
         } else {
@@ -130,7 +137,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
   return (
     <div className="space-y-12 animate-fade-in pb-20 max-w-[1600px] mx-auto">
       
-      {/* 1. QUADROS DE SALDO (LAYOUT CONFORME IMAGEM) */}
+      {/* 1. QUADROS DE SALDO */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {linkedBalances.map(group => (
             <div key={group.ptres} className="bg-white p-8 rounded-[2.5rem] shadow-2xl border-t-8 border-indigo-900 flex flex-col h-full animate-fade-in-up">
@@ -190,7 +197,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
         ))}
       </div>
 
-      {/* 2. FORMULÁRIO DE LANÇAMENTO (OTIMIZADO) */}
+      {/* 2. FORMULÁRIO DE LANÇAMENTO */}
       <div className={`bg-white p-8 rounded-[2.5rem] shadow-xl border-2 transition-all ${isEditing ? 'border-orange-500 ring-4 ring-orange-50' : 'border-gray-100'}`}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
@@ -232,7 +239,6 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-indigo-600 uppercase ml-1">Valor Creditado (R$)</label>
-                {/* Fix: Cast e.target.value as any to assign string from input to number field in state. sanitizeNum handles conversion in handleSubmit. */}
                 <input type="text" value={formData.valorRecebido ?? ''} onChange={e => setFormData({...formData, valorRecebido: e.target.value as any})} placeholder="0,00" className="w-full p-3 border rounded-xl bg-white border-indigo-100 font-black text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
             </>
@@ -244,26 +250,36 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-red-600 uppercase ml-1">Valor Gasto (R$)</label>
-                {/* Fix: Cast e.target.value as any to assign string from input to number field in state. sanitizeNum handles conversion in handleSubmit. */}
                 <input type="text" value={formData.valorUtilizado ?? ''} onChange={e => setFormData({...formData, valorUtilizado: e.target.value as any})} placeholder="0,00" className="w-full p-3 border rounded-xl bg-white border-red-100 font-black text-red-700 outline-none focus:ring-2 focus:ring-red-400" />
               </div>
             </>
           )}
 
-          <div className="md:col-span-2 space-y-1">
+          <div className="md:col-span-2 lg:col-span-4 space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Descrição do Objeto / Serviço</label>
-            <textarea rows={2} value={formData.descricao || ''} onChange={e => setFormData({...formData, descricao: e.target.value})} className="w-full p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-400 font-medium text-sm" placeholder="O que foi adquirido?" />
-          </div>
-          <div className="md:col-span-2 space-y-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Justificativa da Necessidade</label>
-            <textarea rows={2} value={formData.justificativa || ''} onChange={e => setFormData({...formData, justificativa: e.target.value})} className="w-full p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-400 font-medium italic text-sm" placeholder="Por que foi necessário?" />
+            <textarea rows={1} value={formData.descricao || ''} onChange={e => setFormData({...formData, descricao: e.target.value})} className="w-full p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-400 font-medium text-sm" placeholder="O que foi adquirido?" />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Status / Processo</label>
-            <div className="flex gap-2">
-                <input type="text" value={formData.status || ''} onChange={e => setFormData({...formData, status: e.target.value.toUpperCase()})} className="w-1/2 p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-400 font-black text-[10px]" placeholder="STATUS" />
-                <input type="text" value={formData.numeroProcesso || ''} onChange={e => setFormData({...formData, numeroProcesso: e.target.value})} className="w-1/2 p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-400 font-mono text-[10px]" placeholder="Nº PROC" />
+          {/* NOVO BLOCO: PROCESSO E EMPENHO */}
+          <div className="md:col-span-3 lg:col-span-4 space-y-1">
+            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Informações do Processo e Empenho</label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                <div className="space-y-1">
+                    <span className="text-[8px] font-black text-gray-400 uppercase ml-1">Status</span>
+                    <input type="text" value={formData.status || ''} onChange={e => setFormData({...formData, status: e.target.value.toUpperCase()})} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-400 font-black text-[10px]" placeholder="STATUS" />
+                </div>
+                <div className="space-y-1">
+                    <span className="text-[8px] font-black text-gray-400 uppercase ml-1">Nº Processo</span>
+                    <input type="text" value={formData.numeroProcesso || ''} onChange={e => setFormData({...formData, numeroProcesso: e.target.value})} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-400 font-mono text-[10px]" placeholder="Nº PROC" />
+                </div>
+                <div className="space-y-1">
+                    <span className="text-[8px] font-black text-gray-400 uppercase ml-1">Finalização</span>
+                    <input type="date" value={formData.dataFinalizacaoProcesso || ''} onChange={e => setFormData({...formData, dataFinalizacaoProcesso: e.target.value})} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-400 text-[10px]" />
+                </div>
+                <div className="space-y-1">
+                    <span className="text-[8px] font-black text-gray-400 uppercase ml-1">Nº Empenho</span>
+                    <input type="text" value={formData.numeroEmpenho || ''} onChange={e => setFormData({...formData, numeroEmpenho: e.target.value})} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-400 font-mono text-[10px]" placeholder="Nº EMP" />
+                </div>
             </div>
           </div>
 
@@ -304,7 +320,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-black text-gray-400 uppercase">Saldo do Grupo</p>
-                  <p className={`font-black ${ptresTotals.rec - ptresTotals.gast >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                  <p className={`font-black ${ptresTotals.rec - ptresTotals.gast >= 0 ? 'text-indigo-600' : 'text-red-700'}`}>
                     {formatCurrency(ptresTotals.rec - ptresTotals.gast)}
                   </p>
                 </div>
@@ -330,6 +346,13 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
                         <div>
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Descrição do Objeto</p>
                           <p className="text-sm font-bold text-gray-800 leading-relaxed uppercase">{r.descricao || 'N/A'}</p>
+                          
+                          {/* EXIBIÇÃO PROCESSO / EMPENHO NO HISTÓRICO ADMIN */}
+                          <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-gray-50 text-[9px] font-bold uppercase text-gray-400">
+                             {r.numeroProcesso && <span>PROCESSO: <span className="text-gray-600">{r.numeroProcesso}</span></span>}
+                             {r.numeroEmpenho && <span>EMPENHO: <span className="text-gray-600">{r.numeroEmpenho}</span></span>}
+                             {r.dataFinalizacaoProcesso && <span>CONCLUÍDO EM: <span className="text-gray-600">{r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</span></span>}
+                          </div>
                         </div>
                       </div>
 

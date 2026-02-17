@@ -68,6 +68,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
         const matchesSearch = r.ptres.toLowerCase().includes(searchTerm.toLowerCase()) ||
             r.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (r.numeroProcesso || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (r.numeroEmpenho || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (r.modalidade || '').toLowerCase().includes(searchTerm.toLowerCase());
         
         if (activeSubTab === 'recursos') return matchesSearch && r.tipo === 'RECURSO';
@@ -356,8 +357,14 @@ const FinancialCard: React.FC<{ record: FinancialRecord }> = ({ record: r }) => 
 
             <div className="mt-6 flex justify-between items-end">
                 <div>
-                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Processo</p>
-                    <p className="text-[10px] font-mono font-black text-gray-600">{r.numeroProcesso || 'N/A'}</p>
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Processo / Empenho</p>
+                    <p className="text-[10px] font-mono font-black text-gray-600 leading-tight">
+                        {r.numeroProcesso || 'N/A'}
+                        {r.numeroEmpenho ? ` | EMP: ${r.numeroEmpenho}` : ''}
+                    </p>
+                    {r.dataFinalizacaoProcesso && (
+                        <p className="text-[8px] font-bold text-indigo-500 uppercase mt-1">Concluído em: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</p>
+                    )}
                 </div>
                 <div className="text-right">
                     <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Valor</p>
