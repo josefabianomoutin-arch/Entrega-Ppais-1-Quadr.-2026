@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import type { StandardMenu, DailyMenus, MenuRow, Supplier } from '../types';
 
@@ -292,22 +290,20 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
               <table>
                   <thead>
                       <tr>
-                          <th style="width: 30%;">Alimento / Preparação</th>
-                          <th style="width: 25%;">Descrição Preparo</th>
-                          <th style="width: 20%;">Item Contratado (p/ Análise)</th>
-                          <th style="width: 12.5%; text-align: right;">Peso/Qtd. Unit.</th>
-                          <th style="width: 12.5%; text-align: right;">Peso/Qtd. Total</th>
+                          <th style="width: 40%;">Alimento / Preparação</th>
+                          <th style="width: 30%;">Item Contratado (p/ Análise)</th>
+                          <th style="width: 15%; text-align: right;">Peso/Qtd. Unit.</th>
+                          <th style="width: 15%; text-align: right;">Peso/Qtd. Total</th>
                       </tr>
                   </thead>
                   <tbody>
                     ${MEAL_PERIODS.map(period => {
                       if (!groupedMenu[period] || groupedMenu[period].length === 0) return '';
                       return `
-                        <tr><td colspan="5" class="period-header">${period}</td></tr>
+                        <tr><td colspan="4" class="period-header">${period}</td></tr>
                         ${groupedMenu[period].map(row => `
                           <tr>
                             <td>${row.foodItem}</td>
-                            <td>${row.preparationDetails || ''}</td>
                             <td>${row.contractedItem || '-'}</td>
                             <td style="text-align: right;">${row.unitWeight}</td>
                             <td style="text-align: right;">${row.totalWeight}</td>
@@ -569,7 +565,6 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                             <tr>
                                 <th className="p-3 border text-left w-32">Período</th>
                                 <th className="p-3 border text-left">Alimento / Preparação</th>
-                                <th className="p-3 border text-left">Descrição Preparo</th>
                                 <th className="p-3 border text-left">Item Contratado (p/ Análise)</th>
                                 <th className="p-3 border text-center w-28">Peso/Qtd. Unit.</th>
                                 <th className="p-3 border text-center w-32">Peso/Qtd. Total</th>
@@ -597,15 +592,6 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                             value={row.foodItem}
                                             onChange={(e) => handleInputChange(idx, 'foodItem', e.target.value)}
                                             placeholder="Ex: Arroz à grega"
-                                            className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-medium"
-                                        />
-                                    </td>
-                                    <td className="p-1 border">
-                                        <input
-                                            type="text"
-                                            value={row.preparationDetails || ''}
-                                            onChange={(e) => handleInputChange(idx, 'preparationDetails', e.target.value)}
-                                            placeholder="Ex: Cozido com legumes"
                                             className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-medium"
                                         />
                                     </td>
@@ -688,7 +674,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                               </ul>
                           ) : (
                               <p className="mt-2 text-sm text-red-600 font-semibold flex items-center gap-2">
-                                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                   Nenhum fornecedor contratado para este item.
                               </p>
                           )}
