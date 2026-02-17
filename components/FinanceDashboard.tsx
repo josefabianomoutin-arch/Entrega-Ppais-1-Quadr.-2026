@@ -10,7 +10,6 @@ interface FinanceDashboardProps {
 const PTRES_OPTIONS = ['380302', '380303', '380304', '380308', '380328'] as const;
 const NATUREZA_OPTIONS = ['339030', '339039'] as const;
 
-// Mapeamento de descrições solicitado pelo usuário
 const PTRES_DESCRIPTIONS: Record<string, string> = {
     '380302': 'Materiais para o Setor de Saúde',
     '380303': 'Recurso para Atender peças e serviços de viaturas',
@@ -35,7 +34,6 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
       }), { utilizado: 0, recurso: 0 });
   }, [records]);
 
-  // Cálculo de saldos vinculados PTRES + Natureza
   const linkedBalances = useMemo(() => {
     return PTRES_OPTIONS.map(p => {
       const naturezas = NATUREZA_OPTIONS.map(n => {
@@ -75,11 +73,6 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
         if (activeSubTab === 'recursos') return matchesSearch && r.tipo === 'RECURSO';
         if (activeSubTab === 'pagamentos') return matchesSearch && r.tipo === 'DESPESA';
         return matchesSearch;
-    }).sort((a, b) => {
-        if (a.tipo !== b.tipo) {
-            return a.tipo === 'RECURSO' ? -1 : 1;
-        }
-        return new Date(b.dataRecebimento || b.dataPagamento || '').getTime() - new Date(a.dataRecebimento || a.dataPagamento || '').getTime();
     });
   }, [records, searchTerm, activeSubTab]);
 
@@ -93,7 +86,6 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
         <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 text-white font-black py-2 px-6 rounded-xl text-xs uppercase shadow-lg transition-all active:scale-95">Sair</button>
       </header>
 
-      {/* SUB-MENU DE NAVEGAÇÃO */}
       <div className="bg-indigo-900 text-white py-3 px-4 shadow-inner">
         <div className="max-w-[1600px] mx-auto flex flex-wrap justify-center gap-2">
             <button 
@@ -119,7 +111,6 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
 
       <main className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-12 animate-fade-in">
         
-        {/* BUSCA GLOBAL */}
         {activeSubTab !== 'saldos' && (
             <div className="flex justify-center">
                 <div className="w-full max-w-2xl relative">
@@ -137,7 +128,6 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
             </div>
         )}
 
-        {/* CONTEÚDO DA SUBABA: RECURSOS */}
         {activeSubTab === 'recursos' && (
             <div className="space-y-12 animate-fade-in-up">
                 <div className="max-w-md mx-auto">
@@ -151,11 +141,10 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                         </div>
                     </div>
                 </div>
-                <MovementsGrid filteredRecords={filteredRecords} allRecords={records} />
+                <MovementsGrid filteredRecords={filteredRecords} allRecords={records} viewMode="recursos" />
             </div>
         )}
 
-        {/* CONTEÚDO DA SUBABA: PAGAMENTOS */}
         {activeSubTab === 'pagamentos' && (
             <div className="space-y-12 animate-fade-in-up">
                 <div className="max-w-md mx-auto">
@@ -169,11 +158,10 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                         </div>
                     </div>
                 </div>
-                <MovementsGrid filteredRecords={filteredRecords} allRecords={records} />
+                <MovementsGrid filteredRecords={filteredRecords} allRecords={records} viewMode="pagamentos" />
             </div>
         )}
 
-        {/* CONTEÚDO DA SUBABA: SALDOS */}
         {activeSubTab === 'saldos' && (
             <div className="space-y-12 animate-fade-in-up">
                 <div className="max-w-md mx-auto">
@@ -269,8 +257,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
   );
 };
 
-// Componente Interno para organizar a grade de movimentos agrupada por PTRES
-const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: FinancialRecord[] }> = ({ filteredRecords, allRecords }) => {
+const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: FinancialRecord[], viewMode: 'recursos' | 'pagamentos' }> = ({ filteredRecords, allRecords, viewMode }) => {
     return (
         <div className="space-y-16">
             {PTRES_OPTIONS.map(ptres => {
@@ -288,7 +275,7 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: 
                                 <div className="flex items-baseline gap-4">
                                     <h3 className="text-4xl font-black text-indigo-900 tracking-tighter italic">PTRES {ptres}</h3>
                                     <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">
-                                        {groupDisplayRecords.length} Registros Exibidos
+                                        {groupDisplayRecords.length} Registros
                                     </span>
                                 </div>
                                 <p className="text-xs font-black text-gray-400 uppercase tracking-tighter mt-1 italic">
@@ -296,69 +283,101 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: 
                                 </p>
                             </div>
                             <div className="text-right bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Saldo Líquido do Grupo</p>
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Saldo Atual PTRES</p>
                                 <p className={`text-xl font-black ${realBalance >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
                                     {formatCurrency(realBalance)}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {groupDisplayRecords.sort((a,b) => {
-                                if (a.tipo !== b.tipo) return a.tipo === 'RECURSO' ? -1 : 1;
-                                return new Date(b.dataRecebimento || b.dataPagamento || '').getTime() - new Date(a.dataRecebimento || a.dataPagamento || '').getTime();
-                            }).map((r, index) => (
-                                <div key={r.id || `rec-${ptres}-${index}`} className={`bg-white p-6 rounded-[2.5rem] shadow-lg border-l-[12px] flex flex-col justify-between transition-all hover:shadow-2xl hover:-translate-y-1 ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'}`}>
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-start">
-                                            <div className="flex flex-col gap-1">
-                                                <span className={`text-[9px] w-fit font-black px-3 py-1 rounded-full uppercase border shadow-sm ${r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                                                    {r.tipo}
-                                                </span>
-                                                <span className="text-[8px] text-gray-300 font-mono uppercase">ID: ...{r.id?.slice(-4) || 'NOID'}</span>
-                                            </div>
-                                            <span className="text-[10px] font-mono font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded">
-                                                {(r.dataRecebimento || r.dataPagamento || r.dataSolicitacao || '-').split('-').reverse().join('/')}
-                                            </span>
-                                        </div>
+                        {viewMode === 'pagamentos' ? (
+                            <div className="grid grid-cols-1 gap-10">
+                                {NATUREZA_OPTIONS.map(natureza => {
+                                    const natRecords = groupDisplayRecords.filter(r => r.natureza === natureza);
+                                    if (natRecords.length === 0) return null;
+                                    const natTotal = natRecords.reduce((s, r) => s + Number(r.valorUtilizado), 0);
 
-                                        <div>
-                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Objeto / Serviço</p>
-                                            <p className="text-sm font-black text-gray-800 leading-tight uppercase line-clamp-2" title={r.descricao}>{r.descricao || 'Sem descrição'}</p>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
-                                            <div>
-                                                <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Natureza</p>
-                                                <p className="text-[10px] font-bold text-indigo-600">{r.natureza} ({r.natureza === '339030' ? 'Peças' : 'Serviços'})</p>
-                                            </div>
-                                            {r.tipo === 'DESPESA' && (
-                                                <div>
-                                                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Modalidade</p>
-                                                    <p className="text-[10px] font-bold text-gray-600 uppercase truncate">{r.modalidade || '-'}</p>
+                                    return (
+                                        <div key={natureza} className="space-y-4">
+                                            <div className="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2 mx-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-3 h-3 rounded-full ${natureza === '339030' ? 'bg-blue-500' : 'bg-purple-500'}`}></div>
+                                                    <h4 className="text-sm font-black text-gray-700 uppercase tracking-widest">
+                                                        {natureza === '339030' ? 'Peças e Materiais (339030)' : 'Outros Serviços (339039)'}
+                                                    </h4>
                                                 </div>
-                                            )}
+                                                <span className="text-sm font-black text-red-600">Subtotal: {formatCurrency(natTotal)}</span>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                                {natRecords.map((r, idx) => (
+                                                    <FinancialCard key={r.id || idx} record={r} />
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    <div className="mt-6 flex justify-between items-end">
-                                        <div>
-                                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Processo</p>
-                                            <p className="text-[10px] font-mono font-black text-gray-600">{r.numeroProcesso || 'N/A'}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Valor</p>
-                                            <p className={`text-xl font-black ${r.tipo === 'RECURSO' ? 'text-indigo-700' : 'text-red-700'}`}>
-                                                {r.tipo === 'RECURSO' ? `+ ${formatCurrency(r.valorRecebido)}` : `- ${formatCurrency(r.valorUtilizado)}`}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                {groupDisplayRecords.map((r, index) => (
+                                    <FinancialCard key={r.id || index} record={r} />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 );
             })}
+        </div>
+    );
+};
+
+const FinancialCard: React.FC<{ record: FinancialRecord }> = ({ record: r }) => {
+    return (
+        <div className={`bg-white p-6 rounded-[2.5rem] shadow-lg border-l-[12px] flex flex-col justify-between transition-all hover:shadow-2xl hover:-translate-y-1 ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'}`}>
+            <div className="space-y-4">
+                <div className="flex justify-between items-start">
+                    <div className="flex flex-col gap-1">
+                        <span className={`text-[9px] w-fit font-black px-3 py-1 rounded-full uppercase border shadow-sm ${r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                            {r.tipo}
+                        </span>
+                        <span className="text-[8px] text-gray-300 font-mono uppercase">ID: ...{r.id?.slice(-4) || 'NOID'}</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded">
+                        {(r.dataRecebimento || r.dataPagamento || r.dataSolicitacao || '-').split('-').reverse().join('/')}
+                    </span>
+                </div>
+
+                <div>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Objeto / Serviço</p>
+                    <p className="text-sm font-black text-gray-800 leading-tight uppercase line-clamp-2" title={r.descricao}>{r.descricao || 'Sem descrição'}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
+                    <div>
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Natureza</p>
+                        <p className="text-[10px] font-bold text-indigo-600">{r.natureza} ({r.natureza === '339030' ? 'Peças' : 'Serviços'})</p>
+                    </div>
+                    {r.tipo === 'DESPESA' && (
+                        <div>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Modalidade</p>
+                            <p className="text-[10px] font-bold text-gray-600 uppercase truncate">{r.modalidade || '-'}</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="mt-6 flex justify-between items-end">
+                <div>
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Processo</p>
+                    <p className="text-[10px] font-mono font-black text-gray-600">{r.numeroProcesso || 'N/A'}</p>
+                </div>
+                <div className="text-right">
+                    <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Valor</p>
+                    <p className={`text-xl font-black ${r.tipo === 'RECURSO' ? 'text-indigo-700' : 'text-red-700'}`}>
+                        {r.tipo === 'RECURSO' ? `+ ${formatCurrency(r.valorRecebido)}` : `- ${formatCurrency(r.valorUtilizado)}`}
+                    </p>
+                </div>
+            </div>
         </div>
     );
 };
