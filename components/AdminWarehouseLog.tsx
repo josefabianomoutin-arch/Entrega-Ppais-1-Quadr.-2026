@@ -258,7 +258,12 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                             <div className="space-y-3">
                                 <div className="flex justify-between items-start">
                                     <span className="text-[10px] font-black bg-indigo-600 text-white px-3 py-1 rounded-full uppercase shadow-sm">Entrada Recente</span>
-                                    <div className={`px-3 py-1 rounded-lg text-white font-black text-[10px] uppercase shadow-sm ${item.shelfLifeDays > 30 ? 'bg-green-500' : item.shelfLifeDays > 15 ? 'bg-orange-500' : 'bg-red-500'}`}>
+                                    <div className={`px-3 py-1 rounded-lg text-white font-black text-[10px] uppercase shadow-sm ${
+                                        item.shelfLifeDays > 180 ? 'bg-green-900 border border-green-700' : 
+                                        item.shelfLifeDays > 30 ? 'bg-green-500' : 
+                                        item.shelfLifeDays > 15 ? 'bg-orange-500' : 
+                                        'bg-red-500'
+                                    }`}>
                                         Prazo: {item.shelfLifeDays} dias
                                     </div>
                                 </div>
@@ -279,7 +284,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                             </div>
                             <div className="mt-4 flex items-center justify-between">
                                 <p className="text-[9px] text-gray-400 font-mono">Lote: {item.lotNumber}</p>
-                                <span className="text-[9px] font-black text-indigo-400 group-hover:text-indigo-600 transition-colors uppercase">Giro Calculado</span>
+                                <span className={`text-[9px] font-black uppercase transition-colors ${item.shelfLifeDays > 180 ? 'text-green-800' : 'text-indigo-400'} group-hover:text-indigo-600`}>Giro Calculado</span>
                             </div>
                         </div>
                     )) : (
