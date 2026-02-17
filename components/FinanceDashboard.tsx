@@ -141,7 +141,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                         </div>
                     </div>
                 </div>
-                <MovementsGrid filteredRecords={filteredRecords} allRecords={records} viewMode="recursos" />
+                <MovementsGrid filteredRecords={filteredRecords} viewMode="recursos" />
             </div>
         )}
 
@@ -158,7 +158,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                         </div>
                     </div>
                 </div>
-                <MovementsGrid filteredRecords={filteredRecords} allRecords={records} viewMode="pagamentos" />
+                <MovementsGrid filteredRecords={filteredRecords} viewMode="pagamentos" />
             </div>
         )}
 
@@ -257,14 +257,12 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
   );
 };
 
-const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: FinancialRecord[], viewMode: 'recursos' | 'pagamentos' }> = ({ filteredRecords, allRecords, viewMode }) => {
+const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], viewMode: 'recursos' | 'pagamentos' }> = ({ filteredRecords, viewMode }) => {
     return (
         <div className="space-y-16">
             {PTRES_OPTIONS.map(ptres => {
                 const groupDisplayRecords = filteredRecords.filter(r => r.ptres.trim() === ptres);
                 if (groupDisplayRecords.length === 0) return null;
-
-                const groupBalanceRecords = allRecords.filter(r => r.ptres.trim() === ptres);
 
                 return (
                     <div key={ptres} className="space-y-6">
@@ -288,17 +286,6 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: 
                                     const natRecords = groupDisplayRecords.filter(r => r.natureza === natureza);
                                     if (natRecords.length === 0) return null;
 
-                                    // CÁLCULO ESPECÍFICO POR NATUREZA (339030 ou 339039) DENTRO DESTE PTRES
-                                    const natEntrou = groupBalanceRecords
-                                        .filter(r => r.natureza === natureza && r.tipo === 'RECURSO')
-                                        .reduce((acc, curr) => acc + (Number(curr.valorRecebido) || 0), 0);
-                                    
-                                    const natUtilizado = groupBalanceRecords
-                                        .filter(r => r.natureza === natureza && r.tipo === 'DESPESA')
-                                        .reduce((acc, curr) => acc + (Number(curr.valorUtilizado) || 0), 0);
-                                    
-                                    const natSaldo = natEntrou - natUtilizado;
-
                                     return (
                                         <div key={natureza} className="space-y-6 bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-200/50">
                                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-dashed border-gray-300 pb-4 mx-2">
@@ -307,22 +294,6 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], allRecords: 
                                                     <h4 className="text-lg font-black text-gray-800 uppercase tracking-widest italic">
                                                         {natureza === '339030' ? 'Peças e Materiais (339030)' : 'Outros Serviços (339039)'}
                                                     </h4>
-                                                </div>
-                                                
-                                                {/* TRÍADE DE SALDO ESPECÍFICA DA CATEGORIA (ÚNICA FONTE DE SALDO AQUI) */}
-                                                <div className="flex items-center gap-4 bg-white/80 px-6 py-2 rounded-2xl shadow-sm border border-gray-100">
-                                                    <div className="text-center border-r pr-4 border-gray-100">
-                                                        <p className="text-[7px] font-black text-blue-400 uppercase leading-none mb-1">Entrou</p>
-                                                        <p className="text-[11px] font-bold text-blue-600">{formatCurrency(natEntrou)}</p>
-                                                    </div>
-                                                    <div className="text-center border-r pr-4 border-gray-100">
-                                                        <p className="text-[7px] font-black text-red-400 uppercase leading-none mb-1">Utilizado</p>
-                                                        <p className="text-[11px] font-bold text-red-600">{formatCurrency(natUtilizado)}</p>
-                                                    </div>
-                                                    <div className="text-center">
-                                                        <p className="text-[7px] font-black text-indigo-400 uppercase leading-none mb-1">Saldo</p>
-                                                        <p className={`text-[11px] font-black ${natSaldo >= 0 ? 'text-indigo-700' : 'text-red-700'}`}>{formatCurrency(natSaldo)}</p>
-                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
