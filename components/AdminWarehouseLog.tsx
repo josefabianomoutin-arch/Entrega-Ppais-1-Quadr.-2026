@@ -48,6 +48,25 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
             });
     }, [warehouseLog, searchTerm, filterType]);
 
+    // Lógica para o novo Painel de Validade (Shelf-Life)
+    const validityAnalysis = useMemo(() => {
+        return warehouseLog
+            .filter(log => log.type === 'entrada' && log.date && log.expirationDate)
+            .map(log => {
+                const start = new Date(log.date + 'T00:00:00');
+                const end = new Date(log.expirationDate + 'T00:00:00');
+                const diffTime = end.getTime() - start.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                return {
+                    ...log,
+                    shelfLifeDays: diffDays
+                };
+            })
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .slice(0, 20); // Mostra os 20 mais recentes para análise
+    }, [warehouseLog]);
+
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -127,94 +146,148 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
     };
 
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-lg max-w-7xl mx-auto border-t-8 border-gray-700 animate-fade-in">
-            <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
-                <div>
-                    <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Histórico de Estoque</h2>
-                    <p className="text-gray-400 font-medium">Gerencie as movimentações e realize lançamentos retroativos usando a Data do Documento.</p>
+        <div className="bg-white p-6 rounded-2xl shadow-lg max-w-7xl mx-auto border-t-8 border-gray-700 animate-fade-in space-y-12">
+            
+            {/* CABEÇALHO E FILTROS */}
+            <div>
+                <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
+                    <div>
+                        <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Histórico de Estoque</h2>
+                        <p className="text-gray-400 font-medium">Gerencie as movimentações e realize lançamentos retroativos usando a Data do Documento.</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <button 
+                            onClick={() => setIsManualModalOpen(true)}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                            Lançar Movimentação Manual
+                        </button>
+                        <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-6 rounded-xl text-xs transition-colors flex items-center gap-2 disabled:bg-gray-50 border border-gray-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                            {isImporting ? 'Importando...' : 'Importar Planilha .CSV'}
+                        </button>
+                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".csv" />
+                    </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                    <button 
-                        onClick={() => setIsManualModalOpen(true)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-                        Lançar Movimentação Manual
-                    </button>
-                    <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-6 rounded-xl text-xs transition-colors flex items-center gap-2 disabled:bg-gray-50 border border-gray-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                        {isImporting ? 'Importando...' : 'Importar Planilha .CSV'}
-                    </button>
-                    <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".csv" />
+
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                    <input type="text" placeholder="Pesquisar (Nome, Lote, Código de Barras)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-80 border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all font-bold" />
+                    <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all bg-white font-bold">
+                        <option value="all">Todos</option>
+                        <option value="entrada">Entradas</option>
+                        <option value="saída">Saídas</option>
+                    </select>
                 </div>
-            </div>
 
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                <input type="text" placeholder="Pesquisar (Nome, Lote, Código de Barras)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-80 border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all font-bold" />
-                <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all bg-white font-bold">
-                    <option value="all">Todos</option>
-                    <option value="entrada">Entradas</option>
-                    <option value="saída">Saídas</option>
-                </select>
-            </div>
-
-            <div className="overflow-x-auto max-h-[65vh] custom-scrollbar border rounded-xl shadow-inner">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-100 sticky top-0 z-10 border-b">
-                        <tr>
-                            <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Tipo</th>
-                            <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Data Doc.</th>
-                            <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Produto</th>
-                            <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Barras</th>
-                            <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Lote</th>
-                            <th className="p-3 text-right text-[10px] font-black uppercase text-gray-500 tracking-widest">Quantidade</th>
-                            <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">NF/Doc</th>
-                            <th className="p-3 text-center text-[10px] font-black uppercase text-gray-500 tracking-widest">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {filteredLog.map(log => (
-                            <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="p-3">
-                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${log.type === 'entrada' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{log.type}</span>
-                                </td>
-                                <td className="p-3 font-mono text-indigo-700 text-xs font-black">{(log.date || '').split('-').reverse().join('/')}</td>
-                                <td className="p-3">
-                                    <p className="font-bold text-gray-800 uppercase text-xs">{log.itemName}</p>
-                                    <p className="text-[9px] text-gray-400 uppercase">{log.supplierName}</p>
-                                </td>
-                                <td className="p-3 font-mono text-xs text-blue-600 font-bold">{log.barcode || '-'}</td>
-                                <td className="p-3 font-mono text-xs">{log.lotNumber}</td>
-                                <td className="p-3 text-right font-mono font-black text-gray-800">
-                                    {(log.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
-                                </td>
-                                <td className="p-3 font-mono text-xs text-gray-500">{log.inboundInvoice || log.outboundInvoice || '-'}</td>
-                                <td className="p-3 text-center">
-                                    <div className="flex justify-center gap-1">
-                                        <button 
-                                            onClick={() => setEditingLog(log)}
-                                            className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
-                                            title="Editar Registro"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                        </button>
-                                        <button 
-                                            onClick={() => handleDelete(log)} 
-                                            disabled={isDeleting === log.id}
-                                            className="text-red-400 hover:text-red-700 p-2 rounded-full transition-colors disabled:opacity-50"
-                                            title="Excluir Registro"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        </button>
-                                    </div>
-                                </td>
+                <div className="overflow-x-auto max-h-[65vh] custom-scrollbar border rounded-xl shadow-inner">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-100 sticky top-0 z-10 border-b">
+                            <tr>
+                                <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Tipo</th>
+                                <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Data Doc.</th>
+                                <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Produto</th>
+                                <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Barras</th>
+                                <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Lote</th>
+                                <th className="p-3 text-right text-[10px] font-black uppercase text-gray-500 tracking-widest">Quantidade</th>
+                                <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">NF/Doc</th>
+                                <th className="p-3 text-center text-[10px] font-black uppercase text-gray-500 tracking-widest">Ações</th>
                             </tr>
-                        ))}
-                        {filteredLog.length === 0 && (
-                            <tr><td colSpan={8} className="p-20 text-center text-gray-400 italic font-medium uppercase tracking-widest">Nenhuma movimentação localizada.</td></tr>
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {filteredLog.map(log => (
+                                <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                                    <td className="p-3">
+                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${log.type === 'entrada' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{log.type}</span>
+                                    </td>
+                                    <td className="p-3 font-mono text-indigo-700 text-xs font-black">{(log.date || '').split('-').reverse().join('/')}</td>
+                                    <td className="p-3">
+                                        <p className="font-bold text-gray-800 uppercase text-xs">{log.itemName}</p>
+                                        <p className="text-[9px] text-gray-400 uppercase">{log.supplierName}</p>
+                                    </td>
+                                    <td className="p-3 font-mono text-xs text-blue-600 font-bold">{log.barcode || '-'}</td>
+                                    <td className="p-3 font-mono text-xs">{log.lotNumber}</td>
+                                    <td className="p-3 text-right font-mono font-black text-gray-800">
+                                        {(log.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
+                                    </td>
+                                    <td className="p-3 font-mono text-xs text-gray-500">{log.inboundInvoice || log.outboundInvoice || '-'}</td>
+                                    <td className="p-3 text-center">
+                                        <div className="flex justify-center gap-1">
+                                            <button 
+                                                onClick={() => setEditingLog(log)}
+                                                className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
+                                                title="Editar Registro"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDelete(log)} 
+                                                disabled={isDeleting === log.id}
+                                                className="text-red-400 hover:text-red-700 p-2 rounded-full transition-colors disabled:opacity-50"
+                                                title="Excluir Registro"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                            {filteredLog.length === 0 && (
+                                <tr><td colSpan={8} className="p-20 text-center text-gray-400 italic font-medium uppercase tracking-widest">Nenhuma movimentação localizada.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* NOVO CAMPO: MONITORAMENTO DE PRAZO DE VALIDADE (SHELF-LIFE) */}
+            <div className="pt-10 border-t-2 border-dashed border-gray-100">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="bg-amber-100 text-amber-600 p-2 rounded-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <div>
+                        <h3 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">Análise de Shelf-Life (Vida Útil)</h3>
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Relacionamento entre Data de Entrada e Vencimento</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {validityAnalysis.length > 0 ? validityAnalysis.map(item => (
+                        <div key={`shelf-${item.id}`} className="bg-slate-50 p-5 rounded-[2rem] border-2 border-white shadow-sm flex flex-col justify-between hover:shadow-md transition-all group">
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-start">
+                                    <span className="text-[10px] font-black bg-indigo-600 text-white px-3 py-1 rounded-full uppercase shadow-sm">Entrada Recente</span>
+                                    <div className={`px-3 py-1 rounded-lg text-white font-black text-[10px] uppercase shadow-sm ${item.shelfLifeDays > 30 ? 'bg-green-500' : item.shelfLifeDays > 15 ? 'bg-orange-500' : 'bg-red-500'}`}>
+                                        Prazo: {item.shelfLifeDays} dias
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black text-gray-800 uppercase leading-tight line-clamp-1">{item.itemName}</p>
+                                    <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">{item.supplierName}</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 py-2 border-y border-gray-100">
+                                    <div>
+                                        <p className="text-[8px] font-black text-gray-400 uppercase">Entrada</p>
+                                        <p className="text-[11px] font-mono font-bold text-indigo-700">{(item.date || '').split('-').reverse().join('/')}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[8px] font-black text-gray-400 uppercase">Vencimento</p>
+                                        <p className="text-[11px] font-mono font-bold text-red-600">{(item.expirationDate || '').split('-').reverse().join('/')}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mt-4 flex items-center justify-between">
+                                <p className="text-[9px] text-gray-400 font-mono">Lote: {item.lotNumber}</p>
+                                <span className="text-[9px] font-black text-indigo-400 group-hover:text-indigo-600 transition-colors uppercase">Giro Calculado</span>
+                            </div>
+                        </div>
+                    )) : (
+                        <div className="col-span-full py-12 text-center bg-gray-50 rounded-[3rem] border-4 border-dashed border-gray-100 opacity-50">
+                            <p className="text-gray-400 font-black uppercase tracking-widest italic">Aguardando entradas com validade informada para gerar análise.</p>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {isManualModalOpen && (
