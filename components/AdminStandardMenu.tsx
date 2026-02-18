@@ -336,21 +336,19 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
               <table>
                   <thead>
                       <tr>
-                          <th style="width: 40%;">Alimento / Preparação</th>
-                          <th style="width: 30%;">Item Contratado (p/ Análise)</th>
-                          <th style="width: 15%; text-align: right;">Peso/Qtd. Unit.</th>
-                          <th style="width: 15%; text-align: right;">Peso/Qtd. Total</th>
+                          <th style="width: 50%;">Item Contratado (p/ Análise)</th>
+                          <th style="width: 25%; text-align: right;">Peso/Qtd. Unit.</th>
+                          <th style="width: 25%; text-align: right;">Peso/Qtd. Total</th>
                       </tr>
                   </thead>
                   <tbody>
                     ${MEAL_PERIODS.map(period => {
                       if (!groupedMenu[period] || groupedMenu[period].length === 0) return '';
                       return `
-                        <tr><td colspan="4" class="period-header">${period}</td></tr>
+                        <tr><td colspan="3" class="period-header">${period}</td></tr>
                         ${groupedMenu[period].map(row => `
                           <tr>
-                            <td>${row.foodItem}</td>
-                            <td>${row.contractedItem || '-'}</td>
+                            <td>${row.contractedItem || row.foodItem || '-'}</td>
                             <td style="text-align: right;">${row.unitWeight}</td>
                             <td style="text-align: right;">${row.totalWeight}</td>
                           </tr>
@@ -519,7 +517,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
             <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
                 <div className="flex-1">
                 <h2 className="text-3xl font-black text-amber-900 uppercase tracking-tighter leading-tight italic">Cardápio Institucional</h2>
-                <p className="text-gray-400 font-medium">Gestão de descrições e pesos por data para fins de controle nutricional.</p>
+                <p className="text-gray-400 font-medium">Gestão de pesos e itens contratados por data.</p>
                 </div>
 
                 <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 text-center">
@@ -626,7 +624,6 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                 <thead className="bg-gray-100 text-gray-500 font-black uppercase text-[10px] tracking-widest">
                                     <tr>
                                         <th className="p-3 border text-left w-32">Período</th>
-                                        <th className="p-3 border text-left">Alimento / Preparação</th>
                                         <th className="p-3 border text-left">Item Contratado (p/ Análise)</th>
                                         <th className="p-3 border text-center w-28">Peso/Qtd. Unit.</th>
                                         <th className="p-3 border text-center w-32">Peso/Qtd. Total</th>
@@ -649,19 +646,10 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                                 </select>
                                             </td>
                                             <td className="p-1 border">
-                                                <input
-                                                    type="text"
-                                                    value={row.foodItem}
-                                                    onChange={(e) => handleInputChange(idx, 'foodItem', e.target.value)}
-                                                    placeholder="Ex: Arroz à grega"
-                                                    className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-bold uppercase placeholder:italic placeholder:font-normal"
-                                                />
-                                            </td>
-                                            <td className="p-1 border">
                                                 <select
                                                     value={row.contractedItem || ''}
                                                     onChange={(e) => handleInputChange(idx, 'contractedItem', e.target.value)}
-                                                    className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-medium text-xs"
+                                                    className="w-full p-2 bg-transparent outline-none focus:bg-white border-none rounded text-gray-700 font-bold text-xs uppercase"
                                                 >
                                                     <option value="">-- Selecionar Item --</option>
                                                     {availableContractItems.map(item => (
