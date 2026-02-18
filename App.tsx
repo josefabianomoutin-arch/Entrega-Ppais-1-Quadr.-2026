@@ -80,6 +80,12 @@ const App: React.FC = () => {
     const rawPass = (passwordInput || '').trim();
     const numericPass = rawPass.replace(/\D/g, '');
 
+    // ACESSO ESPECÍFICO: DANIELE GARCIA POSSIDONIO
+    if (cleanName.includes('DANIELE') && numericPass === '33342143894') {
+      setUser({ name: 'DANIELE GARCIA POSSIDONIO', cpf: numericPass, role: 'financeiro' });
+      return true;
+    }
+
     const adminCpfs = ['15210361870', '29099022859', '29462706821'];
     if (['ADMINISTRADOR', 'ADM', 'GALDINO', 'DOUGLAS'].some(n => cleanName.includes(n))) {
       if (adminCpfs.includes(numericPass)) {
