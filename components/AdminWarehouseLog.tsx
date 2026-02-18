@@ -130,6 +130,60 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
         reader.readAsText(file);
     };
 
+    const handlePrintLabel = (log: WarehouseMovement) => {
+        const printWindow = window.open('', '_blank', 'width=600,height=400');
+        if (!printWindow) return;
+
+        const htmlContent = `
+            <html>
+            <head>
+                <title>Etiqueta - ${log.itemName}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; text-align: center; border: 2px solid #000; margin: 10px; border-radius: 10px; }
+                    h1 { font-size: 24px; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
+                    h2 { font-size: 18px; margin: 5px 0; color: #333; }
+                    .info { margin-top: 20px; text-align: left; font-size: 14px; }
+                    .info p { margin: 5px 0; border-bottom: 1px dashed #ccc; padding-bottom: 2px; }
+                    .info strong { display: inline-block; width: 120px; }
+                    .barcode { margin-top: 20px; font-family: 'Courier New', Courier, monospace; font-size: 12px; }
+                    .footer { margin-top: 20px; font-size: 10px; color: #666; }
+                    @media print {
+                        body { border: none; margin: 0; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>${log.itemName}</h1>
+                <h2>${log.supplierName}</h2>
+                
+                <div class="info">
+                    <p><strong>LOTE:</strong> ${log.lotNumber}</p>
+                    <p><strong>VALIDADE:</strong> ${log.expirationDate ? log.expirationDate.split('-').reverse().join('/') : 'N/A'}</p>
+                    <p><strong>DATA ENTRADA:</strong> ${log.date ? log.date.split('-').reverse().join('/') : 'N/A'}</p>
+                    <p><strong>QUANTIDADE:</strong> ${log.quantity} kg</p>
+                    <p><strong>NOTA FISCAL:</strong> ${log.inboundInvoice || log.outboundInvoice || 'N/A'}</p>
+                </div>
+
+                <div class="barcode">
+                    ${log.barcode ? `* ${log.barcode} *` : ''}
+                </div>
+
+                <div class="footer">
+                    Gerado em: ${new Date().toLocaleString('pt-BR')}
+                </div>
+
+                <script>
+                    window.onload = function() { window.print(); window.close(); }
+                </script>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    };
+
     const handleDelete = async (log: WarehouseMovement) => {
         const msg = log.type === 'entrada' 
             ? 'Excluir esta entrada? O lote será removido e o saldo voltará ao contrato.' 
@@ -213,6 +267,15 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                                     <td className="p-3 font-mono text-xs text-gray-500">{log.inboundInvoice || log.outboundInvoice || '-'}</td>
                                     <td className="p-3 text-center">
                                         <div className="flex justify-center gap-1">
+                                            <button 
+                                                onClick={() => handlePrintLabel(log)}
+                                                className="text-gray-500 hover:bg-gray-100 p-2 rounded-full transition-colors"
+                                                title="Imprimir Etiqueta"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                </svg>
+                                            </button>
                                             <button 
                                                 onClick={() => setEditingLog(log)}
                                                 className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
