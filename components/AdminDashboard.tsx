@@ -61,7 +61,7 @@ const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   const { suppliers = [], onLogout, onResetData, onRestoreFullBackup, perCapitaConfig, warehouseLog = [], financialRecords = [], cleaningLogs = [], directorWithdrawals = [], standardMenu, dailyMenus } = props;
   const [activeTab, setActiveTab] = useState<AdminTab>('register');
-  const [supplierSubTab, setSupplierSubTab] = useState<'list' | 'new'>('list'); // NOVO: Controle de sub-aba no mobile
+  const [supplierSubTab, setSupplierSubTab] = useState<'list' | 'new'>('list'); 
   const [supplierSearch, setSupplierSearch] = useState('');
   const [regName, setRegName] = useState('');
   const [regCpf, setRegCpf] = useState('');
@@ -78,6 +78,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     { id: 'schedule', name: 'Agenda', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg> },
     { id: 'invoices', name: 'Notas Fiscais', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z" /><path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg> },
     { id: 'warehouse', name: 'Estoque', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 8a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm-1 4a1 1 0 011-1h2a1 1 0 110 2H5a1 1 0 01-1-1zm8-4a1 1 0 00-1-1h-2a1 1 0 100 2h2a1 1 0 001-1z" /><path fillRule="evenodd" d="M2 3a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H3a1 1 0 01-1-1V3zm2 1h12v12H4V4z" clipRule="evenodd" /></svg> },
+    { id: 'cleaning', name: 'Limpeza', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clipRule="evenodd" /></svg> },
     { id: 'menu', name: 'Cardápio', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" /><path d="M11 3.5v3a1 1 0 001 1h3m-6 4H7v2h3v-2zm0 3H7v2h3v-2z" /></svg> },
     { id: 'info', name: 'Sistema', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm14 1a1 1 0 11-2 0 1 1 0 012 0zM2 13a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2zm14 1a1 1 0 11-2 0 1 1 0 012 0z" clipRule="evenodd" /></svg> },
   ];
@@ -110,7 +111,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'register':
         return (
           <div className="space-y-6 max-w-6xl mx-auto animate-fade-in p-2 md:p-0 pb-16">
-            {/* Seletor Mobile para evitar rolagem infinita */}
             <div className="md:hidden flex bg-white p-1 rounded-2xl shadow-md mb-4 border border-indigo-100">
                 <button onClick={() => setSupplierSubTab('list')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${supplierSubTab === 'list' ? 'bg-indigo-600 text-white shadow-lg' : 'text-indigo-400'}`}>Lista Ativos</button>
                 <button onClick={() => setSupplierSubTab('new')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${supplierSubTab === 'new' ? 'bg-indigo-600 text-white shadow-lg' : 'text-indigo-400'}`}>Novo Registro</button>
@@ -209,6 +209,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'invoices': return <AdminInvoices suppliers={suppliers} onReopenInvoice={props.onReopenInvoice} onDeleteInvoice={props.onDeleteInvoice} onUpdateInvoiceItems={props.onUpdateInvoiceItems} onManualInvoiceEntry={props.onManualInvoiceEntry} />;
       case 'schedule': return <AdminScheduleView suppliers={suppliers} onCancelDeliveries={props.onCancelDeliveries} />;
       case 'warehouse': return <AdminWarehouseLog suppliers={suppliers} warehouseLog={warehouseLog} onDeleteEntry={props.onDeleteWarehouseEntry} onUpdateWarehouseEntry={props.onUpdateWarehouseEntry} onRegisterEntry={props.onRegisterEntry} onRegisterWithdrawal={props.onRegisterWithdrawal} />;
+      case 'cleaning': return <AdminCleaningLog logs={cleaningLogs} onRegister={props.onRegisterCleaningLog} onDelete={props.onDeleteCleaningLog} />;
       case 'analytics': return <AdminAnalytics suppliers={suppliers} warehouseLog={warehouseLog} />;
       case 'menu': return <AdminStandardMenu suppliers={suppliers} template={props.standardMenu} dailyMenus={props.dailyMenus} onUpdateDailyMenus={props.onUpdateDailyMenu} inmateCount={perCapitaConfig.inmateCount || 0} />;
       case 'info': 
