@@ -105,7 +105,6 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     const weightsMap = new Map<string, string>();
 
     // 1. Pega do template padrão
-    // Added explicit type casting to MenuRow[] to fix 'unknown' type inference on flattened array
     (Object.values(template).flat() as MenuRow[]).forEach(row => {
       if (row.contractedItem && row.unitWeight) {
         weightsMap.set(row.contractedItem, row.unitWeight);
@@ -113,7 +112,6 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     });
 
     // 2. Pega de todos os cardápios diários (sobrescrevendo o template se houver alteração)
-    // Added explicit type casting to MenuRow[] to fix 'unknown' type inference on flattened array
     (Object.values(dailyMenus).flat() as MenuRow[]).forEach(row => {
       if (row.contractedItem && row.unitWeight) {
         weightsMap.set(row.contractedItem, row.unitWeight);
@@ -124,6 +122,13 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
       .map(([name, weight]) => ({ name, weight }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [template, dailyMenus]);
+
+  // Mapa otimizado para lookup rápido durante o preenchimento automático
+  const weightsLookupMap = useMemo(() => {
+      const map = new Map<string, string>();
+      aggregatedWeights.forEach(w => map.set(w.name, w.weight));
+      return map;
+  }, [aggregatedWeights]);
 
   const filteredWeights = useMemo(() => {
     return aggregatedWeights.filter(w => 
@@ -212,6 +217,14 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   const handleInputChange = (index: number, field: keyof MenuRow, value: string) => {
     const updated = [...currentMenu];
     let newRow = { ...updated[index], [field]: value };
+
+    // LÓGICA DE AUTO-PREENCHIMENTO DO PESO UNITÁRIO
+    if (field === 'contractedItem') {
+        const suggestedWeight = weightsLookupMap.get(value);
+        if (suggestedWeight) {
+            newRow.unitWeight = suggestedWeight;
+        }
+    }
 
     if (field === 'unitWeight' || field === 'contractedItem') {
         const item = field === 'contractedItem' ? value : newRow.contractedItem;
