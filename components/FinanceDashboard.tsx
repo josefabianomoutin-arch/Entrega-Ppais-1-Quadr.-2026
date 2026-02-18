@@ -87,7 +87,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
         <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 text-white font-black py-2 px-6 rounded-xl text-xs uppercase shadow-lg transition-all active:scale-95">Sair</button>
       </header>
 
-      {/* SUB-ABAS RESTAURADAS */}
+      {/* SUB-ABAS */}
       <div className="bg-indigo-900 text-white py-3 px-4 shadow-inner">
         <div className="max-w-[1600px] mx-auto flex flex-wrap justify-center gap-2">
             <button 
@@ -143,7 +143,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                         </div>
                     </div>
                 </div>
-                <MovementsGrid filteredRecords={filteredRecords} viewMode="recursos" />
+                <MovementsGrid allRecords={records} filteredRecords={filteredRecords} viewMode="recursos" />
             </div>
         )}
 
@@ -160,7 +160,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
                         </div>
                     </div>
                 </div>
-                <MovementsGrid filteredRecords={filteredRecords} viewMode="pagamentos" />
+                <MovementsGrid allRecords={records} filteredRecords={filteredRecords} viewMode="pagamentos" />
             </div>
         )}
 
@@ -259,16 +259,23 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
   );
 };
 
-const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], viewMode: 'recursos' | 'pagamentos' }> = ({ filteredRecords, viewMode }) => {
+const MovementsGrid: React.FC<{ allRecords: FinancialRecord[], filteredRecords: FinancialRecord[], viewMode: 'recursos' | 'pagamentos' }> = ({ allRecords, filteredRecords, viewMode }) => {
     return (
         <div className="space-y-16">
             {PTRES_OPTIONS.map(ptres => {
                 const groupDisplayRecords = filteredRecords.filter(r => r.ptres.trim() === ptres);
                 if (groupDisplayRecords.length === 0) return null;
 
+                // CÁLCULO DE VALORES QUE CHEGARAM E FORAM UTILIZADOS POR PTRES
+                const ptresTotals = allRecords.filter(r => r.ptres.trim() === ptres).reduce((acc, r) => {
+                    if (r.tipo === 'RECURSO') acc.recurso += (Number(r.valorRecebido) || 0);
+                    if (r.tipo === 'DESPESA') acc.gasto += (Number(r.valorUtilizado) || 0);
+                    return acc;
+                }, { recurso: 0, gasto: 0 });
+
                 return (
                     <div key={ptres} className="space-y-6">
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between px-4 gap-4">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between px-4 gap-6">
                             <div className="flex flex-col">
                                 <div className="flex items-baseline gap-4">
                                     <h3 className="text-4xl font-black text-indigo-900 tracking-tighter italic">PTRES {ptres}</h3>
@@ -279,6 +286,24 @@ const MovementsGrid: React.FC<{ filteredRecords: FinancialRecord[], viewMode: 'r
                                 <p className="text-xs font-black text-gray-400 uppercase tracking-tighter mt-1 italic">
                                     {PTRES_DESCRIPTIONS[ptres] || 'Outros Recursos'}
                                 </p>
+                            </div>
+
+                            {/* QUADRO DE VALORES RESTAURADO NO TOPO DO GRUPO */}
+                            <div className="grid grid-cols-3 gap-2 sm:gap-4 bg-white p-4 rounded-3xl shadow-lg border border-indigo-50 min-w-[300px]">
+                                <div className="text-center px-2">
+                                    <p className="text-[8px] font-black text-gray-400 uppercase mb-1">Valor que Chegou</p>
+                                    <p className="text-sm font-black text-indigo-700">{formatCurrency(ptresTotals.recurso)}</p>
+                                </div>
+                                <div className="text-center px-2 border-x border-gray-100">
+                                    <p className="text-[8px] font-black text-gray-400 uppercase mb-1">Valor Utilizado</p>
+                                    <p className="text-sm font-black text-red-600">{formatCurrency(ptresTotals.gasto)}</p>
+                                </div>
+                                <div className="text-center px-2">
+                                    <p className="text-[8px] font-black text-gray-400 uppercase mb-1">Saldo do Grupo</p>
+                                    <p className={`text-sm font-black ${ptresTotals.recurso - ptresTotals.gasto >= 0 ? 'text-green-700' : 'text-red-900'}`}>
+                                        {formatCurrency(ptresTotals.recurso - ptresTotals.gasto)}
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
