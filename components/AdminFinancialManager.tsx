@@ -349,11 +349,15 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Descrição do Objeto</p>
                             <p className="text-sm font-bold text-gray-800 leading-relaxed uppercase">{r.descricao || 'N/A'}</p>
                             
-                            {/* EXIBIÇÃO PROCESSO / EMPENHO NO HISTÓRICO ADMIN */}
-                            <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-gray-50 text-[9px] font-bold uppercase text-gray-400">
+                            <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-gray-50 text-[9px] font-bold uppercase text-gray-400">
                                {r.numeroProcesso && <span>PROCESSO: <span className={isFinalizado ? "text-green-700 font-black" : "text-gray-600"}>{r.numeroProcesso}</span></span>}
                                {r.numeroEmpenho && <span>EMPENHO: <span className={isFinalizado ? "text-green-700 font-black" : "text-gray-600"}>{r.numeroEmpenho}</span></span>}
-                               {r.dataFinalizacaoProcesso && <span>CONCLUÍDO EM: <span className={isFinalizado ? "text-green-700 font-black" : "text-gray-600"}>{r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</span></span>}
+                               {r.dataFinalizacaoProcesso && (
+                                   <span className={`flex items-center gap-2 ${isFinalizado ? "text-green-700 bg-green-100 px-3 py-1.5 rounded-lg border border-green-200 text-sm font-black scale-105" : "text-gray-500"}`}>
+                                       {isFinalizado ? "✅ CONCLUÍDO EM: " : "CONCLUÍDO EM: "}
+                                       {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}
+                                   </span>
+                               )}
                             </div>
                           </div>
                         </div>
