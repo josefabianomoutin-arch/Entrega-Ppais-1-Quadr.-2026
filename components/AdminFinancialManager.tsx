@@ -27,7 +27,6 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
     tipo: 'DESPESA',
     ptres: '380302',
     natureza: '339030',
-    // Corrigido typo de modalbody para modalidade para coincidir com a interface FinancialRecord
     modalidade: '',
     dataSolicitacao: new Date().toISOString().split('T')[0],
     valorSolicitado: 0,
@@ -50,7 +49,6 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
   
   const isEditing = !!formData.id;
 
-  // Cálculo detalhado para os quadros de saldo vinculados
   const linkedBalances = useMemo(() => {
     return PTRES_OPTIONS.map(p => {
       const naturezas = NATUREZA_OPTIONS.map(n => {
@@ -93,41 +91,43 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
     setIsSaving(true);
     try {
         const sanitizeNum = (val: any) => {
-            const n = parseFloat(String(val).replace(',', '.'));
+            if (typeof val === 'number') return val;
+            const n = parseFloat(String(val || '0').replace(/\./g, '').replace(',', '.'));
             return isNaN(n) ? 0 : n;
         };
+
         const recordToSave: any = { 
             ...formData,
             id: formData.id || null, 
             ptres: formData.ptres?.trim(),
             descricao: formData.descricao?.trim() || '',
-            justificativa: formData.justificativa?.trim() || '',
+            status: (formData.status || 'PENDENTE').toUpperCase().trim(),
             numeroProcesso: formData.numeroProcesso?.trim() || '',
             numeroEmpenho: formData.numeroEmpenho?.trim() || '',
             dataFinalizacaoProcesso: formData.dataFinalizacaoProcesso || '',
-            modalidade: formData.modalidade?.trim() || '',
-            status: formData.status?.trim() || 'PENDENTE'
+            modalidade: formData.modalidade?.trim() || ''
         };
+
         if (formData.tipo === 'RECURSO') {
           recordToSave.valorRecebido = sanitizeNum(formData.valorRecebido);
           recordToSave.valorSolicitado = sanitizeNum(formData.valorSolicitado);
+          // Garantir que campos de despesa não poluam registros de entrada
           delete recordToSave.valorUtilizado;
-          delete recordToSave.localUtilizado;
-          delete recordToSave.numeroProcesso;
           delete recordToSave.numeroEmpenho;
-          delete recordToSave.dataFinalizacaoProcesso;
-          delete recordToSave.dataPagamento;
-          delete recordToSave.modalidade;
         } else {
           recordToSave.valorUtilizado = sanitizeNum(formData.valorUtilizado);
-          delete recordToSave.dataSolicitacao;
-          delete recordToSave.valorSolicitado;
-          delete recordToSave.dataRecebimento;
+          // Garantir que campos de entrada não poluam registros de gasto
           delete recordToSave.valorRecebido;
+          delete recordToSave.valorSolicitado;
         }
+
         const res = await onSave(recordToSave as FinancialRecord);
-        if (res && res.success) setFormData(initialFormState);
-        else alert(res?.message || 'Falha ao salvar registro.');
+        if (res && res.success) {
+            setFormData(initialFormState);
+            alert('Registro salvo com sucesso!');
+        } else {
+            alert(res?.message || 'Falha ao salvar registro.');
+        }
     } catch (error) {
         alert("Erro de conexão. Tente novamente.");
     } finally {
@@ -267,7 +267,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 <div className="space-y-1">
                     <span className="text-[8px] font-black text-gray-400 uppercase ml-1">Status</span>
-                    <input type="text" value={formData.status || ''} onChange={e => setFormData({...formData, status: e.target.value.toUpperCase()})} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-400 font-black text-[10px]" placeholder="STATUS" />
+                    <input type="text" value={formData.status || ''} onChange={e => setFormData({...formData, status: e.target.value.toUpperCase()})} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-400 font-black text-[10px]" placeholder="EX: CONCLUÍDO" />
                 </div>
                 <div className="space-y-1">
                     <span className="text-[8px] font-black text-gray-400 uppercase ml-1">Nº Processo</span>
@@ -331,8 +331,9 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
                 {ptresRecords.sort((a, b) => {
                   return new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime();
                 }).map((r, index) => {
-                  const statusUpper = (r.status || '').toUpperCase();
-                  const isFinalizado = statusUpper === 'FINALIZADO';
+                  const statusUpper = (r.status || '').toUpperCase().trim();
+                  // Lógica robusta para detectar finalização
+                  const isFinalizado = ['FINALIZADO', 'CONCLUIDO', 'CONCLUÍDO'].includes(statusUpper);
                   const isEmAndamentoEmpenhado = statusUpper === 'EM ANDAMENTO' && !!r.numeroEmpenho;
                   
                   return (
@@ -359,7 +360,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
                                {/* BANNER DE DESTAQUE PARA FINALIZADO OU EM ANDAMENTO COM EMPENHO */}
                                {(isFinalizado && r.dataFinalizacaoProcesso) && (
                                    <span className="flex items-center gap-2 text-green-700 bg-green-100 px-3 py-1.5 rounded-lg border border-green-200 text-sm font-black scale-105">
-                                       ✅ CONCLUÍDO EM: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}
+                                       ✅ PROCESSO CONCLUÍDO EM: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}
                                    </span>
                                )}
 

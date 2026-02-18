@@ -339,8 +339,9 @@ const MovementsGrid: React.FC<{ allRecords: FinancialRecord[], filteredRecords: 
 };
 
 const FinancialCard: React.FC<{ record: FinancialRecord }> = ({ record: r }) => {
-    const statusUpper = (r.status || '').toUpperCase();
-    const isFinalizado = statusUpper === 'FINALIZADO';
+    const statusUpper = (r.status || '').toUpperCase().trim();
+    // Lógica robusta para detectar finalização (Aceita variações com e sem acento)
+    const isFinalizado = ['FINALIZADO', 'CONCLUIDO', 'CONCLUÍDO'].includes(statusUpper);
     const isEmAndamentoEmpenhado = statusUpper === 'EM ANDAMENTO' && !!r.numeroEmpenho;
 
     return (
@@ -368,7 +369,7 @@ const FinancialCard: React.FC<{ record: FinancialRecord }> = ({ record: r }) => 
                     <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-xl shadow-inner animate-fade-in">
                         <p className="text-[10px] font-black text-green-600 uppercase tracking-widest leading-none mb-1">Status Final</p>
                         <p className="text-base font-black text-green-800 uppercase tracking-tighter italic">
-                            ✅ Concluído em: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}
+                            ✅ PROCESSO CONCLUÍDO EM: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}
                         </p>
                     </div>
                 )}
