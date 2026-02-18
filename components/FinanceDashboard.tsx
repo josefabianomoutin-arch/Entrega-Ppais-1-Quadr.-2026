@@ -87,7 +87,6 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
         <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 text-white font-black py-2 px-6 rounded-xl text-xs uppercase shadow-lg transition-all active:scale-95">Sair</button>
       </header>
 
-      {/* SUB-ABAS */}
       <div className="bg-indigo-900 text-white py-3 px-4 shadow-inner">
         <div className="max-w-[1600px] mx-auto flex flex-wrap justify-center gap-2">
             <button 
@@ -266,13 +265,6 @@ const MovementsGrid: React.FC<{ allRecords: FinancialRecord[], filteredRecords: 
                 const groupDisplayRecords = filteredRecords.filter(r => r.ptres.trim() === ptres);
                 if (groupDisplayRecords.length === 0) return null;
 
-                // CÁLCULO DE VALORES QUE CHEGARAM E FORAM UTILIZADOS POR PTRES
-                const ptresTotals = allRecords.filter(r => r.ptres.trim() === ptres).reduce((acc, r) => {
-                    if (r.tipo === 'RECURSO') acc.recurso += (Number(r.valorRecebido) || 0);
-                    if (r.tipo === 'DESPESA') acc.gasto += (Number(r.valorUtilizado) || 0);
-                    return acc;
-                }, { recurso: 0, gasto: 0 });
-
                 return (
                     <div key={ptres} className="space-y-6">
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between px-4 gap-6">
@@ -287,58 +279,58 @@ const MovementsGrid: React.FC<{ allRecords: FinancialRecord[], filteredRecords: 
                                     {PTRES_DESCRIPTIONS[ptres] || 'Outros Recursos'}
                                 </p>
                             </div>
-
-                            {/* QUADRO DE VALORES RESTAURADO NO TOPO DO GRUPO */}
-                            <div className="grid grid-cols-3 gap-2 sm:gap-4 bg-white p-4 rounded-3xl shadow-lg border border-indigo-50 min-w-[300px]">
-                                <div className="text-center px-2">
-                                    <p className="text-[8px] font-black text-gray-400 uppercase mb-1">Valor que Chegou</p>
-                                    <p className="text-sm font-black text-indigo-700">{formatCurrency(ptresTotals.recurso)}</p>
-                                </div>
-                                <div className="text-center px-2 border-x border-gray-100">
-                                    <p className="text-[8px] font-black text-gray-400 uppercase mb-1">Valor Utilizado</p>
-                                    <p className="text-sm font-black text-red-600">{formatCurrency(ptresTotals.gasto)}</p>
-                                </div>
-                                <div className="text-center px-2">
-                                    <p className="text-[8px] font-black text-gray-400 uppercase mb-1">Saldo do Grupo</p>
-                                    <p className={`text-sm font-black ${ptresTotals.recurso - ptresTotals.gasto >= 0 ? 'text-green-700' : 'text-red-900'}`}>
-                                        {formatCurrency(ptresTotals.recurso - ptresTotals.gasto)}
-                                    </p>
-                                </div>
-                            </div>
                         </div>
 
-                        {viewMode === 'pagamentos' ? (
-                            <div className="grid grid-cols-1 gap-12">
-                                {NATUREZA_OPTIONS.map(natureza => {
-                                    const natRecords = groupDisplayRecords.filter(r => r.natureza === natureza);
-                                    if (natRecords.length === 0) return null;
+                        <div className="grid grid-cols-1 gap-12">
+                            {NATUREZA_OPTIONS.map(natureza => {
+                                const natRecords = groupDisplayRecords.filter(r => r.natureza === natureza);
+                                if (natRecords.length === 0) return null;
 
-                                    return (
-                                        <div key={natureza} className="space-y-6 bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-200/50">
-                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-dashed border-gray-300 pb-4 mx-2">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-4 h-4 rounded-full ${natureza === '339030' ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]'}`}></div>
-                                                    <h4 className="text-lg font-black text-gray-800 uppercase tracking-widest italic">
-                                                        {natureza === '339030' ? 'Peças e Materiais (339030)' : 'Outros Serviços (339039)'}
-                                                    </h4>
+                                // CÁLCULO DE VALORES POR NATUREZA DENTRO DO PTRES
+                                const natTotals = allRecords.filter(r => r.ptres.trim() === ptres && r.natureza === natureza).reduce((acc, r) => {
+                                    if (r.tipo === 'RECURSO') acc.recurso += (Number(r.valorRecebido) || 0);
+                                    if (r.tipo === 'DESPESA') acc.gasto += (Number(r.valorUtilizado) || 0);
+                                    return acc;
+                                }, { recurso: 0, gasto: 0 });
+
+                                return (
+                                    <div key={natureza} className="space-y-6 bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-200/50">
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-dashed border-gray-300 pb-4 mx-2">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-4 h-4 rounded-full ${natureza === '339030' ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]'}`}></div>
+                                                <h4 className="text-lg font-black text-gray-800 uppercase tracking-widest italic">
+                                                    {natureza === '339030' ? 'Peças e Materiais (339030)' : 'Outros Serviços (339039)'}
+                                                </h4>
+                                            </div>
+
+                                            {/* RESUMO POR NATUREZA (LADO DIREITO) */}
+                                            <div className="flex flex-wrap items-center gap-6 bg-white/80 px-6 py-2 rounded-2xl shadow-sm border border-slate-100">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Entrada</span>
+                                                    <span className="text-xs font-black text-indigo-700">{formatCurrency(natTotals.recurso)}</span>
+                                                </div>
+                                                <div className="flex flex-col border-x border-slate-100 px-4">
+                                                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Saída</span>
+                                                    <span className="text-xs font-black text-red-600">{formatCurrency(natTotals.gasto)}</span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Saldo</span>
+                                                    <span className={`text-sm font-black ${natTotals.recurso - natTotals.gasto >= 0 ? 'text-green-700' : 'text-red-900'}`}>
+                                                        {formatCurrency(natTotals.recurso - natTotals.gasto)}
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                                {natRecords.map((r, idx) => (
-                                                    <FinancialCard key={r.id || idx} record={r} />
-                                                ))}
-                                            </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                {groupDisplayRecords.map((r, index) => (
-                                    <FinancialCard key={r.id || index} record={r} />
-                                ))}
-                            </div>
-                        )}
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                            {natRecords.map((r, idx) => (
+                                                <FinancialCard key={r.id || idx} record={r} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 );
             })}
