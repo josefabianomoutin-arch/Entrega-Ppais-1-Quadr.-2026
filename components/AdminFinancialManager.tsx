@@ -329,63 +329,66 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
               <div className="grid grid-cols-1 gap-4">
                 {ptresRecords.sort((a, b) => {
                   return new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime();
-                }).map((r, index) => (
-                  <div key={r.id || `admin-rec-${index}`} className={`group bg-white p-6 rounded-3xl border-l-[12px] shadow-sm hover:shadow-md transition-all ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'} ${formData.id === r.id ? 'ring-4 ring-orange-300' : ''}`}>
-                    <div className="flex flex-col lg:flex-row justify-between gap-6">
-                      <div className="flex-1 space-y-4">
-                        <div className="flex justify-between">
-                            <div className="flex items-center gap-3">
-                            <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase border ${r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                                {r.tipo}
-                            </span>
-                            <span className="text-[10px] font-bold text-gray-400">NATUREZA: {r.natureza}</span>
-                            {r.tipo === 'DESPESA' && <span className="text-[10px] font-black text-indigo-500 uppercase">{r.modalidade || 'DISPENSA'}</span>}
-                            </div>
-                            <span className="text-[8px] font-mono text-gray-300 uppercase">ID: ...{r.id?.slice(-4)}</span>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Descrição do Objeto</p>
-                          <p className="text-sm font-bold text-gray-800 leading-relaxed uppercase">{r.descricao || 'N/A'}</p>
-                          
-                          {/* EXIBIÇÃO PROCESSO / EMPENHO NO HISTÓRICO ADMIN */}
-                          <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-gray-50 text-[9px] font-bold uppercase text-gray-400">
-                             {r.numeroProcesso && <span>PROCESSO: <span className="text-gray-600">{r.numeroProcesso}</span></span>}
-                             {r.numeroEmpenho && <span>EMPENHO: <span className="text-gray-600">{r.numeroEmpenho}</span></span>}
-                             {r.dataFinalizacaoProcesso && <span>CONCLUÍDO EM: <span className="text-gray-600">{r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</span></span>}
+                }).map((r, index) => {
+                  const isFinalizado = (r.status || '').toUpperCase() === 'FINALIZADO';
+                  return (
+                    <div key={r.id || `admin-rec-${index}`} className={`group bg-white p-6 rounded-3xl border-l-[12px] shadow-sm hover:shadow-md transition-all ${isFinalizado ? 'border-green-600 bg-green-50/10' : (r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500')} ${formData.id === r.id ? 'ring-4 ring-orange-300' : ''}`}>
+                      <div className="flex flex-col lg:flex-row justify-between gap-6">
+                        <div className="flex-1 space-y-4">
+                          <div className="flex justify-between">
+                              <div className="flex items-center gap-3">
+                              <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase border shadow-sm ${isFinalizado ? 'bg-green-100 text-green-700 border-green-200' : (r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100')}`}>
+                                  {r.tipo}
+                              </span>
+                              <span className="text-[10px] font-bold text-gray-400">NATUREZA: {r.natureza}</span>
+                              {r.tipo === 'DESPESA' && <span className={`text-[10px] font-black uppercase ${isFinalizado ? 'text-green-600' : 'text-indigo-500'}`}>{r.modalidade || 'DISPENSA'}</span>}
+                              </div>
+                              <span className="text-[8px] font-mono text-gray-300 uppercase">ID: ...{r.id?.slice(-4)}</span>
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="lg:w-64 bg-gray-50 p-4 rounded-2xl space-y-3 flex flex-col justify-center">
-                        <div className="flex justify-between items-end border-b border-gray-200 pb-2">
-                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Valor</p>
-                          <p className={`text-lg font-black ${r.tipo === 'RECURSO' ? 'text-indigo-700' : 'text-red-700'}`}>
-                            {r.tipo === 'RECURSO' ? formatCurrency(r.valorRecebido) : formatCurrency(r.valorUtilizado)}
-                          </p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Data</p>
-                            <p className="text-[10px] font-mono font-bold text-gray-600">{(r.dataRecebimento || r.dataPagamento || '-').split('-').reverse().join('/')}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Status</p>
-                            <p className="text-[10px] font-black text-indigo-600">{r.status || 'PENDENTE'}</p>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Descrição do Objeto</p>
+                            <p className="text-sm font-bold text-gray-800 leading-relaxed uppercase">{r.descricao || 'N/A'}</p>
+                            
+                            {/* EXIBIÇÃO PROCESSO / EMPENHO NO HISTÓRICO ADMIN */}
+                            <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-gray-50 text-[9px] font-bold uppercase text-gray-400">
+                               {r.numeroProcesso && <span>PROCESSO: <span className={isFinalizado ? "text-green-700 font-black" : "text-gray-600"}>{r.numeroProcesso}</span></span>}
+                               {r.numeroEmpenho && <span>EMPENHO: <span className={isFinalizado ? "text-green-700 font-black" : "text-gray-600"}>{r.numeroEmpenho}</span></span>}
+                               {r.dataFinalizacaoProcesso && <span>CONCLUÍDO EM: <span className={isFinalizado ? "text-green-700 font-black" : "text-gray-600"}>{r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</span></span>}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="lg:w-16 flex lg:flex-col justify-end lg:justify-center gap-2">
-                        <button onClick={() => handleEdit(r)} className={`p-3 rounded-2xl transition-all ${formData.id === r.id ? 'bg-orange-500 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white'}`}>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        </button>
-                        <button onClick={() => { if(window.confirm('Excluir este registro?')) onDelete(r.id); }} className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
+                        <div className={`lg:w-64 p-4 rounded-2xl space-y-3 flex flex-col justify-center ${isFinalizado ? 'bg-green-50' : 'bg-gray-50'}`}>
+                          <div className={`flex justify-between items-end border-b pb-2 ${isFinalizado ? 'border-green-200' : 'border-gray-200'}`}>
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Valor</p>
+                            <p className={`text-lg font-black ${isFinalizado ? 'text-green-700' : (r.tipo === 'RECURSO' ? 'text-indigo-700' : 'text-red-700')}`}>
+                              {r.tipo === 'RECURSO' ? formatCurrency(r.valorRecebido) : formatCurrency(r.valorUtilizado)}
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Data</p>
+                              <p className={`text-10px font-mono font-bold ${isFinalizado ? 'text-green-800' : 'text-gray-600'}`}>{(r.dataRecebimento || r.dataPagamento || '-').split('-').reverse().join('/')}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Status</p>
+                              <p className={`text-[10px] font-black ${isFinalizado ? 'text-green-700' : 'text-indigo-600'}`}>{r.status || 'PENDENTE'}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="lg:w-16 flex lg:flex-col justify-end lg:justify-center gap-2">
+                          <button onClick={() => handleEdit(r)} className={`p-3 rounded-2xl transition-all ${formData.id === r.id ? 'bg-orange-500 text-white' : (isFinalizado ? 'bg-green-100 text-green-700 hover:bg-green-600 hover:text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white')}`}>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          </button>
+                          <button onClick={() => { if(window.confirm('Excluir este registro?')) onDelete(r.id); }} className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );

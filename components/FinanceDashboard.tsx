@@ -339,35 +339,36 @@ const MovementsGrid: React.FC<{ allRecords: FinancialRecord[], filteredRecords: 
 };
 
 const FinancialCard: React.FC<{ record: FinancialRecord }> = ({ record: r }) => {
+    const isFinalizado = (r.status || '').toUpperCase() === 'FINALIZADO';
     return (
-        <div className={`bg-white p-6 rounded-[2.5rem] shadow-lg border-l-[12px] flex flex-col justify-between transition-all hover:shadow-2xl hover:-translate-y-1 ${r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500'}`}>
+        <div className={`bg-white p-6 rounded-[2.5rem] shadow-lg border-l-[12px] flex flex-col justify-between transition-all hover:shadow-2xl hover:-translate-y-1 ${isFinalizado ? 'border-green-500 ring-2 ring-green-100' : (r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500')}`}>
             <div className="space-y-4">
                 <div className="flex justify-between items-start">
                     <div className="flex flex-col gap-1">
-                        <span className={`text-[9px] w-fit font-black px-3 py-1 rounded-full uppercase border shadow-sm ${r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                        <span className={`text-[9px] w-fit font-black px-3 py-1 rounded-full uppercase border shadow-sm ${isFinalizado ? 'bg-green-600 text-white border-green-700' : (r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100')}`}>
                             {r.tipo}
                         </span>
                         <span className="text-[8px] text-gray-300 font-mono uppercase">ID: ...{r.id?.slice(-4) || 'NOID'}</span>
                     </div>
-                    <span className="text-[10px] font-mono font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded">
+                    <span className={`text-[10px] font-mono font-bold px-2 py-1 rounded ${isFinalizado ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-400'}`}>
                         {(r.dataRecebimento || r.dataPagamento || r.dataSolicitacao || '-').split('-').reverse().join('/')}
                     </span>
                 </div>
 
                 <div>
                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Objeto / Serviço</p>
-                    <p className="text-sm font-black text-gray-800 leading-tight uppercase line-clamp-2" title={r.descricao}>{r.descricao || 'Sem descrição'}</p>
+                    <p className={`text-sm font-black leading-tight uppercase line-clamp-2 ${isFinalizado ? 'text-green-900' : 'text-gray-800'}`} title={r.descricao}>{r.descricao || 'Sem descrição'}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
                     <div>
                         <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Natureza</p>
-                        <p className="text-[10px] font-bold text-indigo-600">{r.natureza} ({r.natureza === '339030' ? 'Peças' : 'Serviços'})</p>
+                        <p className={`text-[10px] font-bold ${isFinalizado ? 'text-green-600' : 'text-indigo-600'}`}>{r.natureza} ({r.natureza === '339030' ? 'Peças' : 'Serviços'})</p>
                     </div>
                     {r.tipo === 'DESPESA' && (
                         <div>
                             <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Modalidade</p>
-                            <p className="text-[10px] font-bold text-gray-600 uppercase truncate">{r.modalidade || '-'}</p>
+                            <p className={`text-[10px] font-bold uppercase truncate ${isFinalizado ? 'text-green-600' : 'text-gray-600'}`}>{r.modalidade || '-'}</p>
                         </div>
                     )}
                 </div>
@@ -376,17 +377,17 @@ const FinancialCard: React.FC<{ record: FinancialRecord }> = ({ record: r }) => 
             <div className="mt-6 flex justify-between items-end">
                 <div>
                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Processo / Empenho</p>
-                    <p className="text-[10px] font-mono font-black text-gray-600 leading-tight">
+                    <p className={`text-[10px] font-mono font-black leading-tight ${isFinalizado ? 'text-green-700' : 'text-gray-600'}`}>
                         {r.numeroProcesso || 'N/A'}
                         {r.numeroEmpenho ? ` | EMP: ${r.numeroEmpenho}` : ''}
                     </p>
                     {r.dataFinalizacaoProcesso && (
-                        <p className="text-[8px] font-bold text-indigo-500 uppercase mt-1">Concluído em: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</p>
+                        <p className={`text-[8px] font-bold uppercase mt-1 ${isFinalizado ? 'text-green-600' : 'text-indigo-500'}`}>Concluído em: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</p>
                     )}
                 </div>
                 <div className="text-right">
                     <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Valor</p>
-                    <p className={`text-xl font-black ${r.tipo === 'RECURSO' ? 'text-indigo-700' : 'text-red-700'}`}>
+                    <p className={`text-xl font-black ${isFinalizado ? 'text-green-600' : (r.tipo === 'RECURSO' ? 'text-indigo-700' : 'text-red-700')}`}>
                         {r.tipo === 'RECURSO' ? `+ ${formatCurrency(r.valorRecebido)}` : `- ${formatCurrency(r.valorUtilizado)}`}
                     </p>
                 </div>
