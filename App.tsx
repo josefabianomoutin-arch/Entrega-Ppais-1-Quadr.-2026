@@ -95,8 +95,9 @@ const App: React.FC = () => {
     }
 
     if (cleanName === 'ALMOXARIFADO' || cleanName === 'ALMOX') {
-      if (rawPass.toLowerCase() === 'almox123') {
-        setUser({ name: 'ALMOXARIFADO', cpf: 'almox123', role: 'almoxarifado' });
+      const lowerPass = rawPass.toLowerCase();
+      if (lowerPass === 'almoxarifado123' || lowerPass === 'almox123') {
+        setUser({ name: 'ALMOXARIFADO', cpf: lowerPass, role: 'almoxarifado' });
         return true;
       }
     }
