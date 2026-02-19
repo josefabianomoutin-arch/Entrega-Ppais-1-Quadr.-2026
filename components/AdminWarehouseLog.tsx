@@ -347,7 +347,18 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                             </div>
                             <div className="mt-4 flex items-center justify-between">
                                 <p className="text-[9px] text-gray-400 font-mono">Lote: {item.lotNumber}</p>
-                                <span className={`text-[9px] font-black uppercase transition-colors ${item.shelfLifeDays > 180 ? 'text-green-800' : 'text-indigo-400'} group-hover:text-indigo-600`}>Giro Calculado</span>
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                        onClick={() => handlePrintLabel(item)}
+                                        className="text-indigo-400 hover:text-indigo-600 transition-colors p-1"
+                                        title="Imprimir Etiqueta"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                        </svg>
+                                    </button>
+                                    <span className={`text-[9px] font-black uppercase transition-colors ${item.shelfLifeDays > 180 ? 'text-green-800' : 'text-indigo-400'} group-hover:text-indigo-600`}>Giro Calculado</span>
+                                </div>
                             </div>
                         </div>
                     )) : (
