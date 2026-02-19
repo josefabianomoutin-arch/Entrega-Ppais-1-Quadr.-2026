@@ -58,8 +58,10 @@ export interface WarehouseMovement {
   inboundInvoice?: string;
   outboundInvoice?: string;
   quantity?: number;
+  unitPrice?: number; // NOVO
+  totalValue?: number; // NOVO
   expirationDate?: string;
-  barcode?: string; // NOVO CAMPO
+  barcode?: string; // Este campo agora armazena o Código de Barras da Nota Fiscal
 }
 
 export interface PerCapitaConfig {

@@ -13,7 +13,9 @@ import { getDatabase, ref, onValue, set, runTransaction, push, child, update, re
 import { firebaseConfig } from './firebaseConfig';
 
 const app = initializeApp(firebaseConfig);
-const database = getDatabase(app);
+// Inicializa o database passando explicitamente a URL do config para garantir a conexão
+const database = getDatabase(app, firebaseConfig.databaseURL);
+
 const rootRef = ref(database);
 const suppliersRef = ref(database, 'suppliers');
 const warehouseLogRef = ref(database, 'warehouseLog');

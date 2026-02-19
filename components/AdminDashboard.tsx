@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef } from 'react';
 import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, FinancialRecord, Delivery } from '../types';
 import AdminAnalytics from './AdminAnalytics';
@@ -295,7 +294,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
               <div className="grid grid-cols-2 gap-3 pb-20">
                   {tabs.map(tab => (
                       <button key={tab.id} onClick={() => { setActiveTab(tab.id); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center justify-center p-6 rounded-3xl text-[9px] font-black uppercase gap-3 border-2 transition-all active:scale-95 ${activeTab === tab.id ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-indigo-900/50 border-indigo-900 text-indigo-300'}`}>
-                          {React.cloneElement(tab.icon as React.ReactElement, { className: "h-6 w-6" })}
+                          {/* Fix: added type cast to allow className property on cloned element, avoiding "No overload matches this call" error */}
+                          {React.cloneElement(tab.icon as React.ReactElement<any>, { className: "h-6 w-6" })}
                           {tab.name}
                       </button>
                   ))}
