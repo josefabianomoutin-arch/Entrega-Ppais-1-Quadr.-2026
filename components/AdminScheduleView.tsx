@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import type { Supplier, Delivery } from '../types';
+import type { Supplier, Delivery, WarehouseMovement } from '../types';
 
 interface AdminScheduleViewProps {
   suppliers: Supplier[];
+  warehouseLog: WarehouseMovement[];
   onCancelDeliveries: (supplierCpf: string, deliveryIds: string[]) => void;
 }
 
@@ -12,30 +13,46 @@ const formatDate = (dateString: string) => {
     return date.toLocaleDateString('pt-BR');
 };
 
-const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCancelDeliveries }) => {
+const superNormalize = (text: string) => {
+    return (text || "")
+        .toString()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") 
+        .replace(/[^a-z0-9]/g, "") 
+        .trim();
+};
+
+const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, warehouseLog, onCancelDeliveries }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [dateFilter, setDateFilter] = useState('');
 
     const filteredSuppliers = useMemo(() => {
         return (suppliers || []).filter(p => {
             const nameMatch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase());
-            const dateMatch = !dateFilter || (p.deliveries || []).some(d => d.date === dateFilter);
+            const hasDeliveryOnDate = (p.deliveries || []).some(d => d.date === dateFilter);
+            const hasWarehouseOnDate = (warehouseLog || []).some(log => log.supplierName === p.name && log.date === dateFilter);
+            const dateMatch = !dateFilter || hasDeliveryOnDate || hasWarehouseOnDate;
             return nameMatch && dateMatch;
         });
-    }, [suppliers, searchTerm, dateFilter]);
+    }, [suppliers, warehouseLog, searchTerm, dateFilter]);
     
     const sortedSuppliers = useMemo(() => {
         return [...filteredSuppliers].sort((a, b) => a.name.localeCompare(b.name));
     }, [filteredSuppliers]);
 
     const handleCancelGroup = (supplierCpf: string, ids: string[], date: string, nf: string) => {
-        if (window.confirm(`ATENÇÃO: Deseja realmente EXCLUIR o registro da NF ${nf} do dia ${formatDate(date)}?\n\nEsta ação removerá todos os itens vinculados a esta nota.`)) {
+        if (ids.length === 0) {
+            alert('Este registro foi originado no Almoxarifado. Para removê-lo, acesse a aba Estoque.');
+            return;
+        }
+        if (window.confirm(`ATENÇÃO: Deseja realmente EXCLUIR o agendamento da NF ${nf} do dia ${formatDate(date)}?\n\nEsta ação removerá os itens da agenda financeira.`)) {
             onCancelDeliveries(supplierCpf, ids);
         }
     };
 
     const handleCancelSingle = (supplierCpf: string, deliveryId: string, date: string) => {
-        if (window.confirm(`Deseja excluir o agendamento do dia ${formatDate(date)}?`)) {
+        if (window.confirm(`Deseja excluir o agendamento pendente do dia ${formatDate(date)}?`)) {
             onCancelDeliveries(supplierCpf, [deliveryId]);
         }
     };
@@ -45,7 +62,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 border-b pb-6">
                 <div>
                     <h2 className="text-3xl font-black text-purple-900 uppercase tracking-tighter">Agenda de Entregas</h2>
-                    <p className="text-gray-400 font-medium">Gerencie agendamentos e faturamentos agrupados por Nota Fiscal.</p>
+                    <p className="text-gray-400 font-medium">Visualização completa de agendamentos e faturamentos (Financeiro + Almoxarifado).</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                     <div className="flex-1">
@@ -76,21 +93,33 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
             <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-3 custom-scrollbar">
                 {sortedSuppliers.length > 0 ? sortedSuppliers.map(supplier => {
                     const displayDeliveries = (supplier.deliveries || []).filter(d => !dateFilter || d.date === dateFilter);
-                    
-                    // Separa os agendamentos pendentes (itens sem descrição real ainda)
                     const pendingDeliveries = displayDeliveries.filter(d => d.item === 'AGENDAMENTO PENDENTE');
                     
-                    // Lógica de agrupamento manual por Nota Fiscal (Sem usar hooks dentro do map)
-                    const realDeliveries = displayDeliveries.filter(d => d.item !== 'AGENDAMENTO PENDENTE');
-                    const invoiceGroups: Record<string, { date: string; nf: string; ids: string[] }> = {};
+                    // LÓGICA DE UNIFICAÇÃO: Deliveries (Financeiro) + WarehouseLog (Almoxarifado)
+                    const invoiceGroups: Record<string, { date: string; nf: string; ids: string[]; source: 'finance' | 'warehouse' | 'both' }> = {};
                     
-                    realDeliveries.forEach(d => {
+                    // 1. Processa registros financeiros do fornecedor
+                    displayDeliveries.filter(d => d.item !== 'AGENDAMENTO PENDENTE' && d.invoiceNumber).forEach(d => {
                         const nf = (d.invoiceNumber || 'S/N').trim().toUpperCase();
                         const key = `${d.date}-${nf}`;
                         if (!invoiceGroups[key]) {
-                            invoiceGroups[key] = { date: d.date, nf: nf, ids: [] };
+                            invoiceGroups[key] = { date: d.date, nf: nf, ids: [], source: 'finance' };
                         }
                         invoiceGroups[key].ids.push(d.id);
+                    });
+
+                    // 2. Processa registros físicos (Almoxarifado) para incluir notas não agendadas
+                    const supplierNameNorm = superNormalize(supplier.name);
+                    warehouseLog.filter(log => log.type === 'entrada' && superNormalize(log.supplierName) === supplierNameNorm && (!dateFilter || log.date === dateFilter)).forEach(log => {
+                        const nf = (log.inboundInvoice || 'S/N').trim().toUpperCase();
+                        const key = `${log.date}-${nf}`;
+                        if (!invoiceGroups[key]) {
+                            // Se a nota não existia no financeiro, cria pílula vinda do Almoxarifado
+                            invoiceGroups[key] = { date: log.date, nf: nf, ids: [], source: 'warehouse' };
+                        } else if (invoiceGroups[key].source === 'finance') {
+                            // Se já existia, marca como presente em ambos
+                            invoiceGroups[key].source = 'both';
+                        }
                     });
                     
                     const groupedInvoices = Object.values(invoiceGroups).sort((a, b) => 
@@ -105,13 +134,13 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
                                     <p className="text-[10px] font-mono text-gray-400">{supplier.cpf}</p>
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-[10px] font-black text-gray-400 uppercase block">Registros Únicos</span>
-                                    <span className="font-mono font-bold text-purple-600">{pendingDeliveries.length + groupedInvoices.length}</span>
+                                    <span className="text-[10px] font-black text-gray-400 uppercase block">Total de NFs Únicas</span>
+                                    <span className="font-mono font-bold text-purple-600">{groupedInvoices.length}</span>
                                 </div>
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Coluna de Agendamentos */}
+                                {/* Coluna de Agendamentos Pendentes */}
                                 <div className="bg-white p-4 rounded-xl border shadow-inner">
                                     <h4 className="text-[10px] font-black uppercase text-orange-500 mb-3 tracking-widest flex items-center gap-2">
                                         <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
@@ -120,24 +149,22 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
                                     {pendingDeliveries.length > 0 ? (
                                         <div className="flex flex-wrap gap-2">
                                             {pendingDeliveries.map(delivery => (
-                                                <div key={delivery.id} className="flex flex-col gap-2 p-3 bg-orange-50/50 rounded-xl border border-orange-100">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-black text-orange-800 font-mono">{formatDate(delivery.date)}</span>
-                                                        <span className="text-[10px] font-bold text-orange-600">{delivery.time}</span>
-                                                        <button 
-                                                            onClick={() => handleCancelSingle(supplier.cpf, delivery.id, delivery.date)}
-                                                            className="hover:bg-red-600 hover:text-white bg-white rounded-lg p-1 text-red-500 transition-all border border-red-100 shadow-sm ml-auto"
-                                                        >
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                        </button>
-                                                    </div>
+                                                <div key={delivery.id} className="flex items-center gap-3 p-3 bg-orange-50/50 rounded-xl border border-orange-100">
+                                                    <span className="text-xs font-black text-orange-800 font-mono">{formatDate(delivery.date)}</span>
+                                                    <span className="text-[10px] font-bold text-orange-600">{delivery.time}</span>
+                                                    <button 
+                                                        onClick={() => handleCancelSingle(supplier.cpf, delivery.id, delivery.date)}
+                                                        className="hover:bg-red-600 hover:text-white bg-white rounded-lg p-1 text-red-500 transition-all border border-red-100 shadow-sm"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    </button>
                                                 </div>
                                             ))}
                                         </div>
-                                    ) : <p className="text-[10px] text-gray-300 italic">Nenhum pendente.</p>}
+                                    ) : <p className="text-[10px] text-gray-300 italic">Nenhum agendamento pendente.</p>}
                                 </div>
 
-                                {/* Coluna de Faturamentos Agrupados (Sua Solicitação) */}
+                                {/* Coluna de Faturamentos Concluídos (UNIFICADA) */}
                                 <div className="bg-white p-4 rounded-xl border shadow-inner">
                                     <h4 className="text-[10px] font-black uppercase text-green-600 mb-3 tracking-widest flex items-center gap-2">
                                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -145,20 +172,24 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
                                     </h4>
                                     <div className="flex flex-wrap gap-3">
                                         {groupedInvoices.length > 0 ? groupedInvoices.map((group, idx) => (
-                                            <div key={`${group.date}-${group.nf}-${idx}`} className="flex items-center gap-3 bg-[#f0fff4] text-[#2f855a] px-4 py-2.5 rounded-2xl border border-[#c6f6d5] shadow-sm animate-fade-in group">
+                                            <div key={`${group.date}-${group.nf}-${idx}`} className={`flex items-center gap-3 bg-[#f0fff4] text-[#2f855a] px-4 py-2.5 rounded-2xl border border-[#c6f6d5] shadow-sm animate-fade-in group ${group.source === 'warehouse' ? 'border-dashed border-indigo-300 bg-indigo-50/30' : ''}`}>
                                                 <span className="text-xs font-black font-mono tracking-tighter">{formatDate(group.date)}</span>
-                                                <div className="bg-[#c6f6d5] px-2 py-0.5 rounded-md text-[10px] font-black uppercase">
+                                                <div className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${group.source === 'warehouse' ? 'bg-indigo-100 text-indigo-700' : 'bg-[#c6f6d5]'}`}>
                                                     NF {group.nf}
                                                 </div>
+                                                {group.source === 'warehouse' && (
+                                                    <span className="text-[8px] font-black text-indigo-400 uppercase italic">Apenas Almox.</span>
+                                                )}
                                                 <button 
                                                     onClick={() => handleCancelGroup(supplier.cpf, group.ids, group.date, group.nf)}
-                                                    className="bg-white hover:bg-red-500 text-red-500 hover:text-white p-2 rounded-xl transition-all border border-red-100 shadow-sm active:scale-90"
-                                                    title={`Excluir Nota Completa (${group.ids.length} itens)`}
+                                                    disabled={group.source === 'warehouse'}
+                                                    className={`p-2 rounded-xl transition-all border shadow-sm active:scale-90 ${group.source === 'warehouse' ? 'opacity-20 cursor-not-allowed' : 'bg-white hover:bg-red-500 text-red-500 hover:text-white border-red-100'}`}
+                                                    title={group.source === 'warehouse' ? 'Exclua via aba Estoque' : `Excluir Nota Completa`}
                                                 >
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                 </button>
                                             </div>
-                                        )) : <p className="text-[10px] text-gray-300 italic">Nenhum faturamento.</p>}
+                                        )) : <p className="text-[10px] text-gray-300 italic">Nenhum faturamento concluído.</p>}
                                     </div>
                                 </div>
                             </div>
