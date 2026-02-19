@@ -21,6 +21,9 @@ const superNormalize = (text: string) => {
 const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [], warehouseLog = [], onUpdateContractForItem }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [manageItem, setManageItem] = useState<any | null>(null);
+    const [isAddingItem, setIsAddingItem] = useState(false);
+    const [newItemName, setNewItemName] = useState('');
+    const [newItemUnit, setNewItemUnit] = useState('kg-1');
 
     const itemAggregation = useMemo(() => {
         const map = new Map<string, any>();
@@ -83,12 +86,76 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
         }, { contracted: 0, delivered: 0 });
     }, [filteredItems]);
 
+    const handleAddNewItem = () => {
+        if (!newItemName.trim()) return;
+        setManageItem({
+            name: newItemName.toUpperCase(),
+            unit: newItemUnit,
+            details: []
+        });
+        setIsAddingItem(false);
+        setNewItemName('');
+    };
+
+    const handleDeleteItem = async (itemName: string) => {
+        if (window.confirm(`Tem certeza que deseja excluir o item "${itemName}" de TODOS os contratos? Esta ação não pode ser desfeita.`)) {
+            const res = await onUpdateContractForItem(itemName, []);
+            if (!res.success) alert(res.message);
+        }
+    };
+
     return (
         <div className="space-y-8 animate-fade-in pb-12">
-            <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-600">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2 uppercase tracking-tight italic">Gestão Geral por Item</h2>
-                <p className="text-sm text-gray-500 font-medium">Consolidado de todos os contratos: O que foi comprado vs. O que entrou no estoque.</p>
+            <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-600 flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2 uppercase tracking-tight italic">Gestão Geral por Item</h2>
+                    <p className="text-sm text-gray-500 font-medium">Consolidado de todos os contratos: O que foi comprado vs. O que entrou no estoque.</p>
+                </div>
+                <button 
+                    onClick={() => setIsAddingItem(true)}
+                    className="bg-green-600 hover:bg-green-700 text-white font-black py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95 uppercase text-xs flex items-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                    Adicionar Novo Item
+                </button>
             </div>
+
+            {isAddingItem && (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-[200] p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-fade-in-up">
+                        <h2 className="text-xl font-black text-indigo-900 uppercase tracking-tighter mb-6">Novo Item de Contrato</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Nome do Produto</label>
+                                <input 
+                                    type="text" 
+                                    value={newItemName} 
+                                    onChange={e => setNewItemName(e.target.value)} 
+                                    className="w-full p-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-green-400 outline-none font-bold"
+                                    placeholder="EX: ARROZ AGULHINHA"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Unidade Padrão</label>
+                                <select 
+                                    value={newItemUnit} 
+                                    onChange={e => setNewItemUnit(e.target.value)}
+                                    className="w-full p-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-green-400 outline-none font-bold"
+                                >
+                                    <option value="kg-1">Quilograma (kg)</option>
+                                    <option value="L-1">Litro (L)</option>
+                                    <option value="un-1">Unidade (un)</option>
+                                    <option value="cx-1">Caixa (cx)</option>
+                                </select>
+                            </div>
+                            <div className="flex gap-3 pt-4">
+                                <button onClick={() => setIsAddingItem(false)} className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold uppercase text-xs">Cancelar</button>
+                                <button onClick={handleAddNewItem} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-black uppercase text-xs shadow-md">Continuar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-2xl shadow-lg border-b-8 border-indigo-500">
@@ -159,12 +226,21 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                                             <span className="text-[9px] font-black text-gray-400">{pct.toFixed(0)}%</span>
                                         </td>
                                         <td className="p-4 text-center">
-                                            <button 
-                                                onClick={() => setManageItem(item)}
-                                                className="bg-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all shadow-sm"
-                                            >
-                                                Gerenciar
-                                            </button>
+                                            <div className="flex justify-center gap-2">
+                                                <button 
+                                                    onClick={() => setManageItem(item)}
+                                                    className="bg-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all shadow-sm"
+                                                >
+                                                    Gerenciar
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteItem(item.name)}
+                                                    className="bg-red-50 text-red-500 hover:bg-red-600 hover:text-white p-2 rounded-lg transition-all shadow-sm"
+                                                    title="Excluir Item"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 );
