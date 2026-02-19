@@ -50,9 +50,19 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     // --- AÇÕES ENTRADA ---
     const handleAddEntryItem = () => setEntryItems([...entryItems, { id: Math.random().toString(), itemName: '', quantity: '', unitPrice: '', expirationDate: '', lot: '' }]);
     const handleRemoveEntryItem = (index: number) => setEntryItems(entryItems.filter((_, i) => i !== index));
+    
     const handleEntryItemChange = (index: number, field: string, value: string) => {
         const newItems = [...entryItems];
         (newItems[index] as any)[field] = value;
+
+        // SE O CAMPO ALTERADO FOR O NOME DO ITEM, BUSCAR PREÇO NO CONTRATO
+        if (field === 'itemName' && selectedSupplier) {
+            const contractItem = selectedSupplier.contractItems.find(ci => ci.name === value);
+            if (contractItem) {
+                newItems[index].unitPrice = contractItem.valuePerKg.toString().replace('.', ',');
+            }
+        }
+
         setEntryItems(newItems);
     };
 
@@ -275,7 +285,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100 shadow-inner">
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Fornecedor</label>
-                                    <select value={entrySupplierCpf} onChange={e => setEntrySupplierCpf(e.target.value)} className="w-full p-3 border-2 border-white rounded-xl shadow-sm outline-none focus:ring-2 focus:ring-green-500 font-bold text-sm bg-white" required>
+                                    <select value={entrySupplierCpf} onChange={e => { setEntrySupplierCpf(e.target.value); setEntryItems([{ id: Math.random().toString(), itemName: '', quantity: '', unitPrice: '', expirationDate: '', lot: '' }]); }} className="w-full p-3 border-2 border-white rounded-xl shadow-sm outline-none focus:ring-2 focus:ring-green-500 font-bold text-sm bg-white" required>
                                         <option value="">-- SELECIONE --</option>
                                         {suppliers.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}
                                     </select>
@@ -323,8 +333,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                                 <input type="text" value={item.quantity} onChange={e => handleEntryItemChange(idx, 'quantity', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2.5 border rounded-xl text-center font-mono font-black text-xs" placeholder="0,00" required />
                                             </div>
                                             <div className="md:col-span-1">
-                                                <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Preço</label>
-                                                <input type="text" value={item.unitPrice} onChange={e => handleEntryItemChange(idx, 'unitPrice', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2.5 border rounded-xl text-center font-mono text-xs" placeholder="0,00" />
+                                                <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Preço (Contrato)</label>
+                                                <input type="text" value={item.unitPrice} onChange={e => handleEntryItemChange(idx, 'unitPrice', e.target.value.replace(/[^0-9,.]/g, ''))} className="w-full p-2.5 border rounded-xl text-center font-mono text-xs bg-slate-50 text-indigo-700 font-bold" placeholder="0,00" />
                                             </div>
                                             <div className="md:col-span-2 flex items-center gap-2 justify-end">
                                                 <button type="button" onClick={() => handlePrintLabel(item)} title="Imprimir Etiqueta" className="p-3 bg-slate-900 text-white rounded-xl hover:bg-black transition-all shadow-md">
