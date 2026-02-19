@@ -57,6 +57,128 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, wareho
         }
     };
 
+    const handlePrintCronograma = () => {
+        // Coletar todos os dados brutos respeitando os filtros atuais da tela
+        const reportData: any[] = [];
+        
+        sortedSuppliers.forEach(supplier => {
+            const supplierDeliveries = (supplier.deliveries || []).filter(d => !dateFilter || d.date === dateFilter);
+            
+            supplierDeliveries.forEach(d => {
+                const isFaturado = d.item !== 'AGENDAMENTO PENDENTE';
+                reportData.push({
+                    date: d.date,
+                    time: d.time,
+                    supplier: supplier.name,
+                    nf: d.invoiceNumber || '-',
+                    status: isFaturado ? 'FATURADO' : 'AGENDADO',
+                    patio: d.arrivalTime || '-'
+                });
+            });
+
+            // Inclui notas que vieram apenas do Almoxarifado (sem agendamento prévio)
+            const supplierNameNorm = superNormalize(supplier.name);
+            warehouseLog.filter(log => log.type === 'entrada' && superNormalize(log.supplierName) === supplierNameNorm && (!dateFilter || log.date === dateFilter)).forEach(log => {
+                const nf = (log.inboundInvoice || 'S/N').trim().toUpperCase();
+                const alreadyAdded = reportData.some(r => r.supplier === supplier.name && r.date === log.date && r.nf === nf);
+                if (!alreadyAdded) {
+                    reportData.push({
+                        date: log.date,
+                        time: 'S/H',
+                        supplier: supplier.name,
+                        nf: nf,
+                        status: 'ALMOXARIFADO',
+                        patio: '-'
+                    });
+                }
+            });
+        });
+
+        // Ordenar cronologicamente
+        reportData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.time.localeCompare(b.time));
+
+        const printContent = `
+          <html>
+            <head>
+              <title>Cronograma de Entregas - Taiúva 2026</title>
+              <style>
+                @page { size: A4; margin: 15mm; }
+                body { font-family: Arial, sans-serif; font-size: 11px; color: #333; line-height: 1.4; }
+                .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                .header-sap { font-size: 13px; font-weight: bold; margin-bottom: 2px; text-transform: uppercase; }
+                .header-unit { font-size: 15px; font-weight: bold; margin-bottom: 4px; }
+                .header-address { font-size: 9px; color: #666; }
+                .report-title { text-align: center; font-size: 16px; font-weight: bold; margin: 20px 0; text-transform: uppercase; text-decoration: underline; }
+                .filter-info { margin-bottom: 15px; font-weight: bold; font-size: 10px; background: #f9f9f9; padding: 5px; border: 1px solid #ddd; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+                th { background-color: #f2f2f2; font-weight: bold; text-transform: uppercase; font-size: 9px; }
+                .status-agendado { color: #2563eb; }
+                .status-faturado { color: #16a34a; font-weight: bold; }
+                .footer { margin-top: 60px; display: flex; justify-content: space-around; page-break-inside: avoid; }
+                .sig { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; font-size: 10px; font-weight: bold; margin-top: 40px; }
+                .date-print { text-align: right; font-size: 8px; color: #999; margin-top: 10px; }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <div class="header-sap">Secretaria da Administração Penitenciária</div>
+                <div class="header-unit">Polícia Penal - Penitenciária de Taiúva</div>
+                <div class="header-address">Rodovia Brigadeiro Faria Lima, SP 326, KM 359,6 Taiúva/SP - CEP: 14.720-000<br>Fone: (16) 3247-6261 - E-mail: dg@ptaiuva.sap.gov.br</div>
+              </div>
+              
+              <div class="report-title">CRONOGRAMA DE ENTREGAS</div>
+              
+              <div class="filter-info">
+                Filtro aplicado: ${dateFilter ? 'Data ' + formatDate(dateFilter) : 'Período Completo'} 
+                ${searchTerm ? ' | Fornecedor: ' + searchTerm : ''}
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 80px;">Data</th>
+                    <th style="width: 60px;">Horário</th>
+                    <th>Fornecedor</th>
+                    <th style="width: 80px;">Nº Nota Fiscal</th>
+                    <th style="width: 100px;">Status</th>
+                    <th style="width: 80px;">Chegada Pátio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${reportData.length > 0 ? reportData.map(r => `
+                    <tr>
+                      <td>${formatDate(r.date)}</td>
+                      <td style="font-family: monospace;">${r.time}</td>
+                      <td style="font-weight: bold;">${r.supplier}</td>
+                      <td>${r.nf}</td>
+                      <td class="${r.status === 'FATURADO' ? 'status-faturado' : 'status-agendado'}">${r.status}</td>
+                      <td style="font-weight: bold;">${r.patio}</td>
+                    </tr>
+                  `).join('') : '<tr><td colspan="6" style="text-align: center; padding: 20px;">Nenhum registro encontrado para os filtros aplicados.</td></tr>'}
+                </tbody>
+              </table>
+              
+              <div class="footer">
+                <div class="sig">Responsável Almoxarifado<br>(Conferência)</div>
+                <div class="sig">Diretoria de Centro<br>(Visto)</div>
+              </div>
+
+              <div class="date-print">Relatório extraído em: ${new Date().toLocaleString('pt-BR')}</div>
+            </body>
+          </html>
+        `;
+
+        const win = window.open('', '_blank');
+        if (win) {
+            win.document.write(printContent);
+            win.document.close();
+            setTimeout(() => {
+                win.print();
+            }, 500);
+        }
+    };
+
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-purple-600 animate-fade-in">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 border-b pb-6">
@@ -65,27 +187,33 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, wareho
                     <p className="text-gray-400 font-medium">Visualização completa de agendamentos e faturamentos (Financeiro + Almoxarifado).</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                    <div className="flex-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Pesquisar Fornecedor</label>
+                    <button 
+                        onClick={handlePrintCronograma}
+                        className="bg-indigo-900 hover:bg-black text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg transition-all flex items-center justify-center gap-2 h-10"
+                        title="Imprimir Cronograma em A4"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        Exportar Cronograma
+                    </button>
+                    <div className="flex-1 min-w-[200px]">
                         <input
                             type="text"
-                            placeholder="Ex: Dominato..."
+                            placeholder="Pesquisar Fornecedor..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-400 transition-all"
+                            className="w-full border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-400 transition-all h-10"
                         />
                     </div>
                     <div className="w-full sm:w-48">
-                        <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Filtrar por Data</label>
                         <input
                             type="date"
                             value={dateFilter}
                             onChange={(e) => setDateFilter(e.target.value)}
-                            className="w-full border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-400 transition-all bg-white"
+                            className="w-full border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-400 transition-all bg-white h-10"
                         />
                     </div>
                     {dateFilter && (
-                        <button onClick={() => setDateFilter('')} className="mt-5 text-xs text-purple-600 font-bold hover:underline">Limpar Data</button>
+                        <button onClick={() => setDateFilter('')} className="text-xs text-purple-600 font-bold hover:underline self-center">Limpar Filtros</button>
                     )}
                 </div>
             </div>
@@ -95,10 +223,8 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, wareho
                     const displayDeliveries = (supplier.deliveries || []).filter(d => !dateFilter || d.date === dateFilter);
                     const pendingDeliveries = displayDeliveries.filter(d => d.item === 'AGENDAMENTO PENDENTE');
                     
-                    // LÓGICA DE UNIFICAÇÃO: Deliveries (Financeiro) + WarehouseLog (Almoxarifado)
                     const invoiceGroups: Record<string, { date: string; nf: string; ids: string[]; source: 'finance' | 'warehouse' | 'both' }> = {};
                     
-                    // 1. Processa registros financeiros do fornecedor
                     displayDeliveries.filter(d => d.item !== 'AGENDAMENTO PENDENTE' && d.invoiceNumber).forEach(d => {
                         const nf = (d.invoiceNumber || 'S/N').trim().toUpperCase();
                         const key = `${d.date}-${nf}`;
@@ -108,16 +234,13 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, wareho
                         invoiceGroups[key].ids.push(d.id);
                     });
 
-                    // 2. Processa registros físicos (Almoxarifado) para incluir notas não agendadas
                     const supplierNameNorm = superNormalize(supplier.name);
                     warehouseLog.filter(log => log.type === 'entrada' && superNormalize(log.supplierName) === supplierNameNorm && (!dateFilter || log.date === dateFilter)).forEach(log => {
                         const nf = (log.inboundInvoice || 'S/N').trim().toUpperCase();
                         const key = `${log.date}-${nf}`;
                         if (!invoiceGroups[key]) {
-                            // Se a nota não existia no financeiro, cria pílula vinda do Almoxarifado
                             invoiceGroups[key] = { date: log.date, nf: nf, ids: [], source: 'warehouse' };
                         } else if (invoiceGroups[key].source === 'finance') {
-                            // Se já existia, marca como presente em ambos
                             invoiceGroups[key].source = 'both';
                         }
                     });
@@ -140,7 +263,6 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, wareho
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Coluna de Agendamentos Pendentes */}
                                 <div className="bg-white p-4 rounded-xl border shadow-inner">
                                     <h4 className="text-[10px] font-black uppercase text-orange-500 mb-3 tracking-widest flex items-center gap-2">
                                         <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
@@ -164,7 +286,6 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, wareho
                                     ) : <p className="text-[10px] text-gray-300 italic">Nenhum agendamento pendente.</p>}
                                 </div>
 
-                                {/* Coluna de Faturamentos Concluídos (UNIFICADA) */}
                                 <div className="bg-white p-4 rounded-xl border shadow-inner">
                                     <h4 className="text-[10px] font-black uppercase text-green-600 mb-3 tracking-widest flex items-center gap-2">
                                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -177,9 +298,6 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, wareho
                                                 <div className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${group.source === 'warehouse' ? 'bg-indigo-100 text-indigo-700' : 'bg-[#c6f6d5]'}`}>
                                                     NF {group.nf}
                                                 </div>
-                                                {group.source === 'warehouse' && (
-                                                    <span className="text-[8px] font-black text-indigo-400 uppercase italic">Apenas Almox.</span>
-                                                )}
                                                 <button 
                                                     onClick={() => handleCancelGroup(supplier.cpf, group.ids, group.date, group.nf)}
                                                     disabled={group.source === 'warehouse'}
