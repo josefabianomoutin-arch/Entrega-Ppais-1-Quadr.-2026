@@ -34,7 +34,6 @@ const formatDate = (dateString: string) => {
 const extractInclusionTime = (id: string) => {
     try {
         const parts = id.split('-');
-        // Padrao inv-timestamp ou manual-timestamp
         const timestampStr = parts.find(p => p.length >= 10 && !isNaN(Number(p)));
         if (timestampStr) {
             return new Date(Number(timestampStr)).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -62,6 +61,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
     const [editingInvoice, setEditingInvoice] = useState<InvoiceInfo | null>(null);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
+    const [selectedSupplierReport, setSelectedSupplierReport] = useState('all');
 
     const allInvoices = useMemo((): InvoiceInfo[] => {
         const invoicesMap = new Map<string, InvoiceInfo>();
@@ -111,6 +111,13 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
     };
 
     const handlePrintCronograma = () => {
+        // Filtragem para o relatório baseada na seleção
+        const reportData = selectedSupplierReport === 'all' 
+            ? filteredAndSortedInvoices 
+            : filteredAndSortedInvoices.filter(inv => inv.supplierCpf === selectedSupplierReport);
+
+        if (reportData.length === 0) return alert('Nenhuma nota fiscal encontrada para o fornecedor selecionado.');
+
         const reportContent = `
           <html>
             <head>
@@ -155,7 +162,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                   </tr>
                 </thead>
                 <tbody>
-                  ${filteredAndSortedInvoices.flatMap(invoice => {
+                  ${reportData.flatMap(invoice => {
                       const supplier = suppliers.find(s => s.cpf === invoice.supplierCpf);
                       const totalContracted = supplier?.initialValue || 0;
                       
@@ -163,12 +170,12 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                         <tr>
                           <td style="font-weight: bold; font-size: 9px;">${idx === 0 ? invoice.supplierName : ''}</td>
                           <td>${formatDate(invoice.date)}</td>
-                          <td>${extractInclusionTime(item.inclusionId)}</td>
+                          <td style="font-mono; font-size: 9px;">${extractInclusionTime(item.inclusionId)}</td>
                           <td>${invoice.invoiceNumber}</td>
                           <td style="text-transform: uppercase;">${item.name}</td>
                           <td style="text-align: right; font-weight: bold;">${item.kg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                           <td class="money">${formatCurrency(item.value)}</td>
-                          <td class="money" style="background: #f9f9f9;">${idx === 0 ? formatCurrency(totalContracted) : ''}</td>
+                          <td class="money" style="background: #f9f9f9; font-weight: bold;">${idx === 0 ? formatCurrency(totalContracted) : ''}</td>
                         </tr>
                       `);
                   }).join('')}
@@ -202,7 +209,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
         else alert(res.message || 'Erro ao salvar alterações.');
     };
 
-    const handleManualEntrySave = async (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number }[]) => {
+    const handleManualInvoiceEntry = async (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number }[]) => {
         setIsSavingEdit(true);
         const res = await onManualInvoiceEntry(cpf, date, nf, items);
         setIsSavingEdit(false);
@@ -217,19 +224,32 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                     <h2 className="text-3xl font-black text-teal-900 uppercase tracking-tighter">Consulta de Notas Fiscais</h2>
                     <p className="text-gray-400 font-medium">Visualize faturas, lance notas manuais ou exporte relatórios.</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Fornecedor do Relatório</label>
+                        <select 
+                            value={selectedSupplierReport} 
+                            onChange={e => setSelectedSupplierReport(e.target.value)}
+                            className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-black uppercase text-indigo-900 outline-none focus:ring-2 focus:ring-teal-400 h-10 min-w-[200px]"
+                        >
+                            <option value="all">TODOS OS FORNECEDORES</option>
+                            {suppliers.sort((a,b) => a.name.localeCompare(b.name)).map(s => (
+                                <option key={s.cpf} value={s.cpf}>{s.name}</option>
+                            ))}
+                        </select>
+                    </div>
                     <button 
                         onClick={handlePrintCronograma}
-                        className="bg-gray-800 hover:bg-black text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-[10px] flex items-center gap-2"
+                        className="bg-gray-800 hover:bg-black text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-[10px] flex items-center gap-2 h-10"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                        Exportar Relatório NFs
+                        Exportar Cronograma NFs
                     </button>
-                    <button onClick={() => setIsManualModalOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-[10px] flex items-center gap-2">
+                    <button onClick={() => setIsManualModalOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white font-black py-2 px-6 rounded-xl text-xs uppercase shadow-md active:scale-95 tracking-widest text-[10px] flex items-center gap-2 h-10">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-                        Lançar NF Manualmente
+                        Lançar Manual
                     </button>
-                    <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-400 transition-all w-full md:w-auto h-10" />
+                    <input type="text" placeholder="Filtrar tela..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-400 transition-all w-full md:w-48 h-10" />
                 </div>
             </div>
 
@@ -305,7 +325,8 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
             )}
 
             {isManualModalOpen && (
-                <ManualInvoiceModal suppliers={suppliers} onClose={() => setIsManualModalOpen(false)} onSave={handleManualEntrySave} isSaving={isSavingEdit} />
+                /* Fix: Change handleManualEntrySave to handleManualInvoiceEntry */
+                <ManualInvoiceModal suppliers={suppliers} onClose={() => setIsManualModalOpen(false)} onSave={handleManualInvoiceEntry} isSaving={isSavingEdit} />
             )}
         </div>
     )
@@ -430,6 +451,7 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
     };
 
     const totalValue = useMemo(() => items.reduce((sum, it) => {
+        /* Fix: 'item' was used instead of 'it' */
         const contract = supplier.contractItems.find(ci => ci.name === it.name);
         const kg = parseFloat(it.kg.replace(',', '.'));
         return (contract && !isNaN(kg)) ? sum + (kg * contract.valuePerKg) : sum;
