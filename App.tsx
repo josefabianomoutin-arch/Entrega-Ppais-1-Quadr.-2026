@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem, FinancialRecord, UserRole } from './types';
 import LoginScreen from './components/LoginScreen';
@@ -241,7 +240,7 @@ const App: React.FC = () => {
 
   // --- GERENCIAMENTO DE NOTAS FISCAIS (ADMIN) ---
 
-  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => {
+  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[], barcode?: string) => {
     const supplierRef = child(suppliersRef, supplierCpf);
     try {
       await runTransaction(supplierRef, (currentData: Supplier) => {
@@ -265,7 +264,8 @@ const App: React.FC = () => {
               kg: item.kg,
               value: item.value,
               invoiceUploaded: true,
-              invoiceNumber: invoiceNumber
+              invoiceNumber: invoiceNumber,
+              barcode: barcode || '' // Salva o novo código de barras
             });
           });
         }

@@ -1,4 +1,3 @@
-
 export interface Delivery {
   id: string;
   date: string; // ISO string format: 'YYYY-MM-DD'
@@ -9,6 +8,7 @@ export interface Delivery {
   value?: number;
   invoiceUploaded: boolean;
   invoiceNumber?: string;
+  barcode?: string; // NOVO: Código de barras da Nota Fiscal
   lots?: {
     id: string;
     lotNumber: string;
