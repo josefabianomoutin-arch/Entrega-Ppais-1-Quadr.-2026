@@ -131,24 +131,26 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
     };
 
     const handlePrintLabel = (log: WarehouseMovement) => {
-        const printWindow = window.open('', '_blank', 'width=600,height=400');
+        const printWindow = window.open('', '_blank', 'width=600,height=600');
         if (!printWindow) return;
 
         const htmlContent = `
             <html>
             <head>
                 <title>Etiqueta - ${log.itemName}</title>
+                <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
                 <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; text-align: center; border: 2px solid #000; margin: 10px; border-radius: 10px; }
-                    h1 { font-size: 24px; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
-                    h2 { font-size: 18px; margin: 5px 0; color: #333; }
-                    .info { margin-top: 20px; text-align: left; font-size: 14px; }
-                    .info p { margin: 5px 0; border-bottom: 1px dashed #ccc; padding-bottom: 2px; }
-                    .info strong { display: inline-block; width: 120px; }
-                    .barcode { margin-top: 20px; font-family: 'Courier New', Courier, monospace; font-size: 12px; }
-                    .footer { margin-top: 20px; font-size: 10px; color: #666; }
+                    body { font-family: Arial, sans-serif; padding: 20px; text-align: center; border: 2px solid #000; margin: 10px; border-radius: 10px; width: 400px; margin: 20px auto; }
+                    h1 { font-size: 22px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
+                    h2 { font-size: 16px; margin: 5px 0; color: #444; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+                    .info { margin-top: 15px; text-align: left; font-size: 13px; }
+                    .info p { margin: 4px 0; border-bottom: 1px dashed #eee; padding-bottom: 2px; display: flex; justify-content: space-between; }
+                    .info strong { color: #666; text-transform: uppercase; font-size: 10px; }
+                    .barcode-container { margin-top: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100px; }
+                    #barcode { max-width: 100%; }
+                    .footer { margin-top: 15px; font-size: 9px; color: #999; border-top: 1px solid #eee; padding-top: 5px; }
                     @media print {
-                        body { border: none; margin: 0; }
+                        body { border: none; margin: 0; width: 100%; }
                         .no-print { display: none; }
                     }
                 </style>
@@ -158,15 +160,15 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 <h2>${log.supplierName}</h2>
                 
                 <div class="info">
-                    <p><strong>LOTE:</strong> ${log.lotNumber}</p>
-                    <p><strong>VALIDADE:</strong> ${log.expirationDate ? log.expirationDate.split('-').reverse().join('/') : 'N/A'}</p>
-                    <p><strong>DATA ENTRADA:</strong> ${log.date ? log.date.split('-').reverse().join('/') : 'N/A'}</p>
-                    <p><strong>QUANTIDADE:</strong> ${log.quantity} kg</p>
-                    <p><strong>NOTA FISCAL:</strong> ${log.inboundInvoice || log.outboundInvoice || 'N/A'}</p>
+                    <p><strong>LOTE:</strong> <span>${log.lotNumber}</span></p>
+                    <p><strong>VALIDADE:</strong> <span>${log.expirationDate ? log.expirationDate.split('-').reverse().join('/') : 'N/A'}</span></p>
+                    <p><strong>DATA ENTRADA:</strong> <span>${log.date ? log.date.split('-').reverse().join('/') : 'N/A'}</span></p>
+                    <p><strong>QUANTIDADE:</strong> <span>${log.quantity} kg</span></p>
+                    <p><strong>NOTA FISCAL:</strong> <span>${log.inboundInvoice || log.outboundInvoice || 'N/A'}</span></p>
                 </div>
 
-                <div class="barcode">
-                    ${log.barcode ? `* ${log.barcode} *` : ''}
+                <div class="barcode-container">
+                    ${log.barcode ? `<svg id="barcode"></svg>` : '<p style="font-size: 10px; color: #ccc; margin-top: 40px;">SEM CÓDIGO DE BARRAS</p>'}
                 </div>
 
                 <div class="footer">
@@ -174,7 +176,26 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 </div>
 
                 <script>
-                    window.onload = function() { window.print(); window.close(); }
+                    window.onload = function() {
+                        if (document.getElementById('barcode')) {
+                            try {
+                                JsBarcode("#barcode", "${log.barcode}", {
+                                    format: "CODE128",
+                                    width: 2,
+                                    height: 60,
+                                    displayValue: true,
+                                    fontSize: 14,
+                                    margin: 10
+                                });
+                            } catch (e) {
+                                console.error("Erro ao gerar código de barras:", e);
+                            }
+                        }
+                        setTimeout(() => {
+                            window.print();
+                            window.close();
+                        }, 500);
+                    }
                 </script>
             </body>
             </html>
@@ -386,6 +407,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     suppliers={suppliers} 
                     logEntry={editingLog}
                     onClose={() => setEditingLog(null)}
+                    onPrint={handlePrintLabel}
                     onSave={async (updated) => {
                         const res = await onUpdateWarehouseEntry(updated);
                         if (res.success) setEditingLog(null);
@@ -404,10 +426,11 @@ interface EditWarehouseMovementModalProps {
     suppliers: Supplier[];
     logEntry: WarehouseMovement;
     onClose: () => void;
+    onPrint: (log: WarehouseMovement) => void;
     onSave: (updated: WarehouseMovement) => Promise<void>;
 }
 
-const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({ suppliers, logEntry, onClose, onSave }) => {
+const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({ suppliers, logEntry, onClose, onPrint, onSave }) => {
     const [type, setType] = useState<'entrada' | 'saída'>(logEntry.type);
     const [selectedCpf, setSelectedCpf] = useState(() => {
         const found = suppliers.find(s => superNormalize(s.name) === superNormalize(logEntry.supplierName));
@@ -512,6 +535,16 @@ const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({
 
                     <div className="flex justify-end gap-3 pt-6 border-t">
                         <button type="button" onClick={onClose} className="bg-gray-200 text-gray-700 px-8 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-colors">Cancelar</button>
+                        <button 
+                            type="button"
+                            onClick={() => onPrint(logEntry)}
+                            className="bg-indigo-100 text-indigo-700 px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all hover:bg-indigo-200 flex items-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                            Imprimir Etiqueta
+                        </button>
                         <button 
                             type="submit" 
                             disabled={isSaving || !selectedCpf || !itemName} 
