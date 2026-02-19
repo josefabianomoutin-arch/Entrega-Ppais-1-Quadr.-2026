@@ -5,7 +5,7 @@ import type { Supplier, WarehouseMovement } from '../types';
 interface AdminContractItemsProps {
   suppliers: Supplier[];
   warehouseLog: WarehouseMovement[];
-  onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string }[]) => Promise<{ success: boolean, message: string }>;
+  onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string }[], globalBarcode?: string) => Promise<{ success: boolean, message: string }>;
 }
 
 const superNormalize = (text: string) => {
@@ -21,9 +21,6 @@ const superNormalize = (text: string) => {
 const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [], warehouseLog = [], onUpdateContractForItem }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [manageItem, setManageItem] = useState<any | null>(null);
-    const [isAddingItem, setIsAddingItem] = useState(false);
-    const [newItemName, setNewItemName] = useState('');
-    const [newItemUnit, setNewItemUnit] = useState('kg-1');
 
     const itemAggregation = useMemo(() => {
         const map = new Map<string, any>();
@@ -38,6 +35,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                     totalContracted: 0,
                     totalDelivered: 0,
                     unit: ci.unit || 'kg-1',
+                    barcode: ci.barcode || '', // Pega o código de barras se já existir
                     suppliersCount: 0,
                     details: []
                 };
@@ -50,6 +48,8 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                     amount: Number(ci.totalKg), 
                     price: Number(ci.valuePerKg) 
                 });
+                
+                if (ci.barcode && !existing.barcode) existing.barcode = ci.barcode;
                 
                 map.set(normName, existing);
             });
@@ -86,76 +86,12 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
         }, { contracted: 0, delivered: 0 });
     }, [filteredItems]);
 
-    const handleAddNewItem = () => {
-        if (!newItemName.trim()) return;
-        setManageItem({
-            name: newItemName.toUpperCase(),
-            unit: newItemUnit,
-            details: []
-        });
-        setIsAddingItem(false);
-        setNewItemName('');
-    };
-
-    const handleDeleteItem = async (itemName: string) => {
-        if (window.confirm(`Tem certeza que deseja excluir o item "${itemName}" de TODOS os contratos? Esta ação não pode ser desfeita.`)) {
-            const res = await onUpdateContractForItem(itemName, []);
-            if (!res.success) alert(res.message);
-        }
-    };
-
     return (
         <div className="space-y-8 animate-fade-in pb-12">
-            <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-600 flex justify-between items-center">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2 uppercase tracking-tight italic">Gestão Geral por Item</h2>
-                    <p className="text-sm text-gray-500 font-medium">Consolidado de todos os contratos: O que foi comprado vs. O que entrou no estoque.</p>
-                </div>
-                <button 
-                    onClick={() => setIsAddingItem(true)}
-                    className="bg-green-600 hover:bg-green-700 text-white font-black py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95 uppercase text-xs flex items-center gap-2"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-                    Adicionar Novo Item
-                </button>
+            <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-600">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2 uppercase tracking-tight italic">Gestão Geral por Item</h2>
+                <p className="text-sm text-gray-500 font-medium">Consolidado de todos os contratos: O que foi comprado vs. O que entrou no estoque.</p>
             </div>
-
-            {isAddingItem && (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-[200] p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-fade-in-up">
-                        <h2 className="text-xl font-black text-indigo-900 uppercase tracking-tighter mb-6">Novo Item de Contrato</h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Nome do Produto</label>
-                                <input 
-                                    type="text" 
-                                    value={newItemName} 
-                                    onChange={e => setNewItemName(e.target.value)} 
-                                    className="w-full p-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-green-400 outline-none font-bold"
-                                    placeholder="EX: ARROZ AGULHINHA"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Unidade Padrão</label>
-                                <select 
-                                    value={newItemUnit} 
-                                    onChange={e => setNewItemUnit(e.target.value)}
-                                    className="w-full p-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-green-400 outline-none font-bold"
-                                >
-                                    <option value="kg-1">Quilograma (kg)</option>
-                                    <option value="L-1">Litro (L)</option>
-                                    <option value="un-1">Unidade (un)</option>
-                                    <option value="cx-1">Caixa (cx)</option>
-                                </select>
-                            </div>
-                            <div className="flex gap-3 pt-4">
-                                <button onClick={() => setIsAddingItem(false)} className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold uppercase text-xs">Cancelar</button>
-                                <button onClick={handleAddNewItem} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-black uppercase text-xs shadow-md">Continuar</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-2xl shadow-lg border-b-8 border-indigo-500">
@@ -205,13 +141,18 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                                     <tr key={idx} className="hover:bg-green-50/30 transition-colors">
                                         <td className="p-4">
                                             <p className="font-black text-gray-800 uppercase text-xs mb-1.5">{item.name}</p>
-                                            <div className="flex flex-wrap gap-1">
+                                            <div className="flex flex-wrap gap-1 mb-2">
                                                 {item.details.map((det: any, dIdx: number) => (
                                                     <span key={dIdx} className="inline-block bg-gray-100 text-gray-500 text-[8px] font-black uppercase px-2 py-0.5 rounded border border-gray-200">
                                                         {det.supplierName}
                                                     </span>
                                                 ))}
                                             </div>
+                                            {item.barcode && (
+                                                <p className="text-[10px] font-mono font-black text-indigo-500 uppercase">
+                                                    Barras: {item.barcode}
+                                                </p>
+                                            )}
                                         </td>
                                         <td className="p-4 text-center">
                                             <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold uppercase">{item.unit.split('-')[0]}</span>
@@ -226,21 +167,12 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                                             <span className="text-[9px] font-black text-gray-400">{pct.toFixed(0)}%</span>
                                         </td>
                                         <td className="p-4 text-center">
-                                            <div className="flex justify-center gap-2">
-                                                <button 
-                                                    onClick={() => setManageItem(item)}
-                                                    className="bg-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all shadow-sm"
-                                                >
-                                                    Gerenciar
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleDeleteItem(item.name)}
-                                                    className="bg-red-50 text-red-500 hover:bg-red-600 hover:text-white p-2 rounded-lg transition-all shadow-sm"
-                                                    title="Excluir Item"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                </button>
-                                            </div>
+                                            <button 
+                                                onClick={() => setManageItem(item)}
+                                                className="bg-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all shadow-sm"
+                                            >
+                                                Gerenciar
+                                            </button>
                                         </td>
                                     </tr>
                                 );
@@ -258,9 +190,10 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                     currentSuppliers={manageItem.details} 
                     allSuppliers={suppliers} 
                     unit={manageItem.unit}
+                    initialBarcode={manageItem.barcode}
                     onClose={() => setManageItem(null)} 
-                    onSave={async (assignments) => {
-                        const res = await onUpdateContractForItem(manageItem.name, assignments);
+                    onSave={async (assignments, barcode) => {
+                        const res = await onUpdateContractForItem(manageItem.name, assignments, barcode);
                         if (res.success) setManageItem(null);
                         else alert(res.message);
                     }}
@@ -281,11 +214,12 @@ interface ManageContractSuppliersModalProps {
     currentSuppliers: { supplierName: string, supplierCpf: string, amount: number, price: number }[];
     allSuppliers: Supplier[];
     unit: string;
+    initialBarcode?: string;
     onClose: () => void;
-    onSave: (assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string }[]) => Promise<void>;
+    onSave: (assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string }[], barcode: string) => Promise<void>;
 }
 
-const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> = ({ itemName, currentSuppliers, allSuppliers, unit, onClose, onSave }) => {
+const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> = ({ itemName, currentSuppliers, allSuppliers, unit, initialBarcode, onClose, onSave }) => {
     const [assignments, setAssignments] = useState(() => currentSuppliers.map(s => ({
         supplierCpf: s.supplierCpf,
         supplierName: s.supplierName,
@@ -294,6 +228,7 @@ const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> 
         unit: unit
     })));
 
+    const [globalBarcode, setGlobalBarcode] = useState(initialBarcode || '');
     const [newSupplierCpf, setNewSupplierCpf] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
@@ -334,7 +269,7 @@ const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> 
             unit: a.unit
         })).filter(a => !isNaN(a.totalKg));
 
-        await onSave(finalAssignments);
+        await onSave(finalAssignments, globalBarcode);
         setIsSaving(false);
     };
 
@@ -350,6 +285,26 @@ const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> 
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                    {/* NOVO CAMPO: CÓDIGO DE BARRAS GLOBAL DO ITEM */}
+                    <div className="mb-8 bg-blue-50 p-6 rounded-3xl border-2 border-blue-100">
+                        <div className="flex flex-col md:flex-row items-center gap-4">
+                            <div className="flex-1 w-full">
+                                <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-1 block">Código de Barras Global do Item</label>
+                                <input 
+                                    type="text" 
+                                    value={globalBarcode}
+                                    onChange={e => setGlobalBarcode(e.target.value)}
+                                    placeholder="Bipar ou digitar código do produto..."
+                                    className="w-full h-14 px-6 border-2 border-blue-200 rounded-2xl font-mono text-lg font-black focus:ring-4 focus:ring-blue-100 outline-none text-blue-900"
+                                />
+                            </div>
+                            <div className="bg-white/80 p-4 rounded-2xl border border-blue-100 flex-shrink-0 text-center">
+                                <p className="text-[8px] font-black text-gray-400 uppercase">Dica</p>
+                                <p className="text-[10px] font-bold text-blue-600 uppercase max-w-[150px]">Este código será sugerido automaticamente no Almoxarifado.</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="space-y-4">
                         {assignments.map(a => (
                             <div key={a.supplierCpf} className="bg-gray-50 p-4 rounded-2xl border flex flex-col md:flex-row items-center gap-4 group transition-all hover:bg-white hover:shadow-md">
@@ -423,7 +378,7 @@ const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> 
                     <button 
                         onClick={handleSubmit}
                         disabled={isSaving}
-                        className="bg-green-600 hover:bg-green-700 text-white px-10 py-3 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg transition-all active:scale-95 disabled:bg-gray-400"
+                        className="bg-green-600 hover:bg-green-700 text-white px-10 py-3 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg transition-all active:scale-95 disabled:bg-gray-300"
                     >
                         {isSaving ? 'Salvando...' : 'Salvar Alterações'}
                     </button>

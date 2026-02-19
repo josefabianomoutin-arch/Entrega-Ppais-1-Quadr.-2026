@@ -71,8 +71,6 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMonth, setSelectedMonth] = useState('all');
 
-    const [selectedDetail, setSelectedDetail] = useState<any | null>(null);
-
     const itespSuppliers = useMemo(() => {
         const allowedSet = new Set(ALLOWED_SUPPLIERS_RAW.map(superNormalize));
         return suppliers.filter(s => {
@@ -100,8 +98,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                         contractedKgMonthly: (Number(ci.totalKg) || 0) / 4,
                         receivedKg: 0,
                         unitPrice: Number(ci.valuePerKg) || 0,
-                        sNorm, iNorm,
-                        logEntries: [] // NOVO: Guarda os logs originais
+                        sNorm, iNorm
                     });
                 });
             });
@@ -125,7 +122,6 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                         const iMatch = entry.iNorm === logINorm || entry.iNorm.includes(logINorm) || logINorm.includes(entry.iNorm);
                         if (iMatch) {
                             entry.receivedKg += (Number(log.quantity) || 0);
-                            entry.logEntries.push(log); // NOVO: Adiciona o log original
                         }
                     }
                 }
@@ -182,7 +178,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                         <p className="text-2xl font-black text-blue-700">{totals.contracted.toLocaleString('pt-BR')} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-green-600">
-                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Realizado (Histórico de Estoque)</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Realizado no Período</p>
                         <p className="text-2xl font-black text-green-700">{totals.received.toLocaleString('pt-BR')} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-red-500">
@@ -220,11 +216,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {filteredData.length > 0 ? filteredData.map(item => (
-                                    <tr 
-                                        key={item.id} 
-                                        onClick={() => setSelectedDetail(item)}
-                                        className="hover:bg-green-50/50 transition-colors group cursor-pointer"
-                                    >
+                                    <tr key={item.id} className="hover:bg-green-50/50 transition-colors group">
                                         <td className="p-5 font-black text-gray-900 text-xs uppercase">{item.supplierName}</td>
                                         <td className="p-5 text-gray-500 font-bold uppercase text-[11px]">{item.productName}</td>
                                         <td className="p-5 text-center">
@@ -248,81 +240,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                         </table>
                     </div>
                 </div>
-
-                {selectedDetail && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex justify-center items-center p-4 animate-fade-in">
-                        <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-3xl overflow-hidden animate-scale-up">
-                            <div className="bg-green-800 p-8 text-white flex justify-between items-start">
-                                <div>
-                                    <h3 className="text-2xl font-black uppercase tracking-tighter">{selectedDetail.productName}</h3>
-                                    <p className="text-green-200 font-bold uppercase text-xs tracking-widest mt-1">{selectedDetail.supplierName} • {selectedDetail.month}</p>
-                                </div>
-                                <button onClick={() => setSelectedDetail(null)} className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </div>
-                            
-                            <div className="p-8 space-y-6">
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Meta Mensal</p>
-                                        <p className="text-lg font-black text-blue-700">{selectedDetail.contractedKgMonthly.toLocaleString('pt-BR')} kg</p>
-                                    </div>
-                                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Total Recebido</p>
-                                        <p className="text-lg font-black text-green-700">{selectedDetail.receivedKg.toLocaleString('pt-BR')} kg</p>
-                                    </div>
-                                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Déficit</p>
-                                        <p className="text-lg font-black text-red-600">{selectedDetail.shortfallKg.toLocaleString('pt-BR')} kg</p>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                                        Registros no Histórico de Estoque
-                                    </h4>
-                                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar border rounded-2xl">
-                                        <table className="w-full text-xs">
-                                            <thead className="bg-gray-50 sticky top-0">
-                                                <tr className="text-gray-500 font-black uppercase text-[9px] border-b">
-                                                    <th className="p-4 text-left">Data Doc.</th>
-                                                    <th className="p-4 text-left">Lote</th>
-                                                    <th className="p-4 text-left">NF</th>
-                                                    <th className="p-4 text-right">Qtd (kg)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-50">
-                                                {selectedDetail.logEntries.length > 0 ? selectedDetail.logEntries.map((log: any) => (
-                                                    <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                                                        <td className="p-4 font-mono font-bold text-indigo-700">{(log.date || '').split('-').reverse().join('/')}</td>
-                                                        <td className="p-4 font-mono">{log.lotNumber}</td>
-                                                        <td className="p-4 font-mono">{log.inboundInvoice || '-'}</td>
-                                                        <td className="p-4 text-right font-black">{log.quantity.toLocaleString('pt-BR')} kg</td>
-                                                    </tr>
-                                                )) : (
-                                                    <tr><td colSpan={4} className="p-8 text-center text-gray-400 italic">Nenhuma entrada registrada no estoque para este período.</td></tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="bg-gray-50 p-6 border-t flex justify-end">
-                                <button onClick={() => setSelectedDetail(null)} className="bg-gray-900 text-white font-black py-3 px-10 rounded-2xl uppercase text-xs shadow-lg active:scale-95 transition-all">Fechar Detalhes</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </main>
-            <style>{`
-                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-                @keyframes scale-up { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-                .animate-scale-up { animation: scale-up 0.3s ease-out forwards; }
-            `}</style>
         </div>
     );
 };

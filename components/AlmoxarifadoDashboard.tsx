@@ -38,6 +38,24 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     const [manualExp, setManualExp] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // AUTO-PREENCHIMENTO DO CÓDIGO DE BARRAS BASEADO NO ITEM
+    useEffect(() => {
+        if (selectedItemName && activeTab === 'manual') {
+            // Busca se o item selecionado já tem um código de barras salvo em qualquer contrato
+            let foundBarcode = '';
+            for (const s of suppliers) {
+                const item = (s.contractItems || []).find(ci => ci.name === selectedItemName);
+                if (item && item.barcode) {
+                    foundBarcode = item.barcode;
+                    break;
+                }
+            }
+            if (foundBarcode) {
+                setManualBarcode(foundBarcode);
+            }
+        }
+    }, [selectedItemName, activeTab, suppliers]);
+
     // Efeito para auto-focar o campo de barras ao trocar de tipo ou carregar
     useEffect(() => {
         if (activeTab === 'manual') {
@@ -235,9 +253,9 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                             <div className="space-y-1">
                                 <label className="text-[10px] font-black text-blue-600 uppercase ml-1 flex items-center gap-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM13 3a1 1 0 00-1 1v3a1 1 0 001 1h3a1 1 0 001-1V4a1 1 0 00-1-1h-3zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zM11 4a1 1 0 10-2 0v1a1 1 0 002 0V4zM10 7a1 1 0 011 1v1h2a1 1 0 110 2h-3a1 1 0 01-1-1V8a1 1 0 011-1zM16 9a1 1 0 100 2 1 1 0 000-2zM9 13a1 1 0 011-1h1a1 1 0 110 2H10a1 1 0 01-1-1zM7 11a1 1 0 100-2H4a1 1 0 100 2h3z" /></svg>
-                                    5. Código de Barras (Bipar)
+                                    5. Código de Barras (Auto)
                                 </label>
-                                <input ref={barcodeInputRef} type="text" value={manualBarcode} onChange={e => setManualBarcode(e.target.value)} placeholder="Passe o leitor de barras..." className="w-full p-4 border-2 border-indigo-50 rounded-xl bg-white font-mono focus:ring-4 focus:ring-indigo-100 outline-none text-sm placeholder:italic" />
+                                <input ref={barcodeInputRef} type="text" value={manualBarcode} onChange={e => setManualBarcode(e.target.value)} placeholder="Bipar ou preenchimento auto..." className="w-full p-4 border-2 border-indigo-50 rounded-xl bg-white font-mono focus:ring-4 focus:ring-indigo-100 outline-none text-sm placeholder:italic" />
                             </div>
 
                             <div className="space-y-1">

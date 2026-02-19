@@ -340,7 +340,7 @@ const App: React.FC = () => {
 
   // --- FIM GERENCIAMENTO NOTAS ---
 
-  const handleUpdateContractForItem = async (itemName: string, assignments: any[]) => {
+  const handleUpdateContractForItem = async (itemName: string, assignments: any[], globalBarcode?: string) => {
     for (const supplier of suppliers) {
       const assignment = assignments.find(a => a.supplierCpf === supplier.cpf);
       const supplierRef = child(suppliersRef, supplier.cpf);
@@ -352,7 +352,8 @@ const App: React.FC = () => {
               name: itemName,
               totalKg: assignment.totalKg,
               valuePerKg: assignment.valuePerKg,
-              unit: assignment.unit
+              unit: assignment.unit,
+              barcode: globalBarcode || assignment.barcode || ''
             });
           }
           data.initialValue = (data.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * curr.valuePerKg), 0);

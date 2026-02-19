@@ -30,6 +30,7 @@ export interface ContractItem {
   totalKg: number;
   valuePerKg: number;
   unit?: string;
+  barcode?: string; // NOVO: Código de barras global do item
   order?: number;
   siafemCode?: string;
   comprasCode?: string;
