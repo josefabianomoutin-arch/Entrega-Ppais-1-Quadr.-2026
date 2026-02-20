@@ -60,9 +60,38 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         suppliers.find(s => s.cpf === selectedSupplierCpf), 
     [suppliers, selectedSupplierCpf]);
 
-    const availableItems = useMemo(() => 
-        selectedSupplier ? (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)) : [], 
-    [selectedSupplier]);
+    const availableItems = useMemo(() => {
+        if (selectedSupplier) {
+            return (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name));
+        }
+        // Se for saída e nenhum fornecedor selecionado, podemos listar todos os itens de todos os fornecedores
+        if (manualType === 'saída') {
+            const all: { name: string; supplierName: string; supplierCpf: string }[] = [];
+            suppliers.forEach(s => {
+                (s.contractItems || []).forEach(ci => {
+                    all.push({ name: ci.name, supplierName: s.name, supplierCpf: s.cpf });
+                });
+            });
+            return all.sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return [];
+    }, [selectedSupplier, manualType, suppliers]);
+
+    // Efeito para buscar item automaticamente pelo código de barras
+    useEffect(() => {
+        const barcode = manualBarcode.trim();
+        if (barcode.length >= 8) {
+            // Busca nas movimentações de entrada para localizar o item e fornecedor
+            const found = warehouseLog.find(m => m.barcode === barcode && m.type === 'entrada');
+            if (found) {
+                const supplier = suppliers.find(s => s.name === found.supplierName);
+                if (supplier) {
+                    setSelectedSupplierCpf(supplier.cpf);
+                    setSelectedItemName(found.itemName);
+                }
+            }
+        }
+    }, [manualBarcode, warehouseLog, suppliers]);
 
     const receiptSupplier = useMemo(() => suppliers.find(s => s.cpf === receiptSupplierCpf), [suppliers, receiptSupplierCpf]);
     
@@ -411,7 +440,9 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                             {/* Bloco 1: Identificação da Carga */}
                             <div className="space-y-4 md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">1. Fornecedor / Origem</label>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">
+                                        {manualType === 'entrada' ? '1. Fornecedor / Origem' : '1. Origem (Fornecedor)'}
+                                    </label>
                                     <select value={selectedSupplierCpf} onChange={e => { setSelectedSupplierCpf(e.target.value); setSelectedItemName(''); }} className="w-full p-3 border rounded-xl bg-white font-bold outline-none focus:ring-2 focus:ring-indigo-400 text-sm">
                                         <option value="">-- SELECIONE --</option>
                                         {suppliers.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}
@@ -422,17 +453,42 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                     <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="w-full p-3 border rounded-xl bg-white outline-none focus:ring-2 focus:ring-indigo-400 text-sm" />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">3. Número da Nota Fiscal</label>
-                                    <input type="text" value={manualNf} onChange={e => setManualNf(e.target.value)} placeholder="Nº da Nota / Cupom" className="w-full p-3 border rounded-xl bg-white outline-none focus:ring-2 focus:ring-indigo-400 text-sm font-mono" />
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">
+                                        {manualType === 'entrada' ? '3. Número da Nota Fiscal' : '3. Nº Requisição / Ordem'}
+                                    </label>
+                                    <input type="text" value={manualNf} onChange={e => setManualNf(e.target.value)} placeholder={manualType === 'entrada' ? "Nº da Nota / Cupom" : "Nº do Pedido / Destino"} className="w-full p-3 border rounded-xl bg-white outline-none focus:ring-2 focus:ring-indigo-400 text-sm font-mono" />
                                 </div>
                             </div>
 
                             {/* Bloco 2: O Item (Bipagem) */}
                             <div className="space-y-1">
                                 <label className="text-[10px] font-black text-indigo-600 uppercase ml-1">4. Selecionar Item do Contrato</label>
-                                <select value={selectedItemName} onChange={e => setSelectedItemName(e.target.value)} className="w-full p-4 border-2 border-indigo-50 rounded-xl bg-white font-black outline-none focus:ring-2 focus:ring-indigo-400 text-sm disabled:opacity-50" disabled={!selectedSupplierCpf}>
+                                <select 
+                                    value={selectedItemName} 
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        if (manualType === 'saída' && !selectedSupplierCpf) {
+                                            // Se for saída global, o valor contém o CPF do fornecedor
+                                            const [itemName, supplierCpf] = val.split('|');
+                                            setSelectedSupplierCpf(supplierCpf);
+                                            setSelectedItemName(itemName);
+                                        } else {
+                                            setSelectedItemName(val);
+                                        }
+                                    }} 
+                                    className="w-full p-4 border-2 border-indigo-50 rounded-xl bg-white font-black outline-none focus:ring-2 focus:ring-indigo-400 text-sm disabled:opacity-50" 
+                                    disabled={manualType === 'entrada' && !selectedSupplierCpf}
+                                >
                                     <option value="">-- SELECIONAR PRODUTO --</option>
-                                    {availableItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
+                                    {manualType === 'saída' && !selectedSupplierCpf ? (
+                                        (availableItems as any[]).map((it, idx) => (
+                                            <option key={`${it.name}-${idx}`} value={`${it.name}|${it.supplierCpf}`}>
+                                                {it.name} ({it.supplierName})
+                                            </option>
+                                        ))
+                                    ) : (
+                                        (availableItems as any[]).map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)
+                                    )}
                                 </select>
                             </div>
 
