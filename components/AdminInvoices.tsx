@@ -16,8 +16,8 @@ interface AdminInvoicesProps {
     suppliers: Supplier[];
     onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => void;
     onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => void;
-    onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => Promise<{ success: boolean; message?: string }>;
-    onManualInvoiceEntry: (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => Promise<{ success: boolean; message?: string }>;
+    onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; barcode?: string }[]) => Promise<{ success: boolean; message?: string }>;
+    onManualInvoiceEntry: (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; barcode?: string }[]) => Promise<{ success: boolean; message?: string }>;
 }
 
 const formatCurrency = (value: number) => {
@@ -97,7 +97,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
         else { setSortKey(key); setSortDirection('desc'); }
     };
     
-    const handleEditSave = async (updatedItems: { name: string; kg: number; value: number }[]) => {
+    const handleEditSave = async (updatedItems: { name: string; kg: number; value: number; barcode?: string }[]) => {
         if (!editingInvoice) return;
         setIsSavingEdit(true);
         const res = await onUpdateInvoiceItems(editingInvoice.supplierCpf, editingInvoice.invoiceNumber, updatedItems);
@@ -106,7 +106,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
         else alert(res.message || 'Erro ao salvar alterações.');
     };
 
-    const handleManualEntrySave = async (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number }[]) => {
+    const handleManualEntrySave = async (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number; barcode?: string }[]) => {
         setIsSavingEdit(true);
         const res = await onManualInvoiceEntry(cpf, date, nf, items);
         setIsSavingEdit(false);
@@ -211,7 +211,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
 interface ManualInvoiceModalProps {
     suppliers: Supplier[];
     onClose: () => void;
-    onSave: (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number }[]) => void;
+    onSave: (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number; barcode?: string }[]) => void;
     isSaving: boolean;
 }
 
@@ -219,7 +219,7 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
     const [selectedCpf, setSelectedCpf] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [nf, setNf] = useState('');
-    const [items, setItems] = useState<{ id: string; name: string; kg: string }[]>([{ id: 'init-1', name: '', kg: '' }]);
+    const [items, setItems] = useState<{ id: string; name: string; kg: string; barcode: string }[]>([{ id: 'init-1', name: '', kg: '', barcode: '' }]);
 
     const selectedSupplier = useMemo(() => suppliers.find(s => s.cpf === selectedCpf), [suppliers, selectedCpf]);
     const availableContractItems = useMemo(() => selectedSupplier ? (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)) : [], [selectedSupplier]);
@@ -231,8 +231,8 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
             const contract = selectedSupplier?.contractItems.find(ci => ci.name === it.name);
             const kg = parseFloat(it.kg.replace(',', '.'));
             if (!contract || isNaN(kg) || kg <= 0) return null;
-            return { name: it.name, kg, value: kg * contract.valuePerKg };
-        }).filter(Boolean) as { name: string; kg: number; value: number }[];
+            return { name: it.name, kg, value: kg * contract.valuePerKg, barcode: it.barcode };
+        }).filter(Boolean) as { name: string; kg: number; value: number; barcode?: string }[];
         if (finalItems.length === 0) return alert('Adicione pelo menos um item válido.');
         onSave(selectedCpf, date, nf, finalItems);
     };
@@ -272,22 +272,28 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
                     </div>
                     <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
                         {items.map(item => (
-                            <div key={item.id} className="flex gap-2 items-end bg-gray-50 p-3 rounded-xl border">
-                                <div className="flex-1">
-                                    <label className="text-[9px] font-black text-gray-400 uppercase">Item</label>
-                                    <select value={item.name} onChange={e => setItems(prev => prev.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} className="w-full p-2 border rounded-lg text-sm bg-white" required>
-                                        <option value="">-- Selecione o Item --</option>
-                                        {availableContractItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
-                                    </select>
+                            <div key={item.id} className="bg-gray-50 p-3 rounded-xl border space-y-3">
+                                <div className="flex gap-2 items-end">
+                                    <div className="flex-1">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase">Item</label>
+                                        <select value={item.name} onChange={e => setItems(prev => prev.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))} className="w-full p-2 border rounded-lg text-sm bg-white" required>
+                                            <option value="">-- Selecione o Item --</option>
+                                            {availableContractItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="w-32">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase">Quantidade</label>
+                                        <input type="text" value={item.kg} onChange={e => setItems(prev => prev.map(it => it.id === item.id ? { ...it, kg: e.target.value.replace(/[^0-9,]/g, '') } : it))} placeholder="0,00" className="w-full p-2 border rounded-lg text-sm text-center font-mono" required />
+                                    </div>
+                                    <button type="button" onClick={() => setItems(prev => prev.filter(it => it.id !== item.id))} className="text-red-400 hover:text-red-600 p-2 mb-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                                 </div>
-                                <div className="w-32">
-                                    <label className="text-[9px] font-black text-gray-400 uppercase">Quantidade</label>
-                                    <input type="text" value={item.kg} onChange={e => setItems(prev => prev.map(it => it.id === item.id ? { ...it, kg: e.target.value.replace(/[^0-9,]/g, '') } : it))} placeholder="0,00" className="w-full p-2 border rounded-lg text-sm text-center font-mono" required />
+                                <div className="w-full">
+                                    <label className="text-[9px] font-black text-gray-400 uppercase">Código de Barras</label>
+                                    <input type="text" value={item.barcode} onChange={e => setItems(prev => prev.map(it => it.id === item.id ? { ...it, barcode: e.target.value } : it))} placeholder="Opcional" className="w-full p-2 border rounded-lg text-sm font-mono" />
                                 </div>
-                                <button type="button" onClick={() => setItems(prev => prev.filter(it => it.id !== item.id))} className="text-red-400 hover:text-red-600 p-2 mb-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                             </div>
                         ))}
-                        <button type="button" onClick={() => setItems([...items, { id: `new-${Date.now()}`, name: '', kg: '' }])} className="w-full py-2 border-2 border-dashed border-teal-200 text-teal-600 font-bold rounded-xl text-xs uppercase hover:bg-teal-50 transition-colors">+ Adicionar Item</button>
+                        <button type="button" onClick={() => setItems([...items, { id: `new-${Date.now()}`, name: '', kg: '', barcode: '' }])} className="w-full py-2 border-2 border-dashed border-teal-200 text-teal-600 font-bold rounded-xl text-xs uppercase hover:bg-teal-50 transition-colors">+ Adicionar Item</button>
                     </div>
                     <div className="flex justify-between items-center pt-6 border-t">
                         <div className="text-right"><p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Valor Total NF</p><p className="text-2xl font-black text-green-700 leading-none">{formatCurrency(totalValue)}</p></div>
@@ -307,17 +313,17 @@ interface EditInvoiceModalProps {
     invoice: InvoiceInfo;
     supplier: Supplier;
     onClose: () => void;
-    onSave: (items: { name: string; kg: number; value: number }[]) => void;
+    onSave: (items: { name: string; kg: number; value: number; barcode?: string }[]) => void;
     isSaving: boolean;
 }
 
 const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, onClose, onSave, isSaving }) => {
     const initialItems = invoice.items.length > 0 
-        ? invoice.items.map((it, idx) => ({ id: `edit-${idx}`, name: it.name, kg: String(it.kg).replace('.', ',') }))
-        : [{ id: `new-0`, name: '', kg: '' }];
+        ? invoice.items.map((it, idx) => ({ id: `edit-${idx}`, name: it.name, kg: String(it.kg).replace('.', ','), barcode: it.barcode || '' }))
+        : [{ id: `new-0`, name: '', kg: '', barcode: '' }];
     const [items, setItems] = useState(initialItems);
     const availableContractItems = useMemo(() => (supplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)), [supplier.contractItems]);
-    const handleItemChange = (id: string, field: 'name' | 'kg', value: string) => { setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it)); };
+    const handleItemChange = (id: string, field: 'name' | 'kg' | 'barcode', value: string) => { setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it)); };
     const totalValue = useMemo(() => items.reduce((sum, it) => {
         const contract = supplier.contractItems.find(ci => ci.name === it.name);
         const kg = parseFloat(it.kg.replace(',', '.'));
@@ -329,8 +335,8 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
             const contract = supplier.contractItems.find(ci => ci.name === it.name);
             const kg = parseFloat(it.kg.replace(',', '.'));
             if (!contract || isNaN(kg)) return null;
-            return { name: it.name, kg, value: kg * contract.valuePerKg };
-        }).filter(Boolean) as { name: string; kg: number; value: number }[];
+            return { name: it.name, kg, value: kg * contract.valuePerKg, barcode: it.barcode };
+        }).filter(Boolean) as { name: string; kg: number; value: number; barcode?: string }[];
         if (finalItems.length === 0) return alert('Adicione pelo menos um item válido.');
         onSave(finalItems);
     };
@@ -347,22 +353,28 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
                             const contract = supplier.contractItems.find(ci => ci.name === item.name);
                             const unit = getDisplayUnit(contract);
                             return (
-                                <div key={item.id} className="flex gap-2 items-center bg-gray-50 p-3 rounded-lg border">
-                                    <div className="flex-1"><label className="text-[9px] font-black text-gray-400 uppercase">Item</label>
-                                        <select value={item.name} onChange={e => handleItemChange(item.id, 'name', e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white" required>
-                                            <option value="">-- Selecione o Item --</option>
-                                            {availableContractItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
-                                        </select>
+                                <div key={item.id} className="bg-gray-50 p-3 rounded-lg border space-y-3">
+                                    <div className="flex gap-2 items-center">
+                                        <div className="flex-1"><label className="text-[9px] font-black text-gray-400 uppercase">Item</label>
+                                            <select value={item.name} onChange={e => handleItemChange(item.id, 'name', e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white" required>
+                                                <option value="">-- Selecione o Item --</option>
+                                                {availableContractItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="w-28"><label className="text-[9px] font-black text-gray-400 uppercase">Qtd ({unit})</label>
+                                            <input type="text" value={item.kg} onChange={e => handleItemChange(item.id, 'kg', e.target.value)} placeholder="0,00" className="w-full p-2 border rounded-lg text-sm text-center font-mono" required />
+                                        </div>
+                                        <button type="button" onClick={() => setItems(prev => prev.filter(it => it.id !== item.id))} className="text-red-400 hover:text-red-600 p-1 mt-4"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                                     </div>
-                                    <div className="w-28"><label className="text-[9px] font-black text-gray-400 uppercase">Qtd ({unit})</label>
-                                        <input type="text" value={item.kg} onChange={e => handleItemChange(item.id, 'kg', e.target.value)} placeholder="0,00" className="w-full p-2 border rounded-lg text-sm text-center font-mono" required />
+                                    <div className="w-full">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase">Código de Barras</label>
+                                        <input type="text" value={item.barcode} onChange={e => handleItemChange(item.id, 'barcode', e.target.value)} placeholder="Opcional" className="w-full p-2 border rounded-lg text-sm font-mono" />
                                     </div>
-                                    <button type="button" onClick={() => setItems(prev => prev.filter(it => it.id !== item.id))} className="text-red-400 hover:text-red-600 p-1 mt-4"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                                 </div>
                             );
                         })}
                     </div>
-                    <button type="button" onClick={() => setItems([...items, { id: `new-${Date.now()}`, name: '', kg: '' }])} className="w-full py-2 border-2 border-dashed border-teal-200 text-teal-600 font-bold rounded-lg text-xs uppercase hover:bg-teal-50 transition-colors">+ Adicionar Item à Nota</button>
+                    <button type="button" onClick={() => setItems([...items, { id: `new-${Date.now()}`, name: '', kg: '', barcode: '' }])} className="w-full py-2 border-2 border-dashed border-teal-200 text-teal-600 font-bold rounded-lg text-xs uppercase hover:bg-teal-50 transition-colors">+ Adicionar Item à Nota</button>
                     <div className="flex justify-between items-center pt-4 border-t">
                         <div className="text-right"><p className="text-[10px] text-gray-400 font-black uppercase">Novo Total</p><p className="text-xl font-black text-green-700">{formatCurrency(totalValue)}</p></div>
                         <div className="space-x-2"><button type="button" onClick={onClose} className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm">Cancelar</button><button type="submit" disabled={isSaving} className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-lg font-bold text-sm disabled:bg-gray-400">{isSaving ? 'Gravando...' : 'Salvar Alterações'}</button></div>

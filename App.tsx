@@ -238,7 +238,7 @@ const App: React.FC = () => {
 
   // --- GERENCIAMENTO DE NOTAS FISCAIS (ADMIN) ---
 
-  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => {
+  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; barcode?: string }[]) => {
     const supplierRef = child(suppliersRef, supplierCpf);
     try {
       await runTransaction(supplierRef, (currentData: Supplier) => {
@@ -262,7 +262,14 @@ const App: React.FC = () => {
               kg: item.kg,
               value: item.value,
               invoiceUploaded: true,
-              invoiceNumber: invoiceNumber
+              invoiceNumber: invoiceNumber,
+              lots: [{
+                id: `lot-edit-${Date.now()}-${idx}`,
+                lotNumber: 'EDITADO',
+                initialQuantity: item.kg,
+                remainingQuantity: item.kg,
+                barcode: item.barcode || ''
+              }]
             });
           });
         }
@@ -310,7 +317,7 @@ const App: React.FC = () => {
     });
   };
 
-  const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => {
+  const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; barcode?: string }[]) => {
     const supplierRef = child(suppliersRef, supplierCpf);
     try {
       await runTransaction(supplierRef, (currentData: Supplier) => {
@@ -325,7 +332,14 @@ const App: React.FC = () => {
               kg: item.kg,
               value: item.value,
               invoiceUploaded: true,
-              invoiceNumber: invoiceNumber
+              invoiceNumber: invoiceNumber,
+              lots: [{
+                id: `lot-manual-${Date.now()}-${idx}`,
+                lotNumber: 'MANUAL',
+                initialQuantity: item.kg,
+                remainingQuantity: item.kg,
+                barcode: item.barcode || ''
+              }]
             });
           });
           currentData.deliveries = deliveries;
