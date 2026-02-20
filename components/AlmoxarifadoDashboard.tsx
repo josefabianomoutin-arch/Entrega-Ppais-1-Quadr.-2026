@@ -114,6 +114,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         const totalInvoiceValue = items.reduce((sum, it) => sum + it.totalValue, 0);
         const invoiceDate = entries[0]?.date || ''; 
         const receiptDate = (entries[0]?.timestamp || '').split('T')[0] || '';
+        const barcode = entries[0]?.barcode || '';
 
         return {
             supplierName: receiptSupplier.name,
@@ -122,7 +123,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             invoiceDate,
             receiptDate,
             totalInvoiceValue,
-            items
+            items,
+            barcode
         };
     }, [receiptSupplier, receiptInvoice, warehouseLog]);
 
@@ -142,6 +144,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             <html>
             <head>
                 <title>Termo de Recebimento - NF ${receiptData.invoiceNumber}</title>
+                <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
                 <style>
                     body { font-family: 'Times New Roman', Times, serif; padding: 20mm; line-height: 1.5; color: #000; font-size: 12pt; }
                     .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -156,6 +159,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                     .signature-section { margin-top: 60px; text-align: center; }
                     .signature-line { border-top: 1px solid #000; width: 300px; margin: 0 auto 10px auto; }
                     .location-date { margin-top: 40px; text-align: center; font-weight: bold; }
+                    .barcode-section { margin-top: 40px; text-align: center; display: flex; flex-direction: column; align-items: center; }
+                    .barcode-svg { max-width: 100%; height: 15mm !important; }
                     @media print {
                         body { padding: 0; }
                         .no-print { display: none; }
@@ -223,10 +228,31 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                     <p style="margin: 0;">PRESIDENTE</p>
                 </div>
 
+                ${receiptData.barcode ? `
+                <div class="barcode-section">
+                    <svg id="barcode-receipt" class="barcode-svg"></svg>
+                    <p style="font-size: 8pt; margin-top: 2mm; font-family: monospace;">${receiptData.barcode}</p>
+                </div>
+                ` : ''}
+
                 <script>
                     window.onload = function() {
-                        window.print();
-                        setTimeout(() => window.close(), 500);
+                        ${receiptData.barcode ? `
+                        try {
+                            JsBarcode("#barcode-receipt", "${receiptData.barcode}", {
+                                format: "CODE128",
+                                width: 2,
+                                height: 40,
+                                displayValue: false,
+                                margin: 0
+                            });
+                        } catch (e) { console.error(e); }
+                        ` : ''}
+                        
+                        setTimeout(() => {
+                            window.print();
+                            window.close();
+                        }, 500);
                     }
                 </script>
             </body>
@@ -514,6 +540,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                         <p><span className="font-bold inline-block w-48">DATA NOTA FISCAL:</span> {(receiptData.invoiceDate || '').split('-').reverse().join('/') || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">DATA RECEBIMENTO:</span> {(receiptData.receiptDate || '').split('-').reverse().join('/') || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">VALOR TOTAL NF:</span> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receiptData.totalInvoiceValue || 0)}</p>
+                                        <p><span className="font-bold inline-block w-48">CÓD. BARRAS NF:</span> {receiptData.barcode || 'N/A'}</p>
                                     </div>
 
                                     <table className="w-full border-collapse border border-black text-[10px]">
