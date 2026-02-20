@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem, FinancialRecord, UserRole } from './types';
 import LoginScreen from './components/LoginScreen';
@@ -12,9 +13,7 @@ import { getDatabase, ref, onValue, set, runTransaction, push, child, update, re
 import { firebaseConfig } from './firebaseConfig';
 
 const app = initializeApp(firebaseConfig);
-// Inicializa o database passando explicitamente a URL do config para garantir a conexão
-const database = getDatabase(app, firebaseConfig.databaseURL);
-
+const database = getDatabase(app);
 const rootRef = ref(database);
 const suppliersRef = ref(database, 'suppliers');
 const warehouseLogRef = ref(database, 'warehouseLog');
@@ -96,9 +95,8 @@ const App: React.FC = () => {
     }
 
     if (cleanName === 'ALMOXARIFADO' || cleanName === 'ALMOX') {
-      const lowerPass = rawPass.toLowerCase();
-      if (lowerPass === 'almoxarifado123' || lowerPass === 'almox123') {
-        setUser({ name: 'ALMOXARIFADO', cpf: lowerPass, role: 'almoxarifado' });
+      if (rawPass.toLowerCase() === 'almox123') {
+        setUser({ name: 'ALMOXARIFADO', cpf: 'almox123', role: 'almoxarifado' });
         return true;
       }
     }
@@ -240,7 +238,7 @@ const App: React.FC = () => {
 
   // --- GERENCIAMENTO DE NOTAS FISCAIS (ADMIN) ---
 
-  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[], barcode?: string) => {
+  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => {
     const supplierRef = child(suppliersRef, supplierCpf);
     try {
       await runTransaction(supplierRef, (currentData: Supplier) => {
@@ -264,8 +262,7 @@ const App: React.FC = () => {
               kg: item.kg,
               value: item.value,
               invoiceUploaded: true,
-              invoiceNumber: invoiceNumber,
-              barcode: barcode || '' // Salva o novo código de barras
+              invoiceNumber: invoiceNumber
             });
           });
         }
@@ -343,7 +340,7 @@ const App: React.FC = () => {
 
   // --- FIM GERENCIAMENTO NOTAS ---
 
-  const handleUpdateContractForItem = async (itemName: string, assignments: any[], globalBarcode?: string) => {
+  const handleUpdateContractForItem = async (itemName: string, assignments: any[]) => {
     for (const supplier of suppliers) {
       const assignment = assignments.find(a => a.supplierCpf === supplier.cpf);
       const supplierRef = child(suppliersRef, supplier.cpf);
@@ -355,8 +352,7 @@ const App: React.FC = () => {
               name: itemName,
               totalKg: assignment.totalKg,
               valuePerKg: assignment.valuePerKg,
-              unit: assignment.unit,
-              barcode: globalBarcode || assignment.barcode || ''
+              unit: assignment.unit
             });
           }
           data.initialValue = (data.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * curr.valuePerKg), 0);
@@ -371,6 +367,7 @@ const App: React.FC = () => {
     try {
         const newRef = push(warehouseLogRef);
         const supplier = suppliers.find(s => s.cpf === payload.supplierCpf);
+        const lotId = `lot-${Date.now()}`;
         const entry: WarehouseMovement = {
             id: newRef.key || `ent-${Date.now()}`,
             type: 'entrada',
@@ -383,10 +380,44 @@ const App: React.FC = () => {
             inboundInvoice: payload.invoiceNumber,
             expirationDate: payload.expirationDate,
             barcode: payload.barcode || '',
-            lotId: `lot-${Date.now()}`,
+            lotId: lotId,
             deliveryId: ''
         };
         await set(newRef, entry);
+
+        // Sincronizar com as entregas do fornecedor para aparecer na Consulta de Notas Fiscais
+        if (supplier) {
+            const sRef = child(suppliersRef, supplier.cpf);
+            await runTransaction(sRef, (currentData: Supplier) => {
+                if (currentData) {
+                    const deliveries = currentData.deliveries || [];
+                    const contract = currentData.contractItems.find(ci => ci.name === payload.itemName);
+                    const value = contract ? (payload.quantity * contract.valuePerKg) : 0;
+                    
+                    deliveries.push({
+                        id: `sync-${Date.now()}`,
+                        date: payload.invoiceDate || new Date().toISOString().split('T')[0],
+                        time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                        item: payload.itemName,
+                        kg: payload.quantity,
+                        value: value,
+                        invoiceUploaded: true,
+                        invoiceNumber: payload.invoiceNumber,
+                        lots: [{
+                            id: lotId,
+                            lotNumber: payload.lotNumber,
+                            initialQuantity: payload.quantity,
+                            remainingQuantity: payload.quantity,
+                            barcode: payload.barcode || '',
+                            expirationDate: payload.expirationDate
+                        }]
+                    });
+                    currentData.deliveries = deliveries;
+                }
+                return currentData;
+            });
+        }
+
         return { success: true, message: 'Entrada registrada' };
     } catch (e) {
         return { success: false, message: 'Falha na conexão' };

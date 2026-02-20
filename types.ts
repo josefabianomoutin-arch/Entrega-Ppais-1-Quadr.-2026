@@ -1,3 +1,4 @@
+
 export interface Delivery {
   id: string;
   date: string; // ISO string format: 'YYYY-MM-DD'
@@ -8,7 +9,6 @@ export interface Delivery {
   value?: number;
   invoiceUploaded: boolean;
   invoiceNumber?: string;
-  barcode?: string; // NOVO: Código de barras da Nota Fiscal
   lots?: {
     id: string;
     lotNumber: string;
@@ -30,7 +30,6 @@ export interface ContractItem {
   totalKg: number;
   valuePerKg: number;
   unit?: string;
-  barcode?: string; // NOVO: Código de barras global do item
   order?: number;
   siafemCode?: string;
   comprasCode?: string;
@@ -58,10 +57,8 @@ export interface WarehouseMovement {
   inboundInvoice?: string;
   outboundInvoice?: string;
   quantity?: number;
-  unitPrice?: number; // NOVO
-  totalValue?: number; // NOVO
   expirationDate?: string;
-  barcode?: string; // Este campo agora armazena o Código de Barras da Nota Fiscal
+  barcode?: string; // NOVO CAMPO
 }
 
 export interface PerCapitaConfig {

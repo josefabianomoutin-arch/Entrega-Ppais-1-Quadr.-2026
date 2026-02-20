@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import type { WarehouseMovement, Supplier, ContractItem } from '../types';
 
 interface AdminWarehouseLogProps {
@@ -130,6 +130,121 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
         reader.readAsText(file);
     };
 
+    const handlePrintLabels = (logs: WarehouseMovement[]) => {
+        const printWindow = window.open('', '_blank', 'width=800,height=800');
+        if (!printWindow) return;
+
+        const htmlContent = `
+            <html>
+            <head>
+                <title>Etiquetas de Estoque</title>
+                <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+                <style>
+                    @page {
+                        size: A4;
+                        margin: 10mm;
+                    }
+                    body { 
+                        font-family: Arial, sans-serif; 
+                        margin: 0; 
+                        padding: 0;
+                        background: #f0f0f0;
+                    }
+                    .page-container {
+                        width: 190mm;
+                        margin: 0 auto;
+                        background: white;
+                    }
+                    .label-card {
+                        width: 90mm; /* Aproximadamente 2 colunas em A4 */
+                        height: 60mm;
+                        border: 1px solid #000;
+                        padding: 5mm;
+                        box-sizing: border-box;
+                        display: inline-block;
+                        vertical-align: top;
+                        margin: 2mm;
+                        text-align: center;
+                        position: relative;
+                        overflow: hidden;
+                        border-radius: 4mm;
+                    }
+                    h1 { font-size: 14pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                    h2 { font-size: 10pt; margin: 0 0 3mm 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                    .info { text-align: left; font-size: 9pt; }
+                    .info p { margin: 1mm 0; display: flex; justify-content: space-between; border-bottom: 0.5px dashed #ddd; }
+                    .info strong { font-size: 7pt; color: #666; }
+                    .barcode-container { margin-top: 3mm; display: flex; flex-direction: column; align-items: center; }
+                    .barcode-svg { max-width: 100%; height: 15mm !important; }
+                    .footer { position: absolute; bottom: 2mm; left: 0; right: 0; font-size: 6pt; color: #999; }
+                    
+                    @media print {
+                        body { background: white; }
+                        .page-container { width: 100%; margin: 0; }
+                        .label-card { border: 1px solid #000; margin: 1mm; page-break-inside: avoid; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="page-container">
+                    ${logs.map((log, index) => `
+                        <div class="label-card">
+                            <h1>${log.itemName}</h1>
+                            <h2>${log.supplierName}</h2>
+                            
+                            <div class="info">
+                                <p><strong>LOTE:</strong> <span>${log.lotNumber}</span></p>
+                                <p><strong>VAL:</strong> <span>${log.expirationDate ? log.expirationDate.split('-').reverse().join('/') : 'N/A'}</span></p>
+                                <p><strong>ENT:</strong> <span>${log.date ? log.date.split('-').reverse().join('/') : 'N/A'}</span></p>
+                                <p><strong>QTD:</strong> <span>${log.quantity} kg</span></p>
+                                <p><strong>NF:</strong> <span>${log.inboundInvoice || log.outboundInvoice || 'N/A'}</span></p>
+                            </div>
+
+                            <div class="barcode-container">
+                                ${log.barcode ? `<svg id="barcode-${index}" class="barcode-svg"></svg>` : '<p style="font-size: 8pt; color: #ccc; margin-top: 5mm;">SEM CÓDIGO</p>'}
+                            </div>
+
+                            <div class="footer">
+                                ${new Date().toLocaleString('pt-BR')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <script>
+                    window.onload = function() {
+                        ${logs.map((log, index) => log.barcode ? `
+                            try {
+                                JsBarcode("#barcode-${index}", "${log.barcode}", {
+                                    format: "CODE128",
+                                    width: 2,
+                                    height: 40,
+                                    displayValue: true,
+                                    fontSize: 10,
+                                    margin: 0
+                                });
+                            } catch (e) { console.error(e); }
+                        ` : '').join('')}
+                        
+                        setTimeout(() => {
+                            window.print();
+                            window.close();
+                        }, 1000);
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    };
+
+    const handlePrintLabel = (log: WarehouseMovement) => {
+        handlePrintLabels([log]);
+    };
+
     const handleDelete = async (log: WarehouseMovement) => {
         const msg = log.type === 'entrada' 
             ? 'Excluir esta entrada? O lote será removido e o saldo voltará ao contrato.' 
@@ -166,6 +281,14 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                         <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-6 rounded-xl text-xs transition-colors flex items-center gap-2 disabled:bg-gray-50 border border-gray-200">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
                             {isImporting ? 'Importando...' : 'Importar Planilha .CSV'}
+                        </button>
+                        <button 
+                            onClick={() => handlePrintLabels(filteredLog)}
+                            disabled={filteredLog.length === 0}
+                            className="bg-amber-500 hover:bg-amber-600 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2 disabled:bg-gray-300"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
+                            Imprimir Etiquetas (Filtradas)
                         </button>
                         <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".csv" />
                     </div>
@@ -213,6 +336,15 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                                     <td className="p-3 font-mono text-xs text-gray-500">{log.inboundInvoice || log.outboundInvoice || '-'}</td>
                                     <td className="p-3 text-center">
                                         <div className="flex justify-center gap-1">
+                                            <button 
+                                                onClick={() => handlePrintLabel(log)}
+                                                className="text-gray-500 hover:bg-gray-100 p-2 rounded-full transition-colors"
+                                                title="Imprimir Etiqueta"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                </svg>
+                                            </button>
                                             <button 
                                                 onClick={() => setEditingLog(log)}
                                                 className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
@@ -284,7 +416,18 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                             </div>
                             <div className="mt-4 flex items-center justify-between">
                                 <p className="text-[9px] text-gray-400 font-mono">Lote: {item.lotNumber}</p>
-                                <span className={`text-[9px] font-black uppercase transition-colors ${item.shelfLifeDays > 180 ? 'text-green-800' : 'text-indigo-400'} group-hover:text-indigo-600`}>Giro Calculado</span>
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                        onClick={() => handlePrintLabel(item)}
+                                        className="text-indigo-400 hover:text-indigo-600 transition-colors p-1"
+                                        title="Imprimir Etiqueta"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                        </svg>
+                                    </button>
+                                    <span className={`text-[9px] font-black uppercase transition-colors ${item.shelfLifeDays > 180 ? 'text-green-800' : 'text-indigo-400'} group-hover:text-indigo-600`}>Giro Calculado</span>
+                                </div>
                             </div>
                         </div>
                     )) : (
@@ -312,6 +455,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     suppliers={suppliers} 
                     logEntry={editingLog}
                     onClose={() => setEditingLog(null)}
+                    onPrint={handlePrintLabel}
                     onSave={async (updated) => {
                         const res = await onUpdateWarehouseEntry(updated);
                         if (res.success) setEditingLog(null);
@@ -330,10 +474,11 @@ interface EditWarehouseMovementModalProps {
     suppliers: Supplier[];
     logEntry: WarehouseMovement;
     onClose: () => void;
+    onPrint: (log: WarehouseMovement) => void;
     onSave: (updated: WarehouseMovement) => Promise<void>;
 }
 
-const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({ suppliers, logEntry, onClose, onSave }) => {
+const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({ suppliers, logEntry, onClose, onPrint, onSave }) => {
     const [type, setType] = useState<'entrada' | 'saída'>(logEntry.type);
     const [selectedCpf, setSelectedCpf] = useState(() => {
         const found = suppliers.find(s => superNormalize(s.name) === superNormalize(logEntry.supplierName));
@@ -350,21 +495,6 @@ const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({
 
     const selectedSupplier = useMemo(() => suppliers.find(s => s.cpf === selectedCpf), [suppliers, selectedCpf]);
     const availableItems = useMemo(() => selectedSupplier ? (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)) : [], [selectedSupplier]);
-
-    // AUTO-PREENCHIMENTO DO CÓDIGO DE BARRAS BASEADO NO ITEM
-    useEffect(() => {
-        if (itemName) {
-            let foundBarcode = '';
-            for (const s of suppliers) {
-                const item = (s.contractItems || []).find(ci => ci.name === itemName);
-                if (item && item.barcode) {
-                    foundBarcode = item.barcode;
-                    break;
-                }
-            }
-            if (foundBarcode) setBarcode(foundBarcode);
-        }
-    }, [itemName, suppliers]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -454,6 +584,16 @@ const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({
                     <div className="flex justify-end gap-3 pt-6 border-t">
                         <button type="button" onClick={onClose} className="bg-gray-200 text-gray-700 px-8 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-colors">Cancelar</button>
                         <button 
+                            type="button"
+                            onClick={() => onPrint(logEntry)}
+                            className="bg-indigo-100 text-indigo-700 px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all hover:bg-indigo-200 flex items-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                            Imprimir Etiqueta
+                        </button>
+                        <button 
                             type="submit" 
                             disabled={isSaving || !selectedCpf || !itemName} 
                             className="px-10 py-3 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg transition-all active:scale-95 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300"
@@ -488,21 +628,6 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
 
     const selectedSupplier = useMemo(() => suppliers.find(s => s.cpf === selectedCpf), [suppliers, selectedCpf]);
     const availableItems = useMemo(() => selectedSupplier ? (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)) : [], [selectedSupplier]);
-
-    // AUTO-PREENCHIMENTO DO CÓDIGO DE BARRAS BASEADO NO ITEM
-    useEffect(() => {
-        if (itemName) {
-            let foundBarcode = '';
-            for (const s of suppliers) {
-                const item = (s.contractItems || []).find(ci => ci.name === itemName);
-                if (item && item.barcode) {
-                    foundBarcode = item.barcode;
-                    break;
-                }
-            }
-            if (foundBarcode) setBarcode(foundBarcode);
-        }
-    }, [itemName, suppliers]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -582,8 +707,8 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-blue-600 uppercase ml-1">Código de Barras (Auto)</label>
-                            <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="Barras Global do Contrato" className="w-full p-2 border-2 border-blue-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-400 font-mono" />
+                            <label className="text-[10px] font-black text-blue-600 uppercase ml-1">Código de Barras (Bipar)</label>
+                            <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="Bipar Código" className="w-full p-2 border-2 border-blue-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-400 font-mono" />
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-indigo-600 uppercase ml-1">Data do Documento</label>
@@ -592,7 +717,7 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
 
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Nº NF ou Documento</label>
-                            <input type="text" value={documentNumber} onChange={e => setDocumentNumber(e.target.value)} placeholder="000123" className="w-full p-2 border rounded-xl focus:ring-2 focus:ring-indigo-400 outline-none" required />
+                            <input type="text" value={documentNumber} onChange={e => setDocumentNumber(e.target.value)} placeholder="000123" className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-400" required />
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Número do Lote</label>

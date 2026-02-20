@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Supplier, Delivery, ContractItem } from '../types';
 
@@ -6,17 +7,16 @@ interface InvoiceInfo {
     supplierName: string;
     supplierCpf: string;
     invoiceNumber: string;
-    barcode?: string;
-    date: string;
+    date: string; // The earliest date associated with this invoice
     totalValue: number;
-    items: { name: string; kg: number; value: number; inclusionId: string }[];
+    items: { name: string; kg: number; value: number; barcode?: string }[];
 }
 
 interface AdminInvoicesProps {
     suppliers: Supplier[];
     onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => void;
     onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => void;
-    onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[], barcode?: string) => Promise<{ success: boolean; message?: string }>;
+    onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => Promise<{ success: boolean; message?: string }>;
     onManualInvoiceEntry: (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[]) => Promise<{ success: boolean; message?: string }>;
 }
 
@@ -29,17 +29,6 @@ const formatDate = (dateString: string) => {
     if (!dateString || dateString === "Invalid Date") return 'N/A';
     const date = new Date(dateString + 'T00:00:00');
     return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('pt-BR');
-};
-
-const extractInclusionTime = (id: string) => {
-    try {
-        const parts = id.split('-');
-        const timestampStr = parts.find(p => p.length >= 10 && !isNaN(Number(p)));
-        if (timestampStr) {
-            return new Date(Number(timestampStr)).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        }
-    } catch (e) {}
-    return '--:--:--';
 };
 
 const getDisplayUnit = (item: ContractItem | undefined): string => {
@@ -61,7 +50,6 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
     const [editingInvoice, setEditingInvoice] = useState<InvoiceInfo | null>(null);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
-    const [selectedSupplierReport, setSelectedSupplierReport] = useState('all');
 
     const allInvoices = useMemo((): InvoiceInfo[] => {
         const invoicesMap = new Map<string, InvoiceInfo>();
@@ -76,26 +64,25 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
             deliveriesByInvoice.forEach((deliveries, invoiceNumber) => {
                 const invoiceId = `${supplier.cpf}-${invoiceNumber}`;
                 const totalValue = deliveries.reduce((sum, d) => sum + (d.value || 0), 0);
-                const barcode = deliveries.find(d => d.barcode)?.barcode;
                 const items = deliveries
                     .filter(d => d.item && d.item !== 'AGENDAMENTO PENDENTE')
-                    .map(d => ({ name: d.item || 'Item não especificado', kg: d.kg || 0, value: d.value || 0, inclusionId: d.id }));
-                
+                    .map(d => ({ 
+                        name: d.item || 'Item não especificado', 
+                        kg: d.kg || 0, 
+                        value: d.value || 0,
+                        barcode: d.lots?.[0]?.barcode 
+                    }));
                 if(items.length === 0 && totalValue === 0) return;
                 const validDates = deliveries.map(d => d.date).filter(d => d && d !== "Invalid Date");
                 const earliestDate = validDates.length > 0 ? validDates.sort()[0] : new Date().toISOString().split('T')[0];
-                invoicesMap.set(invoiceId, { id: invoiceId, supplierName: supplier.name, supplierCpf: supplier.cpf, invoiceNumber, barcode, date: earliestDate, totalValue, items });
+                invoicesMap.set(invoiceId, { id: invoiceId, supplierName: supplier.name, supplierCpf: supplier.cpf, invoiceNumber, date: earliestDate, totalValue, items });
             });
         });
         return Array.from(invoicesMap.values());
     }, [suppliers]);
     
     const filteredAndSortedInvoices = useMemo(() => {
-        const filtered = allInvoices.filter(invoice => 
-            invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (invoice.barcode || '').toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        const filtered = allInvoices.filter(invoice => invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()));
         return filtered.sort((a, b) => {
             let comp = 0;
             if (sortKey === 'supplierName') comp = a.supplierName.localeCompare(b.supplierName);
@@ -109,107 +96,17 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
         if (key === sortKey) setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
         else { setSortKey(key); setSortDirection('desc'); }
     };
-
-    const handlePrintCronograma = () => {
-        // Filtragem para o relatório baseada na seleção
-        const reportData = selectedSupplierReport === 'all' 
-            ? filteredAndSortedInvoices 
-            : filteredAndSortedInvoices.filter(inv => inv.supplierCpf === selectedSupplierReport);
-
-        if (reportData.length === 0) return alert('Nenhuma nota fiscal encontrada para o fornecedor selecionado.');
-
-        const reportContent = `
-          <html>
-            <head>
-              <title>Cronograma de Entregas (NFs) - Taiúva 2026</title>
-              <style>
-                @page { size: A4 landscape; margin: 10mm; }
-                body { font-family: Arial, sans-serif; font-size: 10px; color: #333; line-height: 1.3; }
-                .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-                .header-sap { font-size: 12px; font-weight: bold; margin-bottom: 2px; text-transform: uppercase; }
-                .header-unit { font-size: 14px; font-weight: bold; margin-bottom: 4px; }
-                .header-address { font-size: 8px; color: #666; }
-                .report-title { text-align: center; font-size: 16px; font-weight: bold; margin: 15px 0; text-transform: uppercase; text-decoration: underline; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                th, td { border: 1px solid #000; padding: 5px; text-align: left; }
-                th { background-color: #f2f2f2; font-weight: bold; text-transform: uppercase; font-size: 8px; }
-                .footer { margin-top: 40px; display: flex; justify-content: space-around; page-break-inside: avoid; }
-                .sig { border-top: 1px solid #000; width: 180px; text-align: center; padding-top: 5px; font-size: 9px; font-weight: bold; }
-                .date-print { text-align: right; font-size: 7px; color: #999; margin-top: 10px; }
-                .money { text-align: right; font-family: monospace; white-space: nowrap; }
-              </style>
-            </head>
-            <body>
-              <div class="header">
-                <div class="header-sap">Secretaria da Administração Penitenciária</div>
-                <div class="header-unit">Polícia Penal - Penitenciária de Taiúva</div>
-                <div class="header-address">Rodovia Brigadeiro Faria Lima, SP 326, KM 359,6 Taiúva/SP - CEP: 14.720-000<br>Fone: (16) 3247-6261</div>
-              </div>
-              
-              <div class="report-title">CRONOGRAMA DE ENTREGAS (NOTAS FISCAIS LANÇADAS)</div>
-
-              <table>
-                <thead>
-                  <tr>
-                    <th>Fornecedor</th>
-                    <th style="width: 80px;">Data Entrega</th>
-                    <th style="width: 80px;">H. Inclusão Sist.</th>
-                    <th style="width: 60px;">NF</th>
-                    <th>Item Entregue</th>
-                    <th style="width: 70px; text-align: right;">Qtd.</th>
-                    <th style="width: 90px; text-align: right;">Valor Entrega</th>
-                    <th style="width: 100px; text-align: right;">Total Contratado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${reportData.flatMap(invoice => {
-                      const supplier = suppliers.find(s => s.cpf === invoice.supplierCpf);
-                      const totalContracted = supplier?.initialValue || 0;
-                      
-                      return invoice.items.map((item, idx) => `
-                        <tr>
-                          <td style="font-weight: bold; font-size: 9px;">${idx === 0 ? invoice.supplierName : ''}</td>
-                          <td>${formatDate(invoice.date)}</td>
-                          <td style="font-mono; font-size: 9px;">${extractInclusionTime(item.inclusionId)}</td>
-                          <td>${invoice.invoiceNumber}</td>
-                          <td style="text-transform: uppercase;">${item.name}</td>
-                          <td style="text-align: right; font-weight: bold;">${item.kg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                          <td class="money">${formatCurrency(item.value)}</td>
-                          <td class="money" style="background: #f9f9f9; font-weight: bold;">${idx === 0 ? formatCurrency(totalContracted) : ''}</td>
-                        </tr>
-                      `);
-                  }).join('')}
-                </tbody>
-              </table>
-              
-              <div class="footer">
-                <div class="sig">Responsável Almoxarifado<br>(Conferência)</div>
-                <div class="sig">Diretoria de Centro<br>(Visto)</div>
-              </div>
-
-              <div class="date-print">Relatório extraído em: ${new Date().toLocaleString('pt-BR')}</div>
-            </body>
-          </html>
-        `;
-
-        const win = window.open('', '_blank');
-        if (win) {
-            win.document.write(reportContent);
-            win.document.close();
-            setTimeout(() => { win.print(); }, 500);
-        }
-    };
     
-    const handleEditSave = async (updatedItems: { name: string; kg: number; value: number }[], updatedBarcode?: string) => {
+    const handleEditSave = async (updatedItems: { name: string; kg: number; value: number }[]) => {
         if (!editingInvoice) return;
         setIsSavingEdit(true);
-        const res = await onUpdateInvoiceItems(editingInvoice.supplierCpf, editingInvoice.invoiceNumber, updatedItems, updatedBarcode);
+        const res = await onUpdateInvoiceItems(editingInvoice.supplierCpf, editingInvoice.invoiceNumber, updatedItems);
         setIsSavingEdit(false);
         if (res.success) setEditingInvoice(null);
         else alert(res.message || 'Erro ao salvar alterações.');
     };
 
-    const handleManualInvoiceEntry = async (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number }[]) => {
+    const handleManualEntrySave = async (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number }[]) => {
         setIsSavingEdit(true);
         const res = await onManualInvoiceEntry(cpf, date, nf, items);
         setIsSavingEdit(false);
@@ -222,34 +119,14 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
             <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
                  <div>
                     <h2 className="text-3xl font-black text-teal-900 uppercase tracking-tighter">Consulta de Notas Fiscais</h2>
-                    <p className="text-gray-400 font-medium">Visualize faturas, lance notas manuais ou exporte relatórios.</p>
+                    <p className="text-gray-400 font-medium">Visualize as faturas ou lance manualmente caso o fornecedor não consiga agendar.</p>
                 </div>
-                <div className="flex flex-wrap items-end gap-3">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Fornecedor do Relatório</label>
-                        <select 
-                            value={selectedSupplierReport} 
-                            onChange={e => setSelectedSupplierReport(e.target.value)}
-                            className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-black uppercase text-indigo-900 outline-none focus:ring-2 focus:ring-teal-400 h-10 min-w-[200px]"
-                        >
-                            <option value="all">TODOS OS FORNECEDORES</option>
-                            {suppliers.sort((a,b) => a.name.localeCompare(b.name)).map(s => (
-                                <option key={s.cpf} value={s.cpf}>{s.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <button 
-                        onClick={handlePrintCronograma}
-                        className="bg-gray-800 hover:bg-black text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-[10px] flex items-center gap-2 h-10"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                        Exportar Cronograma NFs
-                    </button>
-                    <button onClick={() => setIsManualModalOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white font-black py-2 px-6 rounded-xl text-xs uppercase shadow-md active:scale-95 tracking-widest text-[10px] flex items-center gap-2 h-10">
+                <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setIsManualModalOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-                        Lançar Manual
+                        Lançar NF Manualmente
                     </button>
-                    <input type="text" placeholder="Filtrar tela..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-400 transition-all w-full md:w-48 h-10" />
+                    <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-400 transition-all w-full md:w-auto" />
                 </div>
             </div>
 
@@ -271,12 +148,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                             return (
                                 <React.Fragment key={invoice.id}>
                                     <tr className="border-b hover:bg-gray-50 transition-colors">
-                                        <td className="p-3 font-bold text-gray-800 uppercase">
-                                            {invoice.supplierName}
-                                            {invoice.barcode && (
-                                                <div className="text-[9px] font-mono text-indigo-500 font-black mt-1">BARRAS: {invoice.barcode}</div>
-                                            )}
-                                        </td>
+                                        <td className="p-3 font-bold text-gray-800 uppercase">{invoice.supplierName}</td>
                                         <td className="p-3 font-mono">{formatDate(invoice.date)}</td>
                                         <td className="p-3 font-mono">{invoice.invoiceNumber}</td>
                                         <td className="p-3 text-right font-mono font-bold text-green-700">{formatCurrency(invoice.totalValue)}</td>
@@ -300,12 +172,16 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                                     <h4 className="text-xs font-bold uppercase text-gray-600 mb-2">Detalhamento da NF {invoice.invoiceNumber}</h4>
                                                     <ul className="space-y-1 text-xs">
                                                         {invoice.items.length > 0 ? invoice.items.map((item, index) => (
-                                                            <li key={index} className="flex justify-between items-center p-2 border-b last:border-b-0">
-                                                                <div className="flex flex-col">
+                                                            <li key={index} className="flex flex-col p-2 border-b last:border-b-0">
+                                                                <div className="flex justify-between items-center">
                                                                     <span className="font-semibold text-gray-700 uppercase">{item.name} <span className="text-gray-400 font-normal">({(item.kg || 0).toFixed(2).replace('.',',')} Kg)</span></span>
-                                                                    <span className="text-[9px] text-indigo-500 font-bold uppercase">Incluído às {extractInclusionTime(item.inclusionId)}</span>
+                                                                    <span className="font-mono text-gray-600">{formatCurrency(item.value)}</span>
                                                                 </div>
-                                                                <span className="font-mono text-gray-600">{formatCurrency(item.value)}</span>
+                                                                {item.barcode && (
+                                                                    <div className="mt-1">
+                                                                        <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">CÓD. BARRAS: {item.barcode}</span>
+                                                                    </div>
+                                                                )}
                                                             </li>
                                                         )) : <li className="p-2 text-gray-400 italic">Nota fiscal sem itens registrados.</li>}
                                                     </ul>
@@ -325,8 +201,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
             )}
 
             {isManualModalOpen && (
-                /* Fix: Change handleManualEntrySave to handleManualInvoiceEntry */
-                <ManualInvoiceModal suppliers={suppliers} onClose={() => setIsManualModalOpen(false)} onSave={handleManualInvoiceEntry} isSaving={isSavingEdit} />
+                <ManualInvoiceModal suppliers={suppliers} onClose={() => setIsManualModalOpen(false)} onSave={handleManualEntrySave} isSaving={isSavingEdit} />
             )}
         </div>
     )
@@ -432,7 +307,7 @@ interface EditInvoiceModalProps {
     invoice: InvoiceInfo;
     supplier: Supplier;
     onClose: () => void;
-    onSave: (items: { name: string; kg: number; value: number }[], barcode?: string) => void;
+    onSave: (items: { name: string; kg: number; value: number }[]) => void;
     isSaving: boolean;
 }
 
@@ -440,23 +315,14 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
     const initialItems = invoice.items.length > 0 
         ? invoice.items.map((it, idx) => ({ id: `edit-${idx}`, name: it.name, kg: String(it.kg).replace('.', ',') }))
         : [{ id: `new-0`, name: '', kg: '' }];
-    
     const [items, setItems] = useState(initialItems);
-    const [barcode, setBarcode] = useState(invoice.barcode || '');
-
     const availableContractItems = useMemo(() => (supplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)), [supplier.contractItems]);
-    
-    const handleItemChange = (id: string, field: 'name' | 'kg', value: string) => { 
-        setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it)); 
-    };
-
+    const handleItemChange = (id: string, field: 'name' | 'kg', value: string) => { setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it)); };
     const totalValue = useMemo(() => items.reduce((sum, it) => {
-        /* Fix: 'item' was used instead of 'it' */
         const contract = supplier.contractItems.find(ci => ci.name === it.name);
         const kg = parseFloat(it.kg.replace(',', '.'));
         return (contract && !isNaN(kg)) ? sum + (kg * contract.valuePerKg) : sum;
     }, 0), [items, supplier.contractItems]);
-
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const finalItems = items.map(it => {
@@ -465,36 +331,18 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
             if (!contract || isNaN(kg)) return null;
             return { name: it.name, kg, value: kg * contract.valuePerKg };
         }).filter(Boolean) as { name: string; kg: number; value: number }[];
-        
         if (finalItems.length === 0) return alert('Adicione pelo menos um item válido.');
-        onSave(finalItems, barcode);
+        onSave(finalItems);
     };
-
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 animate-fade-in-up">
                 <div className="flex justify-between items-center mb-4 border-b pb-4">
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-800">Editar Detalhes da NF {invoice.invoiceNumber}</h2>
-                        <p className="text-xs text-gray-500 uppercase font-black">{invoice.supplierName}</p>
-                    </div>
+                    <div><h2 className="text-xl font-bold text-gray-800">Editar Itens da NF {invoice.invoiceNumber}</h2><p className="text-xs text-gray-500 uppercase font-black">{invoice.supplierName}</p></div>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-3xl font-light">&times;</button>
                 </div>
-                
                 <form onSubmit={handleFormSubmit} className="space-y-4">
-                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block mb-1">Código de Barras da Nota Fiscal</label>
-                        <input 
-                            type="text" 
-                            value={barcode} 
-                            onChange={e => setBarcode(e.target.value)} 
-                            placeholder="Bipar ou digitar código de barras da nota..." 
-                            className="w-full p-3 border-2 border-indigo-200 rounded-xl outline-none focus:ring-4 focus:ring-indigo-100 font-mono font-black text-lg bg-white"
-                        />
-                    </div>
-
-                    <div className="max-h-64 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Itens da Nota</label>
+                    <div className="max-h-80 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                         {items.map(item => {
                             const contract = supplier.contractItems.find(ci => ci.name === item.name);
                             const unit = getDisplayUnit(contract);
@@ -507,31 +355,20 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
                                         </select>
                                     </div>
                                     <div className="w-28"><label className="text-[9px] font-black text-gray-400 uppercase">Qtd ({unit})</label>
-                                        <input type="text" value={item.kg} onChange={e => handleItemChange(item.id, 'kg', e.target.value.replace(/[^0-9,]/g, ''))} placeholder="0,00" className="w-full p-2 border rounded-lg text-sm text-center font-mono" required />
+                                        <input type="text" value={item.kg} onChange={e => handleItemChange(item.id, 'kg', e.target.value)} placeholder="0,00" className="w-full p-2 border rounded-lg text-sm text-center font-mono" required />
                                     </div>
                                     <button type="button" onClick={() => setItems(prev => prev.filter(it => it.id !== item.id))} className="text-red-400 hover:text-red-600 p-1 mt-4"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                                 </div>
                             );
                         })}
                     </div>
-                    
                     <button type="button" onClick={() => setItems([...items, { id: `new-${Date.now()}`, name: '', kg: '' }])} className="w-full py-2 border-2 border-dashed border-teal-200 text-teal-600 font-bold rounded-lg text-xs uppercase hover:bg-teal-50 transition-colors">+ Adicionar Item à Nota</button>
-                    
                     <div className="flex justify-between items-center pt-4 border-t">
-                        <div className="text-right">
-                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Valor Total NF</p>
-                            <p className="text-xl font-black text-green-700 leading-none">{formatCurrency(totalValue)}</p>
-                        </div>
-                        <div className="space-x-2">
-                            <button type="button" onClick={onClose} className="bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs">Cancelar</button>
-                            <button type="submit" disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg disabled:bg-gray-400">
-                                {isSaving ? 'Gravando...' : 'Salvar Alterações'}
-                            </button>
-                        </div>
+                        <div className="text-right"><p className="text-[10px] text-gray-400 font-black uppercase">Novo Total</p><p className="text-xl font-black text-green-700">{formatCurrency(totalValue)}</p></div>
+                        <div className="space-x-2"><button type="button" onClick={onClose} className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm">Cancelar</button><button type="submit" disabled={isSaving} className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-lg font-bold text-sm disabled:bg-gray-400">{isSaving ? 'Gravando...' : 'Salvar Alterações'}</button></div>
                     </div>
                 </form>
             </div>
-            <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }`}</style>
         </div>
     );
 };
