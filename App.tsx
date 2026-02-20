@@ -210,7 +210,7 @@ const App: React.FC = () => {
             kg: item.kg,
             value: item.value,
             invoiceUploaded: true,
-            invoiceNumber: invoiceData.invoiceNumber
+            invoiceNumber: String(invoiceData.invoiceNumber || '').trim()
           });
         });
       }
@@ -262,7 +262,7 @@ const App: React.FC = () => {
               kg: item.kg,
               value: item.value,
               invoiceUploaded: true,
-              invoiceNumber: invoiceNumber,
+              invoiceNumber: String(invoiceNumber || '').trim(),
               barcode: barcode,
               lots: [{
                 id: `lot-edit-${Date.now()}-${idx}`,
@@ -332,7 +332,7 @@ const App: React.FC = () => {
               kg: item.kg,
               value: item.value,
               invoiceUploaded: true,
-              invoiceNumber: invoiceNumber,
+              invoiceNumber: String(invoiceNumber || '').trim(),
               barcode: barcode,
               lots: [{
                 id: `lot-manual-${Date.now()}-${idx}`,
@@ -416,7 +416,7 @@ const App: React.FC = () => {
                         kg: payload.quantity,
                         value: value,
                         invoiceUploaded: true,
-                        invoiceNumber: payload.invoiceNumber,
+                        invoiceNumber: String(payload.invoiceNumber || '').trim(),
                         barcode: payload.barcode || '',
                         lots: [{
                             id: lotId,

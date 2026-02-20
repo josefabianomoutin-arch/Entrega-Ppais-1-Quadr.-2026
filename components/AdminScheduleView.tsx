@@ -29,10 +29,10 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
         return [...filteredSuppliers].sort((a, b) => a.name.localeCompare(b.name));
     }, [filteredSuppliers]);
 
-    const handleCancel = (supplierCpf: string, deliveryId: string, date: string, itemName?: string) => {
-        const type = itemName === 'AGENDAMENTO PENDENTE' ? 'AGENDAMENTO' : 'FATURAMENTO';
+    const handleCancel = (supplierCpf: string, deliveryIds: string[], date: string, isInvoice: boolean) => {
+        const type = isInvoice ? 'FATURAMENTO' : 'AGENDAMENTO';
         if (window.confirm(`ATENÇÃO: Deseja realmente EXCLUIR o ${type} do dia ${formatDate(date)}?\n\nEsta ação removerá o registro permanentemente.`)) {
-            onCancelDeliveries(supplierCpf, [deliveryId]);
+            onCancelDeliveries(supplierCpf, deliveryIds);
         }
     };
 
@@ -123,19 +123,19 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
                                     </h4>
                                     {pendingDeliveries.length > 0 ? (
                                         <div className="flex flex-wrap gap-2">
-                                            {pendingDeliveries.map(delivery => (
-                                                <div key={delivery.id} className="flex flex-col gap-2 p-3 bg-orange-50/50 rounded-xl border border-orange-100">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-black text-orange-800 font-mono">{formatDate(delivery.date)}</span>
-                                                        <span className="text-[10px] font-bold text-orange-600">Agendado p/ {delivery.time}</span>
-                                                        <button 
-                                                            onClick={() => handleCancel(supplier.cpf, delivery.id, delivery.date, delivery.item)}
-                                                            className="hover:bg-red-600 hover:text-white bg-white rounded-lg p-1 text-red-500 transition-all border border-red-100 shadow-sm ml-auto"
-                                                            title="Excluir Agendamento"
-                                                        >
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                        </button>
-                                                    </div>
+                                                    {pendingDeliveries.map(delivery => (
+                                                        <div key={delivery.id} className="flex flex-col gap-2 p-3 bg-orange-50/50 rounded-xl border border-orange-100">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-xs font-black text-orange-800 font-mono">{formatDate(delivery.date)}</span>
+                                                                <span className="text-[10px] font-bold text-orange-600">Agendado p/ {delivery.time}</span>
+                                                                <button 
+                                                                    onClick={() => handleCancel(supplier.cpf, [delivery.id], delivery.date, false)}
+                                                                    className="hover:bg-red-600 hover:text-white bg-white rounded-lg p-1 text-red-500 transition-all border border-red-100 shadow-sm ml-auto"
+                                                                    title="Excluir Agendamento"
+                                                                >
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                                </button>
+                                                            </div>
                                                     
                                                     {/* INFORMAÇÃO DA SUBPORTARIA ABERTA AQUI */}
                                                     {delivery.arrivalTime && (
@@ -161,19 +161,30 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
                                     </h4>
                                     {realDeliveries.length > 0 ? (
                                         <div className="flex flex-wrap gap-2">
-                                            {realDeliveries.map(delivery => (
-                                                <div key={delivery.id} className="flex items-center gap-2 bg-green-50 text-green-700 text-xs font-black px-3 py-1.5 rounded-xl border border-green-100">
-                                                    <span className="font-mono">{formatDate(delivery.date)}</span>
-                                                    <span className="text-[9px] px-1 bg-green-100 rounded">NF {delivery.invoiceNumber}</span>
-                                                    <button 
-                                                        onClick={() => handleCancel(supplier.cpf, delivery.id, delivery.date, delivery.item)}
-                                                        className="hover:bg-red-600 hover:text-white bg-white rounded-lg p-1 text-red-500 transition-all border border-red-100 shadow-sm"
-                                                        title="Excluir Faturamento"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                    </button>
-                                                </div>
-                                            ))}
+                                            {(() => {
+                                                const invoices = new Map<string, { date: string, invoiceNumber: string, ids: string[] }>();
+                                                realDeliveries.forEach(d => {
+                                                    const nf = (d.invoiceNumber || '').toString().trim();
+                                                    const key = nf || `no-nf-${d.id}`;
+                                                    if (!invoices.has(key)) {
+                                                        invoices.set(key, { date: d.date, invoiceNumber: nf || 'S/N', ids: [] });
+                                                    }
+                                                    invoices.get(key)!.ids.push(d.id);
+                                                });
+                                                return Array.from(invoices.values()).map((inv, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 bg-green-50 text-green-700 text-xs font-black px-3 py-1.5 rounded-xl border border-green-100">
+                                                        <span className="font-mono">{formatDate(inv.date)}</span>
+                                                        <span className="text-[9px] px-1 bg-green-100 rounded">NF {inv.invoiceNumber}</span>
+                                                        <button 
+                                                            onClick={() => handleCancel(supplier.cpf, inv.ids, inv.date, true)}
+                                                            className="hover:bg-red-600 hover:text-white bg-white rounded-lg p-1 text-red-500 transition-all border border-red-100 shadow-sm"
+                                                            title="Excluir Faturamento"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
+                                                    </div>
+                                                ));
+                                            })()}
                                         </div>
                                     ) : (
                                         <p className="text-xs text-gray-300 italic">Nenhum faturamento nesta visualização.</p>
