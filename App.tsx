@@ -238,7 +238,7 @@ const App: React.FC = () => {
 
   // --- GERENCIAMENTO DE NOTAS FISCAIS (ADMIN) ---
 
-  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; barcode?: string }[]) => {
+  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[], barcode?: string) => {
     const supplierRef = child(suppliersRef, supplierCpf);
     try {
       await runTransaction(supplierRef, (currentData: Supplier) => {
@@ -263,12 +263,12 @@ const App: React.FC = () => {
               value: item.value,
               invoiceUploaded: true,
               invoiceNumber: invoiceNumber,
+              barcode: barcode,
               lots: [{
                 id: `lot-edit-${Date.now()}-${idx}`,
                 lotNumber: 'EDITADO',
                 initialQuantity: item.kg,
-                remainingQuantity: item.kg,
-                barcode: item.barcode || ''
+                remainingQuantity: item.kg
               }]
             });
           });
@@ -317,7 +317,7 @@ const App: React.FC = () => {
     });
   };
 
-  const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; barcode?: string }[]) => {
+  const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number }[], barcode?: string) => {
     const supplierRef = child(suppliersRef, supplierCpf);
     try {
       await runTransaction(supplierRef, (currentData: Supplier) => {
@@ -333,12 +333,12 @@ const App: React.FC = () => {
               value: item.value,
               invoiceUploaded: true,
               invoiceNumber: invoiceNumber,
+              barcode: barcode,
               lots: [{
                 id: `lot-manual-${Date.now()}-${idx}`,
                 lotNumber: 'MANUAL',
                 initialQuantity: item.kg,
-                remainingQuantity: item.kg,
-                barcode: item.barcode || ''
+                remainingQuantity: item.kg
               }]
             });
           });
@@ -417,12 +417,12 @@ const App: React.FC = () => {
                         value: value,
                         invoiceUploaded: true,
                         invoiceNumber: payload.invoiceNumber,
+                        barcode: payload.barcode || '',
                         lots: [{
                             id: lotId,
                             lotNumber: payload.lotNumber,
                             initialQuantity: payload.quantity,
                             remainingQuantity: payload.quantity,
-                            barcode: payload.barcode || '',
                             expirationDate: payload.expirationDate
                         }]
                     });
