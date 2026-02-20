@@ -112,8 +112,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         });
 
         const totalInvoiceValue = items.reduce((sum, it) => sum + it.totalValue, 0);
-        const invoiceDate = entries[0].date; // Assume mesma data para todos os itens da NF
-        const receiptDate = entries[0].timestamp.split('T')[0];
+        const invoiceDate = entries[0]?.date || ''; 
+        const receiptDate = (entries[0]?.timestamp || '').split('T')[0] || '';
 
         return {
             supplierName: receiptSupplier.name,
@@ -128,11 +128,15 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
     const handlePrintReceipt = () => {
         if (!receiptData) return;
-        const printWindow = window.open('', '_blank', 'width=900,height=800');
-        if (!printWindow) return;
+        
+        const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+        const formatDate = (dateStr: string) => (dateStr || '').split('-').reverse().join('/') || 'N/A';
 
-        const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-        const formatDate = (dateStr: string) => dateStr.split('-').reverse().join('/');
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('Por favor, permita popups para imprimir o termo.');
+            return;
+        }
 
         const htmlContent = `
             <html>
@@ -187,9 +191,9 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                         ${receiptData.items.map((it, idx) => `
                             <tr>
                                 <td style="text-align: center;">${String(idx + 1).padStart(2, '0')}</td>
-                                <td class="text-right">${it.quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                                <td style="text-align: center;">${it.unit}</td>
-                                <td>${it.name}</td>
+                                <td class="text-right">${(it.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                <td style="text-align: center;">${it.unit || 'N/A'}</td>
+                                <td>${it.name || 'N/A'}</td>
                                 <td class="text-right">${formatCurrency(it.unitPrice)}</td>
                                 <td class="text-right">${formatCurrency(it.totalValue)}</td>
                             </tr>
@@ -469,6 +473,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                 <p className="text-gray-500 font-medium text-xs">Gere o documento oficial de conferência e ateste de materiais.</p>
                             </div>
                             <button 
+                                type="button"
                                 onClick={handlePrintReceipt}
                                 disabled={!receiptData}
                                 className="bg-teal-600 hover:bg-teal-700 text-white font-black py-3 px-8 rounded-2xl transition-all shadow-lg active:scale-95 disabled:bg-gray-200 disabled:text-gray-400 uppercase tracking-widest text-xs flex items-center gap-2"
@@ -503,12 +508,12 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                     </div>
 
                                     <div className="space-y-2 uppercase text-sm">
-                                        <p><span className="font-bold inline-block w-48">FORNECEDOR:</span> {receiptData.supplierName}</p>
-                                        <p><span className="font-bold inline-block w-48">C.N.P.J.:</span> {receiptData.supplierCpf}</p>
-                                        <p><span className="font-bold inline-block w-48">NOTA FISCAL Nº:</span> {receiptData.invoiceNumber}</p>
-                                        <p><span className="font-bold inline-block w-48">DATA NOTA FISCAL:</span> {receiptData.invoiceDate.split('-').reverse().join('/')}</p>
-                                        <p><span className="font-bold inline-block w-48">DATA RECEBIMENTO:</span> {receiptData.receiptDate.split('-').reverse().join('/')}</p>
-                                        <p><span className="font-bold inline-block w-48">VALOR TOTAL NF:</span> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receiptData.totalInvoiceValue)}</p>
+                                        <p><span className="font-bold inline-block w-48">FORNECEDOR:</span> {receiptData.supplierName || 'N/A'}</p>
+                                        <p><span className="font-bold inline-block w-48">C.N.P.J.:</span> {receiptData.supplierCpf || 'N/A'}</p>
+                                        <p><span className="font-bold inline-block w-48">NOTA FISCAL Nº:</span> {receiptData.invoiceNumber || 'N/A'}</p>
+                                        <p><span className="font-bold inline-block w-48">DATA NOTA FISCAL:</span> {(receiptData.invoiceDate || '').split('-').reverse().join('/') || 'N/A'}</p>
+                                        <p><span className="font-bold inline-block w-48">DATA RECEBIMENTO:</span> {(receiptData.receiptDate || '').split('-').reverse().join('/') || 'N/A'}</p>
+                                        <p><span className="font-bold inline-block w-48">VALOR TOTAL NF:</span> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receiptData.totalInvoiceValue || 0)}</p>
                                     </div>
 
                                     <table className="w-full border-collapse border border-black text-[10px]">
@@ -526,11 +531,11 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                             {receiptData.items.map((it, idx) => (
                                                 <tr key={idx}>
                                                     <td className="border border-black p-1 text-center">{idx + 1}</td>
-                                                    <td className="border border-black p-1 text-right">{it.quantity.toFixed(2)}</td>
-                                                    <td className="border border-black p-1 text-center">{it.unit}</td>
-                                                    <td className="border border-black p-1">{it.name}</td>
-                                                    <td className="border border-black p-1 text-right">{it.unitPrice.toFixed(2)}</td>
-                                                    <td className="border border-black p-1 text-right">{it.totalValue.toFixed(2)}</td>
+                                                    <td className="border border-black p-1 text-right">{(it.quantity || 0).toFixed(2)}</td>
+                                                    <td className="border border-black p-1 text-center">{it.unit || 'N/A'}</td>
+                                                    <td className="border border-black p-1">{it.name || 'N/A'}</td>
+                                                    <td className="border border-black p-1 text-right">{(it.unitPrice || 0).toFixed(2)}</td>
+                                                    <td className="border border-black p-1 text-right">{(it.totalValue || 0).toFixed(2)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
