@@ -10,20 +10,8 @@ interface AlmoxarifadoDashboardProps {
     onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
 }
 
-const superNormalize = (text: string) => {
-    return (text || "")
-        .toString()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") 
-        .replace(/[^a-z0-9]/g, "") 
-        .trim();
-};
-
 const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers, warehouseLog, onLogout, onRegisterEntry, onRegisterWithdrawal }) => {
-    const [isImporting, setIsImporting] = useState(false);
-    const [activeTab, setActiveTab] = useState<'import' | 'manual' | 'receipt'>('manual');
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [activeTab, setActiveTab] = useState<'manual' | 'receipt'>('manual');
     const barcodeInputRef = useRef<HTMLInputElement>(null);
 
     // Estados para o formulário manual/individual
@@ -340,70 +328,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         }
     };
 
-    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            let text = e.target?.result as string;
-            const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-            if (lines.length <= 1) return;
-
-            setIsImporting(true);
-            let successCount = 0;
-            let errorCount = 0;
-            let errorDetails: string[] = [];
-
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-
-                let cols = line.split(";");
-                if (cols.length < 5) cols = line.split(",");
-                if (cols.length < 6) { errorCount++; continue; }
-
-                // Esperado: Tipo; Item; Fornecedor; NF; Lote; Qtd; Data; Vencimento; CódigoBarras
-                const [tipoRaw, csvItem, csvSupplier, nf, lote, qtd, data, venc, barras] = cols.map(c => c.trim());
-                const isEntrada = tipoRaw.toUpperCase().includes('ENTRADA');
-                
-                const cleanQtdStr = qtd.replace(/['"]/g, '').trim(); 
-                const sanitizedQty = cleanQtdStr.replace(/\./g, '').replace(',', '.');
-                const qtyVal = parseFloat(sanitizedQty);
-
-                if (isNaN(qtyVal)) { 
-                    errorCount++; 
-                    errorDetails.push(`Linha ${i+1}: Qtd '${qtd}' inválida.`); 
-                    continue; 
-                }
-
-                const supplier = suppliers.find(s => superNormalize(s.name) === superNormalize(csvSupplier));
-                if (!supplier) { errorCount++; errorDetails.push(`Linha ${i+1}: Fornecedor '${csvSupplier}' não localizado.`); continue; }
-
-                const officialItem = supplier.contractItems.find(ci => superNormalize(ci.name) === superNormalize(csvItem));
-                if (!officialItem) { errorCount++; errorDetails.push(`Linha ${i+1}: Item '${csvItem}' não consta no contrato de ${supplier.name}.`); continue; }
-
-                try {
-                    let res;
-                    const documentDate = data || new Date().toISOString().split('T')[0];
-                    if (isEntrada) {
-                        res = await onRegisterEntry({ supplierCpf: supplier.cpf, itemName: officialItem.name, invoiceNumber: nf, invoiceDate: documentDate, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '', barcode: barras || '' });
-                    } else {
-                        res = await onRegisterWithdrawal({ supplierCpf: supplier.cpf, itemName: officialItem.name, outboundInvoice: nf, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '', date: documentDate, barcode: barras || '' });
-                    }
-
-                    if (res.success) successCount++;
-                    else { errorCount++; errorDetails.push(`Linha ${i+1}: ${res.message}`); }
-                } catch (err) { errorCount++; }
-            }
-
-            setIsImporting(false);
-            alert(`Processamento concluído!\n✅ Sucessos: ${successCount}\n❌ Erros: ${errorCount}${errorDetails.length > 0 ? `\n\nResumo de erros:\n${errorDetails.slice(0, 3).join('\n')}` : ''}`);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        };
-        reader.readAsText(file);
-    };
-
     return (
         <div className="min-h-screen bg-gray-100 text-gray-800 pb-20">
             <header className="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-20 border-b-2 border-indigo-100">
@@ -414,7 +338,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 <div className="flex items-center gap-3">
                     <div className="flex bg-gray-100 p-1 rounded-xl">
                         <button onClick={() => setActiveTab('manual')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'manual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Bipagem / Manual</button>
-                        <button onClick={() => setActiveTab('import')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'import' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Importar CSV</button>
                         <button onClick={() => setActiveTab('receipt')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'receipt' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Termo de Recebimento</button>
                     </div>
                     <button onClick={onLogout} className="bg-red-50 text-red-600 font-black py-2 px-6 rounded-xl text-xs uppercase border border-red-100 shadow-sm active:scale-95">Sair</button>
@@ -522,30 +445,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                 </button>
                             </div>
                         </form>
-                    </div>
-                ) : activeTab === 'import' ? (
-                    <div className="bg-white p-8 rounded-3xl shadow-xl border-t-8 border-indigo-900 text-center space-y-6 animate-fade-in">
-                        <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-indigo-600">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2a4 4 0 00-4-4H5a2 2 0 00-2 2v6a2 2 0 002 2h22a2 2 0 002-2v-6a2 2 0 00-2-2h-1a4 4 0 00-4 4v2m0-10l-4-4m0 0l-4 4m4-4v12" /></svg>
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Importação de Dados Finanças</h2>
-                            <p className="text-gray-500 font-medium text-xs">Atualize o saldo de estoque processando arquivos .CSV padronizados.</p>
-                        </div>
-                        
-                        <button 
-                            onClick={() => fileInputRef.current?.click()} 
-                            disabled={isImporting}
-                            className="bg-indigo-900 hover:bg-black text-white font-black py-4 px-12 rounded-2xl transition-all shadow-lg active:scale-95 disabled:bg-gray-400 flex items-center gap-3 mx-auto uppercase tracking-widest text-sm"
-                        >
-                            {isImporting ? 'Lendo Arquivo...' : 'Selecionar Planilha CSV'}
-                        </button>
-                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".csv" />
-                        
-                        <div className="pt-4 text-left max-w-lg mx-auto bg-gray-50 p-6 rounded-2xl border border-indigo-50">
-                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-3">Layout Requerido (9 colunas):</p>
-                            <code className="text-[9px] font-mono text-indigo-700 block break-all leading-relaxed bg-white p-3 rounded-lg border">Tipo; Item; Fornecedor; NF; Lote; Qtd; Data; Validade; CódigoBarras</code>
-                        </div>
                     </div>
                 ) : (
                     <div className="bg-white p-8 rounded-3xl shadow-xl border-t-8 border-teal-600 animate-fade-in space-y-8">

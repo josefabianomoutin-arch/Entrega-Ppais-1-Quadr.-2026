@@ -11,24 +11,12 @@ interface AdminWarehouseLogProps {
     onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
 }
 
-const superNormalize = (text: string) => {
-    return (text || "")
-        .toString()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") 
-        .replace(/[^a-z0-9]/g, "") 
-        .trim();
-};
-
 const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, suppliers, onDeleteEntry, onUpdateWarehouseEntry, onRegisterEntry, onRegisterWithdrawal }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'entrada' | 'saída'>('all');
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
-    const [isImporting, setIsImporting] = useState(false);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [editingLog, setEditingLog] = useState<WarehouseMovement | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const filteredLog = useMemo(() => {
         return warehouseLog
@@ -66,69 +54,6 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 20); // Mostra os 20 mais recentes para análise
     }, [warehouseLog]);
-
-    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            let text = e.target?.result as string;
-            const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-            if (lines.length <= 1) return;
-
-            setIsImporting(true);
-            let successCount = 0;
-            let errorCount = 0;
-            let errorDetails: string[] = [];
-
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-
-                let cols = line.split(";");
-                if (cols.length < 5) cols = line.split(",");
-                if (cols.length < 6) { errorCount++; continue; }
-
-                const [tipoRaw, csvItem, csvSupplier, nf, lote, qtd, data, venc, barras] = cols.map(c => c.trim());
-                const isEntrada = tipoRaw.toUpperCase().includes('ENTRADA');
-                
-                const cleanQtdStr = qtd.replace(/['"]/g, '').trim(); 
-                const sanitizedQty = cleanQtdStr.replace(/\./g, '').replace(',', '.');
-                const qtyVal = parseFloat(sanitizedQty);
-
-                if (isNaN(qtyVal)) { 
-                    errorCount++; 
-                    errorDetails.push(`Linha ${i+1}: Quantidade '${qtd}' inválida.`); 
-                    continue; 
-                }
-
-                const supplier = suppliers.find(s => superNormalize(s.name) === superNormalize(csvSupplier));
-                if (!supplier) { errorCount++; errorDetails.push(`Linha ${i+1}: Fornecedor '${csvSupplier}' não localizado.`); continue; }
-
-                const officialItem = supplier.contractItems.find(ci => superNormalize(ci.name) === superNormalize(csvItem));
-                if (!officialItem) { errorCount++; errorDetails.push(`Linha ${i+1}: Item '${csvItem}' não consta no contrato de ${supplier.name}.`); continue; }
-
-                try {
-                    let res;
-                    const documentDate = data || new Date().toISOString().split('T')[0];
-                    if (isEntrada) {
-                        res = await onRegisterEntry({ supplierCpf: supplier.cpf, itemName: officialItem.name, invoiceNumber: nf, invoiceDate: documentDate, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '', barcode: barras || '' });
-                    } else {
-                        res = await onRegisterWithdrawal({ supplierCpf: supplier.cpf, itemName: officialItem.name, outboundInvoice: nf, lotNumber: lote, quantity: qtyVal, expirationDate: venc || '', date: documentDate, barcode: barras || '' });
-                    }
-
-                    if (res.success) successCount++;
-                    else { errorCount++; errorDetails.push(`Linha ${i+1}: ${res.message}`); }
-                } catch (err) { errorCount++; }
-            }
-
-            setIsImporting(false);
-            alert(`Concluído!\n✅ Sucessos: ${successCount}\n❌ Erros: ${errorCount}${errorDetails.length > 0 ? `\n\nResumo:\n${errorDetails.slice(0, 3).join('\n')}` : ''}`);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        };
-        reader.readAsText(file);
-    };
 
     const handlePrintLabels = (logs: WarehouseMovement[]) => {
         const printWindow = window.open('', '_blank', 'width=800,height=800');
@@ -278,10 +203,6 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
                             Lançar Movimentação Manual
                         </button>
-                        <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-6 rounded-xl text-xs transition-colors flex items-center gap-2 disabled:bg-gray-50 border border-gray-200">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                            {isImporting ? 'Importando...' : 'Importar Planilha .CSV'}
-                        </button>
                         <button 
                             onClick={() => handlePrintLabels(filteredLog)}
                             disabled={filteredLog.length === 0}
@@ -290,7 +211,6 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
                             Imprimir Etiquetas (Filtradas)
                         </button>
-                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".csv" />
                     </div>
                 </div>
 
