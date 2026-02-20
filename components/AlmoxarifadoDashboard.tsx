@@ -22,7 +22,7 @@ const superNormalize = (text: string) => {
 
 const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers, warehouseLog, onLogout, onRegisterEntry, onRegisterWithdrawal }) => {
     const [isImporting, setIsImporting] = useState(false);
-    const [activeTab, setActiveTab] = useState<'import' | 'manual'>('manual');
+    const [activeTab, setActiveTab] = useState<'import' | 'manual' | 'receipt'>('manual');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const barcodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -37,6 +37,10 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
     const [manualExp, setManualExp] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Estados para o Termo de Recebimento
+    const [receiptSupplierCpf, setReceiptSupplierCpf] = useState('');
+    const [receiptInvoice, setReceiptInvoice] = useState('');
 
     // Efeito para auto-focar o campo de barras ao trocar de tipo ou carregar
     useEffect(() => {
@@ -59,6 +63,175 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     const availableItems = useMemo(() => 
         selectedSupplier ? (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)) : [], 
     [selectedSupplier]);
+
+    const receiptSupplier = useMemo(() => suppliers.find(s => s.cpf === receiptSupplierCpf), [suppliers, receiptSupplierCpf]);
+    
+    const supplierInvoices = useMemo(() => {
+        if (!receiptSupplier) return [];
+        const invoices = new Set<string>();
+        warehouseLog.forEach(log => {
+            if (log.type === 'entrada' && log.supplierName === receiptSupplier.name && log.inboundInvoice) {
+                invoices.add(log.inboundInvoice);
+            }
+        });
+        return Array.from(invoices).sort();
+    }, [receiptSupplier, warehouseLog]);
+
+    const receiptData = useMemo(() => {
+        if (!receiptSupplier || !receiptInvoice) return null;
+        const entries = warehouseLog.filter(log => 
+            log.type === 'entrada' && 
+            log.supplierName === receiptSupplier.name && 
+            log.inboundInvoice === receiptInvoice
+        );
+        if (entries.length === 0) return null;
+
+        const items = entries.map(entry => {
+            const contractItem = receiptSupplier.contractItems.find(ci => ci.name === entry.itemName);
+            const unitPrice = contractItem?.valuePerKg || 0;
+            const totalValue = (entry.quantity || 0) * unitPrice;
+            
+            // Determinar unidade de exibição
+            let unit = 'Kg';
+            if (contractItem?.unit) {
+                const [unitType] = contractItem.unit.split('-');
+                const unitMap: { [key: string]: string } = {
+                    kg: 'Kg', un: 'Un', saco: 'Sc', balde: 'Bd', pacote: 'Pct', pote: 'Pt',
+                    litro: 'L', l: 'L', caixa: 'Cx', embalagem: 'Emb', dz: 'Dz'
+                };
+                unit = unitMap[unitType] || 'Un';
+            }
+
+            return {
+                name: entry.itemName,
+                quantity: entry.quantity || 0,
+                unit,
+                unitPrice,
+                totalValue
+            };
+        });
+
+        const totalInvoiceValue = items.reduce((sum, it) => sum + it.totalValue, 0);
+        const invoiceDate = entries[0].date; // Assume mesma data para todos os itens da NF
+        const receiptDate = entries[0].timestamp.split('T')[0];
+
+        return {
+            supplierName: receiptSupplier.name,
+            supplierCpf: receiptSupplier.cpf,
+            invoiceNumber: receiptInvoice,
+            invoiceDate,
+            receiptDate,
+            totalInvoiceValue,
+            items
+        };
+    }, [receiptSupplier, receiptInvoice, warehouseLog]);
+
+    const handlePrintReceipt = () => {
+        if (!receiptData) return;
+        const printWindow = window.open('', '_blank', 'width=900,height=800');
+        if (!printWindow) return;
+
+        const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+        const formatDate = (dateStr: string) => dateStr.split('-').reverse().join('/');
+
+        const htmlContent = `
+            <html>
+            <head>
+                <title>Termo de Recebimento - NF ${receiptData.invoiceNumber}</title>
+                <style>
+                    body { font-family: 'Times New Roman', Times, serif; padding: 20mm; line-height: 1.5; color: #000; font-size: 12pt; }
+                    .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                    .info-section { margin-bottom: 20px; }
+                    .info-row { margin-bottom: 5px; }
+                    .info-label { font-weight: bold; text-transform: uppercase; display: inline-block; width: 220px; }
+                    table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10pt; }
+                    th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+                    th { background-color: #f2f2f2; text-transform: uppercase; font-weight: bold; }
+                    .text-right { text-align: right; }
+                    .footer-text { margin-top: 30px; text-align: justify; }
+                    .signature-section { margin-top: 60px; text-align: center; }
+                    .signature-line { border-top: 1px solid #000; width: 300px; margin: 0 auto 10px auto; }
+                    .location-date { margin-top: 40px; text-align: center; font-weight: bold; }
+                    @media print {
+                        body { padding: 0; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    ATESTAMOS O RECEBIMENTO DOS MATERIAIS/SERVIÇOS RELACIONADOS, ENTREGA PELA EMPRESA:
+                </div>
+
+                <div class="info-section">
+                    <div class="info-row"><span class="info-label">FORNECEDOR:</span> ${receiptData.supplierName}</div>
+                    <div class="info-row"><span class="info-label">C.N.P.J.:</span> ${receiptData.supplierCpf}</div>
+                    <div class="info-row"><span class="info-label">NOTA FISCAL Nº:</span> ${receiptData.invoiceNumber}</div>
+                    <div class="info-row"><span class="info-label">DATA NOTA FISCAL:</span> ${formatDate(receiptData.invoiceDate)}</div>
+                    <div class="info-row"><span class="info-label">DATA RECEBIMENTO:</span> ${formatDate(receiptData.receiptDate)}</div>
+                    <div class="info-row"><span class="info-label">VALOR TOTAL NOTA FISCAL:</span> ${formatCurrency(receiptData.totalInvoiceValue)}</div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ITEM</th>
+                            <th>QUANT.</th>
+                            <th>UNID.</th>
+                            <th>DESCRIÇÃO</th>
+                            <th>VR.UNIT.</th>
+                            <th>VR. TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${receiptData.items.map((it, idx) => `
+                            <tr>
+                                <td style="text-align: center;">${String(idx + 1).padStart(2, '0')}</td>
+                                <td class="text-right">${it.quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                <td style="text-align: center;">${it.unit}</td>
+                                <td>${it.name}</td>
+                                <td class="text-right">${formatCurrency(it.unitPrice)}</td>
+                                <td class="text-right">${formatCurrency(it.totalValue)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="5" class="text-right" style="font-weight: bold;">TOTAL GERAL:</td>
+                            <td class="text-right" style="font-weight: bold;">${formatCurrency(receiptData.totalInvoiceValue)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="footer-text">
+                    Recebemos em ordem e na quantidade devida os materiais/serviços acima discriminados, os quais foram inspecionados pela comissão de recepção materiais, foi considerado de acordo com solicitado, satisfazendo as especificações e demais exigências do empenho conforme determina o inciso II do artigo 140 da lei nº 14.133/21.
+                </div>
+
+                <div class="location-date">
+                    TAIÚVA, ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()}
+                </div>
+
+                <div class="signature-section">
+                    <p style="font-weight: bold; margin-bottom: 40px; text-transform: uppercase;">COMISSÃO DE RECEPÇÃO DE MATERIAIS/SERVIÇOS</p>
+                    <div class="signature-line"></div>
+                    <p style="font-weight: bold; margin: 0;">FERNANDO RODRIGUES SOARES</p>
+                    <p style="margin: 0;">CPF: 347.810.448-32</p>
+                    <p style="margin: 0;">PRESIDENTE</p>
+                </div>
+
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        setTimeout(() => window.close(), 500);
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    };
 
     const handleManualSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -183,6 +356,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                     <div className="flex bg-gray-100 p-1 rounded-xl">
                         <button onClick={() => setActiveTab('manual')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'manual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Bipagem / Manual</button>
                         <button onClick={() => setActiveTab('import')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'import' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Importar CSV</button>
+                        <button onClick={() => setActiveTab('receipt')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'receipt' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Termo de Recebimento</button>
                     </div>
                     <button onClick={onLogout} className="bg-red-50 text-red-600 font-black py-2 px-6 rounded-xl text-xs uppercase border border-red-100 shadow-sm active:scale-95">Sair</button>
                 </div>
@@ -263,7 +437,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                             </div>
                         </form>
                     </div>
-                ) : (
+                ) : activeTab === 'import' ? (
                     <div className="bg-white p-8 rounded-3xl shadow-xl border-t-8 border-indigo-900 text-center space-y-6 animate-fade-in">
                         <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-indigo-600">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2a4 4 0 00-4-4H5a2 2 0 00-2 2v6a2 2 0 002 2h22a2 2 0 002-2v-6a2 2 0 00-2-2h-1a4 4 0 00-4 4v2m0-10l-4-4m0 0l-4 4m4-4v12" /></svg>
@@ -286,6 +460,104 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                             <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-3">Layout Requerido (9 colunas):</p>
                             <code className="text-[9px] font-mono text-indigo-700 block break-all leading-relaxed bg-white p-3 rounded-lg border">Tipo; Item; Fornecedor; NF; Lote; Qtd; Data; Validade; CódigoBarras</code>
                         </div>
+                    </div>
+                ) : (
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border-t-8 border-teal-600 animate-fade-in space-y-8">
+                        <div className="flex justify-between items-center border-b pb-6">
+                            <div>
+                                <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Termo de Recebimento</h2>
+                                <p className="text-gray-500 font-medium text-xs">Gere o documento oficial de conferência e ateste de materiais.</p>
+                            </div>
+                            <button 
+                                onClick={handlePrintReceipt}
+                                disabled={!receiptData}
+                                className="bg-teal-600 hover:bg-teal-700 text-white font-black py-3 px-8 rounded-2xl transition-all shadow-lg active:scale-95 disabled:bg-gray-200 disabled:text-gray-400 uppercase tracking-widest text-xs flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
+                                Imprimir Termo
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">1. Selecionar Fornecedor</label>
+                                <select value={receiptSupplierCpf} onChange={e => { setReceiptSupplierCpf(e.target.value); setReceiptInvoice(''); }} className="w-full p-3 border rounded-xl bg-white font-bold outline-none focus:ring-2 focus:ring-teal-400 text-sm">
+                                    <option value="">-- SELECIONE O FORNECEDOR --</option>
+                                    {suppliers.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">2. Selecionar Nota Fiscal</label>
+                                <select value={receiptInvoice} onChange={e => setReceiptInvoice(e.target.value)} className="w-full p-3 border rounded-xl bg-white font-bold outline-none focus:ring-2 focus:ring-teal-400 text-sm disabled:opacity-50" disabled={!receiptSupplierCpf}>
+                                    <option value="">-- SELECIONE A NF --</option>
+                                    {supplierInvoices.map(nf => <option key={nf} value={nf}>NF {nf}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        {receiptData ? (
+                            <div className="border-2 border-dashed border-gray-200 rounded-3xl p-8 bg-white shadow-inner max-h-[500px] overflow-y-auto custom-scrollbar">
+                                <div className="max-w-3xl mx-auto space-y-8 text-gray-800 font-serif">
+                                    <div className="text-center font-bold uppercase border-b-2 border-black pb-4">
+                                        ATESTAMOS O RECEBIMENTO DOS MATERIAIS/SERVIÇOS RELACIONADOS, ENTREGA PELA EMPRESA:
+                                    </div>
+
+                                    <div className="space-y-2 uppercase text-sm">
+                                        <p><span className="font-bold inline-block w-48">FORNECEDOR:</span> {receiptData.supplierName}</p>
+                                        <p><span className="font-bold inline-block w-48">C.N.P.J.:</span> {receiptData.supplierCpf}</p>
+                                        <p><span className="font-bold inline-block w-48">NOTA FISCAL Nº:</span> {receiptData.invoiceNumber}</p>
+                                        <p><span className="font-bold inline-block w-48">DATA NOTA FISCAL:</span> {receiptData.invoiceDate.split('-').reverse().join('/')}</p>
+                                        <p><span className="font-bold inline-block w-48">DATA RECEBIMENTO:</span> {receiptData.receiptDate.split('-').reverse().join('/')}</p>
+                                        <p><span className="font-bold inline-block w-48">VALOR TOTAL NF:</span> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receiptData.totalInvoiceValue)}</p>
+                                    </div>
+
+                                    <table className="w-full border-collapse border border-black text-[10px]">
+                                        <thead>
+                                            <tr className="bg-gray-100 uppercase font-bold">
+                                                <th className="border border-black p-1">ITEM</th>
+                                                <th className="border border-black p-1">QUANT.</th>
+                                                <th className="border border-black p-1">UNID.</th>
+                                                <th className="border border-black p-1">DESCRIÇÃO</th>
+                                                <th className="border border-black p-1">VR.UNIT.</th>
+                                                <th className="border border-black p-1">VR. TOTAL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {receiptData.items.map((it, idx) => (
+                                                <tr key={idx}>
+                                                    <td className="border border-black p-1 text-center">{idx + 1}</td>
+                                                    <td className="border border-black p-1 text-right">{it.quantity.toFixed(2)}</td>
+                                                    <td className="border border-black p-1 text-center">{it.unit}</td>
+                                                    <td className="border border-black p-1">{it.name}</td>
+                                                    <td className="border border-black p-1 text-right">{it.unitPrice.toFixed(2)}</td>
+                                                    <td className="border border-black p-1 text-right">{it.totalValue.toFixed(2)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+
+                                    <div className="text-xs text-justify leading-relaxed">
+                                        Recebemos em ordem e na quantidade devida os materiais/serviços acima discriminados, os quais foram inspecionados pela comissão de recepção materiais, foi considerado de acordo com solicitado, satisfazendo as especificações e demais exigências do empenho conforme determina o inciso II do artigo 140 da lei nº 14.133/21.
+                                    </div>
+
+                                    <div className="text-center font-bold pt-4">
+                                        TAIÚVA, {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()}
+                                    </div>
+
+                                    <div className="text-center space-y-1 pt-8">
+                                        <p className="font-bold uppercase">COMISSÃO DE RECEPÇÃO DE MATERIAIS/SERVIÇOS</p>
+                                        <div className="w-64 h-px bg-black mx-auto mt-8 mb-2"></div>
+                                        <p className="font-bold">FERNANDO RODRIGUES SOARES</p>
+                                        <p>CPF: 347.810.448-32</p>
+                                        <p>PRESIDENTE</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="py-20 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                                <p className="text-gray-400 font-bold uppercase tracking-widest">Selecione um fornecedor e uma nota fiscal para visualizar o termo.</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
