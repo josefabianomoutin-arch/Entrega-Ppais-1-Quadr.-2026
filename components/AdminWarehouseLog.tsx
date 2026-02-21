@@ -11,6 +11,16 @@ interface AdminWarehouseLogProps {
     onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
 }
 
+const superNormalize = (text: string) => {
+    return (text || "")
+        .toString()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") 
+        .replace(/[^a-z0-9]/g, "") 
+        .trim();
+};
+
 const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, suppliers, onDeleteEntry, onUpdateWarehouseEntry, onRegisterEntry, onRegisterWithdrawal }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'entrada' | 'saída'>('all');

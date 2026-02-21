@@ -69,44 +69,43 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     useEffect(() => {
         const barcode = manualBarcode.trim();
         if (barcode.length >= 8) {
-            // Busca nas movimentações de entrada para localizar o item e fornecedor
-            const found = warehouseLog.find(m => m.barcode === barcode && m.type === 'entrada');
-            if (found) {
-                const supplier = suppliers.find(s => s.name === found.supplierName);
-                if (supplier) {
-                    setSelectedSupplierCpf(supplier.cpf);
-                    setSelectedItemName(found.itemName);
+            // Busca nas entregas (notas fiscais) dos fornecedores
+            for (const s of suppliers) {
+                const foundDelivery = (s.deliveries || []).find(d => d.barcode === barcode);
+                if (foundDelivery) {
+                    setSelectedSupplierCpf(s.cpf);
+                    setSelectedItemName(foundDelivery.item || '');
+                    setManualNf(foundDelivery.invoiceNumber || '');
+                    return; // Encontrou, pode parar
                 }
             }
         }
-    }, [manualBarcode, warehouseLog, suppliers]);
+    }, [manualBarcode, suppliers]);
 
     const receiptSupplier = useMemo(() => suppliers.find(s => s.cpf === receiptSupplierCpf), [suppliers, receiptSupplierCpf]);
     
     const supplierInvoices = useMemo(() => {
         if (!receiptSupplier) return [];
         const invoices = new Set<string>();
-        warehouseLog.forEach(log => {
-            if (log.type === 'entrada' && log.supplierName === receiptSupplier.name && log.inboundInvoice) {
-                invoices.add(log.inboundInvoice);
+        (receiptSupplier.deliveries || []).forEach(d => {
+            if (d.invoiceNumber) {
+                invoices.add(d.invoiceNumber);
             }
         });
         return Array.from(invoices).sort();
-    }, [receiptSupplier, warehouseLog]);
+    }, [receiptSupplier]);
 
     const receiptData = useMemo(() => {
         if (!receiptSupplier || !receiptInvoice) return null;
-        const entries = warehouseLog.filter(log => 
-            log.type === 'entrada' && 
-            log.supplierName === receiptSupplier.name && 
-            log.inboundInvoice === receiptInvoice
+        const deliveries = (receiptSupplier.deliveries || []).filter(d => 
+            d.invoiceNumber === receiptInvoice && d.item !== 'AGENDAMENTO PENDENTE'
         );
-        if (entries.length === 0) return null;
+        if (deliveries.length === 0) return null;
 
-        const items = entries.map(entry => {
-            const contractItem = receiptSupplier.contractItems.find(ci => ci.name === entry.itemName);
+        const items = deliveries.map(d => {
+            const contractItem = receiptSupplier.contractItems.find(ci => ci.name === d.item);
             const unitPrice = contractItem?.valuePerKg || 0;
-            const totalValue = (entry.quantity || 0) * unitPrice;
+            const totalValue = (d.kg || 0) * unitPrice;
             
             // Determinar unidade de exibição
             let unit = 'Kg';
@@ -120,8 +119,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             }
 
             return {
-                name: entry.itemName,
-                quantity: entry.quantity || 0,
+                name: d.item || 'N/A',
+                quantity: d.kg || 0,
                 unit,
                 unitPrice,
                 totalValue
@@ -129,9 +128,9 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         });
 
         const totalInvoiceValue = items.reduce((sum, it) => sum + it.totalValue, 0);
-        const invoiceDate = entries[0]?.date || ''; 
-        const receiptDate = (entries[0]?.timestamp || '').split('T')[0] || '';
-        const barcode = entries[0]?.barcode || '';
+        const invoiceDate = deliveries[0]?.date || ''; 
+        const receiptDate = deliveries[0]?.date || ''; // Usando a data da entrega
+        const barcode = deliveries.find(d => d.barcode)?.barcode || '';
 
         return {
             supplierName: receiptSupplier.name,
@@ -143,7 +142,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             items,
             barcode
         };
-    }, [receiptSupplier, receiptInvoice, warehouseLog]);
+    }, [receiptSupplier, receiptInvoice]);
 
     const handlePrintReceipt = () => {
         if (!receiptData) return;
@@ -377,7 +376,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black text-gray-400 uppercase ml-1">
-                                        {manualType === 'entrada' ? '3. Número da Nota Fiscal' : '3. Nº Requisição / Ordem'}
+                                        {manualType === 'entrada' ? '3. Número da Nota Fiscal' : '3. Nº Requisição SAN ESTOQUE'}
                                     </label>
                                     <input type="text" value={manualNf} onChange={e => setManualNf(e.target.value)} placeholder={manualType === 'entrada' ? "Nº da Nota / Cupom" : "Nº do Pedido / Destino"} className="w-full p-3 border rounded-xl bg-white outline-none focus:ring-2 focus:ring-indigo-400 text-sm font-mono" />
                                 </div>
