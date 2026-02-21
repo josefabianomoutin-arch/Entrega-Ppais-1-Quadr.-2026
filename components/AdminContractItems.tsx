@@ -58,10 +58,25 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                 
                 map.set(normName, existing);
             });
+
+            // 2. Agrega Entradas de Notas Fiscais (Deliveries)
+            (s.deliveries || []).forEach(del => {
+                if (del.item === 'AGENDAMENTO PENDENTE') return;
+                const delINorm = superNormalize(del.item || '');
+                
+                for (const [normKey, data] of map.entries()) {
+                    if (normKey === delINorm || normKey.includes(delINorm) || delINorm.includes(normKey)) {
+                        data.totalDelivered += Number(del.kg) || 0;
+                        data.totalValueDelivered += Number(del.value) || 0;
+                    }
+                }
+            });
         });
 
-        // 2. Agrega Movimentações do Almoxarifado (Entradas e Saídas)
+        // 3. Agrega Saídas de Notas Fiscais (WarehouseLog com outboundInvoice)
         warehouseLog.forEach(log => {
+            if (log.type !== 'saída' || !log.outboundInvoice) return; // Somente saídas com NF
+            
             const logINorm = superNormalize(log.itemName);
             
             for (const [normKey, data] of map.entries()) {
@@ -70,13 +85,8 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                     const price = supplierDetail ? supplierDetail.price : (data.details[0]?.price || 0);
                     const qty = Number(log.quantity) || 0;
 
-                    if (log.type === 'entrada') {
-                        data.totalDelivered += qty;
-                        data.totalValueDelivered += qty * price;
-                    } else if (log.type === 'saída') {
-                        data.totalExited += qty;
-                        data.totalValueExited += qty * price;
-                    }
+                    data.totalExited += qty;
+                    data.totalValueExited += qty * price;
                 }
             }
         });
@@ -131,7 +141,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
             <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-600 flex justify-between items-center">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-800 mb-2 uppercase tracking-tight italic">Gestão Geral por Item</h2>
-                    <p className="text-sm text-gray-500 font-medium">Consolidado de todos os contratos: O que foi comprado vs. O que entrou no estoque.</p>
+                    <p className="text-sm text-gray-500 font-medium">Consolidado de todos os contratos: O que foi comprado vs. O que foi entregue (Notas Fiscais).</p>
                 </div>
                 <button 
                     onClick={() => setIsAddingItem(true)}

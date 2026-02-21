@@ -98,28 +98,30 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
             });
         });
 
-        // 2. Acumular Estoque Real (Match Flexível para tirar do 0kg)
-        warehouseLog.forEach(log => {
-            if (log.type !== 'entrada') return;
-            
-            const logSNorm = superNormalize(log.supplierName);
-            const logINorm = superNormalize(log.itemName);
-            const logMonth = getMonthNameFromDateString(log.date || log.timestamp);
+        // 2. Acumular Entradas de Notas Fiscais (Deliveries)
+        suppliers.forEach(s => {
+            const sNorm = superNormalize(s.name);
+            (s.deliveries || []).forEach(del => {
+                if (del.item === 'AGENDAMENTO PENDENTE') return;
+                
+                const delINorm = superNormalize(del.item || '');
+                const delMonth = getMonthNameFromDateString(del.date);
 
-            if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(logMonth)) return;
+                if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(delMonth)) return;
 
-            // Busca no mapa consolidado com tolerância de strings
-            for (const [key, entry] of consolidated.entries()) {
-                if (entry.month === logMonth) {
-                    const sMatch = entry.normSupplier === logSNorm || entry.normSupplier.includes(logSNorm) || logSNorm.includes(entry.normSupplier);
-                    if (sMatch) {
-                        const iMatch = entry.normItem === logINorm || entry.normItem.includes(logINorm) || logINorm.includes(entry.normItem);
-                        if (iMatch) {
-                            entry.receivedKg += (Number(log.quantity) || 0);
+                // Busca no mapa consolidado
+                for (const [key, entry] of consolidated.entries()) {
+                    if (entry.month === delMonth) {
+                        const sMatch = entry.normSupplier === sNorm || entry.normSupplier.includes(sNorm) || sNorm.includes(entry.normSupplier);
+                        if (sMatch) {
+                            const iMatch = entry.normItem === delINorm || entry.normItem.includes(delINorm) || delINorm.includes(entry.normItem);
+                            if (iMatch) {
+                                entry.receivedKg += (Number(del.kg) || 0);
+                            }
                         }
                     }
                 }
-            }
+            });
         });
 
         return Array.from(consolidated.values()).map((data, idx) => {
@@ -158,8 +160,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
     return (
         <div className="space-y-8 animate-fade-in pb-12">
             <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-indigo-500">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Auditoria Analítica: Meta Mensal vs. Estoque</h2>
-                <p className="text-sm text-gray-500 font-medium">Cruzamento profundo de dados para identificar déficits de entrega em qualquer período (Jan-Abr).</p>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Auditoria Analítica: Meta Mensal vs. Notas Fiscais</h2>
+                <p className="text-sm text-gray-500 font-medium">Cruzamento profundo de dados para identificar déficits de entrega baseados em Notas Fiscais (Jan-Abr).</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -210,7 +212,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                                 <th className="p-4 text-left">Produto</th>
                                 <th className="p-4 text-center">Mês</th>
                                 <th className="p-4 text-right bg-blue-50/30 text-blue-700">Meta Contratual</th>
-                                <th className="p-4 text-right bg-green-50/30 text-green-700">Estoque Almox.</th>
+                                <th className="p-4 text-right bg-green-50/30 text-green-700">Notas Fiscais</th>
                                 <th className="p-4 text-right bg-red-50 text-red-600">Diferença (Falta)</th>
                                 <th className="p-4 text-right font-black">Prejuízo</th>
                             </tr>
