@@ -465,6 +465,25 @@ const App: React.FC = () => {
     }
   };
 
+  const handleResetWarehouseExits = async () => {
+    try {
+      const snapshot = await get(warehouseLogRef);
+      const data = snapshot.val();
+      if (data) {
+        const updates: any = {};
+        Object.entries(data).forEach(([key, value]: [string, any]) => {
+          if (value.type === 'saída') {
+            updates[key] = null;
+          }
+        });
+        await update(warehouseLogRef, updates);
+      }
+      return { success: true, message: 'Registros de saída zerados com sucesso.' };
+    } catch (e) {
+      return { success: false, message: 'Falha ao zerar registros de saída.' };
+    }
+  };
+
   if (!user) {
     return <LoginScreen onLogin={handleLogin} />;
   }
@@ -541,6 +560,7 @@ const App: React.FC = () => {
              onLogout={handleLogout} 
              onRegisterEntry={handleRegisterWarehouseEntry} 
              onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} 
+             onResetExits={handleResetWarehouseExits}
            />;
   }
 

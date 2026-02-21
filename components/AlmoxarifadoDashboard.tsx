@@ -8,9 +8,10 @@ interface AlmoxarifadoDashboardProps {
     onLogout: () => void;
     onRegisterEntry: (payload: any) => Promise<{ success: boolean; message: string }>;
     onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
+    onResetExits: () => Promise<{ success: boolean; message: string }>;
 }
 
-const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers, warehouseLog, onLogout, onRegisterEntry, onRegisterWithdrawal }) => {
+const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers, warehouseLog, onLogout, onRegisterEntry, onRegisterWithdrawal, onResetExits }) => {
     const [activeTab, setActiveTab] = useState<'manual' | 'receipt'>('manual');
     const barcodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -68,10 +69,15 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 invoice: l.outboundInvoice
             }));
 
-        return [...entries, ...exits]
+        const all = [...entries, ...exits];
+        
+        // Filtra conforme o tipo selecionado no formulário manual
+        const filtered = all.filter(m => m.type === manualType);
+
+        return filtered
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
             .slice(0, 15);
-    }, [suppliers, warehouseLog]);
+    }, [suppliers, warehouseLog, manualType]);
 
     const selectedSupplier = useMemo(() => 
         suppliers.find(s => s.cpf === selectedSupplierCpf), 
@@ -744,10 +750,26 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
                 {/* Tabela de Movimentações Recentes */}
                 <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-                    <h3 className="text-xl font-black text-gray-800 uppercase mb-6 tracking-tight border-b pb-4 flex items-center gap-2">
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
-                        Últimos Registros de Notas Fiscais
-                    </h3>
+                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full animate-pulse ${manualType === 'entrada' ? 'bg-green-600' : 'bg-red-600'}`}></div>
+                            Últimos Registros de Notas Fiscais ({manualType === 'entrada' ? 'Entradas' : 'Saídas'})
+                        </h3>
+                        {manualType === 'saída' && (
+                            <button 
+                                onClick={async () => {
+                                    if (window.confirm('Deseja realmente ZERAR todos os registros de saída de Notas Fiscais? Esta ação não pode ser desfeita.')) {
+                                        const res = await onResetExits();
+                                        if (res.success) alert(res.message);
+                                        else alert(res.message);
+                                    }
+                                }}
+                                className="text-[9px] font-black uppercase text-red-500 hover:text-red-700 bg-red-50 px-3 py-1.5 rounded-lg transition-all border border-red-100 shadow-sm"
+                            >
+                                Zerar Saídas (Reiniciar)
+                            </button>
+                        )}
+                    </div>
                     <div className="overflow-x-auto rounded-xl">
                         <table className="w-full text-sm">
                             <thead>
