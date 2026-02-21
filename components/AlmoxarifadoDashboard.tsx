@@ -21,6 +21,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     const [manualBarcode, setManualBarcode] = useState('');
     const [manualQuantity, setManualQuantity] = useState('');
     const [manualNf, setManualNf] = useState('');
+    const [manualInboundNf, setManualInboundNf] = useState('');
     const [manualLot, setManualLot] = useState('');
     const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
     const [manualExp, setManualExp] = useState('');
@@ -75,12 +76,19 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 if (foundDelivery) {
                     setSelectedSupplierCpf(s.cpf);
                     setSelectedItemName(foundDelivery.item || '');
-                    setManualNf(foundDelivery.invoiceNumber || '');
+                    setManualInboundNf(foundDelivery.invoiceNumber || '');
+                    
+                    // Busca no warehouseLog para pegar lote e validade da entrada original
+                    const entryLog = warehouseLog.find(l => l.barcode === barcode && l.type === 'entrada');
+                    if (entryLog) {
+                        setManualLot(entryLog.lotNumber || '');
+                        setManualExp(entryLog.expirationDate || '');
+                    }
                     return; // Encontrou, pode parar
                 }
             }
         }
-    }, [manualBarcode, suppliers]);
+    }, [manualBarcode, suppliers, warehouseLog]);
 
     const receiptSupplier = useMemo(() => suppliers.find(s => s.cpf === receiptSupplierCpf), [suppliers, receiptSupplierCpf]);
     
@@ -304,6 +312,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                     supplierCpf: selectedSupplierCpf,
                     itemName: selectedItemName,
                     outboundInvoice: manualNf,
+                    inboundInvoice: manualInboundNf,
                     lotNumber: manualLot || 'UNICO',
                     quantity: qtyVal,
                     expirationDate: manualExp,
@@ -315,6 +324,9 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 // Limpa campos específicos para facilitar bipagem sequencial
                 setManualBarcode('');
                 setManualQuantity('');
+                setManualInboundNf('');
+                setManualLot('');
+                setManualExp('');
                 // Mantém Fornecedor, Data e NF para evitar redigitação se for a mesma carga
                 barcodeInputRef.current?.focus();
             } else {
@@ -380,6 +392,12 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                     </label>
                                     <input type="text" value={manualNf} onChange={e => setManualNf(e.target.value)} placeholder={manualType === 'entrada' ? "Nº da Nota / Cupom" : "Nº do Pedido / Destino"} className="w-full p-3 border rounded-xl bg-white outline-none focus:ring-2 focus:ring-indigo-400 text-sm font-mono" />
                                 </div>
+                                {manualType === 'saída' && (
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase ml-1">NOTA FISCAL (ORIGEM)</label>
+                                        <input type="text" value={manualInboundNf} onChange={e => setManualInboundNf(e.target.value)} placeholder="NF de Entrada" className="w-full p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-400 text-sm font-mono" />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Bloco 2: O Item (Bipagem) */}

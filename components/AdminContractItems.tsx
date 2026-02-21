@@ -36,13 +36,18 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                     name: ci.name,
                     normName,
                     totalContracted: 0,
+                    totalValueContracted: 0,
                     totalDelivered: 0,
+                    totalValueDelivered: 0,
+                    totalExited: 0,
+                    totalValueExited: 0,
                     unit: ci.unit || 'kg-1',
                     suppliersCount: 0,
                     details: []
                 };
 
                 existing.totalContracted += Number(ci.totalKg) || 0;
+                existing.totalValueContracted += (Number(ci.totalKg) || 0) * (Number(ci.valuePerKg) || 0);
                 existing.suppliersCount += 1;
                 existing.details.push({ 
                     supplierName: s.name, 
@@ -55,14 +60,23 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
             });
         });
 
-        // 2. Agrega Entregas do Almoxarifado
+        // 2. Agrega Movimentações do Almoxarifado (Entradas e Saídas)
         warehouseLog.forEach(log => {
-            if (log.type !== 'entrada') return;
             const logINorm = superNormalize(log.itemName);
             
             for (const [normKey, data] of map.entries()) {
                 if (normKey === logINorm || normKey.includes(logINorm) || logINorm.includes(normKey)) {
-                    data.totalDelivered += Number(log.quantity) || 0;
+                    const supplierDetail = data.details.find((d: any) => superNormalize(d.supplierName) === superNormalize(log.supplierName));
+                    const price = supplierDetail ? supplierDetail.price : (data.details[0]?.price || 0);
+                    const qty = Number(log.quantity) || 0;
+
+                    if (log.type === 'entrada') {
+                        data.totalDelivered += qty;
+                        data.totalValueDelivered += qty * price;
+                    } else if (log.type === 'saída') {
+                        data.totalExited += qty;
+                        data.totalValueExited += qty * price;
+                    }
                 }
             }
         });
@@ -80,10 +94,18 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
 
     const totals = useMemo(() => {
         return filteredItems.reduce((acc, item) => {
-            acc.contracted += item.totalContracted;
-            acc.delivered += item.totalDelivered;
+            acc.contractedWeight += item.totalContracted;
+            acc.contractedValue += item.totalValueContracted;
+            acc.deliveredWeight += item.totalDelivered;
+            acc.deliveredValue += item.totalValueDelivered;
+            acc.exitedWeight += item.totalExited;
+            acc.exitedValue += item.totalValueExited;
             return acc;
-        }, { contracted: 0, delivered: 0 });
+        }, { 
+            contractedWeight: 0, contractedValue: 0, 
+            deliveredWeight: 0, deliveredValue: 0, 
+            exitedWeight: 0, exitedValue: 0 
+        });
     }, [filteredItems]);
 
     const handleAddNewItem = () => {
@@ -157,18 +179,43 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-lg border-b-8 border-indigo-500">
-                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Total Contratado (Global)</p>
-                    <p className="text-2xl font-black text-indigo-700">{totals.contracted.toLocaleString('pt-BR')} kg/L</p>
+            <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-indigo-500">
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Total Contratado (Valor)</p>
+                        <p className="text-xl font-black text-indigo-700">{totals.contractedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-green-500">
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Entradas (Notas Fiscais)</p>
+                        <p className="text-xl font-black text-green-700">{totals.deliveredValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-red-500">
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Saídas (Notas Fiscais)</p>
+                        <p className="text-xl font-black text-red-700">{totals.exitedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-blue-500">
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Saldo a Entregar (Valor)</p>
+                        <p className="text-xl font-black text-blue-700">{Math.max(0, totals.contractedValue - totals.deliveredValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                    </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-lg border-b-8 border-green-500">
-                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Recebido no Almoxarifado</p>
-                    <p className="text-2xl font-black text-green-700">{totals.delivered.toLocaleString('pt-BR')} kg/L</p>
-                </div>
-                <div className="bg-white p-6 rounded-2xl shadow-lg border-b-8 border-blue-500">
-                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Saldo a Receber</p>
-                    <p className="text-2xl font-black text-blue-700">{Math.max(0, totals.contracted - totals.delivered).toLocaleString('pt-BR')} kg/L</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-indigo-400">
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Total Contratado (Peso)</p>
+                        <p className="text-xl font-black text-indigo-600">{totals.contractedWeight.toLocaleString('pt-BR')} kg/L</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-green-400">
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Entradas (Peso)</p>
+                        <p className="text-xl font-black text-green-600">{totals.deliveredWeight.toLocaleString('pt-BR')} kg/L</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-red-400">
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Saídas (Peso)</p>
+                        <p className="text-xl font-black text-red-600">{totals.exitedWeight.toLocaleString('pt-BR')} kg/L</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-blue-400">
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Saldo a Entregar (Peso)</p>
+                        <p className="text-xl font-black text-blue-600">{Math.max(0, totals.contractedWeight - totals.deliveredWeight).toLocaleString('pt-BR')} kg/L</p>
+                    </div>
                 </div>
             </div>
 

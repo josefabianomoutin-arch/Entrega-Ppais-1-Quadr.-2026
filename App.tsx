@@ -451,6 +451,7 @@ const App: React.FC = () => {
             supplierName: supplier?.name || 'Desconhecido',
             lotNumber: payload.lotNumber || 'SAIDA_AVULSA',
             quantity: payload.quantity,
+            inboundInvoice: payload.inboundInvoice,
             outboundInvoice: payload.outboundInvoice,
             expirationDate: payload.expirationDate,
             barcode: payload.barcode || '',
