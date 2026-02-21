@@ -83,6 +83,15 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         suppliers.find(s => s.cpf === selectedSupplierCpf), 
     [suppliers, selectedSupplierCpf]);
 
+    const manualSupplierInvoices = useMemo(() => {
+        if (!selectedSupplier) return [];
+        const invoices = new Set<string>();
+        (selectedSupplier.deliveries || []).forEach(d => {
+            if (d.invoiceNumber) invoices.add(d.invoiceNumber);
+        });
+        return Array.from(invoices).sort();
+    }, [selectedSupplier]);
+
     const availableItems = useMemo(() => {
         if (selectedSupplier) {
             return (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name));
@@ -485,13 +494,15 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
                                                 Nota Fiscal de Origem (Entrada)
                                             </label>
-                                            <input 
-                                                type="text" 
+                                            <select 
                                                 value={manualInboundNf} 
                                                 onChange={e => setManualInboundNf(e.target.value)} 
-                                                placeholder="Informe a NF que deu entrada neste material..." 
-                                                className="w-full h-14 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-mono font-bold outline-none focus:ring-4 focus:ring-indigo-100 transition-all text-sm placeholder:text-gray-300" 
-                                            />
+                                                className="w-full h-14 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-indigo-100 transition-all text-sm appearance-none cursor-pointer disabled:opacity-50"
+                                                disabled={!selectedSupplierCpf}
+                                            >
+                                                <option value="">-- SELECIONE A NF DE ENTRADA --</option>
+                                                {manualSupplierInvoices.map(nf => <option key={nf} value={nf}>NF {nf}</option>)}
+                                            </select>
                                         </div>
                                     )}
                                 </div>
