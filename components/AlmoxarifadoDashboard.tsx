@@ -305,37 +305,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                     <div class="info-row"><span class="info-label">VALOR TOTAL NOTA FISCAL:</span> ${formatCurrency(receiptData.totalInvoiceValue)}</div>
                 </div>
 
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ITEM</th>
-                            <th>QUANT.</th>
-                            <th>UNID.</th>
-                            <th>DESCRIÇÃO</th>
-                            <th>VR.UNIT.</th>
-                            <th>VR. TOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${receiptData.items.map((it, idx) => `
-                            <tr>
-                                <td style="text-align: center;">${String(idx + 1).padStart(2, '0')}</td>
-                                <td class="text-right">${(it.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                                <td style="text-align: center;">${it.unit || 'N/A'}</td>
-                                <td>${it.name || 'N/A'}</td>
-                                <td class="text-right">${formatCurrency(it.unitPrice)}</td>
-                                <td class="text-right">${formatCurrency(it.totalValue)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="5" class="text-right" style="font-weight: bold;">TOTAL GERAL:</td>
-                            <td class="text-right" style="font-weight: bold;">${formatCurrency(receiptData.totalInvoiceValue)}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-
                 <div class="footer-text">
                     Recebemos em ordem e na quantidade devida os materiais/serviços acima discriminados, os quais foram inspecionados pela comissão de recepção materiais, foi considerado de acordo com solicitado, satisfazendo as especificações e demais exigências do empenho conforme determina o inciso II do artigo 140 da lei nº 14.133/21.
                 </div>
@@ -726,11 +695,11 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                             ? 'border-indigo-100 opacity-80' 
                                             : item.arrivalTime 
                                                 ? 'border-green-200 bg-green-50/30' 
-                                                : 'border-white'
+                                                : 'border-red-500 bg-red-50'
                                     }`}
                                 >
                                     <div className={`absolute top-0 left-0 w-2 h-full ${
-                                        item.status === 'FATURADO' ? 'bg-indigo-900' : item.arrivalTime ? 'bg-green-500' : 'bg-slate-200'
+                                        item.status === 'FATURADO' ? 'bg-indigo-900' : item.arrivalTime ? 'bg-green-500' : 'bg-red-600'
                                     }`} />
 
                                     <div className="p-5 pl-7">
@@ -740,7 +709,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                                     ? 'bg-indigo-900 text-white' 
                                                     : item.arrivalTime 
                                                         ? 'bg-green-600 text-white' 
-                                                        : 'bg-slate-100 text-slate-500'
+                                                        : 'bg-red-600 text-white shadow-red-100'
                                             }`}>
                                                 {item.time}
                                             </div>
@@ -751,7 +720,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                                         ? 'bg-indigo-100 text-indigo-700' 
                                                         : item.arrivalTime 
                                                             ? 'bg-green-100 text-green-700' 
-                                                            : 'bg-slate-100 text-slate-400'
+                                                            : 'bg-red-100 text-red-700'
                                                 }`}>
                                                     {item.status === 'FATURADO' ? '✓ Descarregado' : item.arrivalTime ? '● No Pátio' : '○ Aguardando'}
                                                 </span>
@@ -854,31 +823,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                         <p><span className="font-bold inline-block w-48">CÓD. BARRAS NF:</span> {receiptData.barcode || 'N/A'}</p>
                                     </div>
 
-                                    <table className="w-full border-collapse border border-black text-[10px]">
-                                        <thead>
-                                            <tr className="bg-gray-100 uppercase font-bold">
-                                                <th className="border border-black p-1">ITEM</th>
-                                                <th className="border border-black p-1">QUANT.</th>
-                                                <th className="border border-black p-1">UNID.</th>
-                                                <th className="border border-black p-1">DESCRIÇÃO</th>
-                                                <th className="border border-black p-1">VR.UNIT.</th>
-                                                <th className="border border-black p-1">VR. TOTAL</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {receiptData.items.map((it, idx) => (
-                                                <tr key={idx}>
-                                                    <td className="border border-black p-1 text-center">{idx + 1}</td>
-                                                    <td className="border border-black p-1 text-right">{(it.quantity || 0).toFixed(2)}</td>
-                                                    <td className="border border-black p-1 text-center">{it.unit || 'N/A'}</td>
-                                                    <td className="border border-black p-1">{it.name || 'N/A'}</td>
-                                                    <td className="border border-black p-1 text-right">{(it.unitPrice || 0).toFixed(2)}</td>
-                                                    <td className="border border-black p-1 text-right">{(it.totalValue || 0).toFixed(2)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-
                                     <div className="text-xs text-justify leading-relaxed">
                                         Recebemos em ordem e na quantidade devida os materiais/serviços acima discriminados, os quais foram inspecionados pela comissão de recepção materiais, foi considerado de acordo com solicitado, satisfazendo as especificações e demais exigências do empenho conforme determina o inciso II do artigo 140 da lei nº 14.133/21.
                                     </div>
@@ -905,107 +849,111 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 )}
 
                 {/* Tabela de Movimentações Recentes ou Agenda da Semana */}
-                <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-                    <div className="flex justify-between items-center mb-6 border-b pb-4">
-                        <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
-                            {activeTab === 'agenda' ? (
-                                <>
-                                    <div className="w-2 h-2 rounded-full animate-pulse bg-indigo-600"></div>
-                                    Agendamentos da Semana (Grade Completa)
-                                </>
-                            ) : (
-                                <>
-                                    <div className={`w-2 h-2 rounded-full animate-pulse ${manualType === 'entrada' ? 'bg-green-600' : 'bg-red-600'}`}></div>
-                                    Últimos Registros de Notas Fiscais ({manualType === 'entrada' ? 'Entradas' : 'Saídas'})
-                                </>
+                {activeTab !== 'receipt' && (
+                    <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
+                        <div className="flex justify-between items-center mb-6 border-b pb-4">
+                            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
+                                {activeTab === 'agenda' ? (
+                                    <>
+                                        <div className="w-2 h-2 rounded-full animate-pulse bg-indigo-600"></div>
+                                        Agendamentos da Semana (Grade Completa)
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className={`w-2 h-2 rounded-full animate-pulse ${manualType === 'entrada' ? 'bg-green-600' : 'bg-red-600'}`}></div>
+                                        Últimos Registros de Notas Fiscais ({manualType === 'entrada' ? 'Entradas' : 'Saídas'})
+                                    </>
+                                )}
+                            </h3>
+                            {activeTab !== 'agenda' && manualType === 'saída' && (
+                                <button 
+                                    onClick={async () => {
+                                        if (window.confirm('Deseja realmente ZERAR todos os registros de saída de Notas Fiscais? Esta ação não pode ser desfeita.')) {
+                                            const res = await onResetExits();
+                                            if (res.success) alert(res.message);
+                                            else alert(res.message);
+                                        }
+                                    }}
+                                    className="text-[9px] font-black uppercase text-red-500 hover:text-red-700 bg-red-50 px-3 py-1.5 rounded-lg transition-all border border-red-100 shadow-sm"
+                                >
+                                    Zerar Saídas (Reiniciar)
+                                </button>
                             )}
-                        </h3>
-                        {activeTab !== 'agenda' && manualType === 'saída' && (
-                            <button 
-                                onClick={async () => {
-                                    if (window.confirm('Deseja realmente ZERAR todos os registros de saída de Notas Fiscais? Esta ação não pode ser desfeita.')) {
-                                        const res = await onResetExits();
-                                        if (res.success) alert(res.message);
-                                        else alert(res.message);
-                                    }
-                                }}
-                                className="text-[9px] font-black uppercase text-red-500 hover:text-red-700 bg-red-50 px-3 py-1.5 rounded-lg transition-all border border-red-100 shadow-sm"
-                            >
-                                Zerar Saídas (Reiniciar)
-                            </button>
-                        )}
-                    </div>
-                    <div className="overflow-x-auto rounded-xl">
-                        {activeTab === 'agenda' ? (
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="bg-slate-900 text-[10px] font-black uppercase text-slate-100 tracking-widest">
-                                        <th className="p-4 text-left">Data</th>
-                                        <th className="p-4 text-left">Horário</th>
-                                        <th className="p-4 text-left">Fornecedor</th>
-                                        <th className="p-4 text-center">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {weeklyDeliveries.length > 0 ? weeklyDeliveries.map(item => (
-                                        <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors">
-                                            <td className="p-4 text-xs text-slate-700 font-mono font-bold">{item.date.split('-').reverse().join('/')}</td>
-                                            <td className="p-4 text-xs font-mono text-indigo-800 font-black">{item.time}</td>
-                                            <td className="p-4 font-bold text-slate-900 uppercase text-xs">{item.supplierName}</td>
-                                            <td className="p-4 text-center">
-                                                <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
-                                                    item.status === 'FATURADO' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400'
-                                                }`}>
-                                                    {item.status === 'FATURADO' ? '✓ Descarregado' : '○ Aguardando'}
-                                                </span>
-                                            </td>
+                        </div>
+                        <div className="overflow-x-auto rounded-xl">
+                            {activeTab === 'agenda' ? (
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-slate-900 text-[10px] font-black uppercase text-slate-100 tracking-widest">
+                                            <th className="p-4 text-left">Data</th>
+                                            <th className="p-4 text-left">Horário</th>
+                                            <th className="p-4 text-left">Fornecedor</th>
+                                            <th className="p-4 text-center">Status</th>
                                         </tr>
-                                    )) : (
-                                        <tr><td colSpan={4} className="p-10 text-center text-gray-400 italic">Nenhum agendamento para esta semana...</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        ) : (
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="bg-slate-900 text-[10px] font-black uppercase text-slate-100 tracking-widest">
-                                        <th className="p-4 text-left">Fluxo</th>
-                                        <th className="p-4 text-left">Documento</th>
-                                        <th className="p-4 text-left">Item / Fornecedor</th>
-                                        <th className="p-4 text-left">Cód. Barras</th>
-                                        <th className="p-4 text-right">Peso/Qtd</th>
-                                        <th className="p-4 text-left">NF/Cupom</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {recentMovements.length > 0 ? recentMovements.map(mov => (
-                                        <tr key={mov.id} className="hover:bg-indigo-50/30 transition-colors">
-                                            <td className="p-4">
-                                                {mov.type === 'entrada' ? (
-                                                    <span className="bg-green-100 text-green-700 text-[10px] font-black uppercase px-2 py-1 rounded-lg">Entrada</span>
-                                                ) : (
-                                                    <span className="bg-red-100 text-red-700 text-[10px] font-black uppercase px-2 py-1 rounded-lg">Saída</span>
-                                                )}
-                                            </td>
-                                            <td className="p-4 text-xs text-slate-700 font-mono font-bold">{(mov.date || '').split('-').reverse().join('/')}</td>
-                                            <td className="p-4">
-                                                <p className="font-bold text-slate-900 uppercase text-xs">{mov.itemName}</p>
-                                                <p className="text-[9px] text-indigo-400 uppercase font-bold">{mov.supplierName}</p>
-                                            </td>
-                                            <td className="p-4 text-xs font-mono text-indigo-800 font-black">{mov.barcode || '—'}</td>
-                                            <td className="p-4 text-right font-mono font-black text-slate-800">
-                                                {(mov.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                            </td>
-                                            <td className="p-4 text-xs text-gray-500 font-mono">{mov.invoice || 'N/A'}</td>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {weeklyDeliveries.length > 0 ? weeklyDeliveries.map(item => (
+                                            <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors">
+                                                <td className="p-4 text-xs text-slate-700 font-mono font-bold">{item.date.split('-').reverse().join('/')}</td>
+                                                <td className="p-4 text-xs font-mono text-indigo-800 font-black">{item.time}</td>
+                                                <td className="p-4 font-bold text-slate-900 uppercase text-xs">{item.supplierName}</td>
+                                                <td className="p-4 text-center">
+                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                                                        item.status === 'FATURADO' 
+                                                            ? 'bg-indigo-100 text-indigo-700' 
+                                                            : 'bg-red-100 text-red-700'
+                                                    }`}>
+                                                        {item.status === 'FATURADO' ? '✓ Descarregado' : '○ Aguardando'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr><td colSpan={4} className="p-10 text-center text-gray-400 italic">Nenhum agendamento para esta semana...</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-slate-900 text-[10px] font-black uppercase text-slate-100 tracking-widest">
+                                            <th className="p-4 text-left">Fluxo</th>
+                                            <th className="p-4 text-left">Documento</th>
+                                            <th className="p-4 text-left">Item / Fornecedor</th>
+                                            <th className="p-4 text-left">Cód. Barras</th>
+                                            <th className="p-4 text-right">Peso/Qtd</th>
+                                            <th className="p-4 text-left">NF/Cupom</th>
                                         </tr>
-                                    )) : (
-                                        <tr><td colSpan={6} className="p-10 text-center text-gray-400 italic">Aguardando novos lançamentos...</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        )}
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {recentMovements.length > 0 ? recentMovements.map(mov => (
+                                            <tr key={mov.id} className="hover:bg-indigo-50/30 transition-colors">
+                                                <td className="p-4">
+                                                    {mov.type === 'entrada' ? (
+                                                        <span className="bg-green-100 text-green-700 text-[10px] font-black uppercase px-2 py-1 rounded-lg">Entrada</span>
+                                                    ) : (
+                                                        <span className="bg-red-100 text-red-700 text-[10px] font-black uppercase px-2 py-1 rounded-lg">Saída</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-xs text-slate-700 font-mono font-bold">{(mov.date || '').split('-').reverse().join('/')}</td>
+                                                <td className="p-4">
+                                                    <p className="font-bold text-slate-900 uppercase text-xs">{mov.itemName}</p>
+                                                    <p className="text-[9px] text-indigo-400 uppercase font-bold">{mov.supplierName}</p>
+                                                </td>
+                                                <td className="p-4 text-xs font-mono text-indigo-800 font-black">{mov.barcode || '—'}</td>
+                                                <td className="p-4 text-right font-mono font-black text-slate-800">
+                                                    {(mov.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="p-4 text-xs text-gray-500 font-mono">{mov.invoice || 'N/A'}</td>
+                                            </tr>
+                                        )) : (
+                                            <tr><td colSpan={6} className="p-10 text-center text-gray-400 italic">Aguardando novos lançamentos...</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
             </main>
             <style>{`
                 .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }

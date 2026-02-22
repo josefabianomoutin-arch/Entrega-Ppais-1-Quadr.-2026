@@ -1,6 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import type { Supplier, WarehouseMovement } from '../types';
+import WeeklyScheduleControl from './WeeklyScheduleControl';
 
 interface ItespDashboardProps {
   suppliers: Supplier[];
@@ -68,6 +69,7 @@ const ALLOWED_SUPPLIERS_RAW = [
 ];
 
 const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehouseLog = [], onLogout }) => {
+    const [activeTab, setActiveTab] = useState<'audit' | 'schedule'>('audit');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMonth, setSelectedMonth] = useState('all');
 
@@ -149,7 +151,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         const lowerSearch = searchTerm.toLowerCase();
         return comparisonData.filter(item => {
             const searchMatch = item.supplierName.toLowerCase().includes(lowerSearch) || 
-                               item.productName.toLowerCase().includes(lowerSearch);
+                                item.productName.toLowerCase().includes(lowerSearch);
             const monthMatch = selectedMonth === 'all' || item.month === selectedMonth;
             return searchMatch && monthMatch;
         });
@@ -172,82 +174,125 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                     <h1 className="text-xl md:text-2xl font-black text-green-800 uppercase tracking-tighter italic leading-none">Monitor ITESP 2026</h1>
                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Janeiro a Abril • Auditoria em Tempo Real</p>
                 </div>
-                <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 text-white font-black py-2 px-6 rounded-xl text-xs uppercase shadow-lg active:scale-95 transition-all">Sair</button>
+                <div className="flex items-center gap-4">
+                    <div className="hidden md:flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+                        <button 
+                            onClick={() => setActiveTab('audit')} 
+                            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'audit' ? 'bg-green-700 text-white shadow-md' : 'text-gray-400 hover:text-green-700'}`}
+                        >
+                            Auditoria Quadrimestral
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('schedule')} 
+                            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'schedule' ? 'bg-green-700 text-white shadow-md' : 'text-gray-400 hover:text-green-700'}`}
+                        >
+                            Agenda Semanal
+                        </button>
+                    </div>
+                    <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 text-white font-black py-2 px-6 rounded-xl text-xs uppercase shadow-lg active:scale-95 transition-all">Sair</button>
+                </div>
             </header>
 
             <main className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-fade-in">
-                    <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-blue-500">
-                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Meta de Recebimento</p>
-                        <p className="text-2xl font-black text-blue-700">{totals.contracted.toLocaleString('pt-BR')} kg</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-green-600">
-                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Realizado (Histórico de Estoque)</p>
-                        <p className="text-2xl font-black text-green-700">{totals.received.toLocaleString('pt-BR')} kg</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-red-500">
-                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Déficit (Faltante)</p>
-                        <p className="text-2xl font-black text-red-600">{totals.shortfall.toLocaleString('pt-BR')} kg</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-orange-500">
-                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Impacto Financeiro</p>
-                        <p className="text-2xl font-black text-orange-600">{formatCurrency(totals.loss)}</p>
-                    </div>
+                {/* Mobile Tab Switcher */}
+                <div className="md:hidden flex bg-white p-1 rounded-2xl shadow-md border border-green-100">
+                    <button 
+                        onClick={() => setActiveTab('audit')} 
+                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'audit' ? 'bg-green-700 text-white shadow-lg' : 'text-green-400'}`}
+                    >
+                        Auditoria
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('schedule')} 
+                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'schedule' ? 'bg-green-700 text-white shadow-lg' : 'text-green-400'}`}
+                    >
+                        Agenda
+                    </button>
                 </div>
 
-                <div className="bg-white p-6 rounded-3xl shadow-2xl border border-gray-100">
-                    <div className="flex flex-col md:flex-row justify-between gap-4 mb-8">
-                        <div className="flex-1 relative">
-                             <input type="text" placeholder="Filtrar por produtor ou produto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-green-400 font-bold bg-gray-50 transition-all" />
+                {activeTab === 'audit' ? (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-fade-in">
+                            <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-blue-500">
+                                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Meta de Recebimento</p>
+                                <p className="text-2xl font-black text-blue-700">{totals.contracted.toLocaleString('pt-BR')} kg</p>
+                            </div>
+                            <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-green-600">
+                                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Realizado (Histórico de Estoque)</p>
+                                <p className="text-2xl font-black text-green-700">{totals.received.toLocaleString('pt-BR')} kg</p>
+                            </div>
+                            <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-red-500">
+                                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Déficit (Faltante)</p>
+                                <p className="text-2xl font-black text-red-600">{totals.shortfall.toLocaleString('pt-BR')} kg</p>
+                            </div>
+                            <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-orange-500">
+                                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Impacto Financeiro</p>
+                                <p className="text-2xl font-black text-orange-600">{formatCurrency(totals.loss)}</p>
+                            </div>
                         </div>
-                        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="md:w-72 border-2 border-gray-50 rounded-2xl px-6 py-4 font-black bg-white text-green-800 outline-none cursor-pointer">
-                            <option value="all">Ver Período Completo</option>
-                            {months.slice(0, 4).map(m => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                    </div>
 
-                    <div className="overflow-x-auto rounded-3xl border-2 border-gray-50">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-900 text-gray-100 text-[10px] font-black uppercase tracking-widest">
-                                <tr>
-                                    <th className="p-5 text-left">PRODUTOR ITESP</th>
-                                    <th className="p-5 text-left">GÊNERO ALIMENTÍCIO</th>
-                                    <th className="p-5 text-center">MÊS</th>
-                                    <th className="p-5 text-right bg-blue-900/50">META</th>
-                                    <th className="p-5 text-right bg-green-900/50">ESTOQUE</th>
-                                    <th className="p-5 text-right bg-red-900/50">SALDO</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {filteredData.length > 0 ? filteredData.map(item => (
-                                    <tr 
-                                        key={item.id} 
-                                        onClick={() => setSelectedDetail(item)}
-                                        className="hover:bg-green-50/50 transition-colors group cursor-pointer"
-                                    >
-                                        <td className="p-5 font-black text-gray-900 text-xs uppercase">{item.supplierName}</td>
-                                        <td className="p-5 text-gray-500 font-bold uppercase text-[11px]">{item.productName}</td>
-                                        <td className="p-5 text-center">
-                                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${item.month === 'Janeiro' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600'}`}>{item.month}</span>
-                                        </td>
-                                        <td className="p-5 text-right font-black text-blue-700 font-mono">{(item.contractedKgMonthly || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
-                                        <td className={`p-5 text-right font-black font-mono ${item.receivedKg > 0 ? 'text-green-700' : 'text-gray-300'}`}>{(item.receivedKg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
-                                        <td className={`p-5 text-right font-black font-mono ${item.shortfallKg > 0.01 ? 'text-red-600' : 'text-gray-200'}`}>
-                                            {item.shortfallKg > 0.01 ? `-${item.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '✓ OK'}
-                                        </td>
-                                    </tr>
-                                )) : (
-                                    <tr><td colSpan={6} className="p-32 text-center">
-                                        <div className="flex flex-col items-center gap-4 opacity-30">
-                                            <svg className="w-20 h-20 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                            <p className="text-gray-600 italic font-black uppercase tracking-widest text-lg text-center">Nenhum dado capturado para o período.<br/><span className="text-xs font-normal">Verifique o Histórico de Estoque do Almoxarifado.</span></p>
-                                        </div>
-                                    </td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                        <div className="bg-white p-6 rounded-3xl shadow-2xl border border-gray-100">
+                            <div className="flex flex-col md:flex-row justify-between gap-4 mb-8">
+                                <div className="flex-1 relative">
+                                    <input type="text" placeholder="Filtrar por produtor ou produto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-green-400 font-bold bg-gray-50 transition-all" />
+                                </div>
+                                <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="md:w-72 border-2 border-gray-50 rounded-2xl px-6 py-4 font-black bg-white text-green-800 outline-none cursor-pointer">
+                                    <option value="all">Ver Período Completo</option>
+                                    {months.slice(0, 4).map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="overflow-x-auto rounded-3xl border-2 border-gray-50">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-900 text-gray-100 text-[10px] font-black uppercase tracking-widest">
+                                        <tr>
+                                            <th className="p-5 text-left">PRODUTOR ITESP</th>
+                                            <th className="p-5 text-left">GÊNERO ALIMENTÍCIO</th>
+                                            <th className="p-5 text-center">MÊS</th>
+                                            <th className="p-5 text-right bg-blue-900/50">META</th>
+                                            <th className="p-5 text-right bg-green-900/50">ESTOQUE</th>
+                                            <th className="p-5 text-right bg-red-900/50">SALDO</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {filteredData.length > 0 ? filteredData.map(item => (
+                                            <tr 
+                                                key={item.id} 
+                                                onClick={() => setSelectedDetail(item)}
+                                                className="hover:bg-green-50/50 transition-colors group cursor-pointer"
+                                            >
+                                                <td className="p-5 font-black text-gray-900 text-xs uppercase">{item.supplierName}</td>
+                                                <td className="p-5 text-gray-500 font-bold uppercase text-[11px]">{item.productName}</td>
+                                                <td className="p-5 text-center">
+                                                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${item.month === 'Janeiro' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600'}`}>{item.month}</span>
+                                                </td>
+                                                <td className="p-5 text-right font-black text-blue-700 font-mono">{(item.contractedKgMonthly || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
+                                                <td className={`p-5 text-right font-black font-mono ${item.receivedKg > 0 ? 'text-green-700' : 'text-gray-300'}`}>{(item.receivedKg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
+                                                <td className={`p-5 text-right font-black font-mono ${item.shortfallKg > 0.01 ? 'text-red-600' : 'text-gray-200'}`}>
+                                                    {item.shortfallKg > 0.01 ? `-${item.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '✓ OK'}
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr><td colSpan={6} className="p-32 text-center">
+                                                <div className="flex flex-col items-center gap-4 opacity-30">
+                                                    <svg className="w-20 h-20 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                    <p className="text-gray-600 italic font-black uppercase tracking-widest text-lg text-center">Nenhum dado capturado para o período.<br/><span className="text-xs font-normal">Verifique o Histórico de Estoque do Almoxarifado.</span></p>
+                                                </div>
+                                            </td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <WeeklyScheduleControl 
+                        suppliers={suppliers} 
+                        itespOnly={true} 
+                        title="Agenda Semanal ITESP" 
+                        subtitle="Controle de entregas exclusivo para produtores ITESP."
+                    />
+                )}
 
                 {selectedDetail && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex justify-center items-center p-4 animate-fade-in">
@@ -326,5 +371,6 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         </div>
     );
 };
+
 
 export default ItespDashboard;

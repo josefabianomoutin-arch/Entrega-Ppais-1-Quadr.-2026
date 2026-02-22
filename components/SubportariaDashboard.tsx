@@ -99,12 +99,12 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
                                     ? 'border-indigo-100 opacity-80' 
                                     : item.arrivalTime 
                                         ? 'border-green-200 bg-green-50/30' 
-                                        : 'border-white'
+                                        : 'border-red-500 bg-red-50'
                             }`}
                         >
                             {/* Faixa lateral de status */}
                             <div className={`absolute top-0 left-0 w-2 h-full ${
-                                item.status === 'FATURADO' ? 'bg-indigo-900' : item.arrivalTime ? 'bg-green-500' : 'bg-slate-200'
+                                item.status === 'FATURADO' ? 'bg-indigo-900' : item.arrivalTime ? 'bg-green-500' : 'bg-red-600'
                             }`} />
 
                             <div className="p-5 pl-7">
@@ -114,7 +114,7 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
                                             ? 'bg-indigo-900 text-white' 
                                             : item.arrivalTime 
                                                 ? 'bg-green-600 text-white' 
-                                                : 'bg-slate-100 text-slate-500'
+                                                : 'bg-red-600 text-white shadow-red-100'
                                     }`}>
                                         {item.time}
                                     </div>
@@ -125,7 +125,7 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
                                                 ? 'bg-indigo-100 text-indigo-700' 
                                                 : item.arrivalTime 
                                                     ? 'bg-green-100 text-green-700' 
-                                                    : 'bg-slate-100 text-slate-400'
+                                                    : 'bg-red-100 text-red-700'
                                         }`}>
                                             {item.status === 'FATURADO' ? '✓ Descarregado' : item.arrivalTime ? '● No Pátio' : '○ Aguardando'}
                                         </span>
