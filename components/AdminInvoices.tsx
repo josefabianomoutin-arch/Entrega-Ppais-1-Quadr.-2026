@@ -43,6 +43,92 @@ const getDisplayUnit = (item: ContractItem | undefined): string => {
     return unitMap[unitType] || 'Un';
 };
 
+const handlePrintLabels = (invoices: InvoiceInfo[]) => {
+    const printWindow = window.open('', '_blank', 'width=800,height=800');
+    if (!printWindow) return;
+
+    // Flatten items for printing
+    const labels = invoices.flatMap(inv => 
+        inv.items.map(item => ({
+            itemName: item.name,
+            supplierName: inv.supplierName,
+            lotNumber: item.lotNumber || 'N/A',
+            expirationDate: item.expirationDate || 'N/A',
+            date: inv.date,
+            quantity: item.kg,
+            invoiceNumber: inv.invoiceNumber,
+            barcode: inv.barcode
+        }))
+    );
+
+    const htmlContent = `
+        <html>
+        <head>
+            <title>Etiquetas de Notas Fiscais</title>
+            <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+            <style>
+                @page { size: A4; margin: 10mm; }
+                body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f0f0f0; }
+                .page-container { width: 190mm; margin: 0 auto; background: white; }
+                .label-card {
+                    width: 90mm; height: 60mm; border: 1px solid #000; padding: 5mm;
+                    box-sizing: border-box; display: inline-block; vertical-align: top;
+                    margin: 2mm; text-align: center; position: relative; overflow: hidden; border-radius: 4mm;
+                }
+                h1 { font-size: 14pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                h2 { font-size: 10pt; margin: 0 0 3mm 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .info { text-align: left; font-size: 9pt; }
+                .info p { margin: 1mm 0; display: flex; justify-content: space-between; border-bottom: 0.5px dashed #ddd; }
+                .info strong { font-size: 7pt; color: #666; }
+                .barcode-container { margin-top: 3mm; display: flex; flex-direction: column; align-items: center; }
+                .barcode-svg { max-width: 100%; height: 15mm !important; }
+                .footer { position: absolute; bottom: 2mm; left: 0; right: 0; font-size: 6pt; color: #999; }
+                @media print {
+                    body { background: white; }
+                    .page-container { width: 100%; margin: 0; }
+                    .label-card { border: 1px solid #000; margin: 1mm; page-break-inside: avoid; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="page-container">
+                ${labels.map((label, index) => `
+                    <div class="label-card">
+                        <h1>${label.itemName}</h1>
+                        <h2>${label.supplierName}</h2>
+                        <div class="info">
+                            <p><strong>LOTE:</strong> <span>${label.lotNumber}</span></p>
+                            <p><strong>VAL:</strong> <span>${label.expirationDate ? label.expirationDate.split('-').reverse().join('/') : 'N/A'}</span></p>
+                            <p><strong>ENT:</strong> <span>${label.date ? label.date.split('-').reverse().join('/') : 'N/A'}</span></p>
+                            <p><strong>QTD:</strong> <span>${label.quantity.toFixed(2).replace('.', ',')} kg</span></p>
+                            <p><strong>NF:</strong> <span>${label.invoiceNumber}</span></p>
+                        </div>
+                        <div class="barcode-container">
+                            ${label.barcode ? `<svg id="barcode-${index}" class="barcode-svg"></svg>` : '<p style="font-size: 8pt; color: #ccc; margin-top: 5mm;">SEM CÓDIGO</p>'}
+                        </div>
+                        <div class="footer">${new Date().toLocaleString('pt-BR')}</div>
+                    </div>
+                `).join('')}
+            </div>
+            <script>
+                window.onload = function() {
+                    ${labels.map((label, index) => label.barcode ? `
+                        try {
+                            JsBarcode("#barcode-${index}", "${label.barcode}", {
+                                format: "CODE128", width: 2, height: 40, displayValue: true, fontSize: 10, margin: 0
+                            });
+                        } catch (e) { console.error(e); }
+                    ` : '').join('')}
+                    setTimeout(() => { window.print(); window.close(); }, 1000);
+                }
+            </script>
+        </body>
+        </html>
+    `;
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+};
+
 const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoice, onDeleteInvoice, onUpdateInvoiceItems, onManualInvoiceEntry }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortKey, setSortKey] = useState<'supplierName' | 'date' | 'totalValue'>('date');
@@ -125,6 +211,14 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                     <p className="text-gray-400 font-medium">Visualize as faturas ou lance manualmente caso o fornecedor não consiga agendar.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                    <button 
+                        onClick={() => handlePrintLabels(filteredAndSortedInvoices)}
+                        disabled={filteredAndSortedInvoices.length === 0}
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2 disabled:bg-gray-300"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
+                        Imprimir Etiquetas (Filtradas)
+                    </button>
                     <button onClick={() => setIsManualModalOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
                         Lançar NF Manualmente
@@ -169,6 +263,15 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                         </td>
                                         <td className="p-3 text-center">
                                             <div className="flex items-center justify-center gap-2">
+                                                <button 
+                                                    onClick={() => handlePrintLabels([invoice])}
+                                                    className="bg-amber-100 text-amber-700 hover:bg-amber-200 p-2 rounded-lg transition-colors"
+                                                    title="Imprimir Etiquetas desta Nota"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                    </svg>
+                                                </button>
                                                 <button onClick={() => setEditingInvoice(invoice)} className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Editar">Editar</button>
                                                 <button onClick={() => { if(window.confirm('Reabrir nota?')) onReopenInvoice(invoice.supplierCpf, invoice.invoiceNumber); }} className="bg-orange-100 text-orange-700 hover:bg-orange-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Reabrir">Reabrir</button>
                                                 <button onClick={() => { if(window.confirm('Excluir nota?')) onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber); }} className="bg-red-100 text-red-700 hover:bg-red-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Excluir">Excluir</button>
