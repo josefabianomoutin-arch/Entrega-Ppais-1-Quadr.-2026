@@ -134,7 +134,8 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
 
                                 <div className="mb-4">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Fornecedor</p>
-                                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight break-words">{item.supplierName}</h3>
+                                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight break-words leading-tight">{item.supplierName}</h3>
+                                    <p className="text-[10px] font-mono text-slate-400 mt-1">{item.supplierCpf}</p>
                                 </div>
 
                                 {item.arrivalTime && (

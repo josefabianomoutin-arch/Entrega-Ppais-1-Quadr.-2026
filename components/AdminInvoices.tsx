@@ -245,7 +245,10 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                             return (
                                 <React.Fragment key={invoice.id}>
                                     <tr className="border-b hover:bg-gray-50 transition-colors">
-                                        <td className="p-3 font-bold text-gray-800 uppercase">{invoice.supplierName}</td>
+                                        <td className="p-3">
+                                            <p className="font-bold text-gray-800 uppercase leading-none">{invoice.supplierName}</p>
+                                            <p className="text-[10px] font-mono text-gray-400 mt-1">{invoice.supplierCpf}</p>
+                                        </td>
                                         <td className="p-3 font-mono">{formatDate(invoice.date)}</td>
                                         <td className="p-3 font-mono">
                                             {invoice.invoiceNumber}

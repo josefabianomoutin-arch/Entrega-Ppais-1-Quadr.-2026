@@ -86,6 +86,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                     const key = `${sNorm}|${iNorm}|${mName}`;
                     consolidated.set(key, {
                         supplierReal: s.name,
+                        supplierCpf: s.cpf,
                         itemReal: ci.name,
                         month: mName,
                         contractedKgMonthly: (Number(ci.totalKg) || 0) / 4,
@@ -220,7 +221,10 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                         <tbody className="divide-y divide-gray-100">
                             {filteredData.length > 0 ? filteredData.map((item) => (
                                 <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${item.shortfallKg > 0.001 ? 'bg-red-50/10' : ''}`}>
-                                    <td className="p-4 font-bold text-gray-800 uppercase text-xs">{item.supplierReal}</td>
+                                    <td className="p-4">
+                                        <p className="font-bold text-gray-800 uppercase text-xs leading-none">{item.supplierReal}</p>
+                                        <p className="text-[9px] font-mono text-gray-400 mt-1">{item.supplierCpf}</p>
+                                    </td>
                                     <td className="p-4 text-gray-600 uppercase text-[10px] font-medium">{item.itemReal}</td>
                                     <td className="p-4 text-center">
                                         <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${item.month === 'Janeiro' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100'}`}>{item.month}</span>
