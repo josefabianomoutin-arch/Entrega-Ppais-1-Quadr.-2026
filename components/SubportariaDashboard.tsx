@@ -53,8 +53,8 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
                     </div>
                     <div>
-                        <h1 className="text-lg font-black uppercase italic tracking-tighter leading-none">Subportaria</h1>
-                        <p className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest">Painel de Acesso 2026</p>
+                        <h1 className="text-lg font-black uppercase italic tracking-tighter leading-none">Entrada e saídas</h1>
+                        <p className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest">segurança externa</p>
                     </div>
                 </div>
                 <button onClick={onLogout} className="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white font-black py-2 px-4 rounded-xl text-[10px] uppercase transition-all border border-red-900/50">Sair</button>
