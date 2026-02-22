@@ -108,7 +108,7 @@ const App: React.FC = () => {
       setUser({ name: 'FINANCEIRO', cpf: 'financeiro123', role: 'financeiro' });
       return true;
     }
-    if (cleanName === 'SUBPORTARIA' && rawPass.toLowerCase() === 'subportaria2026') {
+    if (cleanName === 'SUBPORTARIA' && rawPass === 'subportaria2026') {
       setUser({ name: 'SUBPORTARIA', cpf: 'subportaria2026', role: 'subportaria' });
       return true;
     }
