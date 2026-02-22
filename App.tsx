@@ -572,7 +572,7 @@ const App: React.FC = () => {
   }
 
   if (user.role === 'subportaria') {
-    return <SubportariaDashboard suppliers={suppliers} onLogout={handleLogout} onMarkArrival={handleMarkArrival} />;
+    return <SubportariaDashboard suppliers={suppliers} onLogout={handleLogout} />;
   }
 
   const currentSupplier = suppliers.find(s => s.cpf === user.cpf);

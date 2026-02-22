@@ -5,7 +5,6 @@ import type { Supplier, Delivery } from '../types';
 interface SubportariaDashboardProps {
   suppliers: Supplier[];
   onLogout: () => void;
-  onMarkArrival: (supplierCpf: string, deliveryId: string) => Promise<void>;
 }
 
 const formatDate = (dateString: string) => {
@@ -14,9 +13,8 @@ const formatDate = (dateString: string) => {
     return date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
 };
 
-const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, onLogout, onMarkArrival }) => {
+const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, onLogout }) => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-    const [isUpdating, setIsUpdating] = useState<string | null>(null);
 
     const dailyDeliveries = useMemo(() => {
         const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'FATURADO'; id: string }[] = [];
@@ -45,12 +43,6 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
 
         return list.sort((a, b) => a.time.localeCompare(b.time));
     }, [suppliers, selectedDate]);
-
-    const handleArrival = async (cpf: string, id: string) => {
-        setIsUpdating(id);
-        await onMarkArrival(cpf, id);
-        setIsUpdating(null);
-    };
 
     return (
         <div className="min-h-screen bg-slate-100 text-slate-900 font-sans pb-10">
@@ -146,29 +138,12 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
                                 </div>
 
                                 {item.arrivalTime && (
-                                    <div className="flex items-center gap-2 bg-white/60 p-3 rounded-2xl border border-green-100 mb-2">
+                                    <div className="flex items-center gap-2 bg-white/60 p-3 rounded-2xl border border-green-100">
                                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                                         <p className="text-xs font-bold text-green-700 uppercase">
                                             Entrada registrada às <span className="text-sm font-black">{item.arrivalTime}</span>
                                         </p>
                                     </div>
-                                )}
-
-                                {!item.arrivalTime && item.status !== 'FATURADO' && (
-                                    <button 
-                                        disabled={isUpdating === item.id}
-                                        onClick={() => handleArrival(item.supplierCpf, item.id)}
-                                        className="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-6 rounded-2xl text-sm uppercase shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 disabled:bg-slate-300"
-                                    >
-                                        {isUpdating === item.id ? (
-                                            <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                        ) : (
-                                            <>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                                Registrar Chegada
-                                            </>
-                                        )}
-                                    </button>
                                 )}
                             </div>
                         </div>

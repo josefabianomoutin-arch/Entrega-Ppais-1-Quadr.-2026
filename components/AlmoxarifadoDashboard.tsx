@@ -12,7 +12,7 @@ interface AlmoxarifadoDashboardProps {
 }
 
 const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers, warehouseLog, onLogout, onRegisterEntry, onRegisterWithdrawal, onResetExits }) => {
-    const [activeTab, setActiveTab] = useState<'manual' | 'receipt'>('manual');
+    const [activeTab, setActiveTab] = useState<'manual' | 'receipt' | 'agenda'>('manual');
     const barcodeInputRef = useRef<HTMLInputElement>(null);
 
     // Estados para o formulário manual/individual
@@ -25,6 +25,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
     const [manualInboundNf, setManualInboundNf] = useState('');
     const [manualLot, setManualLot] = useState('');
     const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedAgendaDate, setSelectedAgendaDate] = useState(new Date().toISOString().split('T')[0]);
     const [manualExp, setManualExp] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -38,6 +39,30 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
             barcodeInputRef.current?.focus();
         }
     }, [activeTab, manualType]);
+
+    const dailyDeliveries = useMemo(() => {
+        const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'FATURADO'; id: string }[] = [];
+        
+        suppliers.forEach(s => {
+            (s.deliveries || []).forEach(d => {
+                if (d.date === selectedAgendaDate) {
+                    const isFaturado = d.item !== 'AGENDAMENTO PENDENTE';
+                    const existing = list.find(l => l.supplierName === s.name && l.time === d.time && l.status === (isFaturado ? 'FATURADO' : 'AGENDADO'));
+                    if (!existing) {
+                        list.push({
+                            id: d.id,
+                            supplierName: s.name,
+                            supplierCpf: s.cpf,
+                            time: d.time,
+                            arrivalTime: d.arrivalTime,
+                            status: isFaturado ? 'FATURADO' : 'AGENDADO'
+                        });
+                    }
+                }
+            });
+        });
+        return list.sort((a, b) => a.time.localeCompare(b.time));
+    }, [suppliers, selectedAgendaDate]);
 
     const recentMovements = useMemo(() => {
         const entries = suppliers.flatMap(s => (s.deliveries || [])
@@ -392,6 +417,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 <div className="flex items-center gap-3">
                     <div className="flex bg-gray-100 p-1 rounded-xl">
                         <button onClick={() => setActiveTab('manual')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'manual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Bipagem / Manual</button>
+                        <button onClick={() => setActiveTab('agenda')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'agenda' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Agenda de Chegadas</button>
                         <button onClick={() => setActiveTab('receipt')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'receipt' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Termo de Recebimento</button>
                     </div>
                     <button onClick={onLogout} className="bg-red-50 text-red-600 font-black py-2 px-6 rounded-xl text-xs uppercase border border-red-100 shadow-sm active:scale-95">Sair</button>
@@ -545,7 +571,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
 
                                 <div className="md:col-span-4 space-y-2">
                                     <label className="text-[10px] font-black text-blue-600 uppercase ml-1 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
                                         Código de Barras (Bipar)
                                     </label>
                                     <div className="relative group">
@@ -634,6 +660,93 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                 </div>
                             </div>
                         </form>
+                    </div>
+                ) : activeTab === 'agenda' ? (
+                    <div className="space-y-6 animate-fade-in">
+                        {/* Seletor de Data Estilizado (Copiado da Subportaria) */}
+                        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100">
+                            <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                                <div>
+                                    <h2 className="text-2xl font-black text-indigo-950 uppercase tracking-tighter italic">Agenda de Chegadas</h2>
+                                    <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Visualização de Entregas Programadas</p>
+                                </div>
+                                <div className="flex items-center gap-4 w-full md:w-auto">
+                                    <div className="bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100">
+                                        <span className="text-xs font-black text-indigo-600 uppercase">{dailyDeliveries.length} Veículos</span>
+                                    </div>
+                                    <input 
+                                        type="date" 
+                                        value={selectedAgendaDate} 
+                                        onChange={e => setSelectedAgendaDate(e.target.value)}
+                                        className="p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 font-black text-indigo-900 transition-all text-sm"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Lista de Cards (Copiado da Subportaria) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {dailyDeliveries.length > 0 ? dailyDeliveries.map(item => (
+                                <div 
+                                    key={item.id} 
+                                    className={`relative overflow-hidden bg-white rounded-[2rem] shadow-md border-2 transition-all ${
+                                        item.status === 'FATURADO' 
+                                            ? 'border-indigo-100 opacity-80' 
+                                            : item.arrivalTime 
+                                                ? 'border-green-200 bg-green-50/30' 
+                                                : 'border-white'
+                                    }`}
+                                >
+                                    <div className={`absolute top-0 left-0 w-2 h-full ${
+                                        item.status === 'FATURADO' ? 'bg-indigo-900' : item.arrivalTime ? 'bg-green-500' : 'bg-slate-200'
+                                    }`} />
+
+                                    <div className="p-5 pl-7">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className={`px-4 py-2 rounded-xl text-lg font-black font-mono shadow-sm ${
+                                                item.status === 'FATURADO' 
+                                                    ? 'bg-indigo-900 text-white' 
+                                                    : item.arrivalTime 
+                                                        ? 'bg-green-600 text-white' 
+                                                        : 'bg-slate-100 text-slate-500'
+                                            }`}>
+                                                {item.time}
+                                            </div>
+                                            
+                                            <div className="text-right">
+                                                <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                                                    item.status === 'FATURADO' 
+                                                        ? 'bg-indigo-100 text-indigo-700' 
+                                                        : item.arrivalTime 
+                                                            ? 'bg-green-100 text-green-700' 
+                                                            : 'bg-slate-100 text-slate-400'
+                                                }`}>
+                                                    {item.status === 'FATURADO' ? '✓ Descarregado' : item.arrivalTime ? '● No Pátio' : '○ Aguardando'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="mb-4">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Fornecedor</p>
+                                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight break-words">{item.supplierName}</h3>
+                                        </div>
+
+                                        {item.arrivalTime && (
+                                            <div className="flex items-center gap-2 bg-white/60 p-3 rounded-2xl border border-green-100">
+                                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                                <p className="text-xs font-bold text-green-700 uppercase">
+                                                    Entrada registrada às <span className="text-sm font-black">{item.arrivalTime}</span>
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="md:col-span-2 text-center py-20 bg-white/50 rounded-[3rem] border-4 border-dashed border-slate-200">
+                                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest italic">Nenhum agendamento para esta data</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 ) : (
                     <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden animate-fade-in">
