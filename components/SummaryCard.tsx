@@ -64,10 +64,11 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
             const itemMonthlyData = [];
             const { quantity: itemTotalQuantity, unit: itemUnit } = getContractItemDisplayInfo(item);
             const itemTotalValue = (item.totalKg || 0) * (item.valuePerKg || 0);
-            const monthlyValueQuota = itemTotalValue / 4;
-            const monthlyQuantityQuota = itemTotalQuantity / 4;
-
             for (const month of MONTHS_2026) {
+                const isWithinContract = month.number <= 3; // Jan to Apr
+                const monthlyValueQuota = isWithinContract ? itemTotalValue / 4 : 0;
+                const monthlyQuantityQuota = isWithinContract ? itemTotalQuantity / 4 : 0;
+
                 const deliveredInMonth = supplier.deliveries.filter(d => {
                     if (d.item !== item.name) return false;
                     const parts = d.date.split('-');

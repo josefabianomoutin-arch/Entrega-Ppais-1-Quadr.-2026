@@ -89,7 +89,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                         supplierCpf: s.cpf,
                         itemReal: ci.name,
                         month: mName,
-                        contractedKgMonthly: (Number(ci.totalKg) || 0) / 12,
+                        contractedKgMonthly: (months.indexOf(mName) <= 3) ? (Number(ci.totalKg) || 0) / 4 : 0,
                         receivedKg: 0,
                         price: Number(ci.valuePerKg) || 0,
                         normSupplier: sNorm,

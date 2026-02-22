@@ -99,7 +99,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                         supplierName: s.name,
                         productName: ci.name,
                         month: mName,
-                        contractedKgMonthly: (Number(ci.totalKg) || 0) / 12,
+                        contractedKgMonthly: (months.indexOf(mName) <= 3) ? (Number(ci.totalKg) || 0) / 4 : 0,
                         receivedKg: 0,
                         unitPrice: Number(ci.valuePerKg) || 0,
                         sNorm, iNorm,

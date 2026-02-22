@@ -107,7 +107,9 @@ const Dashboard: React.FC<DashboardProps> = ({
         const deliveredThisMonth = supplier.deliveries
             .filter(d => d.item === item.name && new Date(d.date + 'T00:00:00').getMonth() === currentMonth)
             .reduce((sum, d) => sum + (d.kg || 0), 0);
-        return { name: item.name, monthlyQuota: item.totalKg / 4, deliveredThisMonth, remainingThisMonth: (item.totalKg / 4) - deliveredThisMonth, unit: 'Kg' };
+        const isWithinContract = currentMonth <= 3;
+        const monthlyQuota = isWithinContract ? item.totalKg / 4 : 0;
+        return { name: item.name, monthlyQuota, deliveredThisMonth, remainingThisMonth: monthlyQuota - deliveredThisMonth, unit: 'Kg' };
     });
   }, [selectedDate, supplier.contractItems, supplier.deliveries]);
 
