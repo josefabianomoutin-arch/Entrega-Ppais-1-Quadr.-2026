@@ -305,6 +305,37 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                     <div class="info-row"><span class="info-label">VALOR TOTAL NOTA FISCAL:</span> ${formatCurrency(receiptData.totalInvoiceValue)}</div>
                 </div>
 
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ITEM</th>
+                            <th>QUANT.</th>
+                            <th>UNID.</th>
+                            <th>DESCRIÇÃO</th>
+                            <th>VR.UNIT.</th>
+                            <th>VR. TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${receiptData.items.map((it, idx) => `
+                            <tr>
+                                <td style="text-align: center;">${String(idx + 1).padStart(2, '0')}</td>
+                                <td class="text-right">${(it.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                <td style="text-align: center;">${it.unit || 'N/A'}</td>
+                                <td>${it.name || 'N/A'}</td>
+                                <td class="text-right">${formatCurrency(it.unitPrice)}</td>
+                                <td class="text-right">${formatCurrency(it.totalValue)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="5" class="text-right" style="font-weight: bold;">TOTAL GERAL:</td>
+                            <td class="text-right" style="font-weight: bold;">${formatCurrency(receiptData.totalInvoiceValue)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
                 <div class="footer-text">
                     Recebemos em ordem e na quantidade devida os materiais/serviços acima discriminados, os quais foram inspecionados pela comissão de recepção materiais, foi considerado de acordo com solicitado, satisfazendo as especificações e demais exigências do empenho conforme determina o inciso II do artigo 140 da lei nº 14.133/21.
                 </div>
@@ -822,6 +853,31 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                         <p><span className="font-bold inline-block w-48">VALOR TOTAL NF:</span> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receiptData.totalInvoiceValue || 0)}</p>
                                         <p><span className="font-bold inline-block w-48">CÓD. BARRAS NF:</span> {receiptData.barcode || 'N/A'}</p>
                                     </div>
+
+                                    <table className="w-full border-collapse border border-black text-[10px]">
+                                        <thead>
+                                            <tr className="bg-gray-100 uppercase font-bold">
+                                                <th className="border border-black p-1">ITEM</th>
+                                                <th className="border border-black p-1">QUANT.</th>
+                                                <th className="border border-black p-1">UNID.</th>
+                                                <th className="border border-black p-1">DESCRIÇÃO</th>
+                                                <th className="border border-black p-1">VR.UNIT.</th>
+                                                <th className="border border-black p-1">VR. TOTAL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {receiptData.items.map((it, idx) => (
+                                                <tr key={idx}>
+                                                    <td className="border border-black p-1 text-center">{idx + 1}</td>
+                                                    <td className="border border-black p-1 text-right">{(it.quantity || 0).toFixed(2)}</td>
+                                                    <td className="border border-black p-1 text-center">{it.unit || 'N/A'}</td>
+                                                    <td className="border border-black p-1">{it.name || 'N/A'}</td>
+                                                    <td className="border border-black p-1 text-right">{(it.unitPrice || 0).toFixed(2)}</td>
+                                                    <td className="border border-black p-1 text-right">{(it.totalValue || 0).toFixed(2)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
 
                                     <div className="text-xs text-justify leading-relaxed">
                                         Recebemos em ordem e na quantidade devida os materiais/serviços acima discriminados, os quais foram inspecionados pela comissão de recepção materiais, foi considerado de acordo com solicitado, satisfazendo as especificações e demais exigências do empenho conforme determina o inciso II do artigo 140 da lei nº 14.133/21.
