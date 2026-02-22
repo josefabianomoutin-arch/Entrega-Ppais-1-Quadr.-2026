@@ -8,6 +8,14 @@ export const MONTHS_2026 = [
   { name: 'Fevereiro', number: 1 },
   { name: 'Março', number: 2 },
   { name: 'Abril', number: 3 },
+  { name: 'Maio', number: 4 },
+  { name: 'Junho', number: 5 },
+  { name: 'Julho', number: 6 },
+  { name: 'Agosto', number: 7 },
+  { name: 'Setembro', number: 8 },
+  { name: 'Outubro', number: 9 },
+  { name: 'Novembro', number: 10 },
+  { name: 'Dezembro', number: 11 },
 ];
 
 export const WEEK_DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];

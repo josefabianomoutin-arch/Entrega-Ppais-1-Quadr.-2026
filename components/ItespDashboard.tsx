@@ -88,18 +88,18 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         
         const consolidatedMap = new Map<string, any>();
 
-        // 1. Inicializa Metas Quadrimestrais (Jan a Abr)
+        // 1. Inicializa Metas Anuais (Jan a Dez)
         itespSuppliers.forEach(s => {
             const sNorm = superNormalize(s.name);
             s.contractItems.forEach(ci => {
                 const iNorm = superNormalize(ci.name);
-                ['Janeiro', 'Fevereiro', 'Março', 'Abril'].forEach(mName => {
+                months.forEach(mName => {
                     const key = `${sNorm}|${iNorm}|${mName}`;
                     consolidatedMap.set(key, {
                         supplierName: s.name,
                         productName: ci.name,
                         month: mName,
-                        contractedKgMonthly: (Number(ci.totalKg) || 0) / 4,
+                        contractedKgMonthly: (Number(ci.totalKg) || 0) / 12,
                         receivedKg: 0,
                         unitPrice: Number(ci.valuePerKg) || 0,
                         sNorm, iNorm,
@@ -119,7 +119,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                 const dINorm = superNormalize(delivery.item);
                 const dMonth = getMonthNameFromDateString(delivery.date);
 
-                if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(dMonth)) return;
+                if (!months.includes(dMonth)) return;
 
                 // Busca no mapa
                 for (const [key, entry] of consolidatedMap.entries()) {
@@ -179,7 +179,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             <header className="bg-white shadow-lg p-4 flex justify-between items-center border-b-4 border-green-700 sticky top-0 z-[100]">
                 <div>
                     <h1 className="text-xl md:text-2xl font-black text-green-800 uppercase tracking-tighter italic leading-none">Monitor ITESP 2026</h1>
-                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Janeiro a Abril • Auditoria em Tempo Real</p>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Janeiro a Dezembro • Auditoria em Tempo Real</p>
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="hidden md:flex bg-gray-100 p-1 rounded-xl border border-gray-200">
@@ -187,7 +187,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                             onClick={() => setActiveTab('audit')} 
                             className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'audit' ? 'bg-green-700 text-white shadow-md' : 'text-gray-400 hover:text-green-700'}`}
                         >
-                            Auditoria Quadrimestral
+                            Auditoria Anual
                         </button>
                         <button 
                             onClick={() => setActiveTab('schedule')} 
@@ -245,7 +245,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                 </div>
                                 <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="md:w-72 border-2 border-gray-50 rounded-2xl px-6 py-4 font-black bg-white text-green-800 outline-none cursor-pointer">
                                     <option value="all">Ver Período Completo</option>
-                                    {months.slice(0, 4).map(m => <option key={m} value={m}>{m}</option>)}
+                                    {months.map(m => <option key={m} value={m}>{m}</option>)}
                                 </select>
                             </div>
 

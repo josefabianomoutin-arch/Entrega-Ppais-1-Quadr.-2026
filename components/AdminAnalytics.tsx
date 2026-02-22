@@ -81,15 +81,15 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
             const sNorm = superNormalize(s.name);
             s.contractItems.forEach(ci => {
                 const iNorm = superNormalize(ci.name);
-                // Auditoria focada no 1º Quadrimestre
-                ['Janeiro', 'Fevereiro', 'Março', 'Abril'].forEach(mName => {
+                // Auditoria focada no ano completo
+                months.forEach(mName => {
                     const key = `${sNorm}|${iNorm}|${mName}`;
                     consolidated.set(key, {
                         supplierReal: s.name,
                         supplierCpf: s.cpf,
                         itemReal: ci.name,
                         month: mName,
-                        contractedKgMonthly: (Number(ci.totalKg) || 0) / 4,
+                        contractedKgMonthly: (Number(ci.totalKg) || 0) / 12,
                         receivedKg: 0,
                         price: Number(ci.valuePerKg) || 0,
                         normSupplier: sNorm,
@@ -108,7 +108,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                 const delINorm = superNormalize(del.item || '');
                 const delMonth = getMonthNameFromDateString(del.date);
 
-                if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(delMonth)) return;
+                if (!months.includes(delMonth)) return;
 
                 // Busca no mapa consolidado
                 for (const [key, entry] of consolidated.entries()) {
@@ -162,7 +162,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
         <div className="space-y-8 animate-fade-in pb-12">
             <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-indigo-500">
                 <h2 className="text-2xl font-bold text-gray-800 mb-2">Auditoria Analítica: Meta Mensal vs. Notas Fiscais</h2>
-                <p className="text-sm text-gray-500 font-medium">Cruzamento profundo de dados para identificar déficits de entrega baseados em Notas Fiscais (Jan-Abr).</p>
+                <p className="text-sm text-gray-500 font-medium">Cruzamento profundo de dados para identificar déficits de entrega baseados em Notas Fiscais (Jan-Dez).</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -200,7 +200,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                         </select>
                         <select value={selectedMonthFilter} onChange={(e) => setSelectedMonthFilter(e.target.value)} className="border rounded-lg px-3 py-2 text-sm bg-white font-bold text-gray-700">
                             <option value="all">Todos os Meses</option>
-                            {months.slice(0, 4).map(m => <option key={m} value={m}>{m}</option>)}
+                            {months.map(m => <option key={m} value={m}>{m}</option>)}
                         </select>
                     </div>
                 </div>
