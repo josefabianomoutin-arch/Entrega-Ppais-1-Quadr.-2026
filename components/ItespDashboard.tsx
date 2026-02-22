@@ -109,29 +109,36 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
             });
         });
 
-        // 2. Acumula Estoque Real (Match Flexível)
-        warehouseLog.forEach(log => {
-            if (log.type !== 'entrada') return;
-            
-            const logSNorm = superNormalize(log.supplierName);
-            const logINorm = superNormalize(log.itemName);
-            const logMonth = getMonthNameFromDateString(log.date);
+        // 2. Acumula Entradas Reais (via Consulta de Notas Fiscais / Deliveries)
+        itespSuppliers.forEach(supplier => {
+            const sNorm = superNormalize(supplier.name);
+            (supplier.deliveries || []).forEach(delivery => {
+                // Consideramos apenas entregas com item definido e que não seja o placeholder de agendamento
+                if (!delivery.item || delivery.item === 'AGENDAMENTO PENDENTE') return;
 
-            if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(logMonth)) return;
+                const dINorm = superNormalize(delivery.item);
+                const dMonth = getMonthNameFromDateString(delivery.date);
 
-            // Busca no mapa com lógica de inclusão para nomes compostos
-            for (const [key, entry] of consolidatedMap.entries()) {
-                if (entry.month === logMonth) {
-                    const sMatch = entry.sNorm === logSNorm || entry.sNorm.includes(logSNorm) || logSNorm.includes(entry.sNorm);
-                    if (sMatch) {
-                        const iMatch = entry.iNorm === logINorm || entry.iNorm.includes(logINorm) || logINorm.includes(entry.iNorm);
+                if (!['Janeiro', 'Fevereiro', 'Março', 'Abril'].includes(dMonth)) return;
+
+                // Busca no mapa
+                for (const [key, entry] of consolidatedMap.entries()) {
+                    if (entry.month === dMonth && entry.sNorm === sNorm) {
+                        // Match de item
+                        const iMatch = entry.iNorm === dINorm || entry.iNorm.includes(dINorm) || dINorm.includes(entry.iNorm);
                         if (iMatch) {
-                            entry.receivedKg += (Number(log.quantity) || 0);
-                            entry.logEntries.push(log); // NOVO: Adiciona o log original
+                            entry.receivedKg += (Number(delivery.kg) || 0);
+                            entry.logEntries.push({
+                                id: delivery.id,
+                                date: delivery.date,
+                                lotNumber: (delivery.lots && delivery.lots[0]?.lotNumber) || 'N/A',
+                                inboundInvoice: delivery.invoiceNumber || 'N/A',
+                                quantity: delivery.kg || 0
+                            });
                         }
                     }
                 }
-            }
+            });
         });
 
         return Array.from(consolidatedMap.values()).map((data, idx) => {
@@ -145,7 +152,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         }).filter(item => item.contractedKgMonthly > 0)
           .sort((a, b) => months.indexOf(a.month) - months.indexOf(b.month));
 
-    }, [itespSuppliers, warehouseLog]);
+    }, [itespSuppliers]);
 
     const filteredData = useMemo(() => {
         const lowerSearch = searchTerm.toLowerCase();
@@ -218,7 +225,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                 <p className="text-2xl font-black text-blue-700">{totals.contracted.toLocaleString('pt-BR')} kg</p>
                             </div>
                             <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-green-600">
-                                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Realizado (Histórico de Estoque)</p>
+                                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Realizado (Notas Fiscais)</p>
                                 <p className="text-2xl font-black text-green-700">{totals.received.toLocaleString('pt-BR')} kg</p>
                             </div>
                             <div className="bg-white p-6 rounded-2xl shadow-xl border-b-8 border-red-500">
@@ -276,7 +283,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                             <tr><td colSpan={6} className="p-32 text-center">
                                                 <div className="flex flex-col items-center gap-4 opacity-30">
                                                     <svg className="w-20 h-20 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                                    <p className="text-gray-600 italic font-black uppercase tracking-widest text-lg text-center">Nenhum dado capturado para o período.<br/><span className="text-xs font-normal">Verifique o Histórico de Estoque do Almoxarifado.</span></p>
+                                                    <p className="text-gray-600 italic font-black uppercase tracking-widest text-lg text-center">Nenhum dado capturado para o período.<br/><span className="text-xs font-normal">Verifique a Consulta de Notas Fiscais no Almoxarifado.</span></p>
                                                 </div>
                                             </td></tr>
                                         )}
@@ -326,7 +333,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                                 <div>
                                     <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                         <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                                        Registros no Histórico de Estoque
+                                        Registros de Notas Fiscais (Entradas)
                                     </h4>
                                     <div className="max-h-[300px] overflow-y-auto custom-scrollbar border rounded-2xl">
                                         <table className="w-full text-xs">

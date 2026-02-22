@@ -136,17 +136,17 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="bg-white p-4 rounded-xl border shadow-inner">
-                                            <h4 className="text-[10px] font-black uppercase text-orange-500 mb-3 tracking-widest flex items-center gap-2">
-                                                <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
-                                                Agendamentos em Aberto
+                                            <h4 className="text-[10px] font-black uppercase text-red-600 mb-3 tracking-widest flex items-center gap-2">
+                                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                                Agendamentos em Aberto (Aguardando)
                                             </h4>
                                             {pendingDeliveries.length > 0 ? (
                                                 <div className="flex flex-wrap gap-2">
                                                             {pendingDeliveries.map(delivery => (
-                                                                <div key={delivery.id} className="flex flex-col gap-2 p-3 bg-orange-50/50 rounded-xl border border-orange-100">
+                                                                <div key={delivery.id} className="flex flex-col gap-2 p-3 bg-red-50/50 rounded-xl border border-red-100">
                                                                     <div className="flex items-center gap-2">
-                                                                        <span className="text-xs font-black text-orange-800 font-mono">{formatDate(delivery.date)}</span>
-                                                                        <span className="text-[10px] font-bold text-orange-600">Agendado p/ {delivery.time}</span>
+                                                                        <span className="text-xs font-black text-red-800 font-mono">{formatDate(delivery.date)}</span>
+                                                                        <span className="text-[10px] font-bold text-red-600">Agendado p/ {delivery.time}</span>
                                                                         <button 
                                                                             onClick={() => handleCancel(supplier.cpf, [delivery.id], delivery.date, false)}
                                                                             className="hover:bg-red-600 hover:text-white bg-white rounded-lg p-1 text-red-500 transition-all border border-red-100 shadow-sm ml-auto"
