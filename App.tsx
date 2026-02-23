@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem, FinancialRecord, UserRole } from './types';
+import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem, FinancialRecord, UserRole, PestControlLog } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -23,6 +23,7 @@ const directorWithdrawalsRef = ref(database, 'directorWithdrawals');
 const standardMenuRef = ref(database, 'standardMenu');
 const dailyMenusRef = ref(database, 'dailyMenus');
 const financialRecordsRef = ref(database, 'financialRecords');
+const pestControlLogsRef = ref(database, 'pestControlLogs');
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{ name: string; cpf: string; role: UserRole } | null>(null);
@@ -34,6 +35,7 @@ const App: React.FC = () => {
   const [standardMenu, setStandardMenu] = useState<StandardMenu>({});
   const [dailyMenus, setDailyMenus] = useState<DailyMenus>({});
   const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>([]);
+  const [pestControlLogs, setPestControlLogs] = useState<PestControlLog[]>([]);
 
   useEffect(() => {
     onValue(suppliersRef, (snapshot) => {
@@ -72,6 +74,10 @@ const App: React.FC = () => {
       } else {
         setFinancialRecords([]);
       }
+    });
+    onValue(pestControlLogsRef, (snapshot) => {
+      const data = snapshot.val();
+      setPestControlLogs(data ? Object.values(data) : []);
     });
   }, []);
 
@@ -515,6 +521,13 @@ const App: React.FC = () => {
             return { success: true };
         }}
         onDeleteFinancialRecord={async (id) => remove(child(financialRecordsRef, id))}
+        pestControlLogs={pestControlLogs}
+        onRegisterPestControlLog={async (l) => {
+            const r = push(pestControlLogsRef);
+            await set(r, { ...l, id: r.key });
+            return { success: true, message: 'Ok' };
+        }}
+        onDeletePestControlLog={async (id) => remove(child(pestControlLogsRef, id))}
         onCancelDeliveries={handleCancelDeliveries}
         onUpdateContractForItem={handleUpdateContractForItem}
         directorWithdrawals={directorWithdrawals}

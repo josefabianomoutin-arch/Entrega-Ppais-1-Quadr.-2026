@@ -137,4 +137,14 @@ export interface FinancialRecord {
   numeroEmpenho: string; // NOVO
 }
 
+export interface PestControlLog {
+  id: string;
+  date: string;
+  locations: string;
+  companyName: string;
+  companyCnpj: string;
+  monitoringResponsible: string;
+  pestControlResponsible: string;
+}
+
 export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria';

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, FinancialRecord, Delivery } from '../types';
+import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, FinancialRecord, Delivery, PestControlLog } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import AdminContractItems from './AdminContractItems';
 import WeekSelector from './WeekSelector';
@@ -13,8 +13,9 @@ import AdminDirectorPerCapita from './AdminDirectorPerCapita';
 import AdminGraphs from './AdminGraphs';
 import AdminStandardMenu from './AdminStandardMenu';
 import AdminFinancialManager from './AdminFinancialManager';
+import AdminPestControl from './AdminPestControl';
 
-type AdminTab = 'info' | 'register' | 'contracts' | 'finance' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'cleaning' | 'directorPerCapita' | 'menu';
+type AdminTab = 'info' | 'register' | 'contracts' | 'finance' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'cleaning' | 'pestControl' | 'directorPerCapita' | 'menu';
 
 interface AdminDashboardProps {
   onRegister: (name: string, cpf: string, allowedWeeks: number[]) => Promise<void>;
@@ -53,12 +54,15 @@ interface AdminDashboardProps {
   financialRecords: FinancialRecord[];
   onSaveFinancialRecord: (record: Omit<FinancialRecord, 'id'> & { id?: string }) => Promise<{ success: boolean; message?: string }>;
   onDeleteFinancialRecord: (id: string) => Promise<void>;
+  pestControlLogs: PestControlLog[];
+  onRegisterPestControlLog: (log: Omit<PestControlLog, 'id'>) => Promise<{ success: boolean; message: string }>;
+  onDeletePestControlLog: (id: string) => Promise<void>;
 }
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
-  const { suppliers = [], onLogout, onResetData, onRestoreFullBackup, perCapitaConfig, warehouseLog = [], financialRecords = [], cleaningLogs = [], directorWithdrawals = [], standardMenu, dailyMenus } = props;
+  const { suppliers = [], onLogout, onResetData, onRestoreFullBackup, perCapitaConfig, warehouseLog = [], financialRecords = [], cleaningLogs = [], pestControlLogs = [], directorWithdrawals = [], standardMenu, dailyMenus } = props;
   const [activeTab, setActiveTab] = useState<AdminTab>('register');
   const [supplierSubTab, setSupplierSubTab] = useState<'list' | 'new'>('list'); 
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -78,6 +82,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     { id: 'perCapita', name: 'Per Capita', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg> },
     { id: 'invoices', name: 'Notas Fiscais', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z" /><path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg> },
     { id: 'cleaning', name: 'Limpeza', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clipRule="evenodd" /></svg> },
+    { id: 'pestControl', name: 'Dedetização', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg> },
     { id: 'menu', name: 'Cardápio', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" /><path d="M11 3.5v3a1 1 0 001 1h3m-6 4H7v2h3v-2zm0 3H7v2h3v-2z" /></svg> },
     { id: 'info', name: 'Sistema', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm14 1a1 1 0 11-2 0 1 1 0 012 0zM2 13a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2zm14 1a1 1 0 11-2 0 1 1 0 012 0z" clipRule="evenodd" /></svg> },
   ];
@@ -92,6 +97,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       warehouseLog: warehouseLog.reduce((acc, l) => ({ ...acc, [l.id]: l }), {}),
       perCapitaConfig,
       cleaningLogs: cleaningLogs.reduce((acc, l) => ({ ...acc, [l.id]: l }), {}),
+      pestControlLogs: pestControlLogs.reduce((acc, l) => ({ ...acc, [l.id]: l }), {}),
       directorWithdrawals: directorWithdrawals.reduce((acc, l) => ({ ...acc, [l.id]: l }), {}),
       standardMenu,
       dailyMenus,
@@ -209,6 +215,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'schedule': return <AdminScheduleView suppliers={suppliers} onCancelDeliveries={props.onCancelDeliveries} />;
       case 'perCapita': return <AdminPerCapita suppliers={suppliers} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={props.onUpdatePerCapitaConfig} />;
       case 'cleaning': return <AdminCleaningLog logs={cleaningLogs} onRegister={props.onRegisterCleaningLog} onDelete={props.onDeleteCleaningLog} />;
+      case 'pestControl': return <AdminPestControl logs={pestControlLogs} onRegister={props.onRegisterPestControlLog} onDelete={props.onDeletePestControlLog} />;
       case 'analytics': return <AdminAnalytics suppliers={suppliers} warehouseLog={warehouseLog} />;
       case 'menu': return <AdminStandardMenu suppliers={suppliers} template={props.standardMenu} dailyMenus={props.dailyMenus} onUpdateDailyMenus={props.onUpdateDailyMenu} inmateCount={perCapitaConfig.inmateCount || 0} />;
       case 'info': 
