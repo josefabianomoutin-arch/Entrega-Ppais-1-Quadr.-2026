@@ -451,6 +451,27 @@ const App: React.FC = () => {
     try {
         const newRef = push(warehouseLogRef);
         const supplier = suppliers.find(s => s.cpf === payload.supplierCpf);
+        
+        // --- Atualiza o saldo no lote do fornecedor ---
+        if (supplier) {
+            const sRef = child(suppliersRef, supplier.cpf);
+            await runTransaction(sRef, (currentData: Supplier) => {
+                if (currentData && currentData.deliveries) {
+                    const delivery = currentData.deliveries.find(d => 
+                        d.item === payload.itemName && 
+                        d.invoiceNumber === payload.inboundInvoice
+                    );
+                    if (delivery && delivery.lots) {
+                        const lot = delivery.lots.find(l => l.lotNumber === payload.lotNumber);
+                        if (lot) {
+                            lot.remainingQuantity = (lot.remainingQuantity || 0) - payload.quantity;
+                        }
+                    }
+                }
+                return currentData;
+            });
+        }
+
         const exit: WarehouseMovement = {
             id: newRef.key || `sai-${Date.now()}`,
             type: 'saída',
@@ -548,8 +569,44 @@ const App: React.FC = () => {
         onUpdateInvoiceItems={handleUpdateInvoiceItems}
         onManualInvoiceEntry={handleManualInvoiceEntry}
         onDeleteWarehouseEntry={async (l) => {
+            // Se for saída, devolve a quantidade para o saldo do lote
+            if (l.type === 'saída') {
+                const supplier = suppliers.find(s => s.name === l.supplierName);
+                if (supplier) {
+                    const sRef = child(suppliersRef, supplier.cpf);
+                    await runTransaction(sRef, (currentData: Supplier) => {
+                        if (currentData && currentData.deliveries) {
+                            const delivery = currentData.deliveries.find(d => 
+                                d.item === l.itemName && 
+                                d.invoiceNumber === l.inboundInvoice
+                            );
+                            if (delivery && delivery.lots) {
+                                const lot = delivery.lots.find(lotItem => lotItem.lotNumber === l.lotNumber);
+                                if (lot) {
+                                    lot.remainingQuantity = (lot.remainingQuantity || 0) + l.quantity;
+                                }
+                            }
+                        }
+                        return currentData;
+                    });
+                }
+            } else if (l.type === 'entrada') {
+                // Se for entrada, remove a entrega correspondente do fornecedor
+                const supplier = suppliers.find(s => s.name === l.supplierName);
+                if (supplier) {
+                    const sRef = child(suppliersRef, supplier.cpf);
+                    await runTransaction(sRef, (currentData: Supplier) => {
+                        if (currentData && currentData.deliveries) {
+                            currentData.deliveries = currentData.deliveries.filter(d => 
+                                !(d.item === l.itemName && d.invoiceNumber === l.inboundInvoice && d.barcode === l.barcode)
+                            );
+                        }
+                        return currentData;
+                    });
+                }
+            }
             await remove(child(warehouseLogRef, l.id));
-            return { success: true, message: 'Excluído' };
+            return { success: true, message: 'Excluído e saldo atualizado' };
         }}
         onUpdateWarehouseEntry={async (l) => {
             await set(child(warehouseLogRef, l.id), l);

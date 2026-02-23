@@ -171,20 +171,44 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
         const barcode = manualBarcode.trim();
         if (barcode.length >= 8) {
             // Busca nas entregas (notas fiscais) dos fornecedores
+            // Primeiro tentamos encontrar uma correspondência exata de item
+            let foundMatch = false;
             for (const s of suppliers) {
-                const foundDelivery = (s.deliveries || []).find(d => d.barcode === barcode);
-                if (foundDelivery) {
+                const deliveries = (s.deliveries || []).filter(d => d.barcode === barcode);
+                if (deliveries.length > 0) {
                     setSelectedSupplierCpf(s.cpf);
-                    setSelectedItemName(foundDelivery.item || '');
-                    setManualInboundNf(foundDelivery.invoiceNumber || '');
+                    setManualInboundNf(deliveries[0].invoiceNumber || '');
                     
-                    // Busca no warehouseLog para pegar lote e validade da entrada original
-                    const entryLog = warehouseLog.find(l => l.barcode === barcode && l.type === 'entrada');
-                    if (entryLog) {
-                        setManualLot(entryLog.lotNumber || '');
-                        setManualExp(entryLog.expirationDate || '');
+                    // Se houver apenas um item, selecionamos ele
+                    if (deliveries.length === 1) {
+                        setSelectedItemName(deliveries[0].item || '');
+                        
+                        // Busca no warehouseLog para pegar lote e validade da entrada original
+                        const entryLog = warehouseLog.find(l => l.barcode === barcode && l.type === 'entrada');
+                        if (entryLog) {
+                            setManualLot(entryLog.lotNumber || '');
+                            setManualExp(entryLog.expirationDate || '');
+                        }
+                    } else {
+                        // Se houver múltiplos itens com o mesmo código (ex: código da nota), 
+                        // deixamos o usuário escolher o item no dropdown que já estará filtrado pelo fornecedor
+                        setSelectedItemName('');
                     }
-                    return; // Encontrou, pode parar
+                    foundMatch = true;
+                    break;
+                }
+            }
+            
+            // Se não encontrou nas entregas, tenta buscar apenas no log de estoque (entradas manuais sem vínculo direto)
+            if (!foundMatch) {
+                const entryLog = warehouseLog.find(l => l.barcode === barcode && l.type === 'entrada');
+                if (entryLog) {
+                    const supplier = suppliers.find(s => s.name === entryLog.supplierName);
+                    if (supplier) setSelectedSupplierCpf(supplier.cpf);
+                    setSelectedItemName(entryLog.itemName);
+                    setManualInboundNf(entryLog.inboundInvoice || '');
+                    setManualLot(entryLog.lotNumber || '');
+                    setManualExp(entryLog.expirationDate || '');
                 }
             }
         }
@@ -424,7 +448,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 // Limpa campos específicos para facilitar bipagem sequencial
                 setManualBarcode('');
                 setManualQuantity('');
-                setManualInboundNf('');
+                // NÃO limpa a NF de entrada nem o fornecedor para permitir múltiplos itens da mesma nota
+                // setManualInboundNf(''); 
                 setManualLot('');
                 setManualExp('');
                 // Mantém Fornecedor, Data e NF para evitar redigitação se for a mesma carga
@@ -612,6 +637,17 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                                             type="text" 
                                             value={manualBarcode} 
                                             onChange={e => setManualBarcode(e.target.value)} 
+                                            onKeyDown={e => {
+                                                // Previne Ctrl+J (Atalho de Downloads no Chrome) que alguns scanners podem disparar
+                                                if (e.ctrlKey && e.key === 'j') {
+                                                    e.preventDefault();
+                                                }
+                                                // Se pressionar Enter e o campo estiver focado, mas sem quantidade, 
+                                                // apenas move o foco ou evita submissão precoce se for apenas a bipagem
+                                                if (e.key === 'Enter' && !manualQuantity) {
+                                                    // e.preventDefault(); // Opcional: descomentar se quiser que o Enter do scanner não submeta o form
+                                                }
+                                            }}
                                             placeholder="Aguardando leitura..." 
                                             className="w-full h-20 px-6 border-2 border-blue-100 rounded-3xl bg-white font-mono font-bold focus:ring-8 focus:ring-blue-50 outline-none text-lg placeholder:text-blue-200 transition-all shadow-sm" 
                                         />
