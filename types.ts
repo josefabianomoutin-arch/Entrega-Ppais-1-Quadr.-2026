@@ -137,13 +137,15 @@ export interface FinancialRecord {
   numeroEmpenho: string; // NOVO
 }
 
-export interface PestControlLog {
+export interface ThirdPartyEntryLog {
   id: string;
   date: string;
   time?: string; // Horário agendado
   locations: string;
   companyName: string;
   companyCnpj: string;
+  vehicle?: string; // NOVO
+  plate?: string;   // NOVO
   monitoringResponsible: string;
   pestControlResponsible: string;
   serviceExecutionNumber: string;

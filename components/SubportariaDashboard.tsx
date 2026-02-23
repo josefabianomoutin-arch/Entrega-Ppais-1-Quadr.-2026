@@ -1,11 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Supplier, Delivery, PestControlLog } from '../types';
+import type { Supplier, Delivery, ThirdPartyEntryLog } from '../types';
 
 interface SubportariaDashboardProps {
   suppliers: Supplier[];
-  pestControlLogs: PestControlLog[];
-  onUpdatePestControlLog: (log: PestControlLog) => Promise<{ success: boolean; message: string }>;
+  thirdPartyEntries: ThirdPartyEntryLog[];
+  onUpdateThirdPartyEntry: (log: ThirdPartyEntryLog) => Promise<{ success: boolean; message: string }>;
   onLogout: () => void;
 }
 
@@ -15,20 +15,22 @@ const formatDate = (dateString: string) => {
     return date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
 };
 
-const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, pestControlLogs, onUpdatePestControlLog, onLogout }) => {
+const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, thirdPartyEntries, onUpdateThirdPartyEntry, onLogout }) => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
     const dailyAgenda = useMemo(() => {
         const list: { 
             id: string; 
-            type: 'FORNECEDOR' | 'DEDETIZACAO';
+            type: 'FORNECEDOR' | 'TERCEIROS';
             name: string; 
             identifier: string; 
             time: string; 
             arrivalTime?: string; 
             status: string; 
             originalStatus: string;
-            rawLog?: PestControlLog;
+            vehicle?: string;
+            plate?: string;
+            rawLog?: ThirdPartyEntryLog;
         }[] = [];
         
         suppliers.forEach(s => {
@@ -53,28 +55,30 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
             });
         });
 
-        (pestControlLogs || []).forEach(log => {
+        (thirdPartyEntries || []).forEach(log => {
             if (log.date === selectedDate) {
                 list.push({
                     id: log.id,
-                    type: 'DEDETIZACAO',
+                    type: 'TERCEIROS',
                     name: log.companyName,
                     identifier: log.companyCnpj,
                     time: log.time || '00:00',
                     arrivalTime: log.arrivalTime,
                     status: log.status === 'concluido' ? '✓ Concluído' : log.arrivalTime ? '● Em Serviço' : '○ Aguardando',
                     originalStatus: log.status,
+                    vehicle: log.vehicle,
+                    plate: log.plate,
                     rawLog: log
                 });
             }
         });
 
         return list.sort((a, b) => a.time.localeCompare(b.time));
-    }, [suppliers, pestControlLogs, selectedDate]);
+    }, [suppliers, thirdPartyEntries, selectedDate]);
 
-    const handleMarkArrival = async (log: PestControlLog) => {
+    const handleMarkArrival = async (log: ThirdPartyEntryLog) => {
         const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        await onUpdatePestControlLog({ ...log, arrivalTime: now });
+        await onUpdateThirdPartyEntry({ ...log, arrivalTime: now });
     };
 
     return (
@@ -167,10 +171,15 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
 
                                 <div className="mb-4">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
-                                        {item.type === 'FORNECEDOR' ? 'Fornecedor' : 'Dedetização'}
+                                        {item.type === 'FORNECEDOR' ? 'Fornecedor' : 'Entrada Terceiros'}
                                     </p>
                                     <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight break-words leading-tight">{item.name}</h3>
                                     <p className="text-[10px] font-mono text-slate-400 mt-1">{item.identifier}</p>
+                                    {item.vehicle && (
+                                        <p className="text-[10px] font-bold text-indigo-600 uppercase mt-1">
+                                            {item.vehicle} {item.plate ? `(${item.plate})` : ''}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {item.arrivalTime ? (
@@ -180,7 +189,7 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
                                             Entrada registrada às <span className="text-sm font-black">{item.arrivalTime}</span>
                                         </p>
                                     </div>
-                                ) : item.type === 'DEDETIZACAO' && item.originalStatus === 'agendado' && (
+                                ) : item.type === 'TERCEIROS' && item.originalStatus === 'agendado' && (
                                     <button 
                                         onClick={() => handleMarkArrival(item.rawLog!)}
                                         className="w-full bg-red-600 text-white font-black py-3 rounded-2xl uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-100"

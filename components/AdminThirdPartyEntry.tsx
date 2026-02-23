@@ -1,21 +1,25 @@
 
 import React, { useState } from 'react';
-import { PestControlLog } from '../types';
+import { ThirdPartyEntryLog } from '../types';
 
-interface AdminPestControlProps {
-    logs: PestControlLog[];
-    onRegister: (log: Omit<PestControlLog, 'id'>) => Promise<{ success: boolean; message: string }>;
+interface AdminThirdPartyEntryProps {
+    logs: ThirdPartyEntryLog[];
+    onRegister: (log: Omit<ThirdPartyEntryLog, 'id'>) => Promise<{ success: boolean; message: string }>;
+    onUpdate: (log: ThirdPartyEntryLog) => Promise<{ success: boolean; message: string }>;
     onDelete: (id: string) => Promise<void>;
 }
 
-const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, onDelete }) => {
+const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onRegister, onUpdate, onDelete }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [formData, setFormData] = useState<Omit<PestControlLog, 'id'>>({
+    const [editingLogId, setEditingLogId] = useState<string | null>(null);
+    const [formData, setFormData] = useState<Omit<ThirdPartyEntryLog, 'id'>>({
         date: new Date().toISOString().split('T')[0],
         time: '08:00',
         locations: '',
         companyName: '',
         companyCnpj: '',
+        vehicle: '',
+        plate: '',
         monitoringResponsible: '',
         pestControlResponsible: '',
         serviceExecutionNumber: '',
@@ -26,16 +30,26 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
-        const res = await onRegister(formData);
+        
+        let res;
+        if (editingLogId) {
+            res = await onUpdate({ ...formData, id: editingLogId } as ThirdPartyEntryLog);
+        } else {
+            res = await onRegister(formData);
+        }
+
         setIsSaving(false);
         if (res.success) {
             setIsModalOpen(false);
+            setEditingLogId(null);
             setFormData({
                 date: new Date().toISOString().split('T')[0],
                 time: '08:00',
                 locations: '',
                 companyName: '',
                 companyCnpj: '',
+                vehicle: '',
+                plate: '',
                 monitoringResponsible: '',
                 pestControlResponsible: '',
                 serviceExecutionNumber: '',
@@ -44,6 +58,43 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
         } else {
             alert(res.message);
         }
+    };
+
+    const handleEdit = (log: ThirdPartyEntryLog) => {
+        setFormData({
+            date: log.date,
+            time: log.time || '08:00',
+            locations: log.locations,
+            companyName: log.companyName,
+            companyCnpj: log.companyCnpj,
+            vehicle: log.vehicle || '',
+            plate: log.plate || '',
+            monitoringResponsible: log.monitoringResponsible,
+            pestControlResponsible: log.pestControlResponsible,
+            serviceExecutionNumber: log.serviceExecutionNumber || '',
+            status: log.status,
+            arrivalTime: log.arrivalTime
+        });
+        setEditingLogId(log.id);
+        setIsModalOpen(true);
+    };
+
+    const handleOpenNew = () => {
+        setEditingLogId(null);
+        setFormData({
+            date: new Date().toISOString().split('T')[0],
+            time: '08:00',
+            locations: '',
+            companyName: '',
+            companyCnpj: '',
+            vehicle: '',
+            plate: '',
+            monitoringResponsible: '',
+            pestControlResponsible: '',
+            serviceExecutionNumber: '',
+            status: 'agendado'
+        });
+        setIsModalOpen(true);
     };
 
     const handlePrintReport = () => {
@@ -57,7 +108,7 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
         const printContent = `
             <html>
                 <head>
-                    <title>Relatório de Dedetização</title>
+                    <title>Relatório de Entrada de Terceiros</title>
                     <style>
                         body { font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.4; }
                         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -84,7 +135,7 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                         <div class="header-contact">Fone: (16) 3247-6261 - E-mail: dg@ptaiuva.sap.gov.br</div>
                     </div>
                     
-                    <div class="report-title">Relatório de Controle de Dedetização</div>
+                    <div class="report-title">Relatório de Controle de Entrada de Terceiros</div>
 
                     <table>
                         <thead>
@@ -92,6 +143,7 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                                 <th>Data/Hora</th>
                                 <th>Nº Execução</th>
                                 <th>Empresa</th>
+                                <th>Veículo/Placa</th>
                                 <th>Locais</th>
                                 <th>Acompanhamento</th>
                                 <th>Responsável</th>
@@ -104,6 +156,7 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                                     <td>${log.date.split('-').reverse().join('/')} ${log.time || ''}</td>
                                     <td>${log.serviceExecutionNumber || '-'}</td>
                                     <td>${log.companyName}</td>
+                                    <td>${log.vehicle || '-'} / ${log.plate || '-'}</td>
                                     <td>${log.locations}</td>
                                     <td>${log.monitoringResponsible}</td>
                                     <td>${log.pestControlResponsible}</td>
@@ -135,8 +188,8 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
         <div className="bg-white p-6 rounded-2xl shadow-xl max-w-7xl mx-auto border-t-8 border-purple-500 animate-fade-in">
             <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
                 <div>
-                    <h2 className="text-3xl font-black text-purple-900 uppercase tracking-tighter">Controle de Dedetização</h2>
-                    <p className="text-gray-400 font-medium">Gerencie os registros de dedetização e controle de pragas.</p>
+                    <h2 className="text-3xl font-black text-purple-900 uppercase tracking-tighter">Controle de Entrada de Terceiros</h2>
+                    <p className="text-gray-400 font-medium">Gerencie os registros de entrada de prestadores de serviço e terceiros.</p>
                 </div>
                 <div className="flex gap-2">
                     <button 
@@ -147,7 +200,7 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                         Imprimir
                     </button>
                     <button 
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={handleOpenNew}
                         className="bg-purple-600 hover:bg-purple-700 text-white font-black py-3 px-8 rounded-xl transition-all shadow-lg active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -165,9 +218,9 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                             <th className="p-4 text-left">Data/Hora</th>
                             <th className="p-4 text-left">Status</th>
                             <th className="p-4 text-left">Nº Execução</th>
-                            <th className="p-4 text-left">Locais</th>
                             <th className="p-4 text-left">Empresa</th>
-                            <th className="p-4 text-left">CNPJ</th>
+                            <th className="p-4 text-left">Veículo/Placa</th>
+                            <th className="p-4 text-left">Locais</th>
                             <th className="p-4 text-left">Acompanhamento</th>
                             <th className="p-4 text-left">Responsável</th>
                             <th className="p-4 text-center">Ações</th>
@@ -186,25 +239,40 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                                     </span>
                                 </td>
                                 <td className="p-4 font-mono text-xs font-bold text-gray-800">{log.serviceExecutionNumber || '-'}</td>
-                                <td className="p-4 text-gray-700 font-medium">{log.locations}</td>
                                 <td className="p-4 text-gray-700 font-bold uppercase">{log.companyName}</td>
-                                <td className="p-4 font-mono text-gray-500">{log.companyCnpj}</td>
+                                <td className="p-4">
+                                    <p className="text-xs font-bold text-gray-800 uppercase">{log.vehicle || '-'}</p>
+                                    <p className="text-[10px] font-mono text-gray-400">{log.plate || '-'}</p>
+                                </td>
+                                <td className="p-4 text-gray-700 font-medium">{log.locations}</td>
                                 <td className="p-4 text-gray-600 uppercase text-xs">{log.monitoringResponsible}</td>
                                 <td className="p-4 text-gray-600 uppercase text-xs">{log.pestControlResponsible}</td>
                                 <td className="p-4 text-center">
-                                    <button 
-                                        onClick={() => { if(window.confirm('Excluir este registro?')) onDelete(log.id); }}
-                                        className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-all"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                        </svg>
-                                    </button>
+                                    <div className="flex justify-center gap-2">
+                                        <button 
+                                            onClick={() => handleEdit(log)}
+                                            className="text-purple-600 hover:text-purple-800 p-2 rounded-full hover:bg-purple-50 transition-all"
+                                            title="Editar"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            onClick={() => { if(window.confirm('Excluir este registro?')) onDelete(log.id); }}
+                                            className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-all"
+                                            title="Excluir"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={7} className="p-12 text-center text-gray-400 italic">Nenhum registro de dedetização encontrado.</td>
+                                <td colSpan={9} className="p-12 text-center text-gray-400 italic">Nenhum registro de entrada encontrado.</td>
                             </tr>
                         )}
                     </tbody>
@@ -215,8 +283,12 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex justify-center items-center p-4 animate-fade-in">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-scale-up">
                         <div className="bg-purple-800 p-8 text-white">
-                            <h3 className="text-2xl font-black uppercase tracking-tighter">Novo Registro de Dedetização</h3>
-                            <p className="text-purple-200 font-bold uppercase text-xs tracking-widest mt-1">Preencha os dados da prestadora e do serviço</p>
+                            <h3 className="text-2xl font-black uppercase tracking-tighter">
+                                {editingLogId ? 'Editar Registro de Terceiros' : 'Novo Registro de Terceiros'}
+                            </h3>
+                            <p className="text-purple-200 font-bold uppercase text-xs tracking-widest mt-1">
+                                {editingLogId ? 'Atualize os dados do serviço' : 'Preencha os dados da prestadora e do serviço'}
+                            </p>
                         </div>
                         
                         <form onSubmit={handleSave} className="p-8 space-y-6">
@@ -266,6 +338,17 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                                         className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Nº de Execução de Serviços</label>
+                                    <input 
+                                        type="text" 
+                                        required
+                                        placeholder="000/2026"
+                                        value={formData.serviceExecutionNumber}
+                                        onChange={e => setFormData({...formData, serviceExecutionNumber: e.target.value.toUpperCase()})}
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                    />
+                                </div>
                             </div>
 
                             <div>
@@ -280,16 +363,27 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Nº de Execução de Serviços</label>
-                                <input 
-                                    type="text" 
-                                    required
-                                    placeholder="000/2026"
-                                    value={formData.serviceExecutionNumber}
-                                    onChange={e => setFormData({...formData, serviceExecutionNumber: e.target.value.toUpperCase()})}
-                                    className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
-                                />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Veículo</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Ex: FIAT TORO BRANCA"
+                                        value={formData.vehicle}
+                                        onChange={e => setFormData({...formData, vehicle: e.target.value.toUpperCase()})}
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Placa</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="ABC-1234"
+                                        value={formData.plate}
+                                        onChange={e => setFormData({...formData, plate: e.target.value.toUpperCase()})}
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                    />
+                                </div>
                             </div>
 
                             <div>
@@ -341,7 +435,7 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                                     disabled={isSaving}
                                     className="flex-1 bg-purple-600 text-white font-black py-4 rounded-2xl uppercase text-xs tracking-widest hover:bg-purple-700 shadow-lg shadow-purple-200 transition-all disabled:opacity-50"
                                 >
-                                    {isSaving ? 'Salvando...' : 'Salvar Registro'}
+                                    {isSaving ? 'Salvando...' : editingLogId ? 'Atualizar Registro' : 'Salvar Registro'}
                                 </button>
                             </div>
                         </form>
@@ -352,4 +446,4 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
     );
 };
 
-export default AdminPestControl;
+export default AdminThirdPartyEntry;
