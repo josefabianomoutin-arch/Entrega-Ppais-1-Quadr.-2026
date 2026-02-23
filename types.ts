@@ -145,6 +145,7 @@ export interface PestControlLog {
   companyCnpj: string;
   monitoringResponsible: string;
   pestControlResponsible: string;
+  serviceExecutionNumber: string;
 }
 
 export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria';

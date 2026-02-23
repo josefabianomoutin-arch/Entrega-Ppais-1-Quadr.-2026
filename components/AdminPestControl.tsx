@@ -16,7 +16,8 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
         companyName: '',
         companyCnpj: '',
         monitoringResponsible: '',
-        pestControlResponsible: ''
+        pestControlResponsible: '',
+        serviceExecutionNumber: ''
     });
     const [isSaving, setIsSaving] = useState(false);
 
@@ -33,7 +34,8 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                 companyName: '',
                 companyCnpj: '',
                 monitoringResponsible: '',
-                pestControlResponsible: ''
+                pestControlResponsible: '',
+                serviceExecutionNumber: ''
             });
         } else {
             alert(res.message);
@@ -63,6 +65,7 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                     <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                         <tr>
                             <th className="p-4 text-left">Data</th>
+                            <th className="p-4 text-left">Nº Execução</th>
                             <th className="p-4 text-left">Locais</th>
                             <th className="p-4 text-left">Empresa</th>
                             <th className="p-4 text-left">CNPJ</th>
@@ -75,6 +78,7 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                         {logs.length > 0 ? logs.sort((a, b) => b.date.localeCompare(a.date)).map(log => (
                             <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="p-4 font-mono font-bold text-purple-700">{log.date.split('-').reverse().join('/')}</td>
+                                <td className="p-4 font-mono text-xs font-bold text-gray-800">{log.serviceExecutionNumber || '-'}</td>
                                 <td className="p-4 text-gray-700 font-medium">{log.locations}</td>
                                 <td className="p-4 text-gray-700 font-bold uppercase">{log.companyName}</td>
                                 <td className="p-4 font-mono text-gray-500">{log.companyCnpj}</td>
@@ -141,6 +145,18 @@ const AdminPestControl: React.FC<AdminPestControlProps> = ({ logs, onRegister, o
                                     placeholder="NOME DA EMPRESA PRESTADORA"
                                     value={formData.companyName}
                                     onChange={e => setFormData({...formData, companyName: e.target.value.toUpperCase()})}
+                                    className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Nº de Execução de Serviços</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    placeholder="000/2026"
+                                    value={formData.serviceExecutionNumber}
+                                    onChange={e => setFormData({...formData, serviceExecutionNumber: e.target.value.toUpperCase()})}
                                     className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
                                 />
                             </div>
