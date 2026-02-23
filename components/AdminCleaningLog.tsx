@@ -53,6 +53,89 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
     setIsSaving(false);
   };
 
+  const handlePrintReport = () => {
+    if (logs.length === 0) {
+      alert('Não há registros para gerar o relatório.');
+      return;
+    }
+
+    const sortedLogs = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const printContent = `
+      <html>
+        <head>
+          <title>Relatório de Higienização e Manutenção</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.4; }
+            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+            .header-sap { font-size: 14px; margin-bottom: 2px; }
+            .header-unit { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+            .header-address { font-size: 11px; }
+            .header-contact { font-size: 11px; }
+            .report-title { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0; text-transform: uppercase; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 10px; }
+            th { background-color: #f5f5f5; font-weight: bold; text-transform: uppercase; }
+            .footer { margin-top: 60px; display: flex; justify-content: space-around; }
+            .sig { border-top: 1px solid #000; width: 220px; text-align: center; padding-top: 5px; font-size: 11px; font-weight: bold; }
+            @media print {
+              body { -webkit-print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="header-sap">Secretaria da Administração Penitenciária</div>
+            <div class="header-unit">Polícia Penal - Penitenciária de Taiúva</div>
+            <div class="header-address">Rodovia Brigadeiro Faria Lima, SP 326, KM 359,6 Taiúva/SP - CEP: 14.720-000</div>
+            <div class="header-contact">Fone: (16) 3247-6261 - E-mail: dg@ptaiuva.sap.gov.br</div>
+          </div>
+          
+          <div class="report-title">Relatório de Higienização e Manutenção</div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Local</th>
+                <th>Responsável</th>
+                <th>Observações</th>
+                <th>Manutenção</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sortedLogs.map(log => `
+                <tr>
+                  <td>${new Date(log.date + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                  <td style="text-transform: uppercase;">${log.type}</td>
+                  <td>${log.location}</td>
+                  <td>${log.responsible}</td>
+                  <td>${log.observations || '-'}</td>
+                  <td>${log.maintenanceDetails || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <div class="sig">Responsável (Unidade)</div>
+            <div class="sig">Diretor (Núcleo de Infraestrutura)</div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(printContent);
+      win.document.close();
+      setTimeout(() => {
+        win.print();
+      }, 500);
+    }
+  };
+
   const handleExportCSV = () => {
     const headers = ["Data", "Responsável", "Local", "Tipo de Serviço", "Observações", "Manutenção"];
     const csvContent = [
@@ -135,6 +218,10 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <input type="text" placeholder="Filtrar registros..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-1 sm:w-64 border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500" />
+            <button onClick={handlePrintReport} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+              Imprimir
+            </button>
             <button onClick={handleExportCSV} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
               Exportar

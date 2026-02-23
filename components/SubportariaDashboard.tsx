@@ -1,9 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Supplier, Delivery } from '../types';
+import type { Supplier, Delivery, PestControlLog } from '../types';
 
 interface SubportariaDashboardProps {
   suppliers: Supplier[];
+  pestControlLogs: PestControlLog[];
+  onUpdatePestControlLog: (log: PestControlLog) => Promise<{ success: boolean; message: string }>;
   onLogout: () => void;
 }
 
@@ -13,36 +15,67 @@ const formatDate = (dateString: string) => {
     return date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
 };
 
-const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, onLogout }) => {
+const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, pestControlLogs, onUpdatePestControlLog, onLogout }) => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-    const dailyDeliveries = useMemo(() => {
-        const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'FATURADO'; id: string }[] = [];
+    const dailyAgenda = useMemo(() => {
+        const list: { 
+            id: string; 
+            type: 'FORNECEDOR' | 'DEDETIZACAO';
+            name: string; 
+            identifier: string; 
+            time: string; 
+            arrivalTime?: string; 
+            status: string; 
+            originalStatus: string;
+            rawLog?: PestControlLog;
+        }[] = [];
         
         suppliers.forEach(s => {
             (s.deliveries || []).forEach(d => {
                 if (d.date === selectedDate) {
                     const isFaturado = d.item !== 'AGENDAMENTO PENDENTE';
-                    
-                    // Agrupamento para evitar duplicidade visual de caminhões com muitos itens
-                    const existing = list.find(l => l.supplierName === s.name && l.time === d.time && l.status === (isFaturado ? 'FATURADO' : 'AGENDADO'));
+                    const existing = list.find(l => l.type === 'FORNECEDOR' && l.name === s.name && l.time === d.time && l.originalStatus === (isFaturado ? 'FATURADO' : 'AGENDADO'));
                     
                     if (!existing) {
                         list.push({
                             id: d.id,
-                            supplierName: s.name,
-                            supplierCpf: s.cpf,
+                            type: 'FORNECEDOR',
+                            name: s.name,
+                            identifier: s.cpf,
                             time: d.time,
                             arrivalTime: d.arrivalTime,
-                            status: isFaturado ? 'FATURADO' : 'AGENDADO'
+                            status: isFaturado ? '✓ Descarregado' : d.arrivalTime ? '● No Pátio' : '○ Aguardando',
+                            originalStatus: isFaturado ? 'FATURADO' : 'AGENDADO'
                         });
                     }
                 }
             });
         });
 
+        (pestControlLogs || []).forEach(log => {
+            if (log.date === selectedDate) {
+                list.push({
+                    id: log.id,
+                    type: 'DEDETIZACAO',
+                    name: log.companyName,
+                    identifier: log.companyCnpj,
+                    time: log.time || '00:00',
+                    arrivalTime: log.arrivalTime,
+                    status: log.status === 'concluido' ? '✓ Concluído' : log.arrivalTime ? '● Em Serviço' : '○ Aguardando',
+                    originalStatus: log.status,
+                    rawLog: log
+                });
+            }
+        });
+
         return list.sort((a, b) => a.time.localeCompare(b.time));
-    }, [suppliers, selectedDate]);
+    }, [suppliers, pestControlLogs, selectedDate]);
+
+    const handleMarkArrival = async (log: PestControlLog) => {
+        const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        await onUpdatePestControlLog({ ...log, arrivalTime: now });
+    };
 
     return (
         <div className="min-h-screen bg-slate-100 text-slate-900 font-sans pb-10">
@@ -71,7 +104,7 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
                                 <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">{formatDate(selectedDate)}</p>
                             </div>
                             <div className="bg-indigo-50 px-3 py-1 rounded-full">
-                                <span className="text-[10px] font-black text-indigo-600 uppercase">{dailyDeliveries.length} Veículos</span>
+                                <span className="text-[10px] font-black text-indigo-600 uppercase">{dailyAgenda.length} Agendamentos</span>
                             </div>
                         </div>
                         
@@ -91,11 +124,11 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
 
                 {/* Lista de Cards */}
                 <div className="space-y-4">
-                    {dailyDeliveries.length > 0 ? dailyDeliveries.map(item => (
+                    {dailyAgenda.length > 0 ? dailyAgenda.map(item => (
                         <div 
                             key={item.id} 
                             className={`relative overflow-hidden bg-white rounded-[2rem] shadow-md border-2 transition-all active:scale-[0.98] ${
-                                item.status === 'FATURADO' 
+                                item.originalStatus === 'FATURADO' || item.originalStatus === 'concluido'
                                     ? 'border-indigo-100 opacity-80' 
                                     : item.arrivalTime 
                                         ? 'border-green-200 bg-green-50/30' 
@@ -104,13 +137,13 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
                         >
                             {/* Faixa lateral de status */}
                             <div className={`absolute top-0 left-0 w-2 h-full ${
-                                item.status === 'FATURADO' ? 'bg-indigo-900' : item.arrivalTime ? 'bg-green-500' : 'bg-red-600'
+                                item.originalStatus === 'FATURADO' || item.originalStatus === 'concluido' ? 'bg-indigo-900' : item.arrivalTime ? 'bg-green-500' : 'bg-red-600'
                             }`} />
 
                             <div className="p-5 pl-7">
                                 <div className="flex justify-between items-start mb-4">
                                     <div className={`px-4 py-2 rounded-xl text-lg font-black font-mono shadow-sm ${
-                                        item.status === 'FATURADO' 
+                                        item.originalStatus === 'FATURADO' || item.originalStatus === 'concluido'
                                             ? 'bg-indigo-900 text-white' 
                                             : item.arrivalTime 
                                                 ? 'bg-green-600 text-white' 
@@ -121,30 +154,39 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
                                     
                                     <div className="text-right">
                                         <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
-                                            item.status === 'FATURADO' 
+                                            item.originalStatus === 'FATURADO' || item.originalStatus === 'concluido'
                                                 ? 'bg-indigo-100 text-indigo-700' 
                                                 : item.arrivalTime 
                                                     ? 'bg-green-100 text-green-700' 
                                                     : 'bg-red-100 text-red-700'
                                         }`}>
-                                            {item.status === 'FATURADO' ? '✓ Descarregado' : item.arrivalTime ? '● No Pátio' : '○ Aguardando'}
+                                            {item.status}
                                         </span>
                                     </div>
                                 </div>
 
                                 <div className="mb-4">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Fornecedor</p>
-                                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight break-words leading-tight">{item.supplierName}</h3>
-                                    <p className="text-[10px] font-mono text-slate-400 mt-1">{item.supplierCpf}</p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
+                                        {item.type === 'FORNECEDOR' ? 'Fornecedor' : 'Dedetização'}
+                                    </p>
+                                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight break-words leading-tight">{item.name}</h3>
+                                    <p className="text-[10px] font-mono text-slate-400 mt-1">{item.identifier}</p>
                                 </div>
 
-                                {item.arrivalTime && (
+                                {item.arrivalTime ? (
                                     <div className="flex items-center gap-2 bg-white/60 p-3 rounded-2xl border border-green-100">
                                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                                         <p className="text-xs font-bold text-green-700 uppercase">
                                             Entrada registrada às <span className="text-sm font-black">{item.arrivalTime}</span>
                                         </p>
                                     </div>
+                                ) : item.type === 'DEDETIZACAO' && item.originalStatus === 'agendado' && (
+                                    <button 
+                                        onClick={() => handleMarkArrival(item.rawLog!)}
+                                        className="w-full bg-red-600 text-white font-black py-3 rounded-2xl uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-100"
+                                    >
+                                        Registrar Chegada
+                                    </button>
                                 )}
                             </div>
                         </div>
@@ -163,11 +205,11 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({ suppliers, 
                 <div className="grid grid-cols-2 gap-4 pt-4">
                     <div className="bg-green-600 p-5 rounded-[2rem] text-white shadow-lg flex flex-col items-center text-center">
                         <p className="text-[10px] font-black uppercase opacity-60 mb-1">Confirmados</p>
-                        <p className="text-3xl font-black">{dailyDeliveries.filter(d => d.arrivalTime || d.status === 'FATURADO').length}</p>
+                        <p className="text-3xl font-black">{dailyAgenda.filter(d => d.arrivalTime || d.originalStatus === 'FATURADO' || d.originalStatus === 'concluido').length}</p>
                     </div>
                     <div className="bg-indigo-900 p-5 rounded-[2rem] text-white shadow-lg flex flex-col items-center text-center">
                         <p className="text-[10px] font-black uppercase opacity-60 mb-1">Pendentes</p>
-                        <p className="text-3xl font-black">{dailyDeliveries.filter(d => !d.arrivalTime && d.status === 'AGENDADO').length}</p>
+                        <p className="text-3xl font-black">{dailyAgenda.filter(d => !d.arrivalTime && (d.originalStatus === 'AGENDADO' || d.originalStatus === 'agendado')).length}</p>
                     </div>
                 </div>
 

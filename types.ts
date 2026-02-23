@@ -140,12 +140,15 @@ export interface FinancialRecord {
 export interface PestControlLog {
   id: string;
   date: string;
+  time?: string; // Horário agendado
   locations: string;
   companyName: string;
   companyCnpj: string;
   monitoringResponsible: string;
   pestControlResponsible: string;
   serviceExecutionNumber: string;
+  status: 'agendado' | 'concluido';
+  arrivalTime?: string; // Horário real de chegada na subportaria
 }
 
 export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria';

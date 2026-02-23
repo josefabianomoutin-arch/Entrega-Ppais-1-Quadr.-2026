@@ -642,7 +642,17 @@ const App: React.FC = () => {
   }
 
   if (user.role === 'subportaria') {
-    return <SubportariaDashboard suppliers={suppliers} onLogout={handleLogout} />;
+    return (
+      <SubportariaDashboard 
+        suppliers={suppliers} 
+        pestControlLogs={pestControlLogs}
+        onUpdatePestControlLog={async (log) => {
+          await set(child(pestControlLogsRef, log.id), log);
+          return { success: true, message: 'Atualizado' };
+        }}
+        onLogout={handleLogout} 
+      />
+    );
   }
 
   const currentSupplier = suppliers.find(s => s.cpf === user.cpf);
