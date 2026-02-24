@@ -23,7 +23,9 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
         monitoringResponsible: '',
         pestControlResponsible: '',
         serviceExecutionNumber: '',
-        status: 'agendado'
+        status: 'agendado',
+        serviceDetails: '',
+        receiptTermDate: new Date().toISOString().split('T')[0]
     });
     const [isSaving, setIsSaving] = useState(false);
 
@@ -53,7 +55,8 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                 monitoringResponsible: '',
                 pestControlResponsible: '',
                 serviceExecutionNumber: '',
-                status: 'agendado'
+                status: 'agendado',
+                serviceDetails: ''
             });
         } else {
             alert(res.message);
@@ -73,7 +76,9 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
             pestControlResponsible: log.pestControlResponsible,
             serviceExecutionNumber: log.serviceExecutionNumber || '',
             status: log.status,
-            arrivalTime: log.arrivalTime
+            arrivalTime: log.arrivalTime,
+            serviceDetails: log.serviceDetails || '',
+            receiptTermDate: log.receiptTermDate || log.date
         });
         setEditingLogId(log.id);
         setIsModalOpen(true);
@@ -92,7 +97,9 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
             monitoringResponsible: '',
             pestControlResponsible: '',
             serviceExecutionNumber: '',
-            status: 'agendado'
+            status: 'agendado',
+            serviceDetails: '',
+            receiptTermDate: new Date().toISOString().split('T')[0]
         });
         setIsModalOpen(true);
     };
@@ -185,10 +192,10 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
     };
 
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-xl max-w-7xl mx-auto border-t-8 border-purple-500 animate-fade-in">
+        <div className="bg-white p-6 rounded-2xl shadow-xl max-w-7xl mx-auto border-t-8 border-gray-500 animate-fade-in">
             <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
                 <div>
-                    <h2 className="text-3xl font-black text-purple-900 uppercase tracking-tighter">Controle de Entrada de Terceiros</h2>
+                    <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter">Controle de Entrada de Terceiros</h2>
                     <p className="text-gray-400 font-medium">Gerencie os registros de entrada de prestadores de serviço e terceiros.</p>
                 </div>
                 <div className="flex gap-2">
@@ -201,7 +208,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                     </button>
                     <button 
                         onClick={handleOpenNew}
-                        className="bg-purple-600 hover:bg-purple-700 text-white font-black py-3 px-8 rounded-xl transition-all shadow-lg active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2"
+                        className="bg-gray-600 hover:bg-gray-700 text-white font-black py-3 px-8 rounded-xl transition-all shadow-lg active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
@@ -230,11 +237,11 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                         {logs.length > 0 ? logs.sort((a, b) => b.date.localeCompare(a.date) || (b.time || '').localeCompare(a.time || '')).map(log => (
                             <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="p-4">
-                                    <p className="font-mono font-bold text-purple-700">{log.date.split('-').reverse().join('/')}</p>
+                                    <p className="font-mono font-bold text-gray-700">{log.date.split('-').reverse().join('/')}</p>
                                     <p className="text-[10px] font-black text-gray-400">{log.time || '--:--'}</p>
                                 </td>
                                 <td className="p-4">
-                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase ${log.status === 'concluido' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase ${log.status === 'concluido' ? 'bg-green-100 text-green-700' : log.status === 'cancelado' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                                         {log.status}
                                     </span>
                                 </td>
@@ -251,7 +258,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                     <div className="flex justify-center gap-2">
                                         <button 
                                             onClick={() => handleEdit(log)}
-                                            className="text-purple-600 hover:text-purple-800 p-2 rounded-full hover:bg-purple-50 transition-all"
+                                            className="text-gray-600 hover:text-gray-800 p-2 rounded-full hover:bg-gray-50 transition-all"
                                             title="Editar"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -282,11 +289,11 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex justify-center items-center p-4 animate-fade-in">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-scale-up">
-                        <div className="bg-purple-800 p-8 text-white">
+                        <div className="bg-gray-800 p-8 text-white">
                             <h3 className="text-2xl font-black uppercase tracking-tighter">
                                 {editingLogId ? 'Editar Registro de Terceiros' : 'Novo Registro de Terceiros'}
                             </h3>
-                            <p className="text-purple-200 font-bold uppercase text-xs tracking-widest mt-1">
+                            <p className="text-gray-200 font-bold uppercase text-xs tracking-widest mt-1">
                                 {editingLogId ? 'Atualize os dados do serviço' : 'Preencha os dados da prestadora e do serviço'}
                             </p>
                         </div>
@@ -299,8 +306,11 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                         type="date" 
                                         required
                                         value={formData.date}
-                                        onChange={e => setFormData({...formData, date: e.target.value})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                        onChange={e => {
+                                            const newDate = e.target.value;
+                                            setFormData({...formData, date: newDate, receiptTermDate: newDate });
+                                        }}
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
                                     />
                                 </div>
                                 <div>
@@ -310,7 +320,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                         required
                                         value={formData.time}
                                         onChange={e => setFormData({...formData, time: e.target.value})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
                                     />
                                 </div>
                                 <div>
@@ -318,11 +328,22 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                     <select 
                                         value={formData.status}
                                         onChange={e => setFormData({...formData, status: e.target.value as any})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
                                     >
                                         <option value="agendado">Agendado</option>
                                         <option value="concluido">Concluído</option>
+                                        <option value="cancelado">Cancelado</option>
                                     </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Data do Termo de Recebimento</label>
+                                    <input 
+                                        type="date" 
+                                        required
+                                        value={formData.receiptTermDate || ''}
+                                        disabled
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none font-bold bg-gray-100 transition-all text-gray-500"
+                                    />
                                 </div>
                             </div>
 
@@ -335,7 +356,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                         placeholder="00.000.000/0000-00"
                                         value={formData.companyCnpj}
                                         onChange={e => setFormData({...formData, companyCnpj: e.target.value})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
                                     />
                                 </div>
                                 <div>
@@ -346,22 +367,33 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                         placeholder="000/2026"
                                         value={formData.serviceExecutionNumber}
                                         onChange={e => setFormData({...formData, serviceExecutionNumber: e.target.value.toUpperCase()})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Nome da Empresa</label>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Detalhes do Serviço</label>
                                 <input 
                                     type="text" 
-                                    required
-                                    placeholder="NOME DA EMPRESA PRESTADORA"
-                                    value={formData.companyName}
-                                    onChange={e => setFormData({...formData, companyName: e.target.value.toUpperCase()})}
-                                    className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                    placeholder="Ex: Troca de Lâmpadas, Reparo Hidráulico"
+                                    value={formData.serviceDetails || ''}
+                                    onChange={e => setFormData({...formData, serviceDetails: e.target.value})}
+                                    className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
                                 />
                             </div>
+
+                             <div>
+                                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Nome da Empresa</label>
+                                 <input 
+                                     type="text" 
+                                     required
+                                     placeholder="NOME DA EMPRESA PRESTADORA"
+                                     value={formData.companyName}
+                                     onChange={e => setFormData({...formData, companyName: e.target.value.toUpperCase()})}
+                                     className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                 />
+                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
@@ -371,7 +403,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                         placeholder="Ex: FIAT TORO BRANCA"
                                         value={formData.vehicle}
                                         onChange={e => setFormData({...formData, vehicle: e.target.value.toUpperCase()})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
                                     />
                                 </div>
                                 <div>
@@ -381,7 +413,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                         placeholder="ABC-1234"
                                         value={formData.plate}
                                         onChange={e => setFormData({...formData, plate: e.target.value.toUpperCase()})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
                                     />
                                 </div>
                             </div>
@@ -393,7 +425,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                     placeholder="Ex: Cozinha, Refeitório, Almoxarifado..."
                                     value={formData.locations}
                                     onChange={e => setFormData({...formData, locations: e.target.value})}
-                                    className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all h-24 resize-none"
+                                    className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all h-24 resize-none"
                                 />
                             </div>
 
@@ -406,7 +438,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                         placeholder="NOME DO SERVIDOR"
                                         value={formData.monitoringResponsible}
                                         onChange={e => setFormData({...formData, monitoringResponsible: e.target.value.toUpperCase()})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
                                     />
                                 </div>
                                 <div>
@@ -417,7 +449,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                         placeholder="NOME DO TÉCNICO"
                                         value={formData.pestControlResponsible}
                                         onChange={e => setFormData({...formData, pestControlResponsible: e.target.value.toUpperCase()})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-purple-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
                                     />
                                 </div>
                             </div>
@@ -433,7 +465,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                 <button 
                                     type="submit"
                                     disabled={isSaving}
-                                    className="flex-1 bg-purple-600 text-white font-black py-4 rounded-2xl uppercase text-xs tracking-widest hover:bg-purple-700 shadow-lg shadow-purple-200 transition-all disabled:opacity-50"
+                                    className="flex-1 bg-gray-600 text-white font-black py-4 rounded-2xl uppercase text-xs tracking-widest hover:bg-gray-700 shadow-lg shadow-gray-200 transition-all disabled:opacity-50"
                                 >
                                     {isSaving ? 'Salvando...' : editingLogId ? 'Atualizar Registro' : 'Salvar Registro'}
                                 </button>

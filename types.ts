@@ -149,8 +149,10 @@ export interface ThirdPartyEntryLog {
   monitoringResponsible: string;
   pestControlResponsible: string;
   serviceExecutionNumber: string;
-  status: 'agendado' | 'concluido';
+  serviceDetails?: string;
+  status: 'agendado' | 'concluido' | 'cancelado';
   arrivalTime?: string; // Horário real de chegada na subportaria
+  receiptTermDate?: string;
 }
 
 export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria';
