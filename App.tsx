@@ -638,6 +638,17 @@ const App: React.FC = () => {
              onRegisterEntry={handleRegisterWarehouseEntry} 
              onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} 
              onResetExits={handleResetWarehouseExits}
+             thirdPartyEntries={thirdPartyEntries}
+             onRegisterThirdPartyEntry={async (l) => {
+                 const r = push(thirdPartyEntriesRef);
+                 await set(r, { ...l, id: r.key });
+                 return { success: true, message: 'Ok' };
+             }}
+             onUpdateThirdPartyEntry={async (log) => {
+                 await set(child(thirdPartyEntriesRef, log.id), log);
+                 return { success: true, message: 'Atualizado' };
+             }}
+             onDeleteThirdPartyEntry={async (id) => remove(child(thirdPartyEntriesRef, id))}
            />;
   }
 

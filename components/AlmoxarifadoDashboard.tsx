@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import type { Supplier, WarehouseMovement, ContractItem } from '../types';
+import type { Supplier, WarehouseMovement, ContractItem, ThirdPartyEntryLog } from '../types';
 import WarehouseMovementForm from './WarehouseMovementForm';
+import AdminThirdPartyEntry from './AdminThirdPartyEntry';
 
 interface AlmoxarifadoDashboardProps {
     suppliers: Supplier[];
@@ -10,10 +11,25 @@ interface AlmoxarifadoDashboardProps {
     onRegisterEntry: (payload: any) => Promise<{ success: boolean; message: string }>;
     onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
     onResetExits: () => Promise<{ success: boolean; message: string }>;
+    thirdPartyEntries: ThirdPartyEntryLog[];
+    onRegisterThirdPartyEntry: (log: Omit<ThirdPartyEntryLog, 'id'>) => Promise<{ success: boolean; message: string }>;
+    onUpdateThirdPartyEntry: (log: ThirdPartyEntryLog) => Promise<{ success: boolean; message: string }>;
+    onDeleteThirdPartyEntry: (id: string) => Promise<void>;
 }
 
-const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers, warehouseLog, onLogout, onRegisterEntry, onRegisterWithdrawal, onResetExits }) => {
-    const [activeTab, setActiveTab] = useState<'manual' | 'receipt' | 'agenda'>('manual');
+const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ 
+    suppliers, 
+    warehouseLog, 
+    onLogout, 
+    onRegisterEntry, 
+    onRegisterWithdrawal, 
+    onResetExits,
+    thirdPartyEntries,
+    onRegisterThirdPartyEntry,
+    onUpdateThirdPartyEntry,
+    onDeleteThirdPartyEntry
+}) => {
+    const [activeTab, setActiveTab] = useState<'manual' | 'receipt' | 'agenda' | 'visitors'>('manual');
     const [selectedAgendaDate, setSelectedAgendaDate] = useState(new Date().toISOString().split('T')[0]);
     const [receiptSupplierCpf, setReceiptSupplierCpf] = useState('');
     const [receiptInvoice, setReceiptInvoice] = useState('');
@@ -227,7 +243,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                 </div>
 
                 <div class="location-date">
-                    TAIÚVA, ${new Date(receiptData.receiptDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()}
+                    TAIÚVA, ${receiptData.receiptDate ? new Date(receiptData.receiptDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase() : 'DATA NÃO INFORMADA'}
                 </div>
 
                 <div class="signature-section">
@@ -284,6 +300,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                     <div className="flex bg-gray-100 p-1 rounded-xl">
                         <button onClick={() => setActiveTab('manual')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'manual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Bipagem / Manual</button>
                         <button onClick={() => setActiveTab('agenda')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'agenda' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Agenda de Chegadas</button>
+                        <button onClick={() => setActiveTab('visitors')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'visitors' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Controle de Portaria</button>
                         <button onClick={() => setActiveTab('receipt')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'receipt' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Termo de Recebimento</button>
                     </div>
                     <button onClick={onLogout} className="bg-red-50 text-red-600 font-black py-2 px-6 rounded-xl text-xs uppercase border border-red-100 shadow-sm active:scale-95">Sair</button>
@@ -301,6 +318,13 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ suppliers
                     />
 
 
+                ) : activeTab === 'visitors' ? (
+                    <AdminThirdPartyEntry 
+                        logs={thirdPartyEntries} 
+                        onRegister={onRegisterThirdPartyEntry} 
+                        onUpdate={onUpdateThirdPartyEntry} 
+                        onDelete={onDeleteThirdPartyEntry} 
+                    />
                 ) : activeTab === 'agenda' ? (
                     <div className="space-y-6 animate-fade-in">
                         {/* Seletor de Data Estilizado (Copiado da Subportaria) */}

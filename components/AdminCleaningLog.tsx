@@ -119,8 +119,14 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
           </table>
 
           <div class="footer">
-            <div class="sig">${sortedLogs.length > 0 ? sortedLogs[0].responsible.toUpperCase() : 'Responsável (Unidade)'}</div>
-            <div class="sig">CHEFE DE DEPARTAMENTO</div>
+            <div class="sig">
+              ${sortedLogs.length > 0 ? sortedLogs[0].responsible.toUpperCase() : ''}<br/>
+              <span style="font-weight: normal; font-size: 10px;">Responsável (Unidade)</span>
+            </div>
+            <div class="sig">
+              <br/>
+              CHEFE DE DEPARTAMENTO
+            </div>
           </div>
         </body>
       </html>
