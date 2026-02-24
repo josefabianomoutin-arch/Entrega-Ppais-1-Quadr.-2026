@@ -264,6 +264,15 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                     <div class="info-row"><span class="info-label">DATA NOTA FISCAL:</span> ${formatDate(receiptData.invoiceDate)}</div>
                     <div class="info-row"><span class="info-label">DATA RECEBIMENTO:</span> ${formatDate(receiptData.receiptDate)}</div>
                     <div class="info-row"><span class="info-label">VALOR TOTAL NOTA FISCAL:</span> ${formatCurrency(receiptData.totalInvoiceValue)}</div>
+                    ${receiptData.barcode ? `
+                    <div class="info-row" style="display: flex; align-items: center; margin-top: 10px;">
+                        <span class="info-label">CÓD. BARRAS NF:</span>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <svg id="barcode-receipt" class="barcode-svg"></svg>
+                            <p style="font-size: 8pt; margin-top: 1mm; font-family: monospace; margin-bottom: 0;">${receiptData.barcode}</p>
+                        </div>
+                    </div>
+                    ` : ''}
                 </div>
 
                 <table>
@@ -312,13 +321,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                     <p style="margin: 0;">CPF: 347.810.448-32</p>
                     <p style="margin: 0;">PRESIDENTE</p>
                 </div>
-
-                ${receiptData.barcode ? `
-                <div class="barcode-section">
-                    <svg id="barcode-receipt" class="barcode-svg"></svg>
-                    <p style="font-size: 8pt; margin-top: 2mm; font-family: monospace;">${receiptData.barcode}</p>
-                </div>
-                ` : ''}
 
                 <script>
                     window.onload = function() {
