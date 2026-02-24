@@ -59,6 +59,10 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
     const [receiptSupplierCpf, setReceiptSupplierCpf] = useState('');
     const [receiptInvoice, setReceiptInvoice] = useState('');
 
+    const [isScheduleReportOpen, setIsScheduleReportOpen] = useState(false);
+    const [scheduleReportSeiNumber, setScheduleReportSeiNumber] = useState('');
+    const [selectedScheduleSuppliers, setSelectedScheduleSuppliers] = useState<string[]>([]);
+
     const dailyDeliveries = useMemo(() => {
         const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'FATURADO' | 'TERCEIRO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO' }[] = [];
         
@@ -100,7 +104,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
     }, [suppliers, thirdPartyEntries, selectedAgendaDate]);
 
     const weeklyDeliveries = useMemo(() => {
-        const list: { date: string; supplierName: string; time: string; status: 'AGENDADO' | 'FATURADO' | 'TERCEIRO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO' }[] = [];
+        const list: { date: string; supplierName: string; time: string; status: 'AGENDADO' | 'FATURADO' | 'TERCEIRO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO'; itemName?: string }[] = [];
         
         const current = new Date(selectedAgendaDate + 'T12:00:00');
         const day = current.getDay();
@@ -124,7 +128,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                         supplierName: s.name,
                         time: d.time,
                         status: isFaturado ? 'FATURADO' : 'AGENDADO',
-                        type: 'FORNECEDOR'
+                        type: 'FORNECEDOR',
+                        itemName: d.item
                     });
                 }
             });
@@ -138,13 +143,107 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                     supplierName: log.companyName,
                     time: log.time || '00:00',
                     status: 'TERCEIRO',
-                    type: 'TERCEIRO'
+                    type: 'TERCEIRO',
+                    itemName: 'ENTRADA DE TERCEIROS'
                 });
             }
         });
 
         return list.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     }, [suppliers, thirdPartyEntries, selectedAgendaDate]);
+
+    const uniqueWeeklySuppliers = useMemo(() => {
+        const suppliersMap = new Set<string>();
+        weeklyDeliveries.forEach(d => {
+            if (d.type === 'FORNECEDOR') {
+                suppliersMap.add(d.supplierName);
+            }
+        });
+        return Array.from(suppliersMap).sort();
+    }, [weeklyDeliveries]);
+
+    const handlePrintScheduleReport = () => {
+        const filteredDeliveries = weeklyDeliveries.filter(d => 
+            d.type === 'FORNECEDOR' && selectedScheduleSuppliers.includes(d.supplierName)
+        );
+
+        if (filteredDeliveries.length === 0) {
+            alert('Nenhum agendamento encontrado para os produtores selecionados.');
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('Por favor, permita popups para imprimir o cronograma.');
+            return;
+        }
+
+        const htmlContent = `
+            <html>
+            <head>
+                <title>Cronograma de Entregas</title>
+                <style>
+                    body { font-family: 'Times New Roman', Times, serif; padding: 20mm; line-height: 1.5; color: #000; font-size: 12pt; }
+                    .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                    .info-section { margin-bottom: 20px; }
+                    .info-row { margin-bottom: 5px; }
+                    .info-label { font-weight: bold; text-transform: uppercase; display: inline-block; width: 220px; }
+                    table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10pt; }
+                    th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+                    th { background-color: #f2f2f2; text-transform: uppercase; font-weight: bold; }
+                    .text-center { text-align: center; }
+                    .footer-text { margin-top: 30px; text-align: justify; }
+                    @media print {
+                        body { padding: 0; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    CRONOGRAMA DE ENTREGAS
+                </div>
+
+                <div class="info-section">
+                    <div class="info-row"><span class="info-label">PROCESSO SEI Nº:</span> ${scheduleReportSeiNumber || 'N/A'}</div>
+                    <div class="info-row"><span class="info-label">DATA DE EMISSÃO:</span> ${new Date().toLocaleDateString('pt-BR')}</div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>DATA</th>
+                            <th>HORÁRIO</th>
+                            <th>PRODUTOR</th>
+                            <th>ITEM AGENDADO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredDeliveries.map(d => `
+                            <tr>
+                                <td class="text-center">${d.date.split('-').reverse().join('/')}</td>
+                                <td class="text-center">${d.time}</td>
+                                <td>${d.supplierName}</td>
+                                <td>${d.itemName || '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div class="footer-text">
+                    <p>Cronograma gerado para conferência e acompanhamento das entregas de gêneros alimentícios.</p>
+                </div>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        
+        setTimeout(() => {
+            printWindow.print();
+            // printWindow.close(); // Optional: keep open for review
+        }, 500);
+    };
 
 
 
@@ -611,7 +710,82 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
 
                 {/* Tabela de Agendamentos da Semana */}
                 {activeTab === 'agenda' && (
-                    <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
+                    <div className="space-y-6">
+                        {/* Seção de Geração de Cronograma */}
+                        <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
+                            <div 
+                                className="flex justify-between items-center cursor-pointer select-none" 
+                                onClick={() => setIsScheduleReportOpen(!isScheduleReportOpen)}
+                            >
+                                <h3 className="text-lg font-black text-indigo-900 uppercase flex items-center gap-3">
+                                    <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" /></svg>
+                                    </div>
+                                    Gerar Cronograma de Entregas (PDF)
+                                </h3>
+                                <div className={`transform transition-transform duration-300 ${isScheduleReportOpen ? 'rotate-180' : ''}`}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                </div>
+                            </div>
+                            
+                            {isScheduleReportOpen && (
+                                <div className="mt-6 space-y-6 animate-fade-in border-t pt-6">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Número do Processo SEI</label>
+                                        <input 
+                                            type="text" 
+                                            value={scheduleReportSeiNumber} 
+                                            onChange={e => setScheduleReportSeiNumber(e.target.value)}
+                                            className="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 font-bold text-gray-700 transition-all"
+                                            placeholder="Ex: 12345.000000/2026-00"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-3 ml-1">
+                                            Selecionar Produtores (Agendados na Semana)
+                                            <span className="ml-2 text-[10px] text-indigo-500 bg-indigo-50 px-2 py-1 rounded-full">{selectedScheduleSuppliers.length} selecionados</span>
+                                        </label>
+                                        {uniqueWeeklySuppliers.length > 0 ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-4 border-2 border-gray-100 rounded-2xl bg-gray-50/50 custom-scrollbar">
+                                                {uniqueWeeklySuppliers.map(supplierName => (
+                                                    <label key={supplierName} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${selectedScheduleSuppliers.includes(supplierName) ? 'bg-white border-indigo-200 shadow-sm' : 'border-transparent hover:bg-white hover:shadow-sm'}`}>
+                                                        <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${selectedScheduleSuppliers.includes(supplierName) ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300 bg-white'}`}>
+                                                            {selectedScheduleSuppliers.includes(supplierName) && <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                                                        </div>
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={selectedScheduleSuppliers.includes(supplierName)}
+                                                            onChange={e => {
+                                                                if (e.target.checked) setSelectedScheduleSuppliers([...selectedScheduleSuppliers, supplierName]);
+                                                                else setSelectedScheduleSuppliers(selectedScheduleSuppliers.filter(s => s !== supplierName));
+                                                            }}
+                                                            className="hidden"
+                                                        />
+                                                        <span className={`text-xs font-black uppercase ${selectedScheduleSuppliers.includes(supplierName) ? 'text-indigo-900' : 'text-gray-500'}`}>{supplierName}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="p-8 text-center border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 text-xs font-bold uppercase">
+                                                Nenhum produtor com entrega agendada nesta semana.
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <button 
+                                        onClick={handlePrintScheduleReport}
+                                        disabled={selectedScheduleSuppliers.length === 0}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-8 rounded-2xl w-full uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 active:scale-95 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                        Gerar PDF do Cronograma
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
                         <div className="flex justify-between items-center mb-6 border-b pb-4">
                             <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full animate-pulse bg-indigo-600"></div>
@@ -654,6 +828,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                                 </tbody>
                             </table>
                         </div>
+                    </div>
                     </div>
                 )}
             </main>
