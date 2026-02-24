@@ -34,57 +34,57 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
         e.preventDefault();
         setIsSaving(true);
         
-        let res;
-        if (editingLogId) {
-            res = await onUpdate({ ...formData, id: editingLogId } as ThirdPartyEntryLog);
-        } else {
-            res = await onRegister(formData);
-        }
+        try {
+            let res;
+            if (editingLogId) {
+                res = await onUpdate({ ...formData, id: editingLogId } as ThirdPartyEntryLog);
+            } else {
+                res = await onRegister(formData as Omit<ThirdPartyEntryLog, 'id'>);
+            }
 
-        setIsSaving(false);
-        if (res.success) {
-            setIsModalOpen(false);
-            setEditingLogId(null);
-            setFormData({
-                date: new Date().toISOString().split('T')[0],
-                time: '08:00',
-                locations: '',
-                companyName: '',
-                companyCnpj: '',
-                vehicle: '',
-                plate: '',
-                monitoringResponsible: '',
-                pestControlResponsible: '',
-                serviceExecutionNumber: '',
-                contractNumber: '',
-                status: 'agendado',
-                serviceDetails: '',
-                receiptTermDate: new Date().toISOString().split('T')[0]
-            });
-        } else {
-            alert(res.message);
+            if (res.success) {
+                setIsModalOpen(false);
+                setEditingLogId(null);
+                setFormData({
+                    date: new Date().toISOString().split('T')[0],
+                    time: '08:00',
+                    locations: '',
+                    companyName: '',
+                    companyCnpj: '',
+                    vehicle: '',
+                    plate: '',
+                    monitoringResponsible: '',
+                    pestControlResponsible: '',
+                    serviceExecutionNumber: '',
+                    contractNumber: '',
+                    status: 'agendado',
+                    serviceDetails: '',
+                    receiptTermDate: new Date().toISOString().split('T')[0]
+                });
+            } else {
+                alert(res.message || 'Erro ao salvar');
+            }
+        } catch (error) {
+            console.error("Error saving third party entry:", error);
+            alert("Erro ao salvar. Verifique sua conexão ou tente novamente.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleEdit = (log: ThirdPartyEntryLog) => {
+        const { id, ...rest } = log;
         setFormData({
-            date: log.date,
+            ...rest,
             time: log.time || '08:00',
-            locations: log.locations,
-            companyName: log.companyName,
-            companyCnpj: log.companyCnpj,
             vehicle: log.vehicle || '',
             plate: log.plate || '',
-            monitoringResponsible: log.monitoringResponsible,
-            pestControlResponsible: log.pestControlResponsible,
             serviceExecutionNumber: log.serviceExecutionNumber || '',
             contractNumber: log.contractNumber || '',
-            status: log.status,
-            arrivalTime: log.arrivalTime,
             serviceDetails: log.serviceDetails || '',
             receiptTermDate: log.receiptTermDate || log.date
         });
-        setEditingLogId(log.id);
+        setEditingLogId(id);
         setIsModalOpen(true);
     };
 

@@ -216,7 +216,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'contracts': return <AdminContractItems suppliers={suppliers} warehouseLog={warehouseLog} onUpdateContractForItem={props.onUpdateContractForItem} />;
       case 'finance': return <AdminFinancialManager records={financialRecords} onSave={props.onSaveFinancialRecord} onDelete={props.onDeleteFinancialRecord} />;
       case 'invoices': return <AdminInvoices suppliers={suppliers} onReopenInvoice={props.onReopenInvoice} onDeleteInvoice={props.onDeleteInvoice} onUpdateInvoiceItems={props.onUpdateInvoiceItems} onManualInvoiceEntry={props.onManualInvoiceEntry} />;
-      case 'schedule': return <AdminScheduleView suppliers={suppliers} onCancelDeliveries={props.onCancelDeliveries} />;
+      case 'schedule': return <AdminScheduleView suppliers={suppliers} thirdPartyEntries={thirdPartyEntries} onCancelDeliveries={props.onCancelDeliveries} onDeleteThirdPartyEntry={props.onDeleteThirdPartyEntry} />;
       case 'perCapita': return <AdminPerCapita suppliers={suppliers} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={props.onUpdatePerCapitaConfig} />;
       case 'cleaning': return <AdminCleaningLog logs={cleaningLogs} onRegister={props.onRegisterCleaningLog} onDelete={props.onDeleteCleaningLog} />;
       case 'thirdPartyEntry': return <AdminThirdPartyEntry logs={thirdPartyEntries} onRegister={props.onRegisterThirdPartyEntry} onUpdate={props.onUpdateThirdPartyEntry} onDelete={props.onDeleteThirdPartyEntry} />;

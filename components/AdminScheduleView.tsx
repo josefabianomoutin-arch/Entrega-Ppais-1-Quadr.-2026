@@ -1,11 +1,13 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Supplier, Delivery } from '../types';
+import type { Supplier, Delivery, ThirdPartyEntryLog } from '../types';
 import WeeklyScheduleControl from './WeeklyScheduleControl';
 
 interface AdminScheduleViewProps {
   suppliers: Supplier[];
+  thirdPartyEntries: ThirdPartyEntryLog[];
   onCancelDeliveries: (supplierCpf: string, deliveryIds: string[]) => void;
+  onDeleteThirdPartyEntry: (id: string) => Promise<void>;
 }
 
 const formatDate = (dateString: string) => {
@@ -14,7 +16,7 @@ const formatDate = (dateString: string) => {
     return date.toLocaleDateString('pt-BR');
 };
 
-const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCancelDeliveries }) => {
+const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdPartyEntries, onCancelDeliveries, onDeleteThirdPartyEntry }) => {
     const [activeSubTab, setActiveSubTab] = useState<'daily' | 'weekly'>('daily');
     const [searchTerm, setSearchTerm] = useState('');
     const [dateFilter, setDateFilter] = useState('');
@@ -26,15 +28,33 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
             return nameMatch && dateMatch;
         });
     }, [suppliers, searchTerm, dateFilter]);
+
+    const filteredThirdParties = useMemo(() => {
+        return (thirdPartyEntries || []).filter(log => {
+            const nameMatch = log.companyName.toLowerCase().includes(searchTerm.toLowerCase());
+            const dateMatch = !dateFilter || log.date === dateFilter;
+            return nameMatch && dateMatch;
+        });
+    }, [thirdPartyEntries, searchTerm, dateFilter]);
     
     const sortedSuppliers = useMemo(() => {
         return [...filteredSuppliers].sort((a, b) => a.name.localeCompare(b.name));
     }, [filteredSuppliers]);
 
+    const sortedThirdParties = useMemo(() => {
+        return [...filteredThirdParties].sort((a, b) => a.companyName.localeCompare(b.companyName));
+    }, [filteredThirdParties]);
+
     const handleCancel = (supplierCpf: string, deliveryIds: string[], date: string, isInvoice: boolean) => {
         const type = isInvoice ? 'FATURAMENTO' : 'AGENDAMENTO';
         if (window.confirm(`ATENÇÃO: Deseja realmente EXCLUIR o ${type} do dia ${formatDate(date)}?\n\nEsta ação removerá o registro permanentemente.`)) {
             onCancelDeliveries(supplierCpf, deliveryIds);
+        }
+    };
+
+    const handleDeleteThirdParty = async (id: string, company: string, date: string) => {
+        if (window.confirm(`ATENÇÃO: Deseja realmente EXCLUIR o agendamento de ${company} do dia ${formatDate(date)}?`)) {
+            await onDeleteThirdPartyEntry(id);
         }
     };
 
@@ -105,6 +125,50 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
                     </div>
 
                     <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-3 custom-scrollbar">
+                        {/* Seção de Terceiros */}
+                        {sortedThirdParties.length > 0 && (
+                            <div className="space-y-4 mb-8">
+                                <h3 className="text-xs font-black text-amber-600 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                    Agendamentos de Terceiros
+                                </h3>
+                                {sortedThirdParties.map(log => (
+                                    <div key={log.id} className="p-5 border rounded-2xl bg-amber-50/30 hover:bg-white transition-all border-l-8 border-l-amber-400 shadow-sm">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h3 className="font-black text-lg text-amber-900 uppercase">{log.companyName}</h3>
+                                                <p className="text-[10px] font-mono text-gray-400">{log.companyCnpj}</p>
+                                                <div className="flex gap-4 mt-2">
+                                                    <span className="text-xs font-black text-amber-800 font-mono">{formatDate(log.date)}</span>
+                                                    <span className="text-[10px] font-bold text-amber-600 uppercase">Agendado p/ {log.time || '00:00'}</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-right flex flex-col items-end gap-2">
+                                                <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                                                    log.status === 'concluido' ? 'bg-green-100 text-green-700' : log.arrivalTime ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                                                }`}>
+                                                    {log.status === 'concluido' ? '✓ Concluído' : log.arrivalTime ? '● Em Serviço' : '○ Aguardando'}
+                                                </span>
+                                                <button 
+                                                    onClick={() => handleDeleteThirdParty(log.id, log.companyName, log.date)}
+                                                    className="bg-red-50 text-red-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase border border-red-100 hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                                                >
+                                                    Excluir
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Seção de Fornecedores */}
+                        {sortedSuppliers.length > 0 && (
+                             <h3 className="text-xs font-black text-purple-600 uppercase tracking-[0.2em] ml-2 flex items-center gap-2 mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                Entregas de Fornecedores
+                            </h3>
+                        )}
                         {sortedSuppliers.length > 0 ? sortedSuppliers.map(supplier => {
                             const displayDeliveries = dateFilter 
                                 ? (supplier.deliveries || []).filter(d => d.date === dateFilter)
@@ -221,7 +285,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, onCanc
                     </div>
                 </div>
             ) : (
-                <WeeklyScheduleControl suppliers={suppliers} />
+                <WeeklyScheduleControl suppliers={suppliers} thirdPartyEntries={thirdPartyEntries} />
             )}
              <style>{`.custom-scrollbar::-webkit-scrollbar { width: 8px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }`}</style>
         </div>

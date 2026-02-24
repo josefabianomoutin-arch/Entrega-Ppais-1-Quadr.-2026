@@ -14,6 +14,7 @@ interface AlmoxarifadoDashboardProps {
     onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => void;
     onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string) => Promise<{ success: boolean; message?: string }>;
     onManualInvoiceEntry: (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string) => Promise<{ success: boolean; message?: string }>;
+    thirdPartyEntries: ThirdPartyEntryLog[];
 }
 
 const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ 
@@ -26,7 +27,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
     onReopenInvoice,
     onDeleteInvoice,
     onUpdateInvoiceItems,
-    onManualInvoiceEntry
+    onManualInvoiceEntry,
+    thirdPartyEntries
 }) => {
     const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'receipt' | 'agenda'>('entry');
     const [selectedAgendaDate, setSelectedAgendaDate] = useState(new Date().toISOString().split('T')[0]);
@@ -34,7 +36,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
     const [receiptInvoice, setReceiptInvoice] = useState('');
 
     const dailyDeliveries = useMemo(() => {
-        const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'FATURADO'; id: string }[] = [];
+        const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'FATURADO' | 'TERCEIRO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO' }[] = [];
         
         suppliers.forEach(s => {
             (s.deliveries || []).forEach(d => {
@@ -48,17 +50,33 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                             supplierCpf: s.cpf,
                             time: d.time,
                             arrivalTime: d.arrivalTime,
-                            status: isFaturado ? 'FATURADO' : 'AGENDADO'
+                            status: isFaturado ? 'FATURADO' : 'AGENDADO',
+                            type: 'FORNECEDOR'
                         });
                     }
                 }
             });
         });
+
+        (thirdPartyEntries || []).forEach(log => {
+            if (log.date === selectedAgendaDate) {
+                list.push({
+                    id: log.id,
+                    supplierName: log.companyName,
+                    supplierCpf: log.companyCnpj,
+                    time: log.time || '00:00',
+                    arrivalTime: log.arrivalTime,
+                    status: 'TERCEIRO',
+                    type: 'TERCEIRO'
+                });
+            }
+        });
+
         return list.sort((a, b) => a.time.localeCompare(b.time));
-    }, [suppliers, selectedAgendaDate]);
+    }, [suppliers, thirdPartyEntries, selectedAgendaDate]);
 
     const weeklyDeliveries = useMemo(() => {
-        const list: { date: string; supplierName: string; time: string; status: 'AGENDADO' | 'FATURADO'; id: string }[] = [];
+        const list: { date: string; supplierName: string; time: string; status: 'AGENDADO' | 'FATURADO' | 'TERCEIRO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO' }[] = [];
         
         const current = new Date(selectedAgendaDate + 'T12:00:00');
         const day = current.getDay();
@@ -81,13 +99,28 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                         date: d.date,
                         supplierName: s.name,
                         time: d.time,
-                        status: isFaturado ? 'FATURADO' : 'AGENDADO'
+                        status: isFaturado ? 'FATURADO' : 'AGENDADO',
+                        type: 'FORNECEDOR'
                     });
                 }
             });
         });
+
+        (thirdPartyEntries || []).forEach(log => {
+            if (weekDates.includes(log.date)) {
+                list.push({
+                    id: log.id,
+                    date: log.date,
+                    supplierName: log.companyName,
+                    time: log.time || '00:00',
+                    status: 'TERCEIRO',
+                    type: 'TERCEIRO'
+                });
+            }
+        });
+
         return list.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-    }, [suppliers, selectedAgendaDate]);
+    }, [suppliers, thirdPartyEntries, selectedAgendaDate]);
 
 
 
@@ -393,8 +426,13 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                                         </div>
 
                                         <div className="mb-4">
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Fornecedor</p>
-                                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight break-words">{item.supplierName}</h3>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
+                                                {item.type === 'FORNECEDOR' ? 'Fornecedor' : 'Entrada Terceiros'}
+                                            </p>
+                                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight break-words leading-tight">{item.supplierName}</h3>
+                                            {item.type === 'TERCEIRO' && (
+                                                <p className="text-[10px] font-mono text-slate-400 mt-1">{item.supplierCpf}</p>
+                                            )}
                                         </div>
 
                                         {item.arrivalTime && (
@@ -518,7 +556,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                                     </div>
 
                                     <div className="text-center font-bold pt-4">
-                                        TAIÚVA, {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()}
+                                        TAIÚVA, {receiptData.receiptDate ? new Date(receiptData.receiptDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase() : 'DATA NÃO INFORMADA'}
                                     </div>
 
                                     <div className="text-center space-y-1 pt-8">
@@ -553,7 +591,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                                     <tr className="bg-slate-900 text-[10px] font-black uppercase text-slate-100 tracking-widest">
                                         <th className="p-4 text-left">Data</th>
                                         <th className="p-4 text-left">Horário</th>
-                                        <th className="p-4 text-left">Fornecedor</th>
+                                        <th className="p-4 text-left">Tipo</th>
+                                        <th className="p-4 text-left">Fornecedor / Empresa</th>
                                         <th className="p-4 text-center">Status</th>
                                     </tr>
                                 </thead>
@@ -562,14 +601,17 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                                         <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors">
                                             <td className="p-4 text-xs text-slate-700 font-mono font-bold">{item.date.split('-').reverse().join('/')}</td>
                                             <td className="p-4 text-xs font-mono text-indigo-800 font-black">{item.time}</td>
+                                            <td className="p-4 text-[9px] font-black uppercase text-slate-400">{item.type}</td>
                                             <td className="p-4 font-bold text-slate-900 uppercase text-xs">{item.supplierName}</td>
                                             <td className="p-4 text-center">
                                                 <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${ 
                                                     item.status === 'FATURADO' 
                                                         ? 'bg-indigo-100 text-indigo-700' 
-                                                        : 'bg-red-100 text-red-700'
+                                                        : item.status === 'TERCEIRO'
+                                                            ? 'bg-amber-100 text-amber-700'
+                                                            : 'bg-red-100 text-red-700'
                                                 }`}>
-                                                    {item.status === 'FATURADO' ? '✓ Descarregado' : '○ Aguardando'}
+                                                    {item.status === 'FATURADO' ? '✓ Descarregado' : item.status === 'TERCEIRO' ? '● Terceiros' : '○ Aguardando'}
                                                 </span>
                                             </td>
                                         </tr>

@@ -1,9 +1,10 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Supplier, Delivery } from '../types';
+import type { Supplier, Delivery, ThirdPartyEntryLog } from '../types';
 
 interface WeeklyScheduleControlProps {
     suppliers: Supplier[];
+    thirdPartyEntries?: ThirdPartyEntryLog[];
     title?: string;
     subtitle?: string;
     itespOnly?: boolean;
@@ -45,6 +46,7 @@ const ITESP_SUPPLIERS_RAW = [
 
 const WeeklyScheduleControl: React.FC<WeeklyScheduleControlProps> = ({ 
     suppliers, 
+    thirdPartyEntries = [],
     title = "Controle Semanal de Entregas", 
     subtitle = "Acompanhamento de agendamentos vs faturamentos reais.",
     itespOnly = false
@@ -64,7 +66,7 @@ const WeeklyScheduleControl: React.FC<WeeklyScheduleControlProps> = ({
     }, [suppliers, itespOnly]);
 
     const weeklyData = useMemo(() => {
-        return filteredSuppliers.map(supplier => {
+        const supplierData = filteredSuppliers.map(supplier => {
             const weekDeliveries = (supplier.deliveries || []).filter(d => {
                 const dDate = new Date(d.date + 'T00:00:00');
                 return getWeekNumber(dDate) === selectedWeek;
@@ -89,15 +91,35 @@ const WeeklyScheduleControl: React.FC<WeeklyScheduleControlProps> = ({
             const failed = hasScheduled && !hasDelivered;
 
             return {
-                supplier,
+                id: supplier.cpf,
+                type: 'FORNECEDOR' as const,
+                name: supplier.name,
+                identifier: supplier.cpf,
                 scheduledDates,
                 invoices,
                 hasScheduled,
                 hasDelivered,
                 failed
             };
-        }).filter(item => item.hasScheduled || item.hasDelivered);
-    }, [filteredSuppliers, selectedWeek]);
+        });
+
+        const thirdPartyData = (thirdPartyEntries || []).filter(log => {
+            const dDate = new Date(log.date + 'T00:00:00');
+            return getWeekNumber(dDate) === selectedWeek;
+        }).map(log => ({
+            id: log.id,
+            type: 'TERCEIRO' as const,
+            name: log.companyName,
+            identifier: log.companyCnpj,
+            scheduledDates: [log.date],
+            invoices: log.status === 'concluido' ? [{ nf: 'CONCLUÍDO', date: log.date }] : [],
+            hasScheduled: true,
+            hasDelivered: log.status === 'concluido',
+            failed: log.status !== 'concluido' && new Date(log.date + 'T23:59:59').getTime() < new Date().getTime()
+        }));
+
+        return [...supplierData, ...thirdPartyData].filter(item => item.hasScheduled || item.hasDelivered);
+    }, [filteredSuppliers, thirdPartyEntries, selectedWeek]);
 
     const stats = useMemo(() => {
         const total = weeklyData.length;
@@ -157,8 +179,13 @@ const WeeklyScheduleControl: React.FC<WeeklyScheduleControlProps> = ({
                             {weeklyData.length > 0 ? weeklyData.map((item, idx) => (
                                 <tr key={idx} className="hover:bg-gray-50 transition-colors">
                                     <td className="p-5">
-                                        <p className="font-black text-gray-900 uppercase text-xs">{item.supplier.name}</p>
-                                        <p className="text-[10px] font-mono text-gray-400">{item.supplier.cpf}</p>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${item.type === 'FORNECEDOR' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                {item.type}
+                                            </span>
+                                        </div>
+                                        <p className="font-black text-gray-900 uppercase text-xs">{item.name}</p>
+                                        <p className="text-[10px] font-mono text-gray-400">{item.identifier}</p>
                                     </td>
                                     <td className="p-5 text-center">
                                         <div className="flex flex-wrap justify-center gap-1">
