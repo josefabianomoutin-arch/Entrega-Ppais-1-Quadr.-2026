@@ -244,7 +244,7 @@ const App: React.FC = () => {
 
   // --- GERENCIAMENTO DE NOTAS FISCAIS (ADMIN) ---
 
-  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string) => {
+  const handleUpdateInvoiceItems = async (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string, receiptTermNumber?: string) => {
     const supplierRef = child(suppliersRef, supplierCpf);
     try {
       await runTransaction(supplierRef, (currentData: Supplier) => {
@@ -255,6 +255,7 @@ const App: React.FC = () => {
           const baseDate = newDate || existingForNf[0].date;
           const baseTime = existingForNf[0].time;
           const finalInvoiceNumber = newInvoiceNumber || invoiceNumber;
+          const finalReceiptTerm = receiptTermNumber !== undefined ? receiptTermNumber : existingForNf[0].receiptTermNumber;
 
           // Remove itens antigos daquela nota
           currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
@@ -271,6 +272,7 @@ const App: React.FC = () => {
               invoiceUploaded: true,
               invoiceNumber: String(finalInvoiceNumber || '').trim(),
               barcode: barcode,
+              receiptTermNumber: finalReceiptTerm,
               lots: [{
                 id: `lot-edit-${Date.now()}-${idx}`,
                 lotNumber: item.lotNumber || 'EDITADO',
@@ -325,7 +327,7 @@ const App: React.FC = () => {
     });
   };
 
-  const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string) => {
+  const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, receiptTermNumber?: string) => {
     const supplierRef = child(suppliersRef, supplierCpf);
     try {
       await runTransaction(supplierRef, (currentData: Supplier) => {
@@ -342,6 +344,7 @@ const App: React.FC = () => {
               invoiceUploaded: true,
               invoiceNumber: String(invoiceNumber || '').trim(),
               barcode: barcode,
+              receiptTermNumber: receiptTermNumber,
               lots: [{
                 id: `lot-manual-${Date.now()}-${idx}`,
                 lotNumber: item.lotNumber || 'MANUAL',

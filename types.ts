@@ -10,6 +10,7 @@ export interface Delivery {
   invoiceUploaded: boolean;
   invoiceNumber?: string;
   barcode?: string; // NOVO: Código de barras da NF
+  receiptTermNumber?: string; // NOVO: Número do termo de recebimento
   lots?: {
     id: string;
     lotNumber: string;

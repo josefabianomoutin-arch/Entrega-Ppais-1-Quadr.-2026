@@ -58,7 +58,8 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                 serviceExecutionNumber: '',
                 contractNumber: '',
                 status: 'agendado',
-                serviceDetails: ''
+                serviceDetails: '',
+                receiptTermDate: new Date().toISOString().split('T')[0]
             });
         } else {
             alert(res.message);
@@ -295,21 +296,21 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
             </div>
 
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex justify-center items-center p-4 animate-fade-in">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-scale-up">
-                        <div className="bg-gray-800 p-8 text-white">
-                            <h3 className="text-2xl font-black uppercase tracking-tighter">
-                                {editingLogId ? 'Editar Registro de Terceiros' : 'Novo Registro de Terceiros'}
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex justify-center items-center p-2 animate-fade-in">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-xl overflow-hidden animate-scale-up max-h-[95vh] flex flex-col">
+                        <div className="bg-gray-800 p-4 text-white">
+                            <h3 className="text-xl font-black uppercase tracking-tighter">
+                                {editingLogId ? 'Editar Registro' : 'Novo Registro'}
                             </h3>
-                            <p className="text-gray-200 font-bold uppercase text-xs tracking-widest mt-1">
-                                {editingLogId ? 'Atualize os dados do serviço' : 'Preencha os dados da prestadora e do serviço'}
+                            <p className="text-gray-300 font-bold uppercase text-[9px] tracking-widest mt-0.5">
+                                {editingLogId ? 'Atualize os dados do serviço' : 'Preencha os dados da prestadora'}
                             </p>
                         </div>
                         
-                        <form onSubmit={handleSave} className="p-8 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <form onSubmit={handleSave} className="p-5 space-y-4 overflow-y-auto custom-scrollbar">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Data do Serviço</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Data do Serviço</label>
                                     <input 
                                         type="date" 
                                         required
@@ -318,25 +319,25 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                             const newDate = e.target.value;
                                             setFormData({...formData, date: newDate, receiptTermDate: newDate });
                                         }}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Horário</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Horário</label>
                                     <input 
                                         type="time" 
                                         required
                                         value={formData.time}
                                         onChange={e => setFormData({...formData, time: e.target.value})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Status</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</label>
                                     <select 
                                         value={formData.status}
                                         onChange={e => setFormData({...formData, status: e.target.value as any})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
                                     >
                                         <option value="agendado">Agendado</option>
                                         <option value="concluido">Concluído</option>
@@ -344,148 +345,147 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Data do Termo de Recebimento</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Data Termo Rec.</label>
                                     <input 
                                         type="date" 
                                         required
                                         value={formData.receiptTermDate || ''}
                                         disabled
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none font-bold bg-gray-100 transition-all text-gray-500"
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none font-bold bg-gray-100 transition-all text-gray-500 text-sm"
                                     />
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">CNPJ da Prestadora</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">CNPJ da Prestadora</label>
                                     <input 
                                         type="text" 
                                         required
                                         placeholder="00.000.000/0000-00"
                                         value={formData.companyCnpj}
                                         onChange={e => setFormData({...formData, companyCnpj: e.target.value})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Nº de Execução de Serviços</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Nº Execução</label>
                                     <input 
                                         type="text" 
                                         required
                                         placeholder="000/2026"
                                         value={formData.serviceExecutionNumber}
                                         onChange={e => setFormData({...formData, serviceExecutionNumber: e.target.value.toUpperCase()})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Número do Contrato</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Nº Contrato</label>
                                     <input 
                                         type="text" 
                                         placeholder="000/2026"
                                         value={formData.contractNumber || ''}
                                         onChange={e => setFormData({...formData, contractNumber: e.target.value.toUpperCase()})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Empresa</label>
+                                    <input 
+                                        type="text" 
+                                        required
+                                        placeholder="NOME DA EMPRESA"
+                                        value={formData.companyName}
+                                        onChange={e => setFormData({...formData, companyName: e.target.value.toUpperCase()})}
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Detalhes do Serviço</label>
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Detalhes do Serviço</label>
                                 <input 
                                     type="text" 
                                     placeholder="Ex: Troca de Lâmpadas, Reparo Hidráulico"
                                     value={formData.serviceDetails || ''}
                                     onChange={e => setFormData({...formData, serviceDetails: e.target.value})}
-                                    className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                    className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
                                 />
                             </div>
 
-                             <div>
-                                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Nome da Empresa</label>
-                                 <input 
-                                     type="text" 
-                                     required
-                                     placeholder="NOME DA EMPRESA PRESTADORA"
-                                     value={formData.companyName}
-                                     onChange={e => setFormData({...formData, companyName: e.target.value.toUpperCase()})}
-                                     className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
-                                 />
-                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Veículo</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Veículo</label>
                                     <input 
                                         type="text" 
                                         placeholder="Ex: FIAT TORO BRANCA"
                                         value={formData.vehicle}
                                         onChange={e => setFormData({...formData, vehicle: e.target.value.toUpperCase()})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Placa</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Placa</label>
                                     <input 
                                         type="text" 
                                         placeholder="ABC-1234"
                                         value={formData.plate}
                                         onChange={e => setFormData({...formData, plate: e.target.value.toUpperCase()})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Locais Dedetizados</label>
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Locais</label>
                                 <textarea 
                                     required
-                                    placeholder="Ex: Cozinha, Refeitório, Almoxarifado..."
+                                    placeholder="Ex: Cozinha, Refeitório..."
                                     value={formData.locations}
                                     onChange={e => setFormData({...formData, locations: e.target.value})}
-                                    className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all h-24 resize-none"
+                                    className="w-full border-2 border-gray-50 rounded-xl px-4 py-2 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all h-16 resize-none text-sm"
                                 />
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Responsável Acompanhamento</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Resp. Acompanhamento</label>
                                     <input 
                                         type="text" 
                                         required
                                         placeholder="NOME DO SERVIDOR"
                                         value={formData.monitoringResponsible}
                                         onChange={e => setFormData({...formData, monitoringResponsible: e.target.value.toUpperCase()})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Responsável Dedetização</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Resp. Técnico</label>
                                     <input 
                                         type="text" 
                                         required
                                         placeholder="NOME DO TÉCNICO"
                                         value={formData.pestControlResponsible}
                                         onChange={e => setFormData({...formData, pestControlResponsible: e.target.value.toUpperCase()})}
-                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                        className="w-full border-2 border-gray-50 rounded-xl px-4 py-2.5 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all text-sm"
                                     />
                                 </div>
                             </div>
 
-                            <div className="flex gap-4 pt-4">
+                            <div className="flex gap-3 pt-2">
                                 <button 
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="flex-1 bg-gray-100 text-gray-500 font-black py-4 rounded-2xl uppercase text-xs tracking-widest hover:bg-gray-200 transition-all"
+                                    className="flex-1 bg-gray-100 text-gray-500 font-black py-3 rounded-xl uppercase text-[10px] tracking-widest hover:bg-gray-200 transition-all"
                                 >
                                     Cancelar
                                 </button>
                                 <button 
                                     type="submit"
                                     disabled={isSaving}
-                                    className="flex-1 bg-gray-600 text-white font-black py-4 rounded-2xl uppercase text-xs tracking-widest hover:bg-gray-700 shadow-lg shadow-gray-200 transition-all disabled:opacity-50"
+                                    className="flex-1 bg-gray-700 text-white font-black py-3 rounded-xl uppercase text-[10px] tracking-widest hover:bg-gray-800 shadow-lg transition-all disabled:opacity-50"
                                 >
-                                    {isSaving ? 'Salvando...' : editingLogId ? 'Atualizar Registro' : 'Salvar Registro'}
+                                    {isSaving ? 'Salvando...' : editingLogId ? 'Atualizar' : 'Salvar'}
                                 </button>
                             </div>
                         </form>
