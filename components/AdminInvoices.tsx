@@ -178,7 +178,11 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
     }, [suppliers]);
     
     const filteredAndSortedInvoices = useMemo(() => {
-        const filtered = allInvoices.filter(invoice => invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()));
+        const filtered = allInvoices.filter(invoice => 
+            invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (invoice.barcode && invoice.barcode.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
         return filtered.sort((a, b) => {
             let comp = 0;
             if (sortKey === 'supplierName') comp = a.supplierName.localeCompare(b.supplierName);
@@ -191,6 +195,26 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
     const handleSort = (key: 'supplierName' | 'date' | 'totalValue') => {
         if (key === sortKey) setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
         else { setSortKey(key); setSortDirection('desc'); }
+    };
+
+    const handleRegisterExitClick = (invoice: InvoiceInfo) => {
+        // FIFO Logic: Check for older invoices with balance
+        const olderInvoices = allInvoices.filter(inv => 
+            inv.supplierCpf === invoice.supplierCpf && 
+            inv.id !== invoice.id &&
+            new Date(inv.date) < new Date(invoice.date) &&
+            inv.items.some(item => item.kg > 0)
+        );
+
+        if (olderInvoices.length > 0) {
+            // Sort by date ascending
+            olderInvoices.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            const oldest = olderInvoices[0];
+            alert(`BLOQUEIO DE SAÍDA (FIFO):\n\nExiste uma nota fiscal mais antiga com saldo disponível para este fornecedor.\n\nNF: ${oldest.invoiceNumber}\nData: ${formatDate(oldest.date)}\n\nPor favor, utilize a nota mais antiga primeiro para manter a ordem de saída.`);
+            return;
+        }
+
+        setExitingInvoice(invoice);
     };
     
     const handleExitSave = async (outboundNf: string, exitDate: string, itemsToExit: { name: string; kg: number; lotNumber?: string; expirationDate?: string }[]) => {
@@ -256,21 +280,23 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                     <p className="text-gray-400 font-medium">Visualize as faturas ou lance manualmente caso o fornecedor não consiga agendar.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <button 
-                        onClick={() => handlePrintLabels(filteredAndSortedInvoices)}
-                        disabled={filteredAndSortedInvoices.length === 0}
-                        className="bg-amber-500 hover:bg-amber-600 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2 disabled:bg-gray-300"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
-                        Imprimir Etiquetas (Filtradas)
-                    </button>
+                    {mode !== 'warehouse_exit' && (
+                        <button 
+                            onClick={() => handlePrintLabels(filteredAndSortedInvoices)}
+                            disabled={filteredAndSortedInvoices.length === 0}
+                            className="bg-amber-500 hover:bg-amber-600 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2 disabled:bg-gray-300"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
+                            Imprimir Etiquetas (Filtradas)
+                        </button>
+                    )}
                     {mode !== 'warehouse_exit' && (
                         <button onClick={() => setIsManualModalOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
                             Lançar NF Manualmente
                         </button>
                     )}
-                    <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-400 transition-all w-full md:w-auto" />
+                    <input type="text" placeholder="Pesquisar (Fornecedor, NF, Código de Barras)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-400 transition-all w-full md:w-auto" />
                 </div>
             </div>
 
@@ -320,7 +346,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                             <div className="flex items-center justify-center gap-2">
                                                 {mode === 'warehouse_exit' ? (
                                                     <button 
-                                                        onClick={() => setExitingInvoice(invoice)}
+                                                        onClick={() => handleRegisterExitClick(invoice)}
                                                         className="bg-red-600 text-white hover:bg-red-700 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors shadow-md"
                                                         title="Registrar Saída"
                                                     >
