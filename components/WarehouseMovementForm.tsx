@@ -15,14 +15,20 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
     // Estados para o formulário manual/individual
     const [manualType, setManualType] = useState<'entrada' | 'saída'>('entrada');
     const [selectedSupplierCpf, setSelectedSupplierCpf] = useState('');
+    const [manualNf, setManualNf] = useState('');
+    const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
+
+    // Estados para o item sendo adicionado
     const [selectedItemName, setSelectedItemName] = useState('');
     const [manualBarcode, setManualBarcode] = useState('');
     const [manualQuantity, setManualQuantity] = useState('');
-    const [manualNf, setManualNf] = useState('');
     const [manualInboundNf, setManualInboundNf] = useState('');
     const [manualLot, setManualLot] = useState('');
-    const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
     const [manualExp, setManualExp] = useState('');
+    
+    // Lista de itens a serem processados
+    const [items, setItems] = useState<{ id: string; itemName: string; quantity: number; lot: string; exp: string; barcode: string; inboundInvoice?: string }[]>([]);
+    
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
@@ -65,8 +71,14 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
             for (const s of suppliers) {
                 const deliveries = (s.deliveries || []).filter(d => d.barcode === barcode);
                 if (deliveries.length > 0) {
-                    setSelectedSupplierCpf(s.cpf);
-                    setManualInboundNf(deliveries[0].invoiceNumber || '');
+                    // Se o fornecedor ainda não foi selecionado, seleciona
+                    if (!selectedSupplierCpf) {
+                        setSelectedSupplierCpf(s.cpf);
+                    }
+                    // Se for saída e a NF de entrada não foi selecionada, tenta selecionar
+                    if (manualType === 'saída' && !manualInboundNf) {
+                        setManualInboundNf(deliveries[0].invoiceNumber || '');
+                    }
                     
                     if (deliveries.length === 1) {
                         setSelectedItemName(deliveries[0].item || '');
@@ -77,7 +89,8 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
                             setManualExp(entryLog.expirationDate || '');
                         }
                     } else {
-                        setSelectedItemName('');
+                        // Se houver múltiplos itens com mesmo código, não preenche item automaticamente
+                        // setSelectedItemName('');
                     }
                     foundMatch = true;
                     break;
@@ -88,60 +101,114 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
                 const entryLog = warehouseLog.find(l => l.barcode === barcode && l.type === 'entrada');
                 if (entryLog) {
                     const supplier = suppliers.find(s => s.name === entryLog.supplierName);
-                    if (supplier) setSelectedSupplierCpf(supplier.cpf);
+                    if (supplier && !selectedSupplierCpf) setSelectedSupplierCpf(supplier.cpf);
                     setSelectedItemName(entryLog.itemName);
-                    setManualInboundNf(entryLog.inboundInvoice || '');
+                    if (manualType === 'saída' && !manualInboundNf) setManualInboundNf(entryLog.inboundInvoice || '');
                     setManualLot(entryLog.lotNumber || '');
                     setManualExp(entryLog.expirationDate || '');
                 }
             }
         }
-    }, [manualBarcode, suppliers, warehouseLog]);
+    }, [manualBarcode, suppliers, warehouseLog, manualType, selectedSupplierCpf, manualInboundNf]);
 
-    const handleManualSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleAddItem = () => {
         const qtyVal = parseFloat(manualQuantity.replace(',', '.'));
-        if (!selectedSupplierCpf || !selectedItemName || isNaN(qtyVal) || qtyVal <= 0) {
-            alert('Preencha os campos obrigatórios (Fornecedor, Item e Quantidade).');
+        if (!selectedItemName || isNaN(qtyVal) || qtyVal <= 0) {
+            alert('Preencha Item e Quantidade válida.');
+            return;
+        }
+
+        if (manualType === 'saída' && !manualInboundNf) {
+             alert('Selecione a Nota Fiscal de Origem (Entrada) para este item.');
+             return;
+        }
+
+        setItems(prev => [...prev, {
+            id: `item-${Date.now()}`,
+            itemName: selectedItemName,
+            quantity: qtyVal,
+            lot: manualLot,
+            exp: manualExp,
+            barcode: manualBarcode,
+            inboundInvoice: manualInboundNf
+        }]);
+
+        // Limpa campos do item para próxima inserção
+        setSelectedItemName('');
+        setManualQuantity('');
+        setManualLot('');
+        setManualExp('');
+        setManualBarcode('');
+        // Não limpamos manualInboundNf automaticamente pois pode ser a mesma para o próximo item? 
+        // Melhor limpar para forçar atenção ou manter? Manter é mais prático.
+        // Mas se o usuário mudar de item, talvez a NF mude.
+        // Vamos manter por conveniência, mas o usuário pode mudar.
+        barcodeInputRef.current?.focus();
+    };
+
+    const handleRemoveItem = (id: string) => {
+        setItems(prev => prev.filter(i => i.id !== id));
+    };
+
+    const handleRegisterAll = async () => {
+        if (!selectedSupplierCpf) {
+            alert('Selecione o Fornecedor.');
+            return;
+        }
+        if (items.length === 0) {
+            alert('Adicione pelo menos um item à lista.');
             return;
         }
 
         setIsSubmitting(true);
         try {
-            const res = manualType === 'entrada' 
-                ? await onRegisterEntry({
-                    supplierCpf: selectedSupplierCpf,
-                    itemName: selectedItemName,
-                    invoiceNumber: manualNf,
-                    invoiceDate: manualDate,
-                    lotNumber: manualLot || 'UNICO',
-                    quantity: qtyVal,
-                    expirationDate: manualExp,
-                    barcode: manualBarcode
-                })
-                : await onRegisterWithdrawal({
-                    supplierCpf: selectedSupplierCpf,
-                    itemName: selectedItemName,
-                    outboundInvoice: manualNf,
-                    inboundInvoice: manualInboundNf,
-                    lotNumber: manualLot || 'UNICO',
-                    quantity: qtyVal,
-                    expirationDate: manualExp,
-                    date: manualDate,
-                    barcode: manualBarcode
-                });
+            let successCount = 0;
+            let failCount = 0;
 
-            if (res.success) {
+            for (const item of items) {
+                const res = manualType === 'entrada' 
+                    ? await onRegisterEntry({
+                        supplierCpf: selectedSupplierCpf,
+                        itemName: item.itemName,
+                        invoiceNumber: manualNf,
+                        invoiceDate: manualDate,
+                        lotNumber: item.lot || 'UNICO',
+                        quantity: item.quantity,
+                        expirationDate: item.exp,
+                        barcode: item.barcode
+                    })
+                    : await onRegisterWithdrawal({
+                        supplierCpf: selectedSupplierCpf,
+                        itemName: item.itemName,
+                        outboundInvoice: manualNf,
+                        inboundInvoice: item.inboundInvoice,
+                        lotNumber: item.lot || 'UNICO',
+                        quantity: item.quantity,
+                        expirationDate: item.exp,
+                        date: manualDate,
+                        barcode: item.barcode
+                    });
+                
+                if (res.success) successCount++;
+                else failCount++;
+            }
+
+            if (failCount === 0) {
+                alert('Todos os itens foram registrados com sucesso!');
+                setItems([]);
+                setManualNf('');
+                setManualInboundNf('');
                 setManualBarcode('');
                 setManualQuantity('');
                 setManualLot('');
                 setManualExp('');
-                barcodeInputRef.current?.focus();
+                setSelectedItemName('');
             } else {
-                alert(res.message);
+                alert(`${successCount} itens registrados. ${failCount} falharam. Verifique os logs.`);
+                setItems([]); 
             }
         } catch (err) {
-            alert('Erro de conexão ao processar lançamento.');
+            alert('Erro de conexão ao processar lançamentos.');
         } finally {
             setIsSubmitting(false);
         }
@@ -171,14 +238,14 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
                 <div className="flex bg-gray-100 p-1.5 rounded-2xl shadow-inner w-full md:w-auto">
                     <button 
                         type="button" 
-                        onClick={() => setManualType('entrada')} 
+                        onClick={() => { setManualType('entrada'); setItems([]); setManualInboundNf(''); }} 
                         className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-[10px] font-black uppercase transition-all duration-300 flex items-center justify-center gap-2 ${manualType === 'entrada' ? 'bg-white text-green-600 shadow-lg scale-105' : 'text-gray-400 hover:text-gray-600'}`}>
                         <div className={`w-2 h-2 rounded-full ${manualType === 'entrada' ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
                         Entrada
                     </button>
                     <button 
                         type="button" 
-                        onClick={() => setManualType('saída')} 
+                        onClick={() => { setManualType('saída'); setItems([]); setManualInboundNf(''); }} 
                         className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-[10px] font-black uppercase transition-all duration-300 flex items-center justify-center gap-2 ${manualType === 'saída' ? 'bg-white text-red-600 shadow-lg scale-105' : 'text-gray-400 hover:text-gray-600'}`}>
                         <div className={`w-2 h-2 rounded-full ${manualType === 'saída' ? 'bg-red-500 animate-pulse' : 'bg-gray-300'}`}></div>
                         Saída
@@ -186,10 +253,11 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
                 </div>
             </div>
 
-            <form onSubmit={handleManualSubmit} className="p-6 md:p-8 space-y-10">
+            <div className="p-6 md:p-8 space-y-8">
+                {/* CABEÇALHO DO DOCUMENTO */}
                 <div className="relative">
                     <div className="absolute -top-3 left-6 px-3 bg-white text-[9px] font-black text-indigo-600 uppercase tracking-[0.2em] z-10">
-                        Informações do Documento
+                        Informações do Documento (Cabeçalho)
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gray-50/50 p-8 rounded-[2.5rem] border border-gray-100 pt-10">
                         <div className="space-y-2">
@@ -199,7 +267,7 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
                             </label>
                             <select 
                                 value={selectedSupplierCpf} 
-                                onChange={e => { setSelectedSupplierCpf(e.target.value); setSelectedItemName(''); }} 
+                                onChange={e => { setSelectedSupplierCpf(e.target.value); setSelectedItemName(''); setItems([]); }} 
                                 className="w-full h-14 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-indigo-100 transition-all text-sm appearance-none cursor-pointer">
                                 <option value="">-- SELECIONE --</option>
                                 {suppliers.map(s => <option key={s.cpf} value={s.cpf}>{s.name}</option>)}
@@ -228,150 +296,174 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
                                 placeholder={manualType === 'entrada' ? "000.000.000" : "REQ-2026-X"} 
                                 className="w-full h-14 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-mono font-bold outline-none focus:ring-4 focus:ring-indigo-100 transition-all text-sm placeholder:text-gray-300" />
                         </div>
-                        {manualType === 'saída' && (
-                            <div className="space-y-2 md:col-span-3 animate-fade-in">
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1 flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-                                    Nota Fiscal de Origem (Entrada)
-                                </label>
-                                <select 
-                                    value={manualInboundNf} 
-                                    onChange={e => setManualInboundNf(e.target.value)} 
-                                    className="w-full h-14 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-indigo-100 transition-all text-sm appearance-none cursor-pointer disabled:opacity-50"
-                                    disabled={!selectedSupplierCpf}>
-                                    <option value="">-- SELECIONE A NF DE ENTRADA --</option>
-                                    {manualSupplierInvoices.map(nf => <option key={nf} value={nf}>NF {nf}</option>)}
-                                </select>
-                            </div>
-                        )}
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-                    <div className="md:col-span-5 space-y-2">
-                        <label className="text-[10px] font-black text-indigo-600 uppercase ml-1 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                            Item do Contrato
-                        </label>
-                        <select 
-                            value={selectedItemName} 
-                            onChange={e => {
-                                const val = e.target.value;
-                                if (manualType === 'saída' && !selectedSupplierCpf) {
-                                    const [itemName, supplierCpf] = val.split('|');
-                                    setSelectedSupplierCpf(supplierCpf);
-                                    setSelectedItemName(itemName);
-                                } else {
-                                    setSelectedItemName(val);
-                                }
-                            }} 
-                            className="w-full h-20 px-6 border-2 border-indigo-50 rounded-3xl bg-white font-black outline-none focus:ring-4 focus:ring-indigo-100 transition-all text-base disabled:opacity-50 appearance-none cursor-pointer shadow-sm" 
-                            disabled={manualType === 'entrada' && !selectedSupplierCpf}>
-                            <option value="">-- SELECIONAR PRODUTO --</option>
-                            {manualType === 'saída' && !selectedSupplierCpf ? (
-                                (availableItems as any[]).map((it, idx) => (
-                                    <option key={`${it.name}-${idx}`} value={`${it.name}|${it.supplierCpf}`}>
-                                        {it.name} ({it.supplierName})
-                                    </option>
-                                ))
-                            ) : (
-                                (availableItems as any[]).map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)
+                {/* ÁREA DE ADIÇÃO DE ITENS */}
+                <div className="bg-white border-2 border-dashed border-gray-200 rounded-[2rem] p-6 space-y-6">
+                    <h3 className="text-sm font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                        <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
+                        Adicionar Itens à Lista
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                        <div className="md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-indigo-600 uppercase ml-1">Item do Contrato</label>
+                                <select 
+                                    value={selectedItemName} 
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        if (manualType === 'saída' && !selectedSupplierCpf) {
+                                            const [itemName, supplierCpf] = val.split('|');
+                                            setSelectedSupplierCpf(supplierCpf);
+                                            setSelectedItemName(itemName);
+                                        } else {
+                                            setSelectedItemName(val);
+                                        }
+                                    }} 
+                                    className="w-full h-14 px-4 border-2 border-indigo-50 rounded-2xl bg-white font-black outline-none focus:ring-4 focus:ring-indigo-100 transition-all text-sm disabled:opacity-50 appearance-none cursor-pointer shadow-sm" 
+                                    disabled={manualType === 'entrada' && !selectedSupplierCpf}>
+                                    <option value="">-- SELECIONAR PRODUTO --</option>
+                                    {manualType === 'saída' && !selectedSupplierCpf ? (
+                                        (availableItems as any[]).map((it, idx) => (
+                                            <option key={`${it.name}-${idx}`} value={`${it.name}|${it.supplierCpf}`}>
+                                                {it.name} ({it.supplierName})
+                                            </option>
+                                        ))
+                                    ) : (
+                                        (availableItems as any[]).map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)
+                                    )}
+                                </select>
+                            </div>
+                            
+                            {manualType === 'saída' && (
+                                <div className="space-y-2 animate-fade-in">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                                        Nota Fiscal de Origem (Entrada)
+                                    </label>
+                                    <select 
+                                        value={manualInboundNf} 
+                                        onChange={e => setManualInboundNf(e.target.value)} 
+                                        className="w-full h-14 px-4 border-2 border-gray-100 rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-indigo-100 transition-all text-sm appearance-none cursor-pointer disabled:opacity-50"
+                                        disabled={!selectedSupplierCpf}>
+                                        <option value="">-- SELECIONE A NF DE ENTRADA --</option>
+                                        {manualSupplierInvoices.map(nf => <option key={nf} value={nf}>NF {nf}</option>)}
+                                    </select>
+                                </div>
                             )}
-                        </select>
-                    </div>
+                        </div>
 
-                    <div className="md:col-span-4 space-y-2">
-                        <label className="text-[10px] font-black text-blue-600 uppercase ml-1 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
-                            Código de Barras (Bipar)
-                        </label>
-                        <div className="relative group">
+                        <div className="md:col-span-5 space-y-2">
+                            <label className="text-[10px] font-black text-blue-600 uppercase ml-1">Código de Barras</label>
                             <input 
                                 ref={barcodeInputRef} 
                                 type="text" 
                                 value={manualBarcode} 
                                 onChange={e => setManualBarcode(e.target.value)} 
-                                onKeyDown={e => {
-                                    if (e.ctrlKey && e.key === 'j') {
-                                        e.preventDefault();
-                                    }
-                                    if (e.key === 'Enter' && !manualQuantity) {
-                                    }
-                                }}
-                                placeholder="Aguardando leitura..." 
-                                className="w-full h-20 px-6 border-2 border-blue-100 rounded-3xl bg-white font-mono font-bold focus:ring-8 focus:ring-blue-50 outline-none text-lg placeholder:text-blue-200 transition-all shadow-sm" />
-                            <div className="absolute right-6 top-1/2 -translate-y-1/2">
-                                <div className={`w-3 h-3 rounded-full ${manualBarcode ? 'bg-blue-500' : 'bg-gray-200 animate-pulse'}`}></div>
-                            </div>
+                                placeholder="Bipar..." 
+                                className="w-full h-14 px-4 border-2 border-blue-100 rounded-2xl bg-white font-mono font-bold focus:ring-4 focus:ring-blue-50 outline-none text-sm placeholder:text-blue-200 transition-all shadow-sm" />
                         </div>
-                    </div>
 
-                    <div className="md:col-span-3 space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase ml-1 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 01-6.001 0M18 7l-3 9m3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
-                            Quantidade / Peso
-                        </label>
-                        <div className="relative">
+                        <div className="md:col-span-3 space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Quantidade</label>
                             <input 
                                 type="text" 
                                 value={manualQuantity} 
                                 onChange={e => setManualQuantity(e.target.value.replace(/[^0-9,.]/g, ''))} 
                                 placeholder="0,00" 
-                                className="w-full h-20 px-6 border-2 border-gray-100 rounded-3xl bg-gray-900 text-white font-black text-center text-3xl outline-none focus:ring-8 focus:ring-gray-100 transition-all shadow-xl font-mono" 
-                                required />
-                            <div className="absolute bottom-2 left-0 right-0 text-center">
-                                <span className="text-[8px] text-gray-500 font-black uppercase tracking-widest">Digital Display</span>
-                            </div>
+                                className="w-full h-14 px-4 border-2 border-gray-100 rounded-2xl bg-gray-900 text-white font-black text-center text-xl outline-none focus:ring-4 focus:ring-gray-100 transition-all shadow-lg font-mono" 
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Lote</label>
+                            <input 
+                                type="text" 
+                                value={manualLot} 
+                                onChange={e => setManualLot(e.target.value.toUpperCase())} 
+                                placeholder="OPCIONAL" 
+                                className="w-full h-12 px-4 border-2 border-gray-100 rounded-xl bg-white font-mono font-bold outline-none focus:ring-2 focus:ring-gray-50 transition-all text-xs" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Validade</label>
+                            <input 
+                                type="date" 
+                                value={manualExp} 
+                                onChange={e => setManualExp(e.target.value)} 
+                                className="w-full h-12 px-4 border-2 border-gray-100 rounded-xl bg-white font-bold outline-none focus:ring-2 focus:ring-gray-50 transition-all text-xs" />
+                        </div>
+
+                        <div className="flex items-end">
+                            <button 
+                                type="button" 
+                                onClick={handleAddItem}
+                                disabled={!selectedItemName || !manualQuantity}
+                                className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-md transition-all active:scale-95 disabled:bg-gray-100 disabled:text-gray-300 bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                Adicionar Item
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase ml-1 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-                            Lote (Identificação)
-                        </label>
-                        <input 
-                            type="text" 
-                            value={manualLot} 
-                            onChange={e => setManualLot(e.target.value.toUpperCase())} 
-                            placeholder="OPCIONAL" 
-                            className="w-full h-14 px-4 border-2 border-gray-100 rounded-2xl bg-white font-mono font-bold outline-none focus:ring-4 focus:ring-gray-50 transition-all text-sm" />
+                {/* LISTA DE ITENS */}
+                {items.length > 0 && (
+                    <div className="bg-gray-50 rounded-3xl p-6 border border-gray-200">
+                        <h3 className="text-xs font-black text-gray-600 uppercase tracking-widest mb-4">Itens a Registrar ({items.length})</h3>
+                        <div className="space-y-3">
+                            {items.map((item, idx) => (
+                                <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 border border-gray-100">
+                                    <div className="flex-1">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase">Produto</p>
+                                        <p className="font-bold text-gray-800 text-sm">{item.itemName}</p>
+                                    </div>
+                                    <div className="flex gap-6">
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase">Qtd</p>
+                                            <p className="font-mono font-bold text-gray-800">{item.quantity} kg/un</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase">Lote</p>
+                                            <p className="font-mono text-gray-600 text-xs">{item.lot || '-'}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase">Validade</p>
+                                            <p className="font-mono text-gray-600 text-xs">{item.exp ? new Date(item.exp).toLocaleDateString('pt-BR') : '-'}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => handleRemoveItem(item.id)} className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
+                )}
 
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase ml-1 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            Data de Validade
-                        </label>
-                        <input 
-                            type="date" 
-                            value={manualExp} 
-                            onChange={e => setManualExp(e.target.value)} 
-                            className="w-full h-14 px-4 border-2 border-gray-100 rounded-2xl bg-white font-bold outline-none focus:ring-4 focus:ring-gray-50 transition-all text-sm" />
-                    </div>
-
-                    <div className="flex items-end">
-                        <button 
-                            type="submit" 
-                            disabled={isSubmitting || !selectedSupplierCpf || !selectedItemName} 
-                            className={`w-full h-14 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl transition-all active:scale-95 disabled:bg-gray-100 disabled:text-gray-300 text-white flex items-center justify-center gap-3 ${manualType === 'entrada' ? 'bg-green-600 hover:bg-green-700 shadow-green-200' : 'bg-red-600 hover:bg-red-700 shadow-red-200'}`}>
-                            {isSubmitting ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                    Gravando...
-                                </>
-                            ) : (
-                                <>
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                    Confirmar Lançamento
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
-            </form>
+                {/* BOTÃO FINAL */}
+                <button 
+                    type="button" 
+                    onClick={handleRegisterAll}
+                    disabled={isSubmitting || items.length === 0} 
+                    className={`w-full h-16 rounded-2xl font-black uppercase text-sm tracking-[0.2em] shadow-xl transition-all active:scale-95 disabled:bg-gray-100 disabled:text-gray-300 text-white flex items-center justify-center gap-3 ${manualType === 'entrada' ? 'bg-green-600 hover:bg-green-700 shadow-green-200' : 'bg-red-600 hover:bg-red-700 shadow-red-200'}`}>
+                    {isSubmitting ? (
+                        <>
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                            Processando {items.length} itens...
+                        </>
+                    ) : (
+                        <>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                            Confirmar Movimentação
+                        </>
+                    )}
+                </button>
+            </div>
         </div>
     );
 };
