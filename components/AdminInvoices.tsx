@@ -684,8 +684,8 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-red-50 p-3 rounded-xl border border-red-100 space-y-1">
-                            <label className="text-[9px] font-black text-red-400 uppercase">NF de Saída (Manual)</label>
-                            <input type="text" value={outboundNf} onChange={e => setOutboundNf(e.target.value)} placeholder="Número da NF de Saída" className="w-full p-2 border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-red-400" required />
+                            <label className="text-[9px] font-black text-red-400 uppercase">REQUISIÇÃO DO SISTEMA SAM</label>
+                            <input type="text" value={outboundNf} onChange={e => setOutboundNf(e.target.value)} placeholder="Requisição SAM" className="w-full p-2 border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-red-400" required />
                         </div>
                         <div className="bg-red-50 p-3 rounded-xl border border-red-100 space-y-1">
                             <label className="text-[9px] font-black text-red-400 uppercase">Data de Saída</label>
