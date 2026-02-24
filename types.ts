@@ -149,6 +149,7 @@ export interface ThirdPartyEntryLog {
   monitoringResponsible: string;
   pestControlResponsible: string;
   serviceExecutionNumber: string;
+  contractNumber?: string; // NOVO: Número do contrato
   serviceDetails?: string;
   status: 'agendado' | 'concluido' | 'cancelado';
   arrivalTime?: string; // Horário real de chegada na subportaria

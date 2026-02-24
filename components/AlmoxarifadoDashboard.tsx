@@ -1,8 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Supplier, WarehouseMovement, ContractItem, ThirdPartyEntryLog } from '../types';
-import WarehouseMovementForm from './WarehouseMovementForm';
-import AdminThirdPartyEntry from './AdminThirdPartyEntry';
+import AdminInvoices from './AdminInvoices';
 
 interface AlmoxarifadoDashboardProps {
     suppliers: Supplier[];
@@ -11,10 +10,10 @@ interface AlmoxarifadoDashboardProps {
     onRegisterEntry: (payload: any) => Promise<{ success: boolean; message: string }>;
     onRegisterWithdrawal: (payload: any) => Promise<{ success: boolean; message: string }>;
     onResetExits: () => Promise<{ success: boolean; message: string }>;
-    thirdPartyEntries: ThirdPartyEntryLog[];
-    onRegisterThirdPartyEntry: (log: Omit<ThirdPartyEntryLog, 'id'>) => Promise<{ success: boolean; message: string }>;
-    onUpdateThirdPartyEntry: (log: ThirdPartyEntryLog) => Promise<{ success: boolean; message: string }>;
-    onDeleteThirdPartyEntry: (id: string) => Promise<void>;
+    onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => void;
+    onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => void;
+    onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string) => Promise<{ success: boolean; message?: string }>;
+    onManualInvoiceEntry: (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ 
@@ -24,12 +23,12 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
     onRegisterEntry, 
     onRegisterWithdrawal, 
     onResetExits,
-    thirdPartyEntries,
-    onRegisterThirdPartyEntry,
-    onUpdateThirdPartyEntry,
-    onDeleteThirdPartyEntry
+    onReopenInvoice,
+    onDeleteInvoice,
+    onUpdateInvoiceItems,
+    onManualInvoiceEntry
 }) => {
-    const [activeTab, setActiveTab] = useState<'manual' | 'receipt' | 'agenda' | 'visitors'>('manual');
+    const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'receipt' | 'agenda'>('entry');
     const [selectedAgendaDate, setSelectedAgendaDate] = useState(new Date().toISOString().split('T')[0]);
     const [receiptSupplierCpf, setReceiptSupplierCpf] = useState('');
     const [receiptInvoice, setReceiptInvoice] = useState('');
@@ -298,9 +297,9 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="flex bg-gray-100 p-1 rounded-xl">
-                        <button onClick={() => setActiveTab('manual')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'manual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Bipagem / Manual</button>
+                        <button onClick={() => setActiveTab('entry')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'entry' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Entrada de Materiais</button>
+                        <button onClick={() => setActiveTab('exit')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'exit' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Saída de Materiais</button>
                         <button onClick={() => setActiveTab('agenda')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'agenda' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Agenda de Chegadas</button>
-                        <button onClick={() => setActiveTab('visitors')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'visitors' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Controle de Portaria</button>
                         <button onClick={() => setActiveTab('receipt')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'receipt' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Termo de Recebimento</button>
                     </div>
                     <button onClick={onLogout} className="bg-red-50 text-red-600 font-black py-2 px-6 rounded-xl text-xs uppercase border border-red-100 shadow-sm active:scale-95">Sair</button>
@@ -309,21 +308,24 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
 
             <main className="p-4 md:p-8 max-w-6xl mx-auto space-y-8">
                 
-                {activeTab === 'manual' ? (
-                    <WarehouseMovementForm 
-                        suppliers={suppliers}
-                        warehouseLog={warehouseLog}
-                        onRegisterEntry={onRegisterEntry}
-                        onRegisterWithdrawal={onRegisterWithdrawal}
+                {activeTab === 'entry' ? (
+                    <AdminInvoices 
+                        suppliers={suppliers} 
+                        onReopenInvoice={onReopenInvoice} 
+                        onDeleteInvoice={onDeleteInvoice} 
+                        onUpdateInvoiceItems={onUpdateInvoiceItems} 
+                        onManualInvoiceEntry={onManualInvoiceEntry}
+                        mode="warehouse_entry"
                     />
-
-
-                ) : activeTab === 'visitors' ? (
-                    <AdminThirdPartyEntry 
-                        logs={thirdPartyEntries} 
-                        onRegister={onRegisterThirdPartyEntry} 
-                        onUpdate={onUpdateThirdPartyEntry} 
-                        onDelete={onDeleteThirdPartyEntry} 
+                ) : activeTab === 'exit' ? (
+                    <AdminInvoices 
+                        suppliers={suppliers} 
+                        onReopenInvoice={onReopenInvoice} 
+                        onDeleteInvoice={onDeleteInvoice} 
+                        onUpdateInvoiceItems={onUpdateInvoiceItems} 
+                        onManualInvoiceEntry={onManualInvoiceEntry}
+                        mode="warehouse_exit"
+                        onRegisterExit={onRegisterWithdrawal}
                     />
                 ) : activeTab === 'agenda' ? (
                     <div className="space-y-6 animate-fade-in">

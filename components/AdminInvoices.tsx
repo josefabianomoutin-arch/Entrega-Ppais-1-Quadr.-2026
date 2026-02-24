@@ -19,6 +19,8 @@ interface AdminInvoicesProps {
     onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => void;
     onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string) => Promise<{ success: boolean; message?: string }>;
     onManualInvoiceEntry: (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string) => Promise<{ success: boolean; message?: string }>;
+    mode?: 'admin' | 'warehouse_entry' | 'warehouse_exit';
+    onRegisterExit?: (payload: any) => Promise<{ success: boolean; message: string }>;
 }
 
 const formatCurrency = (value: number) => {
@@ -129,12 +131,13 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
     printWindow.document.close();
 };
 
-const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoice, onDeleteInvoice, onUpdateInvoiceItems, onManualInvoiceEntry }) => {
+const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoice, onDeleteInvoice, onUpdateInvoiceItems, onManualInvoiceEntry, mode = 'admin', onRegisterExit }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortKey, setSortKey] = useState<'supplierName' | 'date' | 'totalValue'>('date');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
     const [editingInvoice, setEditingInvoice] = useState<InvoiceInfo | null>(null);
+    const [exitingInvoice, setExitingInvoice] = useState<InvoiceInfo | null>(null);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
 
@@ -186,6 +189,44 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
         else { setSortKey(key); setSortDirection('desc'); }
     };
     
+    const handleExitSave = async (outboundNf: string, exitDate: string, itemsToExit: { name: string; kg: number; lotNumber?: string; expirationDate?: string }[]) => {
+        if (!onRegisterExit || !exitingInvoice) return;
+        setIsSavingEdit(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const item of itemsToExit) {
+            const payload = {
+                type: 'saida',
+                supplierCpf: exitingInvoice.supplierCpf,
+                supplierName: exitingInvoice.supplierName,
+                itemName: item.name,
+                quantity: item.kg,
+                lotNumber: item.lotNumber,
+                expirationDate: item.expirationDate,
+                outboundInvoice: outboundNf, // NF de saída (manual)
+                inboundInvoice: exitingInvoice.invoiceNumber, // NF de entrada (origem)
+                date: exitDate,
+                barcode: exitingInvoice.barcode
+            };
+            try {
+                const res = await onRegisterExit(payload);
+                if (res.success) successCount++;
+                else failCount++;
+            } catch (error) {
+                console.error("Erro ao registrar saída:", error);
+                failCount++;
+            }
+        }
+        setIsSavingEdit(false);
+        if (failCount === 0) {
+            alert('Saída registrada com sucesso!');
+            setExitingInvoice(null);
+        } else {
+            alert(`Saída parcial: ${successCount} itens registrados, ${failCount} falharam.`);
+        }
+    };
+
     const handleEditSave = async (updatedItems: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string) => {
         if (!editingInvoice) return;
         setIsSavingEdit(true);
@@ -219,10 +260,12 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
                         Imprimir Etiquetas (Filtradas)
                     </button>
-                    <button onClick={() => setIsManualModalOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-                        Lançar NF Manualmente
-                    </button>
+                    {mode !== 'warehouse_exit' && (
+                        <button onClick={() => setIsManualModalOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                            Lançar NF Manualmente
+                        </button>
+                    )}
                     <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-400 transition-all w-full md:w-auto" />
                 </div>
             </div>
@@ -266,18 +309,30 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                         </td>
                                         <td className="p-3 text-center">
                                             <div className="flex items-center justify-center gap-2">
-                                                <button 
-                                                    onClick={() => handlePrintLabels([invoice])}
-                                                    className="bg-amber-100 text-amber-700 hover:bg-amber-200 p-2 rounded-lg transition-colors"
-                                                    title="Imprimir Etiquetas desta Nota"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                                    </svg>
-                                                </button>
-                                                <button onClick={() => setEditingInvoice(invoice)} className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Editar">Editar</button>
-                                                <button onClick={() => { if(window.confirm('Reabrir nota?')) onReopenInvoice(invoice.supplierCpf, invoice.invoiceNumber); }} className="bg-orange-100 text-orange-700 hover:bg-orange-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Reabrir">Reabrir</button>
-                                                <button onClick={() => { if(window.confirm('Excluir nota?')) onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber); }} className="bg-red-100 text-red-700 hover:bg-red-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Excluir">Excluir</button>
+                                                {mode === 'warehouse_exit' ? (
+                                                    <button 
+                                                        onClick={() => setExitingInvoice(invoice)}
+                                                        className="bg-red-600 text-white hover:bg-red-700 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors shadow-md"
+                                                        title="Registrar Saída"
+                                                    >
+                                                        Registrar Saída
+                                                    </button>
+                                                ) : (
+                                                    <>
+                                                        <button 
+                                                            onClick={() => handlePrintLabels([invoice])}
+                                                            className="bg-amber-100 text-amber-700 hover:bg-amber-200 p-2 rounded-lg transition-colors"
+                                                            title="Imprimir Etiquetas desta Nota"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                            </svg>
+                                                        </button>
+                                                        <button onClick={() => setEditingInvoice(invoice)} className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Editar">Editar</button>
+                                                        <button onClick={() => { if(window.confirm('Reabrir nota?')) onReopenInvoice(invoice.supplierCpf, invoice.invoiceNumber); }} className="bg-orange-100 text-orange-700 hover:bg-orange-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Reabrir">Reabrir</button>
+                                                        <button onClick={() => { if(window.confirm('Excluir nota?')) onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber); }} className="bg-red-100 text-red-700 hover:bg-red-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Excluir">Excluir</button>
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -307,6 +362,10 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
 
             {editingInvoice && (
                 <EditInvoiceModal invoice={editingInvoice} supplier={suppliers.find(s => s.cpf === editingInvoice.supplierCpf)!} onClose={() => setEditingInvoice(null)} onSave={handleEditSave} isSaving={isSavingEdit} />
+            )}
+
+            {exitingInvoice && (
+                <ExitInvoiceModal invoice={exitingInvoice} supplier={suppliers.find(s => s.cpf === exitingInvoice.supplierCpf)!} onClose={() => setExitingInvoice(null)} onSave={handleExitSave} isSaving={isSavingEdit} />
             )}
 
             {isManualModalOpen && (
@@ -522,6 +581,105 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
                     <div className="flex justify-between items-center pt-4 border-t">
                         <div className="text-right"><p className="text-[10px] text-gray-400 font-black uppercase">Novo Total</p><p className="text-xl font-black text-green-700">{formatCurrency(totalValue)}</p></div>
                         <div className="space-x-2"><button type="button" onClick={onClose} className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm">Cancelar</button><button type="submit" disabled={isSaving} className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-lg font-bold text-sm disabled:bg-gray-400">{isSaving ? 'Gravando...' : 'Salvar Alterações'}</button></div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+interface ExitInvoiceModalProps {
+    invoice: InvoiceInfo;
+    supplier: Supplier;
+    onClose: () => void;
+    onSave: (outboundNf: string, exitDate: string, itemsToExit: { name: string; kg: number; lotNumber?: string; expirationDate?: string }[]) => void;
+    isSaving: boolean;
+}
+
+const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, onClose, onSave, isSaving }) => {
+    const [items, setItems] = useState(invoice.items.map((it, idx) => ({ id: `exit-${idx}`, name: it.name, kg: '0,00', maxKg: it.kg, lot: it.lotNumber, exp: it.expirationDate })));
+    const [outboundNf, setOutboundNf] = useState('');
+    const [exitDate, setExitDate] = useState(new Date().toISOString().split('T')[0]);
+
+    const handleItemChange = (id: string, value: string) => {
+        setItems(prev => prev.map(it => it.id === id ? { ...it, kg: value.replace(/[^0-9,]/g, '') } : it));
+    };
+
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!outboundNf || !exitDate) return alert('Preencha a NF de Saída e a Data.');
+        
+        const itemsToExit = items.map(it => {
+            const kg = parseFloat(it.kg.replace(',', '.'));
+            if (isNaN(kg) || kg <= 0) return null;
+            if (kg > it.maxKg) {
+                alert(`Quantidade de saída para ${it.name} excede a quantidade disponível (${it.maxKg} kg).`);
+                return 'ERROR';
+            }
+            return { name: it.name, kg, lotNumber: it.lot, expirationDate: it.exp };
+        });
+
+        if (itemsToExit.includes('ERROR')) return;
+        const validItems = itemsToExit.filter(Boolean) as { name: string; kg: number; lotNumber?: string; expirationDate?: string }[];
+        
+        if (validItems.length === 0) return alert('Informe a quantidade de saída para pelo menos um item.');
+        onSave(outboundNf, exitDate, validItems);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl p-6 animate-fade-in-up">
+                <div className="flex justify-between items-center mb-4 border-b pb-4">
+                    <div>
+                        <h2 className="text-xl font-bold text-red-800 uppercase">Registrar Saída - NF {invoice.invoiceNumber}</h2>
+                        <p className="text-xs text-gray-500 uppercase font-black">{invoice.supplierName}</p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-3xl font-light">&times;</button>
+                </div>
+                <form onSubmit={handleFormSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-red-50 p-3 rounded-xl border border-red-100 space-y-1">
+                            <label className="text-[9px] font-black text-red-400 uppercase">NF de Saída (Manual)</label>
+                            <input type="text" value={outboundNf} onChange={e => setOutboundNf(e.target.value)} placeholder="Número da NF de Saída" className="w-full p-2 border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-red-400" required />
+                        </div>
+                        <div className="bg-red-50 p-3 rounded-xl border border-red-100 space-y-1">
+                            <label className="text-[9px] font-black text-red-400 uppercase">Data de Saída</label>
+                            <input type="date" value={exitDate} onChange={e => setExitDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" required />
+                        </div>
+                    </div>
+                    
+                    <div className="max-h-80 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">Selecione os itens e quantidades para saída:</p>
+                        {items.map(item => {
+                            const contract = supplier.contractItems.find(ci => ci.name === item.name);
+                            const unit = getDisplayUnit(contract);
+                            return (
+                                <div key={item.id} className="bg-gray-50 p-4 rounded-xl border space-y-3">
+                                    <div className="flex gap-4 items-center">
+                                        <div className="flex-1">
+                                            <p className="text-xs font-black text-gray-700 uppercase">{item.name}</p>
+                                            <p className="text-[10px] text-gray-400">Disponível: {item.maxKg.toFixed(2).replace('.', ',')} {unit}</p>
+                                            {item.lot && <p className="text-[10px] text-gray-400 font-mono">Lote: {item.lot}</p>}
+                                        </div>
+                                        <div className="w-32">
+                                            <label className="text-[9px] font-black text-gray-400 uppercase">Qtd Saída ({unit})</label>
+                                            <input 
+                                                type="text" 
+                                                value={item.kg} 
+                                                onChange={e => handleItemChange(item.id, e.target.value)} 
+                                                placeholder="0,00" 
+                                                className="w-full p-2 border rounded-lg text-sm text-center font-mono focus:ring-2 focus:ring-red-400 outline-none" 
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="flex justify-end items-center pt-4 border-t space-x-2">
+                        <button type="button" onClick={onClose} className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm uppercase">Cancelar</button>
+                        <button type="submit" disabled={isSaving} className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold text-sm uppercase shadow-lg disabled:bg-gray-400">{isSaving ? 'Registrando...' : 'Confirmar Saída'}</button>
                     </div>
                 </form>
             </div>

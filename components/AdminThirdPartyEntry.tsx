@@ -23,6 +23,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
         monitoringResponsible: '',
         pestControlResponsible: '',
         serviceExecutionNumber: '',
+        contractNumber: '',
         status: 'agendado',
         serviceDetails: '',
         receiptTermDate: new Date().toISOString().split('T')[0]
@@ -55,6 +56,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                 monitoringResponsible: '',
                 pestControlResponsible: '',
                 serviceExecutionNumber: '',
+                contractNumber: '',
                 status: 'agendado',
                 serviceDetails: ''
             });
@@ -75,6 +77,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
             monitoringResponsible: log.monitoringResponsible,
             pestControlResponsible: log.pestControlResponsible,
             serviceExecutionNumber: log.serviceExecutionNumber || '',
+            contractNumber: log.contractNumber || '',
             status: log.status,
             arrivalTime: log.arrivalTime,
             serviceDetails: log.serviceDetails || '',
@@ -97,6 +100,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
             monitoringResponsible: '',
             pestControlResponsible: '',
             serviceExecutionNumber: '',
+            contractNumber: '',
             status: 'agendado',
             serviceDetails: '',
             receiptTermDate: new Date().toISOString().split('T')[0]
@@ -149,6 +153,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                             <tr>
                                 <th>Data/Hora</th>
                                 <th>Nº Execução</th>
+                                <th>Contrato</th>
                                 <th>Empresa</th>
                                 <th>Veículo/Placa</th>
                                 <th>Locais</th>
@@ -162,6 +167,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                 <tr>
                                     <td>${log.date.split('-').reverse().join('/')} ${log.time || ''}</td>
                                     <td>${log.serviceExecutionNumber || '-'}</td>
+                                    <td>${log.contractNumber || '-'}</td>
                                     <td>${log.companyName}</td>
                                     <td>${log.vehicle || '-'} / ${log.plate || '-'}</td>
                                     <td>${log.locations}</td>
@@ -225,6 +231,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                             <th className="p-4 text-left">Data/Hora</th>
                             <th className="p-4 text-left">Status</th>
                             <th className="p-4 text-left">Nº Execução</th>
+                            <th className="p-4 text-left">Contrato</th>
                             <th className="p-4 text-left">Empresa</th>
                             <th className="p-4 text-left">Veículo/Placa</th>
                             <th className="p-4 text-left">Locais</th>
@@ -246,6 +253,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                     </span>
                                 </td>
                                 <td className="p-4 font-mono text-xs font-bold text-gray-800">{log.serviceExecutionNumber || '-'}</td>
+                                <td className="p-4 font-mono text-xs font-bold text-gray-800">{log.contractNumber || '-'}</td>
                                 <td className="p-4 text-gray-700 font-bold uppercase">{log.companyName}</td>
                                 <td className="p-4">
                                     <p className="text-xs font-bold text-gray-800 uppercase">{log.vehicle || '-'}</p>
@@ -347,7 +355,7 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">CNPJ da Prestadora</label>
                                     <input 
@@ -367,6 +375,16 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                                         placeholder="000/2026"
                                         value={formData.serviceExecutionNumber}
                                         onChange={e => setFormData({...formData, serviceExecutionNumber: e.target.value.toUpperCase()})}
+                                        className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Número do Contrato</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="000/2026"
+                                        value={formData.contractNumber || ''}
+                                        onChange={e => setFormData({...formData, contractNumber: e.target.value.toUpperCase()})}
                                         className="w-full border-2 border-gray-50 rounded-2xl px-6 py-4 outline-none focus:border-gray-400 font-bold bg-gray-50 transition-all"
                                     />
                                 </div>
