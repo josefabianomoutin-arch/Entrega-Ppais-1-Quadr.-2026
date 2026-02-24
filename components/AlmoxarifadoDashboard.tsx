@@ -173,6 +173,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
         const invoiceDate = deliveries[0]?.date || ''; 
         const receiptDate = deliveries[0]?.date || ''; // Usando a data da entrega
         const barcode = deliveries.find(d => d.barcode)?.barcode || '';
+        const receiptTermNumber = deliveries.find(d => d.receiptTermNumber)?.receiptTermNumber || '';
 
         return {
             supplierName: receiptSupplier.name,
@@ -182,7 +183,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
             receiptDate,
             totalInvoiceValue,
             items,
-            barcode
+            barcode,
+            receiptTermNumber
         };
     }, [receiptSupplier, receiptInvoice]);
 
@@ -234,6 +236,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                     <div class="info-row"><span class="info-label">FORNECEDOR:</span> ${receiptData.supplierName}</div>
                     <div class="info-row"><span class="info-label">C.N.P.J.:</span> ${receiptData.supplierCpf}</div>
                     <div class="info-row"><span class="info-label">NOTA FISCAL Nº:</span> ${receiptData.invoiceNumber}</div>
+                    <div class="info-row"><span class="info-label">NOTA DE EMPENHO:</span> ${receiptData.receiptTermNumber || 'N/A'}</div>
                     <div class="info-row"><span class="info-label">DATA NOTA FISCAL:</span> ${formatDate(receiptData.invoiceDate)}</div>
                     <div class="info-row"><span class="info-label">DATA RECEBIMENTO:</span> ${formatDate(receiptData.receiptDate)}</div>
                     <div class="info-row"><span class="info-label">VALOR TOTAL NOTA FISCAL:</span> ${formatCurrency(receiptData.totalInvoiceValue)}</div>
@@ -520,6 +523,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                                         <p><span className="font-bold inline-block w-48">FORNECEDOR:</span> {receiptData.supplierName || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">C.N.P.J.:</span> {receiptData.supplierCpf || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">NOTA FISCAL Nº:</span> {receiptData.invoiceNumber || 'N/A'}</p>
+                                        <p><span className="font-bold inline-block w-48">NOTA DE EMPENHO:</span> {receiptData.receiptTermNumber || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">DATA NOTA FISCAL:</span> {(receiptData.invoiceDate || '').split('-').reverse().join('/') || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">DATA RECEBIMENTO:</span> {(receiptData.receiptDate || '').split('-').reverse().join('/') || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">VALOR TOTAL NF:</span> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receiptData.totalInvoiceValue || 0)}</p>

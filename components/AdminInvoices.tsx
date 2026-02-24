@@ -453,7 +453,7 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
                             <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="44 dígitos" className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-teal-400 font-mono" />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase">Número do Termo de Recebimento</label>
+                            <label className="text-[10px] font-black text-gray-400 uppercase">Número da Nota de Empenho</label>
                             <input type="text" value={receiptTermNumber} onChange={e => setReceiptTermNumber(e.target.value)} placeholder="Ex: 001/2026" className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-teal-400" />
                         </div>
                     </div>
@@ -560,7 +560,7 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
                             <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="44 dígitos" className="w-full p-2 border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-teal-400" />
                         </div>
                         <div className="bg-gray-50 p-3 rounded-xl border space-y-1">
-                            <label className="text-[9px] font-black text-gray-400 uppercase">Termo de Recebimento</label>
+                            <label className="text-[9px] font-black text-gray-400 uppercase">Nota de Empenho</label>
                             <input type="text" value={receiptTermNumber} onChange={e => setReceiptTermNumber(e.target.value)} placeholder="Ex: 001/2026" className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-400" />
                         </div>
                     </div>
