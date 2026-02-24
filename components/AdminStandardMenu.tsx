@@ -56,6 +56,134 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   const [isLoadedFromSaved, setIsLoadedFromSaved] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<number>(getWeekNumber(new Date(new Date().toISOString().split('T')[0] + 'T00:00:00')));
   const [weightSearch, setWeightSearch] = useState('');
+  const [labelModalOpen, setLabelModalOpen] = useState(false);
+  const [availableLots, setAvailableLots] = useState<{
+      supplierName: string;
+      invoiceNumber: string;
+      lotNumber: string;
+      expirationDate: string;
+      date: string;
+      quantity: number;
+      remainingQuantity: number;
+      barcode?: string;
+      receiptTermNumber?: string;
+      itemName: string;
+  }[]>([]);
+
+  const handlePrintLabel = (lot: typeof availableLots[0]) => {
+      const printWindow = window.open('', '_blank', 'width=800,height=800');
+      if (!printWindow) return;
+
+      const htmlContent = `
+          <html>
+          <head>
+              <title>Etiqueta - ${lot.itemName}</title>
+              <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+              <style>
+                  @page { size: A4; margin: 10mm; }
+                  body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f0f0f0; }
+                  .page-container { width: 190mm; margin: 0 auto; background: white; display: flex; justify-content: center; padding-top: 10mm; }
+                  .label-card {
+                      width: 90mm; height: 60mm; border: 1px solid #000; padding: 5mm;
+                      box-sizing: border-box; display: inline-block; vertical-align: top;
+                      text-align: center; position: relative; overflow: hidden; border-radius: 4mm;
+                  }
+                  h1 { font-size: 14pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                  h2 { font-size: 10pt; margin: 0 0 3mm 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                  .info { text-align: left; font-size: 9pt; }
+                  .info p { margin: 1mm 0; display: flex; justify-content: space-between; border-bottom: 0.5px dashed #ddd; }
+                  .info strong { font-size: 7pt; color: #666; }
+                  .barcode-container { margin-top: 3mm; display: flex; flex-direction: column; align-items: center; }
+                  .barcode-svg { max-width: 100%; height: 15mm !important; }
+                  .footer { position: absolute; bottom: 2mm; left: 0; right: 0; font-size: 6pt; color: #999; }
+                  @media print {
+                      body { background: white; }
+                      .page-container { width: 100%; margin: 0; display: block; }
+                      .label-card { border: 1px solid #000; margin: 0 auto; page-break-inside: avoid; }
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="page-container">
+                  <div class="label-card">
+                      <h1>${lot.itemName}</h1>
+                      <h2>${lot.supplierName}</h2>
+                      <div class="info">
+                          <p><strong>LOTE:</strong> <span>${lot.lotNumber}</span></p>
+                          <p><strong>VAL:</strong> <span>${lot.expirationDate ? lot.expirationDate.split('-').reverse().join('/') : 'N/A'}</span></p>
+                          <p><strong>ENT:</strong> <span>${lot.date ? lot.date.split('-').reverse().join('/') : 'N/A'}</span></p>
+                          <p><strong>QTD:</strong> <span>${lot.quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</span></p>
+                          <p><strong>NF:</strong> <span>${lot.invoiceNumber}</span></p>
+                          ${lot.receiptTermNumber ? `<p><strong>TERMO:</strong> <span>${lot.receiptTermNumber}</span></p>` : ''}
+                      </div>
+                      <div class="barcode-container">
+                          ${lot.barcode ? `<svg id="barcode" class="barcode-svg"></svg>` : '<p style="font-size: 8pt; color: #ccc; margin-top: 5mm;">SEM CÓDIGO</p>'}
+                      </div>
+                      <div class="footer">${new Date().toLocaleString('pt-BR')}</div>
+                  </div>
+              </div>
+              <script>
+                  window.onload = function() {
+                      ${lot.barcode ? `
+                          try {
+                              JsBarcode("#barcode", "${lot.barcode}", {
+                                  format: "CODE128", width: 2, height: 40, displayValue: true, fontSize: 10, margin: 0
+                              });
+                          } catch (e) { console.error(e); }
+                      ` : ''}
+                      setTimeout(() => { window.print(); window.close(); }, 1000);
+                  }
+              </script>
+          </body>
+          </html>
+      `;
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+  };
+
+  const openLabelModal = (itemName: string) => {
+      if (!itemName) return;
+      
+      const lots: typeof availableLots = [];
+      
+      suppliers.forEach(supplier => {
+          (supplier.deliveries || []).forEach(delivery => {
+              if (delivery.item === itemName && delivery.lots) {
+                  delivery.lots.forEach(lot => {
+                      if ((lot.remainingQuantity || 0) > 0) {
+                          lots.push({
+                              supplierName: supplier.name,
+                              invoiceNumber: delivery.invoiceNumber || 'N/A',
+                              lotNumber: lot.lotNumber,
+                              expirationDate: lot.expirationDate || delivery.lots?.[0]?.expirationDate || 'N/A',
+                              date: delivery.date,
+                              quantity: delivery.kg || 0, // Original quantity of the delivery/item
+                              remainingQuantity: lot.remainingQuantity,
+                              barcode: delivery.barcode,
+                              receiptTermNumber: delivery.receiptTermNumber,
+                              itemName: itemName
+                          });
+                      }
+                  });
+              }
+          });
+      });
+
+      if (lots.length === 0) {
+          alert('Nenhum lote com saldo encontrado para este item.');
+          return;
+      }
+
+      // Sort by expiration date (earliest first) to encourage FIFO
+      lots.sort((a, b) => {
+          if (a.expirationDate === 'N/A') return 1;
+          if (b.expirationDate === 'N/A') return -1;
+          return new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime();
+      });
+
+      setAvailableLots(lots);
+      setLabelModalOpen(true);
+  };
 
   useEffect(() => {
     const weekForDate = getWeekNumber(new Date(selectedDate + 'T00:00:00'));
@@ -627,6 +755,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                         <th className="p-3 border text-left">Item Contratado (p/ Análise)</th>
                                         <th className="p-3 border text-center w-28">Peso/Qtd. Unit.</th>
                                         <th className="p-3 border text-center w-32">Peso/Qtd. Total</th>
+                                        <th className="p-3 border text-center w-16">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -675,6 +804,18 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                                                     className="w-full p-2 bg-transparent outline-none border-none text-center font-mono font-black text-amber-700 cursor-default"
                                                 />
                                             </td>
+                                            <td className="p-1 border text-center">
+                                                <button
+                                                    onClick={() => openLabelModal(row.contractedItem || '')}
+                                                    disabled={!row.contractedItem}
+                                                    className="text-gray-400 hover:text-amber-600 transition-colors p-2 rounded-full disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    title="Imprimir Etiqueta de Amostra"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                                    </svg>
+                                                </button>
+                                            </td>
                                         </tr>
                                     )})}
                                 </tbody>
@@ -684,6 +825,51 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                 </div>
             </div>
             
+            {labelModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[200] p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 animate-fade-in-up">
+                        <div className="flex justify-between items-center mb-6 border-b pb-4">
+                            <div>
+                                <h3 className="text-xl font-black text-gray-800 uppercase tracking-tighter">Selecione o Lote</h3>
+                                <p className="text-xs text-gray-500">Item: <span className="font-bold text-amber-600">{availableLots[0]?.itemName}</span></p>
+                            </div>
+                            <button onClick={() => setLabelModalOpen(false)} className="text-gray-400 hover:text-gray-700 text-3xl font-light">&times;</button>
+                        </div>
+                        
+                        <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
+                            {availableLots.map((lot, idx) => (
+                                <div key={idx} className="bg-gray-50 border border-gray-200 p-4 rounded-xl hover:border-amber-400 transition-colors flex justify-between items-center group">
+                                    <div>
+                                        <p className="font-bold text-gray-800 uppercase text-xs">{lot.supplierName}</p>
+                                        <div className="flex gap-4 mt-1 text-[10px] text-gray-500 font-mono">
+                                            <span>NF: {lot.invoiceNumber}</span>
+                                            <span>Lote: {lot.lotNumber}</span>
+                                            <span>Val: {lot.expirationDate.split('-').reverse().join('/')}</span>
+                                        </div>
+                                        <div className="mt-1">
+                                            <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded uppercase">Saldo: {lot.remainingQuantity.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</span>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => handlePrintLabel(lot)}
+                                        className="bg-amber-500 hover:bg-amber-600 text-white p-3 rounded-xl shadow-md active:scale-95 transition-all"
+                                        title="Imprimir"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        <div className="mt-6 pt-4 border-t flex justify-end">
+                            <button onClick={() => setLabelModalOpen(false)} className="px-6 py-2 bg-gray-200 text-gray-700 font-bold rounded-xl text-xs uppercase hover:bg-gray-300 transition-colors">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="mt-12 pt-8 border-t-2 border-dashed">
                 <h3 className="text-2xl font-black text-gray-800 tracking-tight text-center mb-6 uppercase">
                     Análise de Fornecedores Disponíveis (para o dia selecionado)
