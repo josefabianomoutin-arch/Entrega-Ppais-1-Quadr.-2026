@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import JsBarcode from 'jsbarcode';
 import type { Supplier, WarehouseMovement, ContractItem, ThirdPartyEntryLog } from '../types';
 import AdminInvoices from './AdminInvoices';
 
@@ -16,6 +17,29 @@ interface AlmoxarifadoDashboardProps {
     onManualInvoiceEntry: (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string) => Promise<{ success: boolean; message?: string }>;
     thirdPartyEntries: ThirdPartyEntryLog[];
 }
+
+const Barcode: React.FC<{ value: string }> = ({ value }) => {
+    const svgRef = useRef<SVGSVGElement>(null);
+
+    useEffect(() => {
+        if (svgRef.current && value) {
+            try {
+                JsBarcode(svgRef.current, value, {
+                    format: "CODE128",
+                    width: 1.5,
+                    height: 30,
+                    displayValue: true,
+                    fontSize: 12,
+                    margin: 0
+                });
+            } catch (e) {
+                console.error("Barcode generation error:", e);
+            }
+        }
+    }, [value]);
+
+    return <svg ref={svgRef}></svg>;
+};
 
 const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({ 
     suppliers, 
@@ -527,7 +551,10 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                                         <p><span className="font-bold inline-block w-48">DATA NOTA FISCAL:</span> {(receiptData.invoiceDate || '').split('-').reverse().join('/') || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">DATA RECEBIMENTO:</span> {(receiptData.receiptDate || '').split('-').reverse().join('/') || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">VALOR TOTAL NF:</span> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receiptData.totalInvoiceValue || 0)}</p>
-                                        <p><span className="font-bold inline-block w-48">CÓD. BARRAS NF:</span> {receiptData.barcode || 'N/A'}</p>
+                                        <p className="flex items-center gap-2">
+                                            <span className="font-bold inline-block w-48">CÓD. BARRAS NF:</span> 
+                                            {receiptData.barcode ? <Barcode value={receiptData.barcode} /> : 'N/A'}
+                                        </p>
                                     </div>
 
                                     <table className="w-full border-collapse border border-black text-[10px]">
