@@ -122,7 +122,20 @@ const AdminThirdPartyEntry: React.FC<AdminThirdPartyEntryProps> = ({ logs, onReg
                 <head>
                     <title>Relatório de Entrada de Terceiros</title>
                     <style>
-                        body { font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.4; }
+                        @page { 
+                            size: A4; 
+                            margin: 0; 
+                        }
+                        @media print {
+                            header, footer { display: none !important; }
+                        }
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            padding: 20mm; 
+                            color: #333; 
+                            line-height: 1.4; 
+                            margin: 0;
+                        }
                         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
                         .header-sap { font-size: 14px; margin-bottom: 2px; }
                         .header-unit { font-size: 16px; font-weight: bold; margin-bottom: 4px; }

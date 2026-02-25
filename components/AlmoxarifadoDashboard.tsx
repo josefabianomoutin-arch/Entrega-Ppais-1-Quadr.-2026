@@ -183,7 +183,21 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
             <head>
                 <title>Cronograma de Entregas</title>
                 <style>
-                    body { font-family: 'Times New Roman', Times, serif; padding: 20mm; line-height: 1.5; color: #000; font-size: 12pt; }
+                    @page { 
+                        size: A4; 
+                        margin: 0; 
+                    }
+                    @media print {
+                        header, footer { display: none !important; }
+                    }
+                    body { 
+                        font-family: 'Times New Roman', Times, serif; 
+                        padding: 20mm; 
+                        line-height: 1.5; 
+                        color: #000; 
+                        font-size: 12pt; 
+                        margin: 0;
+                    }
                     .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
                     .info-section { margin-bottom: 20px; }
                     .info-row { margin-bottom: 5px; }
@@ -329,7 +343,21 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                 <title>Termo de Recebimento - NF ${receiptData.invoiceNumber}</title>
                 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
                 <style>
-                    body { font-family: 'Times New Roman', Times, serif; padding: 20mm; line-height: 1.5; color: #000; font-size: 12pt; }
+                    @page { 
+                        size: A4; 
+                        margin: 0; 
+                    }
+                    @media print {
+                        header, footer { display: none !important; }
+                    }
+                    body { 
+                        font-family: 'Times New Roman', Times, serif; 
+                        padding: 20mm; 
+                        line-height: 1.5; 
+                        color: #000; 
+                        font-size: 12pt; 
+                        margin: 0;
+                    }
                     .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
                     .info-section { margin-bottom: 20px; }
                     .info-row { margin-bottom: 5px; }

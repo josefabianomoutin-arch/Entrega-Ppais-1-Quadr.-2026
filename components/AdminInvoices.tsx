@@ -71,8 +71,19 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
             <title>Etiquetas de Notas Fiscais</title>
             <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
             <style>
-                @page { size: A4; margin: 10mm; }
-                body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f0f0f0; }
+                @page { 
+                    size: A4; 
+                    margin: 0; 
+                }
+                @media print {
+                    header, footer { display: none !important; }
+                }
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 10mm; 
+                    padding: 0; 
+                    background: white; 
+                }
                 .page-container { width: 190mm; margin: 0 auto; background: white; }
                 .label-card {
                     width: 90mm; height: 60mm; border: 1px solid #000; padding: 5mm;

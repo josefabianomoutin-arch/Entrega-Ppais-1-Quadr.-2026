@@ -110,7 +110,20 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
         <head>
           <title>Relatório de Entrega - Diretoria</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.4; }
+            @page { 
+                size: A4; 
+                margin: 0; 
+            }
+            @media print {
+                header, footer { display: none !important; }
+            }
+            body { 
+                font-family: Arial, sans-serif; 
+                padding: 20mm; 
+                color: #333; 
+                line-height: 1.4; 
+                margin: 0;
+            }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 11px; }
             th { background-color: #f5f5f5; font-weight: bold; }

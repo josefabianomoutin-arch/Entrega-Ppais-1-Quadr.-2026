@@ -77,13 +77,16 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 <style>
                     @page {
                         size: A4;
-                        margin: 10mm;
+                        margin: 0;
+                    }
+                    @media print {
+                        header, footer { display: none !important; }
                     }
                     body { 
                         font-family: Arial, sans-serif; 
-                        margin: 0; 
+                        margin: 10mm; 
                         padding: 0;
-                        background: #f0f0f0;
+                        background: white;
                     }
                     .page-container {
                         width: 190mm;

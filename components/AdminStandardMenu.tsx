@@ -80,8 +80,19 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
               <title>Etiqueta - ${lot.itemName}</title>
               <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
               <style>
-                  @page { size: A4; margin: 10mm; }
-                  body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f0f0f0; }
+                  @page { 
+                      size: A4; 
+                      margin: 0; 
+                  }
+                  @media print {
+                      header, footer { display: none !important; }
+                  }
+                  body { 
+                      font-family: Arial, sans-serif; 
+                      margin: 10mm; 
+                      padding: 0; 
+                      background: white; 
+                  }
                   .page-container { width: 190mm; margin: 0 auto; background: white; display: flex; justify-content: center; padding-top: 10mm; }
                   .label-card {
                       width: 90mm; height: 60mm; border: 1px solid #000; padding: 5mm;
@@ -423,7 +434,20 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
         <head>
           <title>Cardápio do Dia - ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.4; }
+            @page { 
+                size: A4; 
+                margin: 0; 
+            }
+            @media print {
+                header, footer { display: none !important; }
+            }
+            body { 
+                font-family: Arial, sans-serif; 
+                padding: 20mm; 
+                color: #333; 
+                line-height: 1.4; 
+                margin: 0;
+            }
             .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
             .header-sap { font-size: 14px; margin-bottom: 2px; }
             .header-unit { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
