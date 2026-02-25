@@ -82,14 +82,17 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                 body { 
                     font-family: Arial, sans-serif; 
                     margin: 0; 
-                    padding: 2.0cm 1.7cm; 
+                    padding: 1.4cm 1.6cm; 
                     background: white; 
                 }
-                .page-container { width: 176mm; margin: 0 auto; background: white; }
+                .page-container { width: 178mm; margin: 0 auto; background: white; display: flex; flex-wrap: wrap; justify-content: flex-start; }
                 .label-card {
-                    width: 86mm; height: 55mm; border: 1px solid #000; padding: 4mm;
+                    width: 84mm; height: 55mm; border: 1px solid #000; padding: 4mm;
                     box-sizing: border-box; display: inline-block; vertical-align: top;
-                    margin: 1mm; text-align: center; position: relative; overflow: hidden; border-radius: 3mm;
+                    margin: 0 10mm 0 0; text-align: center; position: relative; overflow: hidden; border-radius: 3mm;
+                }
+                .label-card:nth-child(2n) {
+                    margin-right: 0;
                 }
                 h1 { font-size: 14pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 h2 { font-size: 10pt; margin: 0 0 3mm 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
