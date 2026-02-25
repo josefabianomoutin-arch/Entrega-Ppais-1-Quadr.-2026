@@ -403,6 +403,7 @@ const FinancialCard: React.FC<{ record: FinancialRecord }> = ({ record: r }) => 
                     <p className={`text-[10px] font-mono font-black leading-tight ${isFinalizado ? 'text-green-700' : isEmAndamentoEmpenhado ? 'text-orange-700' : 'text-gray-600'}`}>
                         {r.numeroProcesso || 'N/A'}
                         {(!isEmAndamentoEmpenhado && r.numeroEmpenho) ? ` | EMP: ${r.numeroEmpenho}` : ''}
+                        {r.notaCredito ? ` | CRÉDITO: ${r.notaCredito}` : ''}
                     </p>
                     {r.dataFinalizacaoProcesso && !isFinalizado && (
                         <p className="text-[8px] font-bold uppercase mt-1 text-indigo-500">Previsto p/: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</p>

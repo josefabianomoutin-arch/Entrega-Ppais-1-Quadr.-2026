@@ -137,6 +137,7 @@ export interface FinancialRecord {
   status: string;
   dataFinalizacaoProcesso: string; // NOVO
   numeroEmpenho: string; // NOVO
+  notaCredito?: string; // NOVO
 }
 
 export interface ThirdPartyEntryLog {

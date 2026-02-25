@@ -41,7 +41,8 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
     numeroProcesso: '',
     dataPagamento: '',
     dataFinalizacaoProcesso: '',
-    numeroEmpenho: ''
+    numeroEmpenho: '',
+    notaCredito: ''
   };
 
   const [formData, setFormData] = useState<Partial<FinancialRecord>>(initialFormState);
@@ -104,6 +105,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
             status: (formData.status || 'PENDENTE').toUpperCase().trim(),
             numeroProcesso: formData.numeroProcesso?.trim() || '',
             numeroEmpenho: formData.numeroEmpenho?.trim() || '',
+            notaCredito: formData.notaCredito?.trim() || '',
             dataFinalizacaoProcesso: formData.dataFinalizacaoProcesso || '',
             modalidade: formData.modalidade?.trim() || ''
         };
@@ -114,6 +116,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
           // Garantir que campos de despesa não poluam registros de entrada
           delete recordToSave.valorUtilizado;
           delete recordToSave.numeroEmpenho;
+          delete recordToSave.notaCredito;
         } else {
           recordToSave.valorUtilizado = sanitizeNum(formData.valorUtilizado);
           // Garantir que campos de entrada não poluam registros de gasto
@@ -281,6 +284,10 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
                     <span className="text-[8px] font-black text-gray-400 uppercase ml-1">Nº Empenho</span>
                     <input type="text" value={formData.numeroEmpenho || ''} onChange={e => setFormData({...formData, numeroEmpenho: e.target.value})} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-400 font-mono text-[10px]" placeholder="Nº EMP" />
                 </div>
+                <div className="space-y-1">
+                    <span className="text-[8px] font-black text-gray-400 uppercase ml-1">Nota de Crédito</span>
+                    <input type="text" value={formData.notaCredito || ''} onChange={e => setFormData({...formData, notaCredito: e.target.value})} className="w-full p-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-400 font-mono text-[10px]" placeholder="Nº CRÉDITO" />
+                </div>
             </div>
           </div>
 
@@ -372,6 +379,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
 
                                {/* INFO NORMAL CASO NÃO SEJA O BANNER PRINCIPAL */}
                                {(!isEmAndamentoEmpenhado && r.numeroEmpenho) && <span>EMPENHO: {r.numeroEmpenho}</span>}
+                               {r.notaCredito && <span> | CRÉDITO: {r.notaCredito}</span>}
                                {(!isFinalizado && r.dataFinalizacaoProcesso) && <span>DATA PREV.: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</span>}
                             </div>
                           </div>
