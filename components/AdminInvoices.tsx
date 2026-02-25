@@ -85,16 +85,16 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     padding: 0.6cm 1.6cm; 
                     background: white; 
                 }
-                .page-container { width: 154mm; margin: 0 auto; background: white; display: flex; flex-wrap: wrap; justify-content: flex-start; }
+                .page-container { width: 142mm; margin: 0 auto; background: white; display: flex; flex-wrap: wrap; justify-content: flex-start; }
                 .label-card {
-                    width: 72mm; height: 55mm; border: 1px solid #000; padding: 4mm;
+                    width: 66mm; height: 55mm; border: 1px solid #000; padding: 4mm;
                     box-sizing: border-box; display: inline-block; vertical-align: top;
                     margin: 0 10mm 0 0; text-align: center; position: relative; overflow: hidden; border-radius: 3mm;
                 }
                 .label-card:nth-child(2n) {
                     margin-right: 0;
                 }
-                h1 { font-size: 11pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; line-height: 1.2; }
+                h1 { font-size: 9pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; line-height: 1.2; }
                 h2 { font-size: 10pt; margin: 0 0 3mm 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 .info { text-align: left; font-size: 9pt; }
                 .info p { margin: 1mm 0; display: flex; justify-content: space-between; border-bottom: 0.5px dashed #ddd; }
