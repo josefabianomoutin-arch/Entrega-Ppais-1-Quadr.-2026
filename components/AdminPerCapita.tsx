@@ -15,6 +15,16 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+const normalizeItemName = (name: string): string => {
+    return (name || '')
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .replace(/[;,\.\-\/]/g, " ")    // Troca separadores por espaço
+        .replace(/\s+/g, " ")           // Remove espaços duplos
+        .trim()
+        .toUpperCase();
+};
+
 const formatContractedTotal = (quantity: number, unitString?: string): string => {
     const [unitType, unitWeightStr] = (unitString || 'kg-1').split('-');
     
@@ -190,7 +200,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
                 if (!startDate) return;
                 const start = new Date(startDate + 'T12:00:00').getTime();
                 
-                const itemName = (d.item || '').toUpperCase().trim();
+                const itemName = normalizeItemName(d.item || '');
                 if (!itemName) return;
 
                 d.lots?.forEach(l => {
@@ -334,7 +344,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {resolutionData && Object.entries(resolutionData).sort((a, b) => a[0].localeCompare(b[0])).map(([name, data], index) => {
-                                    const avgDays = shelfLifeData.get(name) || 0;
+                                    const normalizedName = normalizeItemName(name);
+                                    const avgDays = shelfLifeData.get(normalizedName) || 0;
                                     const recommendation = getPurchaseRecommendation(avgDays);
                                     
                                     return (
