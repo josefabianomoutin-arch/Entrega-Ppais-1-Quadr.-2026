@@ -82,12 +82,12 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                 body { 
                     font-family: Arial, sans-serif; 
                     margin: 0; 
-                    padding: 1.4cm 1.6cm; 
+                    padding: 0.6cm 1.6cm; 
                     background: white; 
                 }
-                .page-container { width: 178mm; margin: 0 auto; background: white; display: flex; flex-wrap: wrap; justify-content: flex-start; }
+                .page-container { width: 166mm; margin: 0 auto; background: white; display: flex; flex-wrap: wrap; justify-content: flex-start; }
                 .label-card {
-                    width: 84mm; height: 55mm; border: 1px solid #000; padding: 4mm;
+                    width: 78mm; height: 55mm; border: 1px solid #000; padding: 4mm;
                     box-sizing: border-box; display: inline-block; vertical-align: top;
                     margin: 0 10mm 0 0; text-align: center; position: relative; overflow: hidden; border-radius: 3mm;
                 }
