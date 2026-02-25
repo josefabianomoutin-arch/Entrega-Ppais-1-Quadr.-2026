@@ -443,10 +443,19 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
             }
             body { 
                 font-family: Arial, sans-serif; 
-                padding: 20mm; 
+                padding: 0; 
                 color: #333; 
                 line-height: 1.4; 
                 margin: 0;
+                background: white;
+            }
+            .page {
+                width: 210mm;
+                min-height: 297mm;
+                padding: 15mm;
+                margin: 0 auto;
+                box-sizing: border-box;
+                background: white;
             }
             .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
             .header-sap { font-size: 14px; margin-bottom: 2px; }
@@ -463,89 +472,94 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
             .summary-title { font-size: 14px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 10px; }
             .footer { margin-top: 60px; display: flex; justify-content: space-around; }
             .sig { border-top: 1px solid #000; width: 220px; text-align: center; padding-top: 5px; font-size: 11px; font-weight: bold; }
+            
             @media print {
-              body { -webkit-print-color-adjust: exact; }
+                body { margin: 0; padding: 0; }
+                .page { margin: 0; border: none; box-shadow: none; padding: 15mm; }
+                body { -webkit-print-color-adjust: exact; }
             }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div class="header-sap">Secretaria da Administração Penitenciária</div>
-            <div class="header-unit">Polícia Penal - Penitenciária de Taiúva</div>
-            <div class="header-address">Rodovia Brigadeiro Faria Lima, SP 326, KM 359,6 Taiúva/SP - CEP: 14.720-000</div>
-            <div class="header-contact">Fone: (16) 3247-6261 - E-mail: dg@ptaiuva.sap.gov.br</div>
-          </div>
-          
-          <div class="report-title">Cardápio Diário e Necessidade de Gêneros</div>
-  
-          <div class="info-bar">
-              <span>Data: ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} (Semana ${selectedWeek})</span>
-              <span>População Carcerária: ${inmateCount}</span>
-          </div>
-          
-          <div class="menu-section">
-              <div class="summary-title">Cardápio Detalhado</div>
-              <table>
-                  <thead>
-                      <tr>
-                          <th style="width: 50%;">Item Contratado (p/ Análise)</th>
-                          <th style="width: 25%; text-align: right;">Peso/Qtd. Unit.</th>
-                          <th style="width: 25%; text-align: right;">Peso/Qtd. Total</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                    ${MEAL_PERIODS.map(period => {
-                      if (!groupedMenu[period] || groupedMenu[period].length === 0) return '';
-                      return `
-                        <tr><td colspan="3" class="period-header">${period}</td></tr>
-                        ${groupedMenu[period].map(row => `
-                          <tr>
-                            <td>${row.contractedItem || row.foodItem || '-'}</td>
-                            <td style="text-align: right;">${row.unitWeight}</td>
-                            <td style="text-align: right;">${row.totalWeight}</td>
-                          </tr>
-                        `).join('')}
-                      `;
-                    }).join('')}
-                  </tbody>
-              </table>
-          </div>
-  
-          <div class="summary-section">
-              <div class="summary-title">Resumo de Gêneros Necessários para o Dia</div>
-              <table>
-                  <thead>
-                      <tr>
-                          <th>Item Contratado</th>
-                          <th style="text-align: right;">Quantidade Total Necessária</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      ${sortedSummary.length > 0 ? sortedSummary.map(([name, data]) => `
-                          <tr>
-                              <td>${name}</td>
-                              <td style="text-align: right;">${data.total.toLocaleString('pt-BR', { minimumFractionDigits: ['Kg', 'L'].includes(data.unit) ? 3 : 0, maximumFractionDigits: ['Kg', 'L'].includes(data.unit) ? 3 : 0 })} ${data.unit}</td>
-                          </tr>
-                      `).join('') : '<tr><td colspan="2" style="text-align: center;">Nenhum item contratado no cardápio.</td></tr>'}
-                  </tbody>
-              </table>
-          </div>
-          
-          <div class="summary-section">
-            <div class="summary-title">Fornecedores com Entregas na Semana ${selectedWeek}</div>
-            ${sortedSuppliersList.length > 0 ? `
-                <ul style="list-style-type: disc; padding-left: 20px; font-size: 10px;">
-                    ${sortedSuppliersList.map(name => `<li>${name}</li>`).join('')}
-                </ul>
-            ` : `
-                <p style="font-size: 10px; text-align: center; font-style: italic;">Nenhum fornecedor realizou entregas nesta semana.</p>
-            `}
-          </div>
-  
-          <div class="footer">
-            <div class="sig">Responsável (Almoxarifado)</div>
-            <div class="sig">Nutricionista</div>
-            <div class="sig">Diretor (Núcleo de Infraestrutura)</div>
+          <div class="page">
+            <div class="header">
+              <div class="header-sap">Secretaria da Administração Penitenciária</div>
+              <div class="header-unit">Polícia Penal - Penitenciária de Taiúva</div>
+              <div class="header-address">Rodovia Brigadeiro Faria Lima, SP 326, KM 359,6 Taiúva/SP - CEP: 14.720-000</div>
+              <div class="header-contact">Fone: (16) 3247-6261 - E-mail: dg@ptaiuva.sap.gov.br</div>
+            </div>
+            
+            <div class="report-title">Cardápio Diário e Necessidade de Gêneros</div>
+    
+            <div class="info-bar">
+                <span>Data: ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} (Semana ${selectedWeek})</span>
+                <span>População Carcerária: ${inmateCount}</span>
+            </div>
+            
+            <div class="menu-section">
+                <div class="summary-title">Cardápio Detalhado</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 50%;">Item Contratado (p/ Análise)</th>
+                            <th style="width: 25%; text-align: right;">Peso/Qtd. Unit.</th>
+                            <th style="width: 25%; text-align: right;">Peso/Qtd. Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                      ${MEAL_PERIODS.map(period => {
+                        if (!groupedMenu[period] || groupedMenu[period].length === 0) return '';
+                        return `
+                          <tr><td colspan="3" class="period-header">${period}</td></tr>
+                          ${groupedMenu[period].map(row => `
+                            <tr>
+                              <td>${row.contractedItem || row.foodItem || '-'}</td>
+                              <td style="text-align: right;">${row.unitWeight}</td>
+                              <td style="text-align: right;">${row.totalWeight}</td>
+                            </tr>
+                          `).join('')}
+                        `;
+                      }).join('')}
+                    </tbody>
+                </table>
+            </div>
+    
+            <div class="summary-section">
+                <div class="summary-title">Resumo de Gêneros Necessários para o Dia</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Item Contratado</th>
+                            <th style="text-align: right;">Quantidade Total Necessária</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sortedSummary.length > 0 ? sortedSummary.map(([name, data]) => `
+                            <tr>
+                                <td>${name}</td>
+                                <td style="text-align: right;">${data.total.toLocaleString('pt-BR', { minimumFractionDigits: ['Kg', 'L'].includes(data.unit) ? 3 : 0, maximumFractionDigits: ['Kg', 'L'].includes(data.unit) ? 3 : 0 })} ${data.unit}</td>
+                            </tr>
+                        `).join('') : '<tr><td colspan="2" style="text-align: center;">Nenhum item contratado no cardápio.</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="summary-section">
+              <div class="summary-title">Fornecedores com Entregas na Semana ${selectedWeek}</div>
+              ${sortedSuppliersList.length > 0 ? `
+                  <ul style="list-style-type: disc; padding-left: 20px; font-size: 10px;">
+                      ${sortedSuppliersList.map(name => `<li>${name}</li>`).join('')}
+                  </ul>
+              ` : `
+                  <p style="font-size: 10px; text-align: center; font-style: italic;">Nenhum fornecedor realizou entregas nesta semana.</p>
+              `}
+            </div>
+    
+            <div class="footer">
+              <div class="sig">Responsável (Almoxarifado)</div>
+              <div class="sig">Nutricionista</div>
+              <div class="sig">Diretor (Núcleo de Infraestrutura)</div>
+            </div>
           </div>
         </body>
       </html>

@@ -109,10 +109,19 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                         line-height: 1.4; 
                         color: #000; 
                         font-size: 11pt; 
-                        margin: 20mm; 
+                        margin: 0; 
                         padding: 0; 
+                        background: white;
                     }
-                    .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; }
+                    .page {
+                        width: 210mm;
+                        min-height: 297mm;
+                        padding: 20mm;
+                        margin: 0 auto;
+                        box-sizing: border-box;
+                        background: white;
+                    }
+                    .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; font-size: 14pt; }
                     
                     .contractor-info { text-align: justify; margin-bottom: 20px; }
                     .opening-text { text-align: justify; margin-bottom: 20px; text-indent: 2cm; }
@@ -134,12 +143,18 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                     .signature-title { font-size: 9pt; text-transform: uppercase; }
                     
                     .location-date { margin-top: 30px; text-align: right; font-weight: normal; }
+
+                    @media print {
+                        body { margin: 0; padding: 0; }
+                        .page { margin: 0; border: none; box-shadow: none; padding: 20mm; }
+                    }
                 </style>
             </head>
             <body>
-                <div class="header">
-                    CRONOGRAMA DE ENTREGA
-                </div>
+                <div class="page">
+                    <div class="header">
+                        CRONOGRAMA DE ENTREGA
+                    </div>
 
                 <div class="contractor-info">
                     <strong>Agricultor:</strong> ${supplier.name.toUpperCase()}, maior, capaz e residente na ${reportSupplierAddress || '__________________________________________________________________'}, inscrito no CPF: ${supplier.cpf} doravante designado Contratado.

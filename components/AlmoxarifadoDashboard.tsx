@@ -351,124 +351,154 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                         header, footer { display: none !important; }
                     }
                     body { 
-                        font-family: 'Times New Roman', Times, serif; 
-                        padding: 20mm; 
-                        line-height: 1.5; 
-                        color: #000; 
-                        font-size: 12pt; 
+                        font-family: Arial, sans-serif; 
+                        padding: 0; 
                         margin: 0;
+                        background: white;
                     }
-                    .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-                    .info-section { margin-bottom: 20px; }
-                    .info-row { margin-bottom: 5px; }
-                    .info-label { font-weight: bold; text-transform: uppercase; display: inline-block; width: 220px; }
-                    table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10pt; }
+                    .page {
+                        width: 210mm;
+                        min-height: 297mm;
+                        padding: 15mm;
+                        margin: 0 auto;
+                        box-sizing: border-box;
+                        background: white;
+                    }
+                    .header { 
+                        text-align: center; 
+                        font-weight: bold; 
+                        text-transform: uppercase; 
+                        margin-bottom: 25px; 
+                        border-bottom: 2px solid #000; 
+                        padding-bottom: 15px;
+                        font-size: 13pt;
+                    }
+                    .info-section { margin-bottom: 20px; font-size: 11pt; }
+                    .info-row { margin-bottom: 8px; display: flex; align-items: flex-start; }
+                    .info-label { font-weight: bold; text-transform: uppercase; width: 200px; flex-shrink: 0; }
+                    .info-value { flex: 1; }
+                    
+                    .barcode-row { margin-top: 15px; display: flex; align-items: center; }
+                    .barcode-label { font-weight: bold; text-transform: uppercase; width: 200px; flex-shrink: 0; }
+                    .barcode-container { flex: 1; display: flex; flex-direction: column; align-items: center; }
+                    .barcode-svg { width: 100%; height: 18mm !important; }
+                    .barcode-text { font-size: 8pt; font-family: monospace; margin-top: 2px; }
+
+                    table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 9pt; }
                     th, td { border: 1px solid #000; padding: 6px; text-align: left; }
-                    th { background-color: #f2f2f2; text-transform: uppercase; font-weight: bold; }
+                    th { background-color: #f2f2f2; text-transform: uppercase; font-weight: bold; text-align: center; }
                     .text-right { text-align: right; }
-                    .footer-text { margin-top: 30px; text-align: justify; }
+                    .text-center { text-align: center; }
+                    
+                    .footer-text { margin-top: 30px; text-align: justify; font-size: 11pt; line-height: 1.4; }
+                    .location-date { margin-top: 40px; text-align: center; font-weight: bold; font-size: 12pt; text-transform: uppercase; }
+                    
                     .signature-section { margin-top: 60px; text-align: center; }
-                    .signature-line { border-top: 1px solid #000; width: 300px; margin: 0 auto 10px auto; }
-                    .location-date { margin-top: 40px; text-align: center; font-weight: bold; }
-                    .barcode-section { margin-top: 40px; text-align: center; display: flex; flex-direction: column; align-items: center; }
-                    .barcode-svg { max-width: 100%; height: 15mm !important; }
+                    .signature-title { font-weight: bold; margin-bottom: 50px; text-transform: uppercase; font-size: 11pt; }
+                    .signature-line { border-top: 1px solid #000; width: 350px; margin: 0 auto 10px auto; }
+                    .signature-name { font-weight: bold; margin: 0; text-transform: uppercase; font-size: 11pt; }
+                    .signature-info { margin: 0; font-size: 10pt; text-transform: uppercase; }
+
                     @media print {
-                        body { padding: 0; }
-                        .no-print { display: none; }
+                        body { margin: 0; padding: 0; }
+                        .page { margin: 0; border: none; box-shadow: none; padding: 15mm; }
                     }
                 </style>
             </head>
             <body>
-                <div class="header">
-                    ATESTAMOS O RECEBIMENTO DOS MATERIAIS/SERVIÇOS RELACIONADOS, ENTREGA PELA EMPRESA:
-                </div>
-
-                <div class="info-section">
-                    <div class="info-row"><span class="info-label">FORNECEDOR:</span> ${receiptData.supplierName}</div>
-                    <div class="info-row"><span class="info-label">C.N.P.J.:</span> ${receiptData.supplierCpf}</div>
-                    <div class="info-row"><span class="info-label">NOTA FISCAL Nº:</span> ${receiptData.invoiceNumber}</div>
-                    <div class="info-row"><span class="info-label">NOTA DE EMPENHO:</span> ${receiptData.receiptTermNumber || 'N/A'}</div>
-                    <div class="info-row"><span class="info-label">DATA NOTA FISCAL:</span> ${formatDate(receiptData.invoiceDate)}</div>
-                    <div class="info-row"><span class="info-label">DATA RECEBIMENTO:</span> ${formatDate(receiptData.receiptDate)}</div>
-                    <div class="info-row"><span class="info-label">VALOR TOTAL NOTA FISCAL:</span> ${formatCurrency(receiptData.totalInvoiceValue)}</div>
-                    ${receiptData.barcode ? `
-                    <div class="info-row" style="display: flex; align-items: center; margin-top: 10px;">
-                        <span class="info-label">CÓD. BARRAS NF:</span>
-                        <div style="display: flex; flex-direction: column; align-items: center;">
-                            <svg id="barcode-receipt" class="barcode-svg"></svg>
-                            <p style="font-size: 8pt; margin-top: 1mm; font-family: monospace; margin-bottom: 0;">${receiptData.barcode}</p>
-                        </div>
+                <div class="page">
+                    <div class="header">
+                        ATESTAMOS O RECEBIMENTO DOS MATERIAIS/SERVIÇOS RELACIONADOS, ENTREGA PELA EMPRESA:
                     </div>
-                    ` : ''}
-                </div>
 
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ITEM</th>
-                            <th>QUANT.</th>
-                            <th>UNID.</th>
-                            <th>DESCRIÇÃO</th>
-                            <th>VR.UNIT.</th>
-                            <th>VR. TOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${receiptData.items.map((it, idx) => `
-                            <tr>
-                                <td style="text-align: center;">${String(idx + 1).padStart(2, '0')}</td>
-                                <td class="text-right">${(it.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                                <td style="text-align: center;">${it.unit || 'N/A'}</td>
-                                <td>${it.name || 'N/A'}</td>
-                                <td class="text-right">${formatCurrency(it.unitPrice)}</td>
-                                <td class="text-right">${formatCurrency(it.totalValue)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="5" class="text-right" style="font-weight: bold;">TOTAL GERAL:</td>
-                            <td class="text-right" style="font-weight: bold;">${formatCurrency(receiptData.totalInvoiceValue)}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-
-                <div class="footer-text">
-                    Recebemos em ordem e na quantidade devida os materiais/serviços acima discriminados, os quais foram inspecionados pela comissão de recepção materiais, foi considerado de acordo com solicitado, satisfazendo as especificações e demais exigências do empenho conforme determina o inciso II do artigo 140 da lei nº 14.133/21.
-                </div>
-
-                <div class="location-date">
-                    TAIÚVA, ${receiptData.receiptDate ? new Date(receiptData.receiptDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase() : 'DATA NÃO INFORMADA'}
-                </div>
-
-                <div class="signature-section">
-                    <p style="font-weight: bold; margin-bottom: 40px; text-transform: uppercase;">COMISSÃO DE RECEPÇÃO DE MATERIAIS/SERVIÇOS</p>
-                    <div class="signature-line"></div>
-                    <p style="font-weight: bold; margin: 0;">FERNANDO RODRIGUES SOARES</p>
-                    <p style="margin: 0;">CPF: 347.810.448-32</p>
-                    <p style="margin: 0;">PRESIDENTE</p>
-                </div>
-
-                <script>
-                    window.onload = function() {
-                        ${receiptData.barcode ? `
-                        try {
-                            JsBarcode("#barcode-receipt", "${receiptData.barcode}", {
-                                format: "CODE128",
-                                width: 2,
-                                height: 40,
-                                displayValue: false,
-                                margin: 0
-                            });
-                        } catch (e) { console.error(e); }
-                        ` : ''}
+                    <div class="info-section">
+                        <div class="info-row"><span class="info-label">FORNECEDOR:</span> <span class="info-value">${receiptData.supplierName.toUpperCase()}</span></div>
+                        <div class="info-row"><span class="info-label">C.N.P.J.:</span> <span class="info-value">${receiptData.supplierCpf}</span></div>
+                        <div class="info-row"><span class="info-label">NOTA FISCAL Nº:</span> <span class="info-value">${receiptData.invoiceNumber}</span></div>
+                        <div class="info-row"><span class="info-label">NOTA DE EMPENHO:</span> <span class="info-value">${receiptData.receiptTermNumber || 'N/A'}</span></div>
+                        <div class="info-row"><span class="info-label">DATA NOTA FISCAL:</span> <span class="info-value">${formatDate(receiptData.invoiceDate)}</span></div>
+                        <div class="info-row"><span class="info-label">DATA RECEBIMENTO:</span> <span class="info-value">${formatDate(receiptData.receiptDate)}</span></div>
+                        <div class="info-row"><span class="info-label">VALOR TOTAL NOTA FISCAL:</span> <span class="info-value">${formatCurrency(receiptData.totalInvoiceValue)}</span></div>
                         
-                        setTimeout(() => {
-                            window.print();
-                            window.close();
-                        }, 500);
-                    }
-                </script>
+                        ${receiptData.barcode ? `
+                        <div class="barcode-row">
+                            <span class="barcode-label">CÓD. BARRAS NF:</span>
+                            <div class="barcode-container">
+                                <svg id="barcode-receipt" class="barcode-svg"></svg>
+                                <div class="barcode-text">${receiptData.barcode}</div>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">ITEM</th>
+                                <th style="width: 80px;">QUANT.</th>
+                                <th style="width: 60px;">UNID.</th>
+                                <th>DESCRIÇÃO</th>
+                                <th style="width: 100px;">VR.UNIT.</th>
+                                <th style="width: 120px;">VR. TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${receiptData.items.map((it, idx) => `
+                                <tr>
+                                    <td class="text-center">${String(idx + 1).padStart(2, '0')}</td>
+                                    <td class="text-right">${(it.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    <td class="text-center">${it.unit || 'N/A'}</td>
+                                    <td>${it.name || 'N/A'}</td>
+                                    <td class="text-right">${formatCurrency(it.unitPrice)}</td>
+                                    <td class="text-right">${formatCurrency(it.totalValue)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr style="font-weight: bold; background-color: #f2f2f2;">
+                                <td colspan="5" class="text-right">TOTAL GERAL:</td>
+                                <td class="text-right">${formatCurrency(receiptData.totalInvoiceValue)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div class="footer-text">
+                        Recebemos em ordem e na quantidade devida os materiais/serviços acima discriminados, os quais foram inspecionados pela comissão de recepção materiais, foi considerado de acordo com solicitado, satisfazendo as especificações e demais exigências do empenho conforme determina o inciso II do artigo 140 da lei nº 14.133/21.
+                    </div>
+
+                    <div class="location-date">
+                        TAIÚVA, ${receiptData.receiptDate ? new Date(receiptData.receiptDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase() : 'DATA NÃO INFORMADA'}
+                    </div>
+
+                    <div class="signature-section">
+                        <div class="signature-title">COMISSÃO DE RECEPÇÃO DE MATERIAIS/SERVIÇOS</div>
+                        <div class="signature-line"></div>
+                        <div class="signature-name">FERNANDO RODRIGUES SOARES</div>
+                        <div class="signature-info">CPF: 347.810.448-32</div>
+                        <div class="signature-info">PRESIDENTE</div>
+                    </div>
+
+                    <script>
+                        window.onload = function() {
+                            ${receiptData.barcode ? `
+                            try {
+                                JsBarcode("#barcode-receipt", "${receiptData.barcode}", {
+                                    format: "CODE128",
+                                    width: 2,
+                                    height: 50,
+                                    displayValue: false,
+                                    margin: 0
+                                });
+                            } catch (e) { console.error(e); }
+                            ` : ''}
+                            
+                            setTimeout(() => {
+                                window.print();
+                                window.close();
+                            }, 500);
+                        }
+                    </script>
+                </div>
             </body>
             </html>
         `;
