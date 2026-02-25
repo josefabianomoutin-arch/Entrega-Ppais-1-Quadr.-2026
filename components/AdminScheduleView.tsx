@@ -99,12 +99,19 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                 <style>
                     @page { 
                         size: A4; 
-                        margin: 15mm; 
+                        margin: 0; 
                     }
                     @media print {
                         header, footer { display: none !important; }
                     }
-                    body { font-family: Arial, sans-serif; line-height: 1.4; color: #000; font-size: 11pt; margin: 0; padding: 0; }
+                    body { 
+                        font-family: Arial, sans-serif; 
+                        line-height: 1.4; 
+                        color: #000; 
+                        font-size: 11pt; 
+                        margin: 20mm; 
+                        padding: 0; 
+                    }
                     .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; }
                     
                     .contractor-info { text-align: justify; margin-bottom: 20px; }
