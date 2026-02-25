@@ -182,6 +182,47 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
         return itemData.reduce((sum, item) => sum + item.totalValue, 0);
     }, [itemData]);
 
+    const shelfLifeData = useMemo(() => {
+        const shelfLives = new Map<string, number[]>();
+        suppliers.forEach(s => {
+            s.deliveries.forEach(d => {
+                const startDate = d.invoiceDate || d.date;
+                if (!startDate) return;
+                const start = new Date(startDate + 'T12:00:00').getTime();
+                
+                const itemName = (d.item || '').toUpperCase().trim();
+                if (!itemName) return;
+
+                d.lots?.forEach(l => {
+                    if (!l.expirationDate) return;
+                    const end = new Date(l.expirationDate + 'T12:00:00').getTime();
+                    const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays > 0) {
+                        const existing = shelfLives.get(itemName) || [];
+                        existing.push(diffDays);
+                        shelfLives.set(itemName, existing);
+                    }
+                });
+            });
+        });
+        
+        const averages = new Map<string, number>();
+        shelfLives.forEach((lives, name) => {
+            const avg = lives.reduce((a, b) => a + b, 0) / lives.length;
+            averages.set(name, avg);
+        });
+        return averages;
+    }, [suppliers]);
+
+    const getPurchaseRecommendation = (avgDays: number) => {
+        if (avgDays === 0) return 'DADOS INSUFICIENTES';
+        if (avgDays < 45) return 'MENSAL';
+        if (avgDays < 135) return 'QUADRIMESTRAL';
+        if (avgDays < 200) return 'SEMESTRAL';
+        return 'ANUAL';
+    };
+
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-green-500 animate-fade-in relative">
             
@@ -277,131 +318,55 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
             {showComparison && (
                 <div className="mt-8 animate-fade-in">
                     <h3 className="text-2xl font-black text-gray-800 mb-6 text-center uppercase tracking-tighter">
-                        Comparativo Contratado vs. Requerido (Totais para 4 Meses)
+                        Análise de Frequência de Compra por Prazo de Validade (Média das NFs)
                     </h3>
                     <div className="overflow-x-auto border rounded-lg">
                         <table className="w-full text-sm">
                             <thead className="bg-gray-100 text-xs uppercase text-gray-600">
                                 <tr>
                                     <th className="p-3 text-center">#</th>
-                                    <th className="p-3 text-left">Item</th>
-                                    <th className="p-3 text-left">Frequência</th>
-                                    <th className="p-3 text-right">Qtd. Mensal p/ Pessoa</th>
-                                    <th className="p-3 text-right">Citado por Pessoa (4 meses)</th>
-                                    <th className="p-3 text-right">Requerido para 4 meses (População total)</th>
-                                    <th className="p-3 text-right">Contratado para 4 meses (População total)</th>
+                                    <th className="p-3 text-left">Item (Tabela de Pesos)</th>
+                                    <th className="p-3 text-center">Frequência Consumo</th>
+                                    <th className="p-3 text-center">Média Validade (Dias)</th>
+                                    <th className="p-3 text-center">Recomendação de Compra</th>
+                                    <th className="p-3 text-right">Ação Sugerida</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {filteredItemData.length > 0 ? filteredItemData.map((item, index) => {
-                                    const reference = resolutionData[item.name.toUpperCase()];
-                                    const contractedTotal = item.totalQuantity;
-                                    const contractedUnitString = item.unit;
+                                {Object.entries(resolutionData).sort((a, b) => a[0].localeCompare(b[0])).map(([name, data], index) => {
+                                    const avgDays = shelfLifeData.get(name) || 0;
+                                    const recommendation = getPurchaseRecommendation(avgDays);
                                     
-                                    if (!reference) {
-                                        return (
-                                            <tr key={item.name} className="bg-blue-50 hover:bg-blue-100">
-                                                <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
-                                                <td className="p-3 font-semibold text-blue-900">{item.name}</td>
-                                                <td className="p-3 text-center text-blue-800 font-mono">-</td>
-                                                <td className="p-3 text-right">-</td>
-                                                <td className="p-3 text-right">-</td>
-                                                <td className="p-3 text-right font-mono font-bold">-</td>
-                                                <td className="p-3 text-right font-mono font-bold text-blue-900">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
-                                            </tr>
-                                        );
-                                    }
-                                    
-                                    // REVISED LOGIC: Directly use the pre-calculated monthly consumption from resolution data.
-                                    // This is the most reliable method and avoids complex, error-prone calculations based on frequency strings.
-                                    const perCapitaRequiredMonthly = reference.monthlyConsumption;
-                                    
-                                    const perCapitaRequired4Months = perCapitaRequiredMonthly.value * 4;
-
-                                    const customValueStr = customPerCapita[item.name];
-                                    const hasCustomValue = customValueStr !== undefined && customValueStr.trim() !== '';
-
-                                    const effectiveValue4Months = hasCustomValue
-                                        ? parseFloat(customValueStr.replace(',', '.')) || 0
-                                        : perCapitaRequired4Months;
-                                    
-                                    const effectiveValueMonthly = effectiveValue4Months / 4;
-                                    const effectiveUnit = perCapitaRequiredMonthly.unit;
-
-                                    let totalRequiredValue = 0;
-                                    let requiredUnitType = ''; // 'kg', 'L', 'unid.'
-
-                                    if (perCapitaDenominator > 0) {
-                                        const unit = effectiveUnit.toLowerCase();
-                                        const value4Months = effectiveValue4Months;
-
-                                        if (unit === 'g') {
-                                            totalRequiredValue = (value4Months / 1000) * perCapitaDenominator;
-                                            requiredUnitType = 'kg';
-                                        } else if (unit === 'ml') {
-                                            totalRequiredValue = (value4Months / 1000) * perCapitaDenominator;
-                                            requiredUnitType = 'L';
-                                        } else if (unit === 'l') {
-                                            totalRequiredValue = value4Months * perCapitaDenominator;
-                                            requiredUnitType = 'L';
-                                        } else if (unit === 'unid.') {
-                                            totalRequiredValue = value4Months * perCapitaDenominator;
-                                            requiredUnitType = 'unid.';
-                                        }
-                                    }
-
-                                    const formatMonthlyPerCapita = (value: number, unit: string) => {
-                                        const formattedValue = value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                        return `${formattedValue} ${unit}`;
-                                    };
-
-                                    const formatRequiredTotal = (value: number, unit: string) => {
-                                        if (value === 0) return '-';
-                                        const numberFormatOptions: Intl.NumberFormatOptions = {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2,
-                                        };
-                                        if (unit === 'unid.') {
-                                            numberFormatOptions.minimumFractionDigits = 0;
-                                            numberFormatOptions.maximumFractionDigits = 0;
-                                        }
-                                        const formattedValue = value.toLocaleString('pt-BR', numberFormatOptions);
-                                        return `${formattedValue} ${unit}`;
-                                    };
-
                                     return (
-                                         <tr key={item.name} className="hover:bg-gray-50">
+                                        <tr key={name} className="hover:bg-gray-50">
                                             <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
-                                            <td className="p-3 font-semibold text-gray-800">{item.name}</td>
-                                            <td className="p-3 text-left font-mono text-gray-500">{reference.frequency}</td>
-                                            <td className="p-3 text-right font-mono text-gray-600">
-                                                {formatMonthlyPerCapita(effectiveValueMonthly, effectiveUnit)}
+                                            <td className="p-3 font-semibold text-gray-800">{name}</td>
+                                            <td className="p-3 text-center font-mono text-gray-500">{data.frequency}</td>
+                                            <td className="p-3 text-center font-mono font-bold">
+                                                {avgDays > 0 ? `${Math.round(avgDays)} dias` : <span className="text-gray-300 italic">Sem dados NF</span>}
                                             </td>
-                                            <td className="p-3 text-right">
-                                                <div className="inline-flex items-center justify-end">
-                                                    <input
-                                                        type="text"
-                                                        value={customPerCapita[item.name] ?? ''}
-                                                        onChange={(e) => handleCustomPerCapitaChange(item.name, e.target.value)}
-                                                        placeholder={(perCapitaRequired4Months || 0).toString().replace('.', ',')}
-                                                        className="w-24 p-1 border rounded-md text-right font-mono text-sm bg-yellow-50 focus:bg-white focus:ring-2 focus:ring-indigo-400"
-                                                    />
-                                                    <span className="ml-2 text-xs text-gray-500 w-8">{perCapitaRequiredMonthly.unit}</span>
-                                                </div>
+                                            <td className="p-3 text-center">
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                                                    recommendation === 'MENSAL' ? 'bg-red-100 text-red-700' :
+                                                    recommendation === 'QUADRIMESTRAL' ? 'bg-orange-100 text-orange-700' :
+                                                    recommendation === 'SEMESTRAL' ? 'bg-blue-100 text-blue-700' :
+                                                    recommendation === 'ANUAL' ? 'bg-green-100 text-green-700' :
+                                                    'bg-gray-100 text-gray-500'
+                                                }`}>
+                                                    {recommendation}
+                                                </span>
                                             </td>
-                                            <td className={`p-3 text-right font-mono ${hasCustomValue ? 'text-indigo-600 font-bold' : 'text-gray-600'}`}>
-                                                {formatRequiredTotal(totalRequiredValue, requiredUnitType)}
+                                            <td className="p-3 text-right text-[10px] font-medium text-gray-500 italic">
+                                                {avgDays > 0 ? (
+                                                    avgDays < 45 ? "Comprar conforme necessidade imediata" :
+                                                    avgDays < 135 ? "Estoque para até 4 meses" :
+                                                    avgDays < 200 ? "Estoque para até 6 meses" :
+                                                    "Possível estoque anual"
+                                                ) : "Aguardando lançamentos de NF"}
                                             </td>
-                                            <td className="p-3 text-right font-mono font-bold text-gray-800">{formatContractedTotal(contractedTotal, contractedUnitString)}</td>
                                         </tr>
                                     );
-                                }) : (
-                                    <tr>
-                                        <td colSpan={7} className="p-8 text-center text-gray-400 italic">
-                                            Nenhum item de hortifruti ou perecível encontrado nos contratos.
-                                        </td>
-                                    </tr>
-                                )}
+                                })}
                             </tbody>
                         </table>
                     </div>
