@@ -23,7 +23,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
 
     // States for Report
     const [reportSupplierCpf, setReportSupplierCpf] = useState('');
-    const [reportSelectedDate, setReportSelectedDate] = useState('');
+    const [reportSelectedMonth, setReportSelectedMonth] = useState('');
     const [reportSeiNumber, setReportSeiNumber] = useState('');
 
     const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -37,39 +37,45 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
     }, [suppliers, searchTerm, dateFilter]);
 
     const reportSuppliers = useMemo(() => {
-        // Suppliers that have at least one delivery with an invoice number (or just any delivery?)
-        // The user said "BUSCAR OS DADOS NA ABA Consulta de Notas Fiscais", which implies invoices.
-        // So we filter suppliers that have deliveries with invoice numbers.
         return suppliers.filter(s => (s.deliveries || []).some(d => d.invoiceNumber)).sort((a, b) => a.name.localeCompare(b.name));
     }, [suppliers]);
 
-    const reportAvailableDates = useMemo(() => {
+    const reportAvailableMonths = useMemo(() => {
         if (!reportSupplierCpf) return [];
         const supplier = suppliers.find(s => s.cpf === reportSupplierCpf);
         if (!supplier) return [];
         
-        // Get unique dates from deliveries that have invoice numbers
-        const dates = Array.from(new Set((supplier.deliveries || [])
-            .filter(d => d.invoiceNumber)
-            .map(d => d.date)
-        ));
-        return dates.sort().reverse(); // Newest first
+        const months = new Set<string>();
+        (supplier.deliveries || []).filter(d => d.invoiceNumber).forEach(d => {
+            if (d.date) {
+                months.add(d.date.substring(0, 7)); // YYYY-MM
+            }
+        });
+        return Array.from(months).sort().reverse();
     }, [suppliers, reportSupplierCpf]);
+
+    const getMonthName = (monthStr: string) => {
+        if (!monthStr) return '';
+        const [year, month] = monthStr.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+        return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
+    };
 
     const handleGenerateReport = () => {
         const supplier = suppliers.find(s => s.cpf === reportSupplierCpf);
-        if (!supplier || !reportSelectedDate) return;
+        if (!supplier || !reportSelectedMonth) return;
 
-        const items = (supplier.deliveries || []).filter(d => d.date === reportSelectedDate && d.invoiceNumber);
+        const items = (supplier.deliveries || [])
+            .filter(d => d.date.startsWith(reportSelectedMonth) && d.invoiceNumber)
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
         if (items.length === 0) {
-            alert('Nenhum item encontrado para esta data/fornecedor.');
+            alert('Nenhum item encontrado para este mês/fornecedor.');
             return;
         }
 
         const totalWeight = items.reduce((sum, item) => sum + (item.kg || 0), 0);
         const totalValue = items.reduce((sum, item) => sum + (item.value || 0), 0);
-        const invoiceNumber = items[0].invoiceNumber; // Assuming same invoice number for the date, or listing all
 
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
@@ -80,82 +86,71 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
             <head>
                 <title>Cronograma de Entrega</title>
                 <style>
-                    @page { size: A4; margin: 2cm; }
-                    body { font-family: 'Times New Roman', serif; line-height: 1.5; color: #000; }
-                    .header { text-align: center; margin-bottom: 3rem; border-bottom: 2px solid #000; padding-bottom: 1rem; }
-                    .header img { height: 80px; margin-bottom: 1rem; }
-                    .header h1 { font-size: 16pt; font-weight: bold; margin: 0; text-transform: uppercase; }
-                    .header h2 { font-size: 12pt; font-weight: normal; margin: 5px 0 0 0; }
+                    @page { size: A4; margin: 20mm; }
+                    body { font-family: 'Times New Roman', Times, serif; line-height: 1.5; color: #000; font-size: 12pt; }
+                    .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                    .info-section { margin-bottom: 20px; }
+                    .info-row { margin-bottom: 5px; }
+                    .info-label { font-weight: bold; text-transform: uppercase; display: inline-block; width: 220px; }
                     
-                    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
-                    .info-item { margin-bottom: 0.5rem; }
-                    .label { font-weight: bold; text-transform: uppercase; font-size: 10pt; }
-                    .value { font-size: 11pt; border-bottom: 1px dotted #ccc; display: inline-block; min-width: 200px; }
+                    .section-title { font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 2rem 0 1rem 0; text-align: center; background: #f2f2f2; padding: 5px; border: 1px solid #000; }
 
-                    .section-title { font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 2rem 0 1rem 0; text-align: center; background: #f0f0f0; padding: 5px; border: 1px solid #000; }
-
-                    table { w-full; width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
-                    th, td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 10pt; }
-                    th { background-color: #f0f0f0; font-weight: bold; text-transform: uppercase; text-align: center; }
+                    table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10pt; }
+                    th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+                    th { background-color: #f2f2f2; text-transform: uppercase; font-weight: bold; text-align: center; }
                     .text-right { text-align: right; }
                     .text-center { text-align: center; }
 
-                    .footer { margin-top: 4rem; text-align: center; }
-                    .signature-line { border-top: 1px solid #000; width: 60%; margin: 0 auto; padding-top: 5px; }
-                    .signature-text { font-size: 10pt; font-weight: bold; text-transform: uppercase; }
-                    .signature-sub { font-size: 9pt; }
-
-                    .timestamp { position: fixed; bottom: 1cm; right: 1cm; font-size: 8pt; color: #666; }
+                    .footer-text { margin-top: 30px; text-align: justify; }
+                    .signature-section { margin-top: 60px; text-align: center; }
+                    .signature-line { border-top: 1px solid #000; width: 300px; margin: 0 auto 10px auto; }
+                    .location-date { margin-top: 40px; text-align: center; font-weight: bold; }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <h1>Cronograma de Entrega</h1>
-                    <h2>Gestão de Almoxarifado e Nutrição</h2>
+                    CRONOGRAMA DE ENTREGA<br>
+                    GESTÃO DE ALMOXARIFADO E NUTRIÇÃO
                 </div>
 
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="label">Processo SEI:</span><br>
-                        <span class="value">${reportSeiNumber || '_______________________'}</span>
+                <div class="info-section">
+                    <div class="info-row">
+                        <span class="info-label">PROCESSO SEI:</span> ${reportSeiNumber || '_______________________'}
                     </div>
-                    <div class="info-item">
-                        <span class="label">Data do Agendamento (NF):</span><br>
-                        <span class="value">${formatDate(reportSelectedDate)}</span>
+                    <div class="info-row">
+                        <span class="info-label">MÊS DE REFERÊNCIA:</span> ${getMonthName(reportSelectedMonth)}
                     </div>
-                    <div class="info-item">
-                        <span class="label">Fornecedor:</span><br>
-                        <span class="value">${supplier.name}</span>
+                    <div class="info-row">
+                        <span class="info-label">FORNECEDOR:</span> ${supplier.name}
                     </div>
-                    <div class="info-item">
-                        <span class="label">CPF/CNPJ:</span><br>
-                        <span class="value">${supplier.cpf}</span>
+                    <div class="info-row">
+                        <span class="info-label">CPF/CNPJ:</span> ${supplier.cpf}
                     </div>
                 </div>
 
-                <div class="section-title">Relação de Itens a Ser Entregue</div>
+                <div class="section-title">RELAÇÃO DE ITENS A SER ENTREGUE</div>
 
                 <table>
                     <thead>
                         <tr>
-                            <th>Item</th>
-                            <th>Nota Fiscal</th>
-                            <th class="text-center">Peso (Kg)</th>
-                            <th class="text-right">Valor (R$)</th>
+                            <th style="width: 120px;">DATA DO AGENDAMENTO</th>
+                            <th>ITEM</th>
+                            <th class="text-center" style="width: 100px;">PESO (KG)</th>
+                            <th class="text-right" style="width: 120px;">VALOR (R$)</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${items.map(item => `
                             <tr>
+                                <td class="text-center">${formatDate(item.date)}</td>
                                 <td>${item.item}</td>
-                                <td class="text-center">${item.invoiceNumber || '-'}</td>
                                 <td class="text-center">${item.kg?.toFixed(3)}</td>
                                 <td class="text-right">${formatCurrency(item.value || 0)}</td>
                             </tr>
                         `).join('')}
                     </tbody>
                     <tfoot>
-                        <tr style="background-color: #f9f9f9; font-weight: bold;">
+                        <tr style="background-color: #f2f2f2; font-weight: bold;">
                             <td colspan="2" class="text-right">TOTAIS</td>
                             <td class="text-center">${totalWeight.toFixed(3)} Kg</td>
                             <td class="text-right">${formatCurrency(totalValue)}</td>
@@ -163,13 +158,15 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                     </tfoot>
                 </table>
 
-                <div class="footer">
+                <div class="signature-section">
                     <div class="signature-line"></div>
-                    <div class="signature-text">${supplier.name}</div>
-                    <div class="signature-sub">CPF/CNPJ: ${supplier.cpf}</div>
+                    <div>${supplier.name}</div>
+                    <div style="font-size: 10pt;">CPF/CNPJ: ${supplier.cpf}</div>
                 </div>
 
-                <div class="timestamp">Gerado em: ${new Date().toLocaleString('pt-BR')}</div>
+                <div class="location-date">
+                    Brasília, ${new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </div>
 
                 <script>
                     window.onload = function() { window.print(); }
@@ -453,7 +450,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">1. Selecione o Fornecedor (Com Notas Fiscais)</label>
                             <select 
                                 value={reportSupplierCpf} 
-                                onChange={e => { setReportSupplierCpf(e.target.value); setReportSelectedDate(''); }}
+                                onChange={e => { setReportSupplierCpf(e.target.value); setReportSelectedMonth(''); }}
                                 className="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 font-bold text-gray-700 bg-white"
                             >
                                 <option value="">Selecione um fornecedor...</option>
@@ -465,21 +462,21 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
 
                         {reportSupplierCpf && (
                             <div className="animate-fade-in">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">2. Selecione a Data da Nota Fiscal</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">2. Selecione o Mês de Referência</label>
                                 <select 
-                                    value={reportSelectedDate} 
-                                    onChange={e => setReportSelectedDate(e.target.value)}
+                                    value={reportSelectedMonth} 
+                                    onChange={e => setReportSelectedMonth(e.target.value)}
                                     className="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 font-bold text-gray-700 bg-white"
                                 >
-                                    <option value="">Selecione uma data...</option>
-                                    {reportAvailableDates.map(date => (
-                                        <option key={date} value={date}>{formatDate(date)}</option>
+                                    <option value="">Selecione um mês...</option>
+                                    {reportAvailableMonths.map(month => (
+                                        <option key={month} value={month}>{getMonthName(month)}</option>
                                     ))}
                                 </select>
                             </div>
                         )}
 
-                        {reportSelectedDate && (
+                        {reportSelectedMonth && (
                             <div className="animate-fade-in">
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">3. Número do Processo SEI</label>
                                 <input 
@@ -494,7 +491,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
 
                         <button 
                             onClick={handleGenerateReport}
-                            disabled={!reportSupplierCpf || !reportSelectedDate}
+                            disabled={!reportSupplierCpf || !reportSelectedMonth}
                             className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-4 px-8 rounded-2xl uppercase tracking-widest transition-all shadow-lg shadow-purple-200 active:scale-95 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-3 mt-4"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
