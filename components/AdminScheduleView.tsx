@@ -81,14 +81,30 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
 
+        const getReportDate = () => {
+            const [year, month] = reportSelectedMonth.split('-');
+            if (month === '01') {
+                return '02 de janeiro de 2025';
+            } else {
+                const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+                return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+            }
+        };
+
         const htmlContent = `
             <!DOCTYPE html>
             <html>
             <head>
                 <title>Cronograma de Entrega</title>
                 <style>
-                    @page { size: A4; margin: 15mm; }
-                    body { font-family: Arial, sans-serif; line-height: 1.4; color: #000; font-size: 11pt; }
+                    @page { 
+                        size: A4; 
+                        margin: 15mm; 
+                    }
+                    @media print {
+                        header, footer { display: none !important; }
+                    }
+                    body { font-family: Arial, sans-serif; line-height: 1.4; color: #000; font-size: 11pt; margin: 0; padding: 0; }
                     .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; }
                     
                     .contractor-info { text-align: justify; margin-bottom: 20px; }
@@ -161,7 +177,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                 </div>
 
                 <div class="location-date">
-                    Taiuva, ${new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    Taiuva, ${getReportDate()}
                 </div>
 
                 <div class="signatures">
@@ -169,12 +185,6 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                         <div class="signature-line"></div>
                         <div class="signature-name">RICARDO SAMUEL SCARAMAL</div>
                         <div class="signature-title">CHEFE DE SEÇÃO</div>
-                    </div>
-
-                    <div class="signature-block" style="margin-top: 50px;">
-                        <div class="signature-line"></div>
-                        <div class="signature-name">${supplier.name}</div>
-                        <div class="signature-title">CPF: ${supplier.cpf}</div>
                     </div>
                 </div>
 
