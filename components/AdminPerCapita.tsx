@@ -134,7 +134,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
 
     const itemData = useMemo(() => {
       const data = new Map<string, { totalQuantity: number; totalValue: number; unit: string }>();
-      suppliers.forEach(p => {
+      suppliers?.forEach(p => {
         (p.contractItems || []).forEach(item => {
           const current = data.get(item.name) || { totalQuantity: 0, totalValue: 0, unit: item.unit || 'kg-1' };
           
@@ -184,8 +184,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
 
     const shelfLifeData = useMemo(() => {
         const shelfLives = new Map<string, number[]>();
-        suppliers.forEach(s => {
-            s.deliveries.forEach(d => {
+        suppliers?.forEach(s => {
+            s.deliveries?.forEach(d => {
                 const startDate = d.invoiceDate || d.date;
                 if (!startDate) return;
                 const start = new Date(startDate + 'T12:00:00').getTime();
@@ -333,7 +333,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {Object.entries(resolutionData).sort((a, b) => a[0].localeCompare(b[0])).map(([name, data], index) => {
+                                {resolutionData && Object.entries(resolutionData).sort((a, b) => a[0].localeCompare(b[0])).map(([name, data], index) => {
                                     const avgDays = shelfLifeData.get(name) || 0;
                                     const recommendation = getPurchaseRecommendation(avgDays);
                                     
