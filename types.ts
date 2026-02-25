@@ -9,6 +9,7 @@ export interface Delivery {
   value?: number;
   invoiceUploaded: boolean;
   invoiceNumber?: string;
+  invoiceDate?: string; // NOVO: Data de emissão da NF
   barcode?: string; // NOVO: Código de barras da NF
   receiptTermNumber?: string; // NOVO: Número do termo de recebimento
   lots?: {

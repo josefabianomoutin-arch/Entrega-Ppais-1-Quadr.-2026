@@ -7,6 +7,7 @@ interface InvoiceInfo {
     supplierName: string;
     supplierCpf: string;
     invoiceNumber: string;
+    invoiceDate?: string; // NOVO
     receiptTermNumber?: string;
     barcode?: string;
     date: string; // The earliest date associated with this invoice
@@ -18,8 +19,8 @@ interface AdminInvoicesProps {
     suppliers: Supplier[];
     onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => void;
     onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => void;
-    onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string, receiptTermNumber?: string) => Promise<{ success: boolean; message?: string }>;
-    onManualInvoiceEntry: (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, receiptTermNumber?: string) => Promise<{ success: boolean; message?: string }>;
+    onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string, receiptTermNumber?: string, invoiceDate?: string) => Promise<{ success: boolean; message?: string }>;
+    onManualInvoiceEntry: (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, receiptTermNumber?: string, invoiceDate?: string) => Promise<{ success: boolean; message?: string }>;
     mode?: 'admin' | 'warehouse_entry' | 'warehouse_exit';
     onRegisterExit?: (payload: any) => Promise<{ success: boolean; message: string }>;
 }
@@ -80,15 +81,15 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                 }
                 body { 
                     font-family: Arial, sans-serif; 
-                    margin: 10mm; 
-                    padding: 0; 
+                    margin: 0; 
+                    padding: 2.0cm 1.7cm; 
                     background: white; 
                 }
-                .page-container { width: 190mm; margin: 0 auto; background: white; }
+                .page-container { width: 176mm; margin: 0 auto; background: white; }
                 .label-card {
-                    width: 90mm; height: 60mm; border: 1px solid #000; padding: 5mm;
+                    width: 86mm; height: 55mm; border: 1px solid #000; padding: 4mm;
                     box-sizing: border-box; display: inline-block; vertical-align: top;
-                    margin: 2mm; text-align: center; position: relative; overflow: hidden; border-radius: 4mm;
+                    margin: 1mm; text-align: center; position: relative; overflow: hidden; border-radius: 3mm;
                 }
                 h1 { font-size: 14pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 h2 { font-size: 10pt; margin: 0 0 3mm 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -182,7 +183,8 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                 const earliestDate = validDates.length > 0 ? validDates.sort()[0] : new Date().toISOString().split('T')[0];
                 const barcode = deliveries.find(d => d.barcode)?.barcode;
                 const receiptTermNumber = deliveries.find(d => d.receiptTermNumber)?.receiptTermNumber;
-                invoicesMap.set(invoiceId, { id: invoiceId, supplierName: supplier.name, supplierCpf: supplier.cpf, invoiceNumber, barcode, receiptTermNumber, date: earliestDate, totalValue, items });
+                const invoiceDate = deliveries.find(d => d.invoiceDate)?.invoiceDate;
+                invoicesMap.set(invoiceId, { id: invoiceId, supplierName: supplier.name, supplierCpf: supplier.cpf, invoiceNumber, barcode, receiptTermNumber, invoiceDate, date: earliestDate, totalValue, items });
             });
         });
         return Array.from(invoicesMap.values());
@@ -266,18 +268,18 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
         }
     };
 
-    const handleEditSave = async (updatedItems: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string, receiptTermNumber?: string) => {
+    const handleEditSave = async (updatedItems: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string, receiptTermNumber?: string, invoiceDate?: string) => {
         if (!editingInvoice) return;
         setIsSavingEdit(true);
-        const res = await onUpdateInvoiceItems(editingInvoice.supplierCpf, editingInvoice.invoiceNumber, updatedItems, barcode, newInvoiceNumber, newDate, receiptTermNumber);
+        const res = await onUpdateInvoiceItems(editingInvoice.supplierCpf, editingInvoice.invoiceNumber, updatedItems, barcode, newInvoiceNumber, newDate, receiptTermNumber, invoiceDate);
         setIsSavingEdit(false);
         if (res.success) setEditingInvoice(null);
         else alert(res.message || 'Erro ao salvar alterações.');
     };
 
-    const handleManualEntrySave = async (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, receiptTermNumber?: string) => {
+    const handleManualEntrySave = async (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, receiptTermNumber?: string, invoiceDate?: string) => {
         setIsSavingEdit(true);
-        const res = await onManualInvoiceEntry(cpf, date, nf, items, barcode, receiptTermNumber);
+        const res = await onManualInvoiceEntry(cpf, date, nf, items, barcode, receiptTermNumber, invoiceDate);
         setIsSavingEdit(false);
         if (res.success) setIsManualModalOpen(false);
         else alert(res.message || 'Erro ao salvar lançamento manual.');
@@ -333,7 +335,14 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                             <p className="font-bold text-gray-800 uppercase leading-none">{invoice.supplierName}</p>
                                             <p className="text-[10px] font-mono text-gray-400 mt-1">{invoice.supplierCpf}</p>
                                         </td>
-                                        <td className="p-3 font-mono">{formatDate(invoice.date)}</td>
+                                        <td className="p-3 font-mono">
+                                            <div>{formatDate(invoice.date)}</div>
+                                            {invoice.invoiceDate && invoice.invoiceDate !== invoice.date && (
+                                                <div className="text-[9px] text-amber-600 font-bold uppercase mt-1">
+                                                    NF: {formatDate(invoice.invoiceDate)}
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="p-3 font-mono">
                                             {invoice.invoiceNumber}
                                             {invoice.receiptTermNumber && (
@@ -425,13 +434,14 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
 interface ManualInvoiceModalProps {
     suppliers: Supplier[];
     onClose: () => void;
-    onSave: (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, receiptTermNumber?: string) => void;
+    onSave: (cpf: string, date: string, nf: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, receiptTermNumber?: string, invoiceDate?: string) => void;
     isSaving: boolean;
 }
 
 const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onClose, onSave, isSaving }) => {
     const [selectedCpf, setSelectedCpf] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]); // NOVO
     const [nf, setNf] = useState('');
     const [barcode, setBarcode] = useState('');
     const [receiptTermNumber, setReceiptTermNumber] = useState('');
@@ -450,7 +460,7 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
             return { name: it.name, kg, value: kg * contract.valuePerKg, lotNumber: it.lot, expirationDate: it.exp };
         }).filter(Boolean) as { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[];
         if (finalItems.length === 0) return alert('Adicione pelo menos um item válido.');
-        onSave(selectedCpf, date, nf, finalItems, barcode, receiptTermNumber);
+        onSave(selectedCpf, date, nf, finalItems, barcode, receiptTermNumber, invoiceDate);
     };
 
     const totalValue = useMemo(() => {
@@ -478,8 +488,12 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase">Data do Faturamento</label>
+                            <label className="text-[10px] font-black text-gray-400 uppercase">Data de Chegada</label>
                             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-teal-400" required />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase">Data da Nota Fiscal</label>
+                            <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-teal-400" required />
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase">Nº Nota Fiscal</label>
@@ -543,7 +557,7 @@ interface EditInvoiceModalProps {
     invoice: InvoiceInfo;
     supplier: Supplier;
     onClose: () => void;
-    onSave: (items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string, receiptTermNumber?: string) => void;
+    onSave: (items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string, receiptTermNumber?: string, invoiceDate?: string) => void;
     isSaving: boolean;
 }
 
@@ -556,6 +570,7 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
     const [receiptTermNumber, setReceiptTermNumber] = useState(invoice.receiptTermNumber || '');
     const [invoiceNumber, setInvoiceNumber] = useState(invoice.invoiceNumber);
     const [date, setDate] = useState(invoice.date);
+    const [invoiceDate, setInvoiceDate] = useState(invoice.invoiceDate || invoice.date); // NOVO
 
     const availableContractItems = useMemo(() => (supplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)), [supplier.contractItems]);
     const handleItemChange = (id: string, field: 'name' | 'kg' | 'lot' | 'exp', value: string) => { setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it)); };
@@ -573,7 +588,7 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
             return { name: it.name, kg, value: kg * contract.valuePerKg, lotNumber: it.lot, expirationDate: it.exp };
         }).filter(Boolean) as { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[];
         if (finalItems.length === 0) return alert('Adicione pelo menos um item válido.');
-        onSave(finalItems, barcode, invoiceNumber, date, receiptTermNumber);
+        onSave(finalItems, barcode, invoiceNumber, date, receiptTermNumber, invoiceDate);
     };
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
@@ -589,8 +604,12 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
                             <input type="text" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-teal-400" />
                         </div>
                         <div className="bg-gray-50 p-3 rounded-xl border space-y-1">
-                            <label className="text-[9px] font-black text-gray-400 uppercase">Data de Entrada</label>
+                            <label className="text-[9px] font-black text-gray-400 uppercase">Data de Chegada</label>
                             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-400" />
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded-xl border space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase">Data da Nota Fiscal</label>
+                            <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-400" />
                         </div>
                         <div className="bg-gray-50 p-3 rounded-xl border space-y-1">
                             <label className="text-[9px] font-black text-gray-400 uppercase">Chave de Acesso</label>
