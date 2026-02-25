@@ -25,6 +25,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
     const [reportSupplierCpf, setReportSupplierCpf] = useState('');
     const [reportSelectedMonth, setReportSelectedMonth] = useState('');
     const [reportSeiNumber, setReportSeiNumber] = useState('');
+    const [reportSupplierAddress, setReportSupplierAddress] = useState('');
 
     const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 
@@ -86,46 +87,43 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
             <head>
                 <title>Cronograma de Entrega</title>
                 <style>
-                    @page { size: A4; margin: 20mm; }
-                    body { font-family: 'Times New Roman', Times, serif; line-height: 1.5; color: #000; font-size: 12pt; }
-                    .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-                    .info-section { margin-bottom: 20px; }
-                    .info-row { margin-bottom: 5px; }
-                    .info-label { font-weight: bold; text-transform: uppercase; display: inline-block; width: 220px; }
+                    @page { size: A4; margin: 15mm; }
+                    body { font-family: Arial, sans-serif; line-height: 1.4; color: #000; font-size: 11pt; }
+                    .header { text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; }
                     
-                    .section-title { font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 2rem 0 1rem 0; text-align: center; background: #f2f2f2; padding: 5px; border: 1px solid #000; }
+                    .contractor-info { text-align: justify; margin-bottom: 20px; }
+                    .opening-text { text-align: justify; margin-bottom: 20px; text-indent: 2cm; }
+                    
+                    .section-title { font-size: 11pt; font-weight: bold; text-transform: uppercase; margin: 1rem 0 0.5rem 0; text-align: center; background: #f2f2f2; padding: 4px; border: 1px solid #000; }
 
-                    table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10pt; }
-                    th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+                    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 9pt; }
+                    th, td { border: 1px solid #000; padding: 5px; text-align: left; }
                     th { background-color: #f2f2f2; text-transform: uppercase; font-weight: bold; text-align: center; }
                     .text-right { text-align: right; }
                     .text-center { text-align: center; }
 
-                    .footer-text { margin-top: 30px; text-align: justify; }
-                    .signature-section { margin-top: 60px; text-align: center; }
-                    .signature-line { border-top: 1px solid #000; width: 300px; margin: 0 auto 10px auto; }
-                    .location-date { margin-top: 40px; text-align: center; font-weight: bold; }
+                    .closing-text { margin-top: 20px; text-align: justify; font-size: 10pt; }
+                    
+                    .signatures { margin-top: 40px; width: 100%; }
+                    .signature-block { text-align: center; margin-top: 30px; }
+                    .signature-line { border-top: 1px solid #000; width: 350px; margin: 0 auto 5px auto; }
+                    .signature-name { font-weight: bold; text-transform: uppercase; font-size: 10pt; }
+                    .signature-title { font-size: 9pt; text-transform: uppercase; }
+                    
+                    .location-date { margin-top: 30px; text-align: right; font-weight: normal; }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    CRONOGRAMA DE ENTREGA<br>
-                    GESTÃO DE ALMOXARIFADO E NUTRIÇÃO
+                    CRONOGRAMA DE ENTREGA
                 </div>
 
-                <div class="info-section">
-                    <div class="info-row">
-                        <span class="info-label">PROCESSO SEI:</span> ${reportSeiNumber || '_______________________'}
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">MÊS DE REFERÊNCIA:</span> ${getMonthName(reportSelectedMonth)}
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">FORNECEDOR:</span> ${supplier.name}
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">CPF/CNPJ:</span> ${supplier.cpf}
-                    </div>
+                <div class="contractor-info">
+                    <strong>Agricultor:</strong> ${supplier.name.toUpperCase()}, maior, capaz e residente na ${reportSupplierAddress || '__________________________________________________________________'}, inscrito no CPF: ${supplier.cpf} doravante designado Contratado.
+                </div>
+
+                <div class="opening-text">
+                    Solicitamos as devidas providências de Vossa Senhoria, no sentido de fornecer a esta Unidade Prisional, os itens relacionados abaixo, conforme especificações constantes no Folheto Descritivo, durante o período de ${getMonthName(reportSelectedMonth)}. As entregas deverão ser efetuadas no endereço infra mencionado, impreterivelmente no dia e horário (das 08:00 às 11:00 horas e das 13:00 às 16:00 horas) estipulado neste cronograma.
                 </div>
 
                 <div class="section-title">RELAÇÃO DE ITENS A SER ENTREGUE</div>
@@ -158,14 +156,26 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                     </tfoot>
                 </table>
 
-                <div class="signature-section">
-                    <div class="signature-line"></div>
-                    <div>${supplier.name}</div>
-                    <div style="font-size: 10pt;">CPF/CNPJ: ${supplier.cpf}</div>
+                <div class="closing-text">
+                    De acordo com a Cláusula Segunda do contrato no seu item 1º. O objeto da presente contratação será entregue parceladamente, nos prazos e locais determinados pela CONTRATANTE, conforme cronograma de fornecimento Anexo I do presente contrato;
                 </div>
 
                 <div class="location-date">
-                    Brasília, ${new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    Taiuva, ${new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </div>
+
+                <div class="signatures">
+                    <div class="signature-block">
+                        <div class="signature-line"></div>
+                        <div class="signature-name">RICARDO SAMUEL SCARAMAL</div>
+                        <div class="signature-title">CHEFE DE SEÇÃO</div>
+                    </div>
+
+                    <div class="signature-block" style="margin-top: 50px;">
+                        <div class="signature-line"></div>
+                        <div class="signature-name">${supplier.name}</div>
+                        <div class="signature-title">CPF: ${supplier.cpf}</div>
+                    </div>
                 </div>
 
                 <script>
@@ -477,15 +487,27 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                         )}
 
                         {reportSelectedMonth && (
-                            <div className="animate-fade-in">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">3. Número do Processo SEI</label>
-                                <input 
-                                    type="text" 
-                                    value={reportSeiNumber} 
-                                    onChange={e => setReportSeiNumber(e.target.value)}
-                                    className="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 font-bold text-gray-700"
-                                    placeholder="Ex: 12345.000000/2026-00"
-                                />
+                            <div className="animate-fade-in space-y-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">3. Número do Processo SEI</label>
+                                    <input 
+                                        type="text" 
+                                        value={reportSeiNumber} 
+                                        onChange={e => setReportSeiNumber(e.target.value)}
+                                        className="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 font-bold text-gray-700"
+                                        placeholder="Ex: 12345.000000/2026-00"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">4. Endereço do Agricultor</label>
+                                    <input 
+                                        type="text" 
+                                        value={reportSupplierAddress} 
+                                        onChange={e => setReportSupplierAddress(e.target.value)}
+                                        className="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 font-bold text-gray-700"
+                                        placeholder="Ex: Rua Antonio Nunes da Silva, 84, Bairro laranjeiras..."
+                                    />
+                                </div>
                             </div>
                         )}
 
