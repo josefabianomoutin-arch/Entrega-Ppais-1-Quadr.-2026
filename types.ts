@@ -160,4 +160,4 @@ export interface ThirdPartyEntryLog {
   receiptTermDate?: string;
 }
 
-export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria';
+export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria' | 'cardapio';

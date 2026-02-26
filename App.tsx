@@ -8,6 +8,7 @@ import AlmoxarifadoDashboard from './components/AlmoxarifadoDashboard';
 import ItespDashboard from './components/ItespDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 import SubportariaDashboard from './components/SubportariaDashboard';
+import MenuDashboard from './components/MenuDashboard';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, onValue, set, runTransaction, push, child, update, remove, get } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
@@ -112,6 +113,10 @@ const App: React.FC = () => {
     }
     if (cleanName === 'FINANCEIRO' && rawPass.toLowerCase() === 'financeiro123') {
       setUser({ name: 'FINANCEIRO', cpf: 'financeiro123', role: 'financeiro' });
+      return true;
+    }
+    if (cleanName === 'CARDAPIO' && rawPass.toLowerCase() === 'cardapio123') {
+      setUser({ name: 'CARDAPIO', cpf: 'cardapio123', role: 'cardapio' });
       return true;
     }
     if (cleanName === 'SEGURANÇA EXTERNA' && rawPass === 'externa2026') {
@@ -635,6 +640,10 @@ const App: React.FC = () => {
 
   if (user.role === 'financeiro') {
     return <FinanceDashboard records={financialRecords} onLogout={handleLogout} />;
+  }
+
+  if (user.role === 'cardapio') {
+    return <MenuDashboard standardMenu={standardMenu} dailyMenus={dailyMenus} onLogout={handleLogout} />;
   }
 
   if (user.role === 'almoxarifado') {
