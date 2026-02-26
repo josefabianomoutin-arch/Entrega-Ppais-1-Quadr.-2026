@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem, FinancialRecord, UserRole, ThirdPartyEntryLog } from './types';
+import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem, FinancialRecord, UserRole, ThirdPartyEntryLog, AcquisitionItem } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -25,6 +25,7 @@ const standardMenuRef = ref(database, 'standardMenu');
 const dailyMenusRef = ref(database, 'dailyMenus');
 const financialRecordsRef = ref(database, 'financialRecords');
 const thirdPartyEntriesRef = ref(database, 'thirdPartyEntries');
+const acquisitionItemsRef = ref(database, 'acquisitionItems');
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{ name: string; cpf: string; role: UserRole } | null>(null);
@@ -37,6 +38,7 @@ const App: React.FC = () => {
   const [dailyMenus, setDailyMenus] = useState<DailyMenus>({});
   const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>([]);
   const [thirdPartyEntries, setThirdPartyEntries] = useState<ThirdPartyEntryLog[]>([]);
+  const [acquisitionItems, setAcquisitionItems] = useState<AcquisitionItem[]>([]);
 
   useEffect(() => {
     onValue(suppliersRef, (snapshot) => {
@@ -79,6 +81,10 @@ const App: React.FC = () => {
     onValue(thirdPartyEntriesRef, (snapshot) => {
       const data = snapshot.val();
       setThirdPartyEntries(data ? Object.values(data) : []);
+    });
+    onValue(acquisitionItemsRef, (snapshot) => {
+      const data = snapshot.val();
+      setAcquisitionItems(data ? Object.values(data) : []);
     });
   }, []);
 
@@ -398,6 +404,16 @@ const App: React.FC = () => {
       });
     }
     return { success: true, message: 'Contratos atualizados' };
+  };
+
+  const handleUpdateAcquisitionItem = async (item: AcquisitionItem) => {
+    const itemRef = child(acquisitionItemsRef, item.id);
+    await set(itemRef, item);
+  };
+
+  const handleDeleteAcquisitionItem = async (id: string) => {
+    const itemRef = child(acquisitionItemsRef, id);
+    await remove(itemRef);
   };
 
   const handleRegisterWarehouseEntry = async (payload: any) => {

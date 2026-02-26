@@ -161,4 +161,15 @@ export interface ThirdPartyEntryLog {
   receiptTermDate?: string;
 }
 
+export interface AcquisitionItem {
+  id: string;
+  name: string;
+  comprasCode?: string;
+  becCode?: string;
+  unit: string;
+  acquiredQuantity: number;
+  stockBalance: number;
+  category: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO';
+}
+
 export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria' | 'cardapio';
