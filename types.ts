@@ -36,7 +36,7 @@ export interface ContractItem {
   order?: number;
   siafemCode?: string;
   comprasCode?: string;
-  category?: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'OUTROS';
+  category?: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'OUTROS';
 }
 
 export interface Supplier {

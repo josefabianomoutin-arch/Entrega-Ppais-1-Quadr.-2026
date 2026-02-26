@@ -92,7 +92,7 @@ const isHortifrutiOrPerishable = (itemName: string): boolean => {
 };
 
 const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog, perCapitaConfig, onUpdatePerCapitaConfig, onUpdateContractForItem }) => {
-    const [activeSubTab, setActiveSubTab] = useState<'CALCULO' | 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS'>('CALCULO');
+    const [activeSubTab, setActiveSubTab] = useState<'CALCULO' | 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO'>('CALCULO');
     const [staffCount, setStaffCount] = useState<number>(0);
     const [inmateCount, setInmateCount] = useState<number>(0);
     const [customPerCapita, setCustomPerCapita] = useState<Record<string, string>>({});
@@ -271,6 +271,12 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                 >
                     PERECÍVEIS
                 </button>
+                <button 
+                    onClick={() => setActiveSubTab('AUTOMAÇÃO')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${activeSubTab === 'AUTOMAÇÃO' ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    AUTOMAÇÃO
+                </button>
             </div>
 
             {activeSubTab === 'CALCULO' ? (
@@ -433,11 +439,12 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                         <p className="text-gray-400 font-medium">Levantamento de informações iniciais para gestão de itens.</p>
                     </div>
                     <AdminContractItems 
+                        key={activeSubTab}
                         suppliers={suppliers} 
                         warehouseLog={warehouseLog} 
                         onUpdateContractForItem={onUpdateContractForItem}
                         categoryFilter={activeSubTab as any}
-                        hideHeader={true}
+                        hideHeader={false}
                     />
                 </div>
             )}

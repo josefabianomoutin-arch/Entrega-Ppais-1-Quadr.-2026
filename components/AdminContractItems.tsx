@@ -6,7 +6,7 @@ interface AdminContractItemsProps {
   suppliers: Supplier[];
   warehouseLog: WarehouseMovement[];
   onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string }[]) => Promise<{ success: boolean, message: string }>;
-  categoryFilter?: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'OUTROS';
+  categoryFilter?: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'OUTROS';
   hideHeader?: boolean;
 }
 
@@ -26,7 +26,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
     const [isAddingItem, setIsAddingItem] = useState(false);
     const [newItemName, setNewItemName] = useState('');
     const [newItemUnit, setNewItemUnit] = useState('kg-1');
-    const [newItemCategory, setNewItemCategory] = useState<any>('OUTROS');
+    const [newItemCategory, setNewItemCategory] = useState<any>(categoryFilter || 'OUTROS');
 
     const itemAggregation = useMemo(() => {
         const map = new Map<string, any>();
@@ -201,6 +201,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                                     <option value="PPAIS">PPAIS</option>
                                     <option value="ESTOCÁVEIS">ESTOCÁVEIS</option>
                                     <option value="PERECÍVEIS">PERECÍVEIS</option>
+                                    <option value="AUTOMAÇÃO">AUTOMAÇÃO</option>
                                 </select>
                             </div>
                             <div className="flex gap-3 pt-4">
@@ -447,6 +448,7 @@ const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> 
                             <option value="PPAIS">PPAIS</option>
                             <option value="ESTOCÁVEIS">ESTOCÁVEIS</option>
                             <option value="PERECÍVEIS">PERECÍVEIS</option>
+                            <option value="AUTOMAÇÃO">AUTOMAÇÃO</option>
                         </select>
                     </div>
 
