@@ -68,7 +68,7 @@ interface AdminDashboardProps {
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
-  const { suppliers = [], onLogout, onResetData, onRestoreFullBackup, perCapitaConfig, warehouseLog = [], financialRecords = [], cleaningLogs = [], thirdPartyEntries = [], directorWithdrawals = [], standardMenu, dailyMenus } = props;
+  const { suppliers = [], onLogout, onResetData, onRestoreFullBackup, perCapitaConfig, warehouseLog = [], financialRecords = [], cleaningLogs = [], thirdPartyEntries = [], directorWithdrawals = [], standardMenu, dailyMenus, acquisitionItems = [] } = props;
   const [activeTab, setActiveTab] = useState<AdminTab>('register');
   const [supplierSubTab, setSupplierSubTab] = useState<'list' | 'new'>('list'); 
   const [supplierSearch, setSupplierSearch] = useState('');

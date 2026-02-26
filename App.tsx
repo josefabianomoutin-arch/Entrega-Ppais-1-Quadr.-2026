@@ -585,6 +585,9 @@ const App: React.FC = () => {
         onDeleteThirdPartyEntry={async (id) => remove(child(thirdPartyEntriesRef, id))}
         onCancelDeliveries={handleCancelDeliveries}
         onUpdateContractForItem={handleUpdateContractForItem}
+        onUpdateAcquisitionItem={handleUpdateAcquisitionItem}
+        onDeleteAcquisitionItem={handleDeleteAcquisitionItem}
+        acquisitionItems={acquisitionItems}
         directorWithdrawals={directorWithdrawals}
         onRegisterDirectorWithdrawal={async (log) => {
              const newRef = push(directorWithdrawalsRef);
