@@ -5,7 +5,7 @@ import type { Supplier, WarehouseMovement } from '../types';
 interface AdminContractItemsProps {
   suppliers: Supplier[];
   warehouseLog: WarehouseMovement[];
-  onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string }[]) => Promise<{ success: boolean, message: string }>;
+  onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string, comprasCode?: string, becCode?: string }[]) => Promise<{ success: boolean, message: string }>;
   categoryFilter?: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'OUTROS';
   hideHeader?: boolean;
 }
@@ -27,6 +27,8 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
     const [newItemName, setNewItemName] = useState('');
     const [newItemUnit, setNewItemUnit] = useState('kg-1');
     const [newItemCategory, setNewItemCategory] = useState<any>(categoryFilter || 'OUTROS');
+    const [newItemComprasCode, setNewItemComprasCode] = useState('');
+    const [newItemBecCode, setNewItemBecCode] = useState('');
 
     const itemAggregation = useMemo(() => {
         const map = new Map<string, any>();
@@ -48,6 +50,8 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                     totalValueExited: 0,
                     unit: ci.unit || 'kg-1',
                     category: ci.category || 'OUTROS',
+                    comprasCode: ci.comprasCode || '',
+                    becCode: ci.becCode || '',
                     suppliersCount: 0,
                     details: []
                 };
@@ -130,10 +134,14 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
             name: newItemName.toUpperCase(),
             unit: newItemUnit,
             category: newItemCategory,
+            comprasCode: newItemComprasCode,
+            becCode: newItemBecCode,
             details: []
         });
         setIsAddingItem(false);
         setNewItemName('');
+        setNewItemComprasCode('');
+        setNewItemBecCode('');
     };
 
     const handleDeleteItem = async (itemName: string) => {
@@ -204,6 +212,28 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                                     <option value="AUTOMAÇÃO">AUTOMAÇÃO</option>
                                 </select>
                             </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Código Compras</label>
+                                    <input 
+                                        type="text" 
+                                        value={newItemComprasCode} 
+                                        onChange={e => setNewItemComprasCode(e.target.value)} 
+                                        className="w-full p-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-green-400 outline-none font-bold"
+                                        placeholder="Código Compras"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Código BEC</label>
+                                    <input 
+                                        type="text" 
+                                        value={newItemBecCode} 
+                                        onChange={e => setNewItemBecCode(e.target.value)} 
+                                        className="w-full p-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-green-400 outline-none font-bold"
+                                        placeholder="Código BEC"
+                                    />
+                                </div>
+                            </div>
                             <div className="flex gap-3 pt-4">
                                 <button onClick={() => setIsAddingItem(false)} className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold uppercase text-xs">Cancelar</button>
                                 <button onClick={handleAddNewItem} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-black uppercase text-xs shadow-md">Continuar</button>
@@ -269,6 +299,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                         <thead className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">
                             <tr>
                                 <th className="p-4 text-left">Produto do Contrato</th>
+                                <th className="p-4 text-center">Cód. Compras / BEC</th>
                                 <th className="p-4 text-center">Unid.</th>
                                 <th className="p-4 text-right">Meta Total</th>
                                 <th className="p-4 text-right">Entregue</th>
@@ -292,6 +323,12 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                                                         {det.supplierName}
                                                     </span>
                                                 ))}
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <div className="flex flex-col gap-1 items-center">
+                                                <span className="text-[9px] font-black text-gray-400 uppercase">C: {item.comprasCode || '---'}</span>
+                                                <span className="text-[9px] font-black text-gray-400 uppercase">B: {item.becCode || '---'}</span>
                                             </div>
                                         </td>
                                         <td className="p-4 text-center">
@@ -340,6 +377,8 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                     allSuppliers={suppliers} 
                     unit={manageItem.unit}
                     category={manageItem.category}
+                    comprasCode={manageItem.comprasCode}
+                    becCode={manageItem.becCode}
                     onClose={() => setManageItem(null)} 
                     onSave={async (assignments) => {
                         const res = await onUpdateContractForItem(manageItem.name, assignments);
@@ -364,21 +403,27 @@ interface ManageContractSuppliersModalProps {
     allSuppliers: Supplier[];
     unit: string;
     category?: string;
+    comprasCode?: string;
+    becCode?: string;
     onClose: () => void;
-    onSave: (assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string }[]) => Promise<void>;
+    onSave: (assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string, comprasCode?: string, becCode?: string }[]) => Promise<void>;
 }
 
-const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> = ({ itemName, currentSuppliers, allSuppliers, unit, category, onClose, onSave }) => {
+const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> = ({ itemName, currentSuppliers, allSuppliers, unit, category, comprasCode, becCode, onClose, onSave }) => {
     const [assignments, setAssignments] = useState(() => currentSuppliers.map(s => ({
         supplierCpf: s.supplierCpf,
         supplierName: s.supplierName,
         totalKg: String(s.amount).replace('.', ','),
         valuePerKg: String(s.price).replace('.', ','),
         unit: unit,
-        category: category || 'OUTROS'
+        category: category || 'OUTROS',
+        comprasCode: comprasCode || '',
+        becCode: becCode || ''
     })));
 
     const [itemCategory, setItemCategory] = useState(category || 'OUTROS');
+    const [itemComprasCode, setItemComprasCode] = useState(comprasCode || '');
+    const [itemBecCode, setItemBecCode] = useState(becCode || '');
     const [newSupplierCpf, setNewSupplierCpf] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
@@ -417,7 +462,9 @@ const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> 
             totalKg: parseFloat(a.totalKg.replace(',', '.')),
             valuePerKg: parseFloat(a.valuePerKg.replace(',', '.')),
             unit: a.unit,
-            category: itemCategory
+            category: itemCategory,
+            comprasCode: itemComprasCode,
+            becCode: itemBecCode
         })).filter(a => !isNaN(a.totalKg));
 
         await onSave(finalAssignments);
@@ -450,6 +497,29 @@ const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> 
                             <option value="PERECÍVEIS">PERECÍVEIS</option>
                             <option value="AUTOMAÇÃO">AUTOMAÇÃO</option>
                         </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="bg-gray-50 p-4 rounded-2xl border">
+                            <label className="text-[10px] font-black text-gray-400 uppercase block mb-1">Código Compras</label>
+                            <input 
+                                type="text" 
+                                value={itemComprasCode} 
+                                onChange={e => setItemComprasCode(e.target.value)}
+                                className="w-full p-2 border rounded-xl font-bold text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                                placeholder="Cód. Compras"
+                            />
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-2xl border">
+                            <label className="text-[10px] font-black text-gray-400 uppercase block mb-1">Código BEC</label>
+                            <input 
+                                type="text" 
+                                value={itemBecCode} 
+                                onChange={e => setItemBecCode(e.target.value)}
+                                className="w-full p-2 border rounded-xl font-bold text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                                placeholder="Cód. BEC"
+                            />
+                        </div>
                     </div>
 
                     <div className="space-y-4">
