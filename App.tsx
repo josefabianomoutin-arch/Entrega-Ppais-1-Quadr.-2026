@@ -643,7 +643,7 @@ const App: React.FC = () => {
   }
 
   if (user.role === 'cardapio') {
-    return <MenuDashboard standardMenu={standardMenu} dailyMenus={dailyMenus} onLogout={handleLogout} />;
+    return <MenuDashboard standardMenu={standardMenu} dailyMenus={dailyMenus} suppliers={suppliers} onLogout={handleLogout} />;
   }
 
   if (user.role === 'almoxarifado') {

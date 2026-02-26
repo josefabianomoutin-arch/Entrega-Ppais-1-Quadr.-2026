@@ -1,27 +1,32 @@
 
 import React, { useState, useMemo } from 'react';
-import type { StandardMenu, DailyMenus, MenuRow } from '../types';
-import { Calendar, Printer, Clock, Utensils, ChevronRight, ChevronLeft } from 'lucide-react';
+import type { StandardMenu, DailyMenus, MenuRow, Supplier } from '../types';
+import { Calendar, Printer, Clock, Utensils, ChevronRight, ChevronLeft, CheckSquare, Square } from 'lucide-react';
 
 interface MenuDashboardProps {
   standardMenu: StandardMenu;
   dailyMenus: DailyMenus;
+  suppliers: Supplier[];
   onLogout: () => void;
 }
 
 const WEEK_DAYS_BR = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
 const MEAL_PERIODS = ['CAFÉ DA MANHÃ', 'ALMOÇO', 'JANTA', 'LANCHE NOITE'];
 
-const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus, onLogout }) => {
+const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus, suppliers, onLogout }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
   const currentMenu = useMemo(() => {
+    let rows: MenuRow[] = [];
     if (dailyMenus[selectedDate]) {
-      return dailyMenus[selectedDate];
+      rows = dailyMenus[selectedDate];
+    } else {
+      const dateObj = new Date(selectedDate + 'T12:00:00');
+      const dayName = WEEK_DAYS_BR[dateObj.getDay()];
+      rows = standardMenu[dayName] || [];
     }
-    const dateObj = new Date(selectedDate + 'T12:00:00');
-    const dayName = WEEK_DAYS_BR[dateObj.getDay()];
-    return standardMenu[dayName] || [];
+    return rows.map((r, idx) => ({ ...r, id: r.id || `${selectedDate}-${idx}` }));
   }, [selectedDate, dailyMenus, standardMenu]);
 
   const groupedMenu = useMemo(() => {
@@ -33,148 +38,156 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
     }, {} as Record<string, MenuRow[]>);
   }, [currentMenu]);
 
-  const handlePrintLabel = (row: MenuRow, period: string) => {
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (!printWindow) return;
-
-    const dateFormatted = new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR');
-    
-    const htmlContent = `
-      <html>
-        <head>
-          <title>Etiqueta Amostra 72h</title>
-          <style>
-            @page { size: 100mm 60mm; margin: 0; }
-            body { font-family: 'Arial', sans-serif; margin: 0; padding: 5mm; box-sizing: border-box; }
-            .label-container {
-              width: 90mm;
-              height: 50mm;
-              border: 2px solid #000;
-              padding: 3mm;
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-              border-radius: 2mm;
-            }
-            .header {
-              text-align: center;
-              font-weight: bold;
-              font-size: 14pt;
-              border-bottom: 1px solid #000;
-              padding-bottom: 1mm;
-              margin-bottom: 2mm;
-              text-transform: uppercase;
-            }
-            .content {
-              font-size: 10pt;
-              line-height: 1.4;
-            }
-            .field { margin-bottom: 1mm; }
-            .field strong { text-transform: uppercase; font-size: 8pt; color: #555; }
-            .footer {
-              font-size: 8pt;
-              text-align: center;
-              border-top: 1px dashed #000;
-              padding-top: 1mm;
-              margin-top: 2mm;
-              font-weight: bold;
-            }
-            .signature {
-              margin-top: 4mm;
-              border-top: 1px solid #000;
-              width: 60%;
-              margin-left: auto;
-              margin-right: auto;
-              text-align: center;
-              font-size: 7pt;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="label-container">
-            <div class="header">AMOSTRA 72 HORAS</div>
-            <div class="content">
-              <div class="field"><strong>PREPARAÇÃO:</strong> ${row.foodItem || row.contractedItem || 'N/A'}</div>
-              <div class="field"><strong>REFEIÇÃO:</strong> ${period}</div>
-              <div class="field"><strong>DATA COLETA:</strong> ${dateFormatted}</div>
-              <div class="field"><strong>HORA COLETA:</strong> ____:____</div>
-              <div class="field"><strong>ARMAZENAMENTO:</strong> REFRIGERADO (0°C a 4°C)</div>
-            </div>
-            <div class="signature">ASSINATURA DO RESPONSÁVEL</div>
-            <div class="footer">VALIDADE: 72 HORAS APÓS A COLETA</div>
-          </div>
-          <script>
-            window.onload = () => {
-              window.print();
-              setTimeout(() => window.close(), 500);
-            };
-          </script>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+  const toggleRowSelection = (id: string) => {
+    const newSelection = new Set(selectedRows);
+    if (newSelection.has(id)) {
+      newSelection.delete(id);
+    } else {
+      newSelection.add(id);
+    }
+    setSelectedRows(newSelection);
   };
 
-  const handlePrintAllLabels = () => {
+  const toggleAllSelection = () => {
+    if (selectedRows.size === currentMenu.filter(r => r.foodItem || r.contractedItem).length) {
+      setSelectedRows(new Set());
+    } else {
+      const allIds = currentMenu
+        .filter(r => r.foodItem || r.contractedItem)
+        .map(r => r.id);
+      setSelectedRows(new Set(allIds));
+    }
+  };
+
+  const findLotInfo = (contractedItemName: string) => {
+    if (!contractedItemName) return { lot: 'N/A', invoice: 'N/A' };
+    
+    // Find the most recent delivery for this item
+    let latestDelivery = null;
+    let latestDate = 0;
+
+    suppliers.forEach(s => {
+      (s.deliveries || []).forEach(d => {
+        if (d.item === contractedItemName && d.invoiceNumber) {
+          const dDate = new Date(d.date).getTime();
+          if (dDate > latestDate) {
+            latestDate = dDate;
+            latestDelivery = d;
+          }
+        }
+      });
+    });
+
+    if (latestDelivery) {
+      const lotNum = (latestDelivery as any).lots?.[0]?.lotNumber || 'N/A';
+      return { lot: lotNum, invoice: (latestDelivery as any).invoiceNumber || 'N/A' };
+    }
+
+    return { lot: 'N/A', invoice: 'N/A' };
+  };
+
+  const handlePrintSelected = () => {
+    const rowsToPrint = currentMenu.filter(r => selectedRows.has(r.id));
+    if (rowsToPrint.length === 0) {
+      alert('Selecione ao menos um item para imprimir.');
+      return;
+    }
+
     const printWindow = window.open('', '_blank', 'width=800,height=800');
     if (!printWindow) return;
 
     const dateFormatted = new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR');
     
-    const labelsHtml = currentMenu
-      .filter(row => row.foodItem || row.contractedItem)
-      .map(row => `
-        <div class="label-container">
-          <div class="header">AMOSTRA 72 HORAS</div>
-          <div class="content">
-            <div class="field"><strong>PREPARAÇÃO:</strong> ${row.foodItem || row.contractedItem || 'N/A'}</div>
-            <div class="field"><strong>REFEIÇÃO:</strong> ${row.period || 'N/A'}</div>
-            <div class="field"><strong>DATA COLETA:</strong> ${dateFormatted}</div>
-            <div class="field"><strong>HORA COLETA:</strong> ____:____</div>
-            <div class="field"><strong>ARMAZENAMENTO:</strong> REFRIGERADO (0°C a 4°C)</div>
+    const labelsHtml = rowsToPrint.map(row => {
+      const { lot, invoice } = findLotInfo(row.contractedItem || '');
+      return `
+        <div class="label-card">
+          <div class="label-header">AMOSTRA 72 HORAS</div>
+          <div class="label-content">
+            <div class="label-field"><strong>PREPARAÇÃO:</strong> <span>${row.foodItem || row.contractedItem || 'N/A'}</span></div>
+            <div class="label-field"><strong>REFEIÇÃO:</strong> <span>${row.period || 'N/A'}</span></div>
+            <div class="label-field"><strong>LOTE:</strong> <span>${lot}</span></div>
+            <div class="label-field"><strong>NF:</strong> <span>${invoice}</span></div>
+            <div class="label-field"><strong>DATA COLETA:</strong> <span>${dateFormatted}</span></div>
+            <div class="label-field"><strong>HORA COLETA:</strong> <span>____:____</span></div>
+            <div class="label-field"><strong>ARMAZENAMENTO:</strong> <span>REFRIGERADO (0°C a 4°C)</span></div>
           </div>
-          <div class="signature">ASSINATURA DO RESPONSÁVEL</div>
-          <div class="footer">VALIDADE: 72 HORAS APÓS A COLETA</div>
+          <div class="label-signature">ASSINATURA DO RESPONSÁVEL</div>
+          <div class="label-footer">VALIDADE: 72 HORAS APÓS A COLETA</div>
         </div>
-      `).join('');
+      `;
+    }).join('');
 
     const htmlContent = `
       <html>
         <head>
-          <title>Etiquetas Amostra 72h - Dia Completo</title>
+          <title>Etiquetas Amostra 72h - Selecionadas</title>
           <style>
-            @page { size: A4; margin: 10mm; }
-            body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 5mm; justify-content: center; }
-            .label-container {
-              width: 90mm;
-              height: 55mm;
-              border: 1.5px solid #000;
+            @page { 
+              size: A4; 
+              margin: 0; 
+            }
+            body { 
+              margin: 0; 
+              padding: 0; 
+              background: white;
+            }
+            .sheet {
+              width: 210mm;
+              height: 297mm;
+              padding: 20mm 17mm;
+              box-sizing: border-box;
+              display: grid;
+              grid-template-columns: 85.73mm 85.73mm;
+              grid-auto-rows: 59.27mm;
+              column-gap: 10mm;
+              row-gap: 0;
+              justify-content: center;
+              page-break-after: always;
+            }
+            .label-card {
+              width: 85.73mm;
+              height: 59.27mm;
+              border: 1px solid #000;
               padding: 3mm;
+              box-sizing: border-box;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
-              border-radius: 2mm;
-              page-break-inside: avoid;
-              box-sizing: border-box;
+              border-radius: 1mm;
+              overflow: hidden;
             }
-            .header {
+            .label-header {
               text-align: center;
               font-weight: bold;
-              font-size: 12pt;
+              font-size: 11pt;
               border-bottom: 1px solid #000;
               padding-bottom: 1mm;
-              margin-bottom: 2mm;
+              margin-bottom: 1.5mm;
               text-transform: uppercase;
             }
-            .content {
-              font-size: 9pt;
-              line-height: 1.3;
+            .label-content {
+              font-size: 8pt;
+              line-height: 1.2;
+              flex: 1;
             }
-            .field { margin-bottom: 1mm; }
-            .field strong { text-transform: uppercase; font-size: 7pt; color: #555; }
-            .footer {
+            .label-field { 
+              margin-bottom: 0.5mm; 
+              display: flex;
+              gap: 1mm;
+            }
+            .label-field strong { 
+              text-transform: uppercase; 
+              font-size: 7pt; 
+              color: #333; 
+              white-space: nowrap;
+            }
+            .label-field span {
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+            .label-footer {
               font-size: 7pt;
               text-align: center;
               border-top: 1px dashed #000;
@@ -182,19 +195,24 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
               margin-top: 1mm;
               font-weight: bold;
             }
-            .signature {
-              margin-top: 3mm;
-              border-top: 1px solid #000;
-              width: 60%;
+            .label-signature {
+              margin-top: 1.5mm;
+              border-top: 0.5px solid #000;
+              width: 70%;
               margin-left: auto;
               margin-right: auto;
               text-align: center;
               font-size: 6pt;
             }
+            @media print {
+              .sheet { page-break-after: always; }
+            }
           </style>
         </head>
         <body>
-          ${labelsHtml}
+          <div class="sheet">
+            ${labelsHtml}
+          </div>
           <script>
             window.onload = () => {
               window.print();
@@ -213,6 +231,7 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
     const date = new Date(selectedDate + 'T12:00:00');
     date.setDate(date.getDate() + days);
     setSelectedDate(date.toISOString().split('T')[0]);
+    setSelectedRows(new Set());
   };
 
   return (
@@ -267,16 +286,29 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
             <input 
               type="date" 
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => {
+                setSelectedDate(e.target.value);
+                setSelectedRows(new Set());
+              }}
               className="px-6 py-4 bg-slate-50 border-2 border-indigo-50 rounded-2xl font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
             />
-            <button 
-              onClick={handlePrintAllLabels}
-              className="flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-lg shadow-indigo-200 transition-all active:scale-95 uppercase text-xs tracking-widest"
-            >
-              <Printer className="h-5 w-5" />
-              Imprimir Todas Etiquetas
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={toggleAllSelection}
+                className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black rounded-2xl transition-all active:scale-95 uppercase text-[10px] tracking-widest"
+              >
+                {selectedRows.size === currentMenu.filter(r => r.foodItem || r.contractedItem).length ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                {selectedRows.size === currentMenu.filter(r => r.foodItem || r.contractedItem).length ? 'Desmarcar Todos' : 'Marcar Todos'}
+              </button>
+              <button 
+                onClick={handlePrintSelected}
+                disabled={selectedRows.size === 0}
+                className="flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-lg shadow-indigo-200 transition-all active:scale-95 uppercase text-xs tracking-widest disabled:bg-slate-300 disabled:shadow-none"
+              >
+                <Printer className="h-5 w-5" />
+                Imprimir Selecionadas ({selectedRows.size})
+              </button>
+            </div>
           </div>
         </div>
 
@@ -299,22 +331,28 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
               <div className="p-6 flex-1 space-y-4">
                 {groupedMenu[period] && groupedMenu[period].length > 0 ? (
                   groupedMenu[period].map((row, idx) => (
-                    <div key={idx} className="group bg-slate-50 hover:bg-indigo-50/50 p-4 rounded-2xl border border-slate-100 transition-all flex justify-between items-center gap-4">
-                      <div className="flex-1">
-                        <p className="font-bold text-slate-800 uppercase text-sm leading-tight">
-                          {row.foodItem || row.contractedItem || 'Item não especificado'}
-                        </p>
-                        {row.preparationDetails && (
-                          <p className="text-[10px] text-slate-400 mt-1 font-medium">{row.preparationDetails}</p>
-                        )}
+                    <div 
+                      key={row.id} 
+                      onClick={() => toggleRowSelection(row.id)}
+                      className={`group cursor-pointer p-4 rounded-2xl border-2 transition-all flex justify-between items-center gap-4 ${selectedRows.has(row.id) ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100 hover:bg-indigo-50/50'}`}
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className={`transition-colors ${selectedRows.has(row.id) ? 'text-indigo-600' : 'text-slate-300'}`}>
+                          {selectedRows.has(row.id) ? <CheckSquare className="h-6 w-6" /> : <Square className="h-6 w-6" />}
+                        </div>
+                        <div className="flex-1">
+                          <p className={`font-bold uppercase text-sm leading-tight transition-colors ${selectedRows.has(row.id) ? 'text-indigo-900' : 'text-slate-800'}`}>
+                            {row.foodItem || row.contractedItem || 'Item não especificado'}
+                          </p>
+                          {row.preparationDetails && (
+                            <p className="text-[10px] text-slate-400 mt-1 font-medium">{row.preparationDetails}</p>
+                          )}
+                        </div>
                       </div>
-                      <button 
-                        onClick={() => handlePrintLabel(row, period)}
-                        className="bg-white group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white p-3 rounded-xl shadow-sm border border-indigo-50 transition-all active:scale-90"
-                        title="Imprimir Etiqueta de Amostra"
-                      >
-                        <Printer className="h-4 w-4" />
-                      </button>
+                      <div className="flex flex-col items-end text-[9px] font-mono text-slate-400">
+                        <span>LOT: {findLotInfo(row.contractedItem || '').lot}</span>
+                        <span>NF: {findLotInfo(row.contractedItem || '').invoice}</span>
+                      </div>
                     </div>
                   ))
                 ) : (
