@@ -17,6 +17,7 @@ interface InvoiceInfo {
 
 interface AdminInvoicesProps {
     suppliers: Supplier[];
+    warehouseLog?: WarehouseMovement[];
     onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => void;
     onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => void;
     onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string, receiptTermNumber?: string, invoiceDate?: string) => Promise<{ success: boolean; message?: string }>;
@@ -171,13 +172,19 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                 const totalValue = deliveries.reduce((sum, d) => sum + (d.value || 0), 0);
                 const items = deliveries
                     .filter(d => d.item && d.item !== 'AGENDAMENTO PENDENTE')
-                    .map(d => ({ 
-                        name: d.item || 'Item não especificado', 
-                        kg: d.kg || 0, 
-                        value: d.value || 0,
-                        lotNumber: d.lots?.[0]?.lotNumber,
-                        expirationDate: d.lots?.[0]?.expirationDate
-                    }));
+                    .map(d => {
+                        const exitedQuantity = (warehouseLog || [])
+                            .filter(log => log.type === 'saída' && log.inboundInvoice === invoiceNumber && log.itemName === d.item && log.supplierName === supplier.name)
+                            .reduce((sum, log) => sum + (Number(log.quantity) || 0), 0);
+                        return { 
+                            name: d.item || 'Item não especificado', 
+                            kg: d.kg || 0, 
+                            value: d.value || 0,
+                            lotNumber: d.lots?.[0]?.lotNumber,
+                            expirationDate: d.lots?.[0]?.expirationDate,
+                            exitedQuantity
+                        };
+                    });
                 if(items.length === 0 && totalValue === 0) return;
                 const validDates = deliveries.map(d => d.date).filter(d => d && d !== "Invalid Date");
                 const earliestDate = validDates.length > 0 ? validDates.sort()[0] : new Date().toISOString().split('T')[0];
@@ -188,7 +195,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
             });
         });
         return Array.from(invoicesMap.values());
-    }, [suppliers]);
+    }, [suppliers, warehouseLog]);
     
     const filteredAndSortedInvoices = useMemo(() => {
         const filtered = allInvoices.filter(invoice => 
@@ -365,13 +372,19 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                         <td className="p-3 text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 {mode === 'warehouse_exit' ? (
-                                                    <button 
-                                                        onClick={() => handleRegisterExitClick(invoice)}
-                                                        className="bg-red-600 text-white hover:bg-red-700 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors shadow-md"
-                                                        title="Registrar Saída"
-                                                    >
-                                                        Registrar Saída
-                                                    </button>
+                                                    invoice.items.every((item: any) => item.exitedQuantity >= item.kg) ? (
+                                                        <span className="bg-gray-100 text-gray-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg shadow-sm">
+                                                            Saída Concluída
+                                                        </span>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={() => handleRegisterExitClick(invoice)}
+                                                            className="bg-red-600 text-white hover:bg-red-700 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors shadow-md"
+                                                            title="Registrar Saída"
+                                                        >
+                                                            Registrar Saída
+                                                        </button>
+                                                    )
                                                 ) : (
                                                     <>
                                                         <button 
@@ -397,12 +410,23 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoic
                                                 <div className="bg-white p-4 rounded-lg shadow-inner">
                                                     <h4 className="text-xs font-bold uppercase text-gray-600 mb-2">Detalhamento da NF {invoice.invoiceNumber}</h4>
                                                     <ul className="space-y-1 text-xs">
-                                                        {invoice.items.length > 0 ? invoice.items.map((item, index) => (
-                                                            <li key={index} className="flex justify-between items-center p-2 border-b last:border-b-0">
-                                                                <span className="font-semibold text-gray-700 uppercase">{item.name} <span className="text-gray-400 font-normal">({(item.kg || 0).toFixed(2).replace('.',',')} Kg)</span></span>
-                                                                <span className="font-mono text-gray-600">{formatCurrency(item.value)}</span>
-                                                            </li>
-                                                        )) : <li className="p-2 text-gray-400 italic">Nota fiscal sem itens registrados.</li>}
+                                                        {invoice.items.length > 0 ? invoice.items.map((item: any, index) => {
+                                                            const remaining = Math.max(0, item.kg - (item.exitedQuantity || 0));
+                                                            return (
+                                                                <li key={index} className="flex justify-between items-center p-2 border-b last:border-b-0">
+                                                                    <span className="font-semibold text-gray-700 uppercase">
+                                                                        {item.name} 
+                                                                        <span className="text-gray-400 font-normal ml-1">({(item.kg || 0).toFixed(2).replace('.',',')} Kg)</span>
+                                                                        {item.exitedQuantity > 0 && (
+                                                                            <span className="ml-2 text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                                                                                Saldo: {remaining.toFixed(2).replace('.',',')} Kg
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                    <span className="font-mono text-gray-600">{formatCurrency(item.value)}</span>
+                                                                </li>
+                                                            );
+                                                        }) : <li className="p-2 text-gray-400 italic">Nota fiscal sem itens registrados.</li>}
                                                     </ul>
                                                 </div>
                                             </td>

@@ -524,6 +524,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                 {activeTab === 'entry' ? (
                     <AdminInvoices 
                         suppliers={suppliers} 
+                        warehouseLog={warehouseLog}
                         onReopenInvoice={onReopenInvoice} 
                         onDeleteInvoice={onDeleteInvoice} 
                         onUpdateInvoiceItems={onUpdateInvoiceItems} 
@@ -533,6 +534,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                 ) : activeTab === 'exit' ? (
                     <AdminInvoices 
                         suppliers={suppliers} 
+                        warehouseLog={warehouseLog}
                         onReopenInvoice={onReopenInvoice} 
                         onDeleteInvoice={onDeleteInvoice} 
                         onUpdateInvoiceItems={onUpdateInvoiceItems} 
