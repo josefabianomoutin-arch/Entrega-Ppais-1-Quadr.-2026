@@ -5,12 +5,7 @@ import type { Supplier, WarehouseMovement } from '../types';
 interface AdminContractItemsProps {
   suppliers: Supplier[];
   warehouseLog: WarehouseMovement[];
-  globalContractItems?: GlobalContractItem[];
-  onUpdateContractForItem: (
-    itemName: string, 
-    metadata: { unit: string, category: string, comprasCode: string, becCode: string },
-    assignments: { supplierCpf: string, totalKg: number, valuePerKg: number }[]
-  ) => Promise<{ success: boolean, message: string }>;
+  onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string, comprasCode?: string, becCode?: string }[]) => Promise<{ success: boolean, message: string }>;
   categoryFilter?: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'OUTROS';
   hideHeader?: boolean;
 }
@@ -38,32 +33,9 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
     const itemAggregation = useMemo(() => {
         const map = new Map<string, any>();
 
-        // 0. Inicializa com a Lista Global de Itens (para mostrar itens sem fornecedor)
-        (globalContractItems || []).forEach(gi => {
-            if (categoryFilter && gi.category !== categoryFilter) return;
-
-            const normName = superNormalize(gi.name);
-            map.set(normName, {
-                name: gi.name,
-                normName,
-                totalContracted: 0,
-                totalValueContracted: 0,
-                totalDelivered: 0,
-                totalValueDelivered: 0,
-                totalExited: 0,
-                totalValueExited: 0,
-                unit: gi.unit || 'kg-1',
-                category: gi.category || 'OUTROS',
-                comprasCode: gi.comprasCode || '',
-                becCode: gi.becCode || '',
-                suppliersCount: 0,
-                details: []
-            });
-        });
-
         // 1. Agrega Metas de todos os Fornecedores
         suppliers.forEach(s => {
-            s.contractItems.forEach(ci => {
+            (s.contractItems || []).forEach(ci => {
                 if (categoryFilter && ci.category !== categoryFilter) return;
 
                 const normName = superNormalize(ci.name);
@@ -130,8 +102,9 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
         });
 
         return Array.from(map.values())
+            .filter(item => item.totalContracted > 0)
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [suppliers, warehouseLog, categoryFilter, globalContractItems]);
+    }, [suppliers, warehouseLog]);
 
     const filteredItems = useMemo(() => {
         return itemAggregation.filter(i => 
@@ -407,8 +380,8 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                     comprasCode={manageItem.comprasCode}
                     becCode={manageItem.becCode}
                     onClose={() => setManageItem(null)} 
-                    onSave={async (metadata, assignments) => {
-                        const res = await onUpdateContractForItem(manageItem.name, metadata, assignments);
+                    onSave={async (assignments) => {
+                        const res = await onUpdateContractForItem(manageItem.name, assignments);
                         if (res.success) setManageItem(null);
                         else alert(res.message);
                     }}
@@ -433,10 +406,7 @@ interface ManageContractSuppliersModalProps {
     comprasCode?: string;
     becCode?: string;
     onClose: () => void;
-    onSave: (
-        metadata: { unit: string, category: string, comprasCode: string, becCode: string },
-        assignments: { supplierCpf: string, totalKg: number, valuePerKg: number }[]
-    ) => Promise<void>;
+    onSave: (assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string, comprasCode?: string, becCode?: string }[]) => Promise<void>;
 }
 
 const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> = ({ itemName, currentSuppliers, allSuppliers, unit, category, comprasCode, becCode, onClose, onSave }) => {
@@ -487,21 +457,17 @@ const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
-        
-        const metadata = {
-            unit,
-            category: itemCategory,
-            comprasCode: itemComprasCode,
-            becCode: itemBecCode
-        };
-
         const finalAssignments = assignments.map(a => ({
             supplierCpf: a.supplierCpf,
             totalKg: parseFloat(a.totalKg.replace(',', '.')),
             valuePerKg: parseFloat(a.valuePerKg.replace(',', '.')),
+            unit: a.unit,
+            category: itemCategory,
+            comprasCode: itemComprasCode,
+            becCode: itemBecCode
         })).filter(a => !isNaN(a.totalKg));
 
-        await onSave(metadata, finalAssignments);
+        await onSave(finalAssignments);
         setIsSaving(false);
     };
 
