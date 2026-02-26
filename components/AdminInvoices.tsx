@@ -73,7 +73,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
             <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
             <style>
                 @page { 
-                    size: 63mm 100mm; 
+                    size: 100mm 63mm; 
                     margin: 0; 
                 }
                 @media print {
@@ -87,7 +87,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                 }
                 .page-container { width: 100%; margin: 0; background: white; display: flex; flex-direction: column; align-items: center; }
                 .label-card {
-                    width: 63mm; height: 100mm; border: 1px dashed #ccc; padding: 4mm;
+                    width: 100mm; height: 63mm; border: 1px dashed #ccc; padding: 4mm;
                     box-sizing: border-box; display: block;
                     margin: 0 auto 10mm auto; text-align: center; position: relative; overflow: hidden; border-radius: 3mm;
                 }
@@ -102,7 +102,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                 @media print {
                     body { background: white; margin: 0; padding: 0; }
                     .page-container { width: 100%; margin: 0; display: block; }
-                    .label-card { border: none; margin: 0; padding: 4mm; width: 63mm; height: 100mm; page-break-after: always; border-radius: 0; }
+                    .label-card { border: none; margin: 0; padding: 4mm; width: 100mm; height: 63mm; page-break-after: always; border-radius: 0; }
                 }
             </style>
         </head>

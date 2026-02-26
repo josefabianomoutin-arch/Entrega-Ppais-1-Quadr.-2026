@@ -433,6 +433,21 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
             )}
 
                 </>
+            ) : ['KIT PPL', 'PPAIS', 'ESTOCÁVEIS', 'PERECÍVEIS', 'AUTOMAÇÃO'].includes(activeSubTab) ? (
+                <div className="animate-fade-in">
+                    <div className="text-center mb-8">
+                        <h2 className="text-2xl font-black text-indigo-900 uppercase tracking-tighter">
+                            {activeSubTab === 'KIT PPL' ? 'KIT PPL - HIGIÊNE E VESTUÁRIO' : activeSubTab}
+                        </h2>
+                        <p className="text-gray-400 font-medium">Gestão simplificada de aquisição e estoque.</p>
+                    </div>
+                    <AdminAcquisitionItems 
+                        items={acquisitionItems}
+                        category={activeSubTab as any}
+                        onUpdate={onUpdateAcquisitionItem}
+                        onDelete={onDeleteAcquisitionItem}
+                    />
+                </div>
             ) : (
                 <div className="animate-fade-in">
                     <div className="text-center mb-8">
@@ -441,14 +456,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                         </h2>
                         <p className="text-gray-400 font-medium">Levantamento de informações iniciais para gestão de itens.</p>
                     </div>
-                    <AdminContractItems 
-                        key={activeSubTab}
-                        suppliers={suppliers} 
-                        warehouseLog={warehouseLog} 
-                        onUpdateContractForItem={onUpdateContractForItem}
-                        categoryFilter={activeSubTab as any}
-                        hideHeader={false}
-                    />
+                    {/* Fallback if any other tab is added */}
                 </div>
             )}
 
