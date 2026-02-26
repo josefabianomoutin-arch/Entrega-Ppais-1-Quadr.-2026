@@ -381,7 +381,8 @@ const App: React.FC = () => {
               name: itemName,
               totalKg: assignment.totalKg,
               valuePerKg: assignment.valuePerKg,
-              unit: assignment.unit
+              unit: assignment.unit,
+              category: assignment.category
             });
           }
           data.initialValue = (data.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * curr.valuePerKg), 0);

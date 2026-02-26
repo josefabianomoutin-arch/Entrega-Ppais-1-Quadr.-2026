@@ -1,13 +1,16 @@
 
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Supplier, PerCapitaConfig } from '../types';
+import type { Supplier, PerCapitaConfig, WarehouseMovement } from '../types';
 import { resolutionData } from './resolutionData';
+import AdminContractItems from './AdminContractItems';
 
 interface AdminPerCapitaProps {
   suppliers: Supplier[];
+  warehouseLog: WarehouseMovement[];
   perCapitaConfig: PerCapitaConfig;
   onUpdatePerCapitaConfig: (config: PerCapitaConfig) => void;
+  onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string }[]) => Promise<{ success: boolean, message: string }>;
 }
 
 const formatCurrency = (value: number) => {
@@ -88,7 +91,8 @@ const isHortifrutiOrPerishable = (itemName: string): boolean => {
     return allKeywords.some(keyword => lowerItemName.includes(keyword));
 };
 
-const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaConfig, onUpdatePerCapitaConfig }) => {
+const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog, perCapitaConfig, onUpdatePerCapitaConfig, onUpdateContractForItem }) => {
+    const [activeSubTab, setActiveSubTab] = useState<'CALCULO' | 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS'>('CALCULO');
     const [staffCount, setStaffCount] = useState<number>(0);
     const [inmateCount, setInmateCount] = useState<number>(0);
     const [customPerCapita, setCustomPerCapita] = useState<Record<string, string>>({});
@@ -236,7 +240,42 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-green-500 animate-fade-in relative">
             
-            {(isDirty || saveSuccess) && (
+            <div className="flex flex-wrap gap-2 mb-8 border-b pb-4">
+                <button 
+                    onClick={() => setActiveSubTab('CALCULO')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${activeSubTab === 'CALCULO' ? 'bg-green-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    Cálculo Geral
+                </button>
+                <button 
+                    onClick={() => setActiveSubTab('KIT PPL')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${activeSubTab === 'KIT PPL' ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    KIT PPL - HIGIÊNE E VESTUÁRIO
+                </button>
+                <button 
+                    onClick={() => setActiveSubTab('PPAIS')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${activeSubTab === 'PPAIS' ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    PPAIS
+                </button>
+                <button 
+                    onClick={() => setActiveSubTab('ESTOCÁVEIS')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${activeSubTab === 'ESTOCÁVEIS' ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    ESTOCÁVEIS
+                </button>
+                <button 
+                    onClick={() => setActiveSubTab('PERECÍVEIS')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${activeSubTab === 'PERECÍVEIS' ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    PERECÍVEIS
+                </button>
+            </div>
+
+            {activeSubTab === 'CALCULO' ? (
+                <>
+                    {(isDirty || saveSuccess) && (
                 <div className="sticky top-0 z-10 mb-6 -mx-6 -mt-6">
                     {saveSuccess && (
                         <div className="p-4 bg-green-100 border-b border-green-300 text-center font-semibold text-green-800 shadow-sm animate-fade-in">
@@ -381,6 +420,25 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, perCapitaCon
                             </tbody>
                         </table>
                     </div>
+                </div>
+            )}
+
+                </>
+            ) : (
+                <div className="animate-fade-in">
+                    <div className="text-center mb-8">
+                        <h2 className="text-2xl font-black text-indigo-900 uppercase tracking-tighter">
+                            {activeSubTab === 'KIT PPL' ? 'KIT PPL - HIGIÊNE E VESTUÁRIO' : activeSubTab}
+                        </h2>
+                        <p className="text-gray-400 font-medium">Levantamento de informações iniciais para gestão de itens.</p>
+                    </div>
+                    <AdminContractItems 
+                        suppliers={suppliers} 
+                        warehouseLog={warehouseLog} 
+                        onUpdateContractForItem={onUpdateContractForItem}
+                        categoryFilter={activeSubTab as any}
+                        hideHeader={true}
+                    />
                 </div>
             )}
 

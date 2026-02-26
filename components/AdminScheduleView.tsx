@@ -140,7 +140,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                     .signature-block { text-align: center; margin-top: 30px; }
                     .signature-line { border-top: 1px solid #000; width: 350px; margin: 0 auto 5px auto; }
                     .signature-name { font-weight: bold; text-transform: uppercase; font-size: 10pt; }
-                    .signature-title { font-size: 9pt; text-transform: uppercase; }
+                    .signature-title { font-size: 9pt; }
                     
                     .location-date { margin-top: 30px; text-align: right; font-weight: normal; }
 
@@ -205,8 +205,8 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                 <div class="signatures">
                     <div class="signature-block">
                         <div class="signature-line"></div>
-                        <div class="signature-name">RICARDO SAMUEL SCARAMAL</div>
-                        <div class="signature-title">CHEFE DE SEÇÃO</div>
+                        <div class="signature-name">JOSÉ FABIANO MOUTIN</div>
+                        <div class="signature-title">chefe de Seção de Finanças e Suprimentos</div>
                     </div>
                 </div>
 
