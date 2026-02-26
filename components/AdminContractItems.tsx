@@ -5,9 +5,7 @@ import type { Supplier, WarehouseMovement } from '../types';
 interface AdminContractItemsProps {
   suppliers: Supplier[];
   warehouseLog: WarehouseMovement[];
-  onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string, comprasCode?: string, becCode?: string }[]) => Promise<{ success: boolean, message: string }>;
-  categoryFilter?: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'OUTROS';
-  hideHeader?: boolean;
+  onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string }[]) => Promise<{ success: boolean, message: string }>;
 }
 
 const superNormalize = (text: string) => {
@@ -20,15 +18,12 @@ const superNormalize = (text: string) => {
         .trim();
 };
 
-const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [], warehouseLog = [], onUpdateContractForItem, categoryFilter, hideHeader }) => {
+const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [], warehouseLog = [], onUpdateContractForItem }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [manageItem, setManageItem] = useState<any | null>(null);
     const [isAddingItem, setIsAddingItem] = useState(false);
     const [newItemName, setNewItemName] = useState('');
     const [newItemUnit, setNewItemUnit] = useState('kg-1');
-    const [newItemCategory, setNewItemCategory] = useState<any>(categoryFilter || 'OUTROS');
-    const [newItemComprasCode, setNewItemComprasCode] = useState('');
-    const [newItemBecCode, setNewItemBecCode] = useState('');
 
     const itemAggregation = useMemo(() => {
         const map = new Map<string, any>();
@@ -36,8 +31,6 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
         // 1. Agrega Metas de todos os Fornecedores
         suppliers.forEach(s => {
             (s.contractItems || []).forEach(ci => {
-                if (categoryFilter && ci.category !== categoryFilter) return;
-
                 const normName = superNormalize(ci.name);
                 const existing = map.get(normName) || {
                     name: ci.name,
@@ -49,9 +42,6 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                     totalExited: 0,
                     totalValueExited: 0,
                     unit: ci.unit || 'kg-1',
-                    category: ci.category || 'OUTROS',
-                    comprasCode: ci.comprasCode || '',
-                    becCode: ci.becCode || '',
                     suppliersCount: 0,
                     details: []
                 };
@@ -133,15 +123,10 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
         setManageItem({
             name: newItemName.toUpperCase(),
             unit: newItemUnit,
-            category: newItemCategory,
-            comprasCode: newItemComprasCode,
-            becCode: newItemBecCode,
             details: []
         });
         setIsAddingItem(false);
         setNewItemName('');
-        setNewItemComprasCode('');
-        setNewItemBecCode('');
     };
 
     const handleDeleteItem = async (itemName: string) => {
@@ -153,21 +138,19 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
 
     return (
         <div className="space-y-8 animate-fade-in pb-12">
-            {!hideHeader && (
-                <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-600 flex justify-between items-center">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800 mb-2 uppercase tracking-tight italic">Gestão Geral por Item</h2>
-                        <p className="text-sm text-gray-500 font-medium">Consolidado de todos os contratos: O que foi comprado vs. O que foi entregue (Notas Fiscais).</p>
-                    </div>
-                    <button 
-                        onClick={() => setIsAddingItem(true)}
-                        className="bg-green-600 hover:bg-green-700 text-white font-black py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95 uppercase text-xs flex items-center gap-2"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-                        Adicionar Novo Item
-                    </button>
+            <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-green-600 flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2 uppercase tracking-tight italic">Gestão Geral por Item</h2>
+                    <p className="text-sm text-gray-500 font-medium">Consolidado de todos os contratos: O que foi comprado vs. O que foi entregue (Notas Fiscais).</p>
                 </div>
-            )}
+                <button 
+                    onClick={() => setIsAddingItem(true)}
+                    className="bg-green-600 hover:bg-green-700 text-white font-black py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95 uppercase text-xs flex items-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                    Adicionar Novo Item
+                </button>
+            </div>
 
             {isAddingItem && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-[200] p-4">
@@ -196,43 +179,6 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                                     <option value="un-1">Unidade (un)</option>
                                     <option value="cx-1">Caixa (cx)</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Categoria</label>
-                                <select 
-                                    value={newItemCategory} 
-                                    onChange={e => setNewItemCategory(e.target.value)}
-                                    className="w-full p-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-green-400 outline-none font-bold"
-                                >
-                                    <option value="OUTROS">OUTROS</option>
-                                    <option value="KIT PPL">KIT PPL - HIGIÊNE E VESTUÁRIO</option>
-                                    <option value="PPAIS">PPAIS</option>
-                                    <option value="ESTOCÁVEIS">ESTOCÁVEIS</option>
-                                    <option value="PERECÍVEIS">PERECÍVEIS</option>
-                                    <option value="AUTOMAÇÃO">AUTOMAÇÃO</option>
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Código Compras</label>
-                                    <input 
-                                        type="text" 
-                                        value={newItemComprasCode} 
-                                        onChange={e => setNewItemComprasCode(e.target.value)} 
-                                        className="w-full p-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-green-400 outline-none font-bold"
-                                        placeholder="Código Compras"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Código BEC</label>
-                                    <input 
-                                        type="text" 
-                                        value={newItemBecCode} 
-                                        onChange={e => setNewItemBecCode(e.target.value)} 
-                                        className="w-full p-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-green-400 outline-none font-bold"
-                                        placeholder="Código BEC"
-                                    />
-                                </div>
                             </div>
                             <div className="flex gap-3 pt-4">
                                 <button onClick={() => setIsAddingItem(false)} className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold uppercase text-xs">Cancelar</button>
@@ -299,7 +245,6 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                         <thead className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">
                             <tr>
                                 <th className="p-4 text-left">Produto do Contrato</th>
-                                <th className="p-4 text-center">Cód. Compras / BEC</th>
                                 <th className="p-4 text-center">Unid.</th>
                                 <th className="p-4 text-right">Meta Total</th>
                                 <th className="p-4 text-right">Entregue</th>
@@ -323,12 +268,6 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                                                         {det.supplierName}
                                                     </span>
                                                 ))}
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <div className="flex flex-col gap-1 items-center">
-                                                <span className="text-[9px] font-black text-gray-400 uppercase">C: {item.comprasCode || '---'}</span>
-                                                <span className="text-[9px] font-black text-gray-400 uppercase">B: {item.becCode || '---'}</span>
                                             </div>
                                         </td>
                                         <td className="p-4 text-center">

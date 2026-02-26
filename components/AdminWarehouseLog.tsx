@@ -76,7 +76,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
                 <style>
                     @page {
-                        size: A4;
+                        size: 63mm 100mm;
                         margin: 0;
                     }
                     @media print {
@@ -84,42 +84,44 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     }
                     body { 
                         font-family: Arial, sans-serif; 
-                        margin: 10mm; 
+                        margin: 0; 
                         padding: 0;
                         background: white;
                     }
                     .page-container {
-                        width: 190mm;
-                        margin: 0 auto;
+                        width: 100%;
+                        margin: 0;
                         background: white;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
                     }
                     .label-card {
-                        width: 90mm; /* Aproximadamente 2 colunas em A4 */
-                        height: 60mm;
-                        border: 1px solid #000;
-                        padding: 5mm;
+                        width: 63mm;
+                        height: 100mm;
+                        border: 1px dashed #ccc;
+                        padding: 4mm;
                         box-sizing: border-box;
-                        display: inline-block;
-                        vertical-align: top;
-                        margin: 2mm;
+                        display: block;
+                        margin: 0 auto 10mm auto;
                         text-align: center;
                         position: relative;
                         overflow: hidden;
-                        border-radius: 4mm;
+                        border-radius: 3mm;
                     }
-                    h1 { font-size: 14pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                    h2 { font-size: 10pt; margin: 0 0 3mm 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                    h1 { font-size: 10pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; line-height: 1.2; }
+                    h2 { font-size: 9pt; margin: 0 0 3mm 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                     .info { text-align: left; font-size: 9pt; }
-                    .info p { margin: 1mm 0; display: flex; justify-content: space-between; border-bottom: 0.5px dashed #ddd; }
-                    .info strong { font-size: 7pt; color: #666; }
-                    .barcode-container { margin-top: 3mm; display: flex; flex-direction: column; align-items: center; }
+                    .info p { margin: 1.5mm 0; display: flex; justify-content: space-between; border-bottom: 0.5px dashed #ddd; }
+                    .info strong { font-size: 8pt; color: #666; }
+                    .barcode-container { margin-top: 5mm; display: flex; flex-direction: column; align-items: center; }
                     .barcode-svg { max-width: 100%; height: 15mm !important; }
-                    .footer { position: absolute; bottom: 2mm; left: 0; right: 0; font-size: 6pt; color: #999; }
+                    .footer { position: absolute; bottom: 2mm; left: 0; right: 0; font-size: 6pt; color: #999; text-align: center; }
                     
                     @media print {
-                        body { background: white; }
-                        .page-container { width: 100%; margin: 0; }
-                        .label-card { border: 1px solid #000; margin: 1mm; page-break-inside: avoid; }
+                        body { background: white; margin: 0; padding: 0; }
+                        .page-container { width: 100%; margin: 0; display: block; }
+                        .label-card { border: none; margin: 0; padding: 4mm; width: 63mm; height: 100mm; page-break-after: always; border-radius: 0; }
                         .no-print { display: none; }
                     }
                 </style>

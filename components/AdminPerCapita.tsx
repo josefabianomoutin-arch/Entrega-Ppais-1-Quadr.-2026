@@ -4,7 +4,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { Supplier, PerCapitaConfig, WarehouseMovement, AcquisitionItem } from '../types';
 import { resolutionData } from './resolutionData';
 import AdminContractItems from './AdminContractItems';
-import AdminAcquisitionItems from './AdminAcquisitionItems';
 
 interface AdminPerCapitaProps {
   suppliers: Supplier[];
@@ -434,21 +433,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
             )}
 
                 </>
-            ) : ['KIT PPL', 'PPAIS', 'ESTOCÁVEIS', 'PERECÍVEIS', 'AUTOMAÇÃO'].includes(activeSubTab) ? (
-                <div className="animate-fade-in">
-                    <div className="text-center mb-8">
-                        <h2 className="text-2xl font-black text-indigo-900 uppercase tracking-tighter">
-                            {activeSubTab === 'KIT PPL' ? 'KIT PPL - HIGIÊNE E VESTUÁRIO' : activeSubTab}
-                        </h2>
-                        <p className="text-gray-400 font-medium">Gestão simplificada de aquisição e estoque.</p>
-                    </div>
-                    <AdminAcquisitionItems 
-                        items={acquisitionItems}
-                        category={activeSubTab as any}
-                        onUpdate={onUpdateAcquisitionItem}
-                        onDelete={onDeleteAcquisitionItem}
-                    />
-                </div>
             ) : (
                 <div className="animate-fade-in">
                     <div className="text-center mb-8">
