@@ -74,43 +74,143 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
             <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
             <style>
                 @page { 
-                    size: 100mm 63mm landscape; 
+                    size: 100mm 63mm; 
                     margin: 0; 
                 }
                 @media print {
-                    header, footer { display: none !important; }
+                    header, footer, .no-print { display: none !important; }
                     body { margin: 0; padding: 0; width: 100mm; height: 63mm; }
+                    .label-card { border: none !important; box-shadow: none !important; page-break-after: always; }
                 }
                 body { 
-                    font-family: Arial, sans-serif; 
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
                     margin: 0; 
                     padding: 0; 
-                    background: white; 
-                    width: 100mm;
+                    background: #f0f0f0; 
                 }
-                .page-container { width: 100mm; margin: 0; background: white; display: flex; flex-direction: column; align-items: center; }
-                .label-card {
-                    width: 100mm; height: 63mm; padding: 4mm;
-                    box-sizing: border-box; display: block;
-                    margin: 0; text-align: center; position: relative; overflow: hidden;
-                    page-break-after: always;
+                .no-print {
+                    background: #1e1b4b;
+                    color: white;
+                    padding: 10px 20px;
+                    text-align: center;
+                    position: sticky;
+                    top: 0;
+                    z-index: 100;
+                    display: flex;
+                    justify-content: center;
+                    gap: 10px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
                 }
-                h1 { font-size: 10pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; line-height: 1.2; }
-                h2 { font-size: 9pt; margin: 0 0 3mm 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                .info { text-align: left; font-size: 9pt; }
-                .info p { margin: 1.5mm 0; display: flex; justify-content: space-between; border-bottom: 0.5px dashed #ddd; }
-                .info strong { font-size: 8pt; color: #666; }
-                .barcode-container { margin-top: 5mm; display: flex; flex-direction: column; align-items: center; }
-                .barcode-svg { max-width: 100%; height: 15mm !important; }
-                .footer { position: absolute; bottom: 2mm; left: 0; right: 0; font-size: 6pt; color: #999; text-align: center; }
+                .no-print button {
+                    background: #fbbf24;
+                    color: #1e1b4b;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 6px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    text-transform: uppercase;
+                    font-size: 12px;
+                }
+                .page-container { 
+                    display: flex; 
+                    flex-direction: column; 
+                    align-items: center; 
+                    padding: 20px;
+                    gap: 20px;
+                }
                 @media print {
-                    body { background: white; margin: 0; padding: 0; }
-                    .page-container { width: 100mm; margin: 0; display: block; }
-                    .label-card { border: none; margin: 0; padding: 4mm; width: 100mm; height: 63mm; page-break-after: always; border-radius: 0; }
+                    .page-container { padding: 0; gap: 0; display: block; }
+                    body { background: white; }
+                }
+                .label-card {
+                    width: 100mm; 
+                    height: 63mm; 
+                    padding: 5mm;
+                    box-sizing: border-box; 
+                    background: white;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    position: relative; 
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                }
+                h1 { 
+                    font-size: 11pt; 
+                    font-weight: 800; 
+                    margin: 0 0 1mm 0; 
+                    text-transform: uppercase; 
+                    line-height: 1.1;
+                    color: #000;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }
+                h2 { 
+                    font-size: 9pt; 
+                    margin: 0 0 2mm 0; 
+                    color: #333; 
+                    border-bottom: 1.5px solid #000; 
+                    padding-bottom: 1mm; 
+                    white-space: nowrap; 
+                    overflow: hidden; 
+                    text-overflow: ellipsis;
+                    font-weight: 600;
+                }
+                .info { 
+                    text-align: left; 
+                    font-size: 9pt; 
+                    flex: 1;
+                }
+                .info p { 
+                    margin: 1mm 0; 
+                    display: flex; 
+                    justify-content: space-between; 
+                    border-bottom: 0.5px dashed #ccc; 
+                    line-height: 1.2;
+                }
+                .info strong { 
+                    font-size: 7.5pt; 
+                    color: #555; 
+                    text-transform: uppercase;
+                }
+                .info span {
+                    font-weight: 700;
+                    color: #000;
+                }
+                .barcode-container { 
+                    margin-top: 2mm; 
+                    display: flex; 
+                    flex-direction: column; 
+                    align-items: center; 
+                    justify-content: center;
+                }
+                .barcode-svg { 
+                    width: 100% !important; 
+                    height: 14mm !important; 
+                }
+                .footer-label { 
+                    position: absolute; 
+                    bottom: 1mm; 
+                    left: 0; 
+                    right: 0; 
+                    font-size: 6pt; 
+                    color: #666; 
+                    text-align: center; 
+                    font-weight: bold;
                 }
             </style>
         </head>
         <body>
+            <div class="no-print">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-weight: bold; font-size: 14px;">Configuração de Impressão (100x63mm)</span>
+                    <button onclick="window.print()">Imprimir Etiquetas</button>
+                    <button onclick="window.close()" style="background: #ef4444; color: white;">Fechar</button>
+                </div>
+            </div>
             <div class="page-container">
                 ${labels.map((label, index) => `
                     <div class="label-card">
@@ -118,16 +218,20 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                         <h2>${label.supplierName}</h2>
                         <div class="info">
                             <p><strong>LOTE:</strong> <span>${label.lotNumber}</span></p>
-                            <p><strong>VAL:</strong> <span>${label.expirationDate ? label.expirationDate.split('-').reverse().join('/') : 'N/A'}</span></p>
-                            <p><strong>ENT:</strong> <span>${label.date ? label.date.split('-').reverse().join('/') : 'N/A'}</span></p>
-                            <p><strong>QTD:</strong> <span>${label.quantity.toFixed(2).replace('.', ',')} kg</span></p>
-                            <p><strong>NF:</strong> <span>${label.invoiceNumber}</span></p>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;">
+                                <p><strong>VAL:</strong> <span>${label.expirationDate ? label.expirationDate.split('-').reverse().join('/') : 'N/A'}</span></p>
+                                <p><strong>ENT:</strong> <span>${label.date ? label.date.split('-').reverse().join('/') : 'N/A'}</span></p>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;">
+                                <p><strong>QTD:</strong> <span>${label.quantity.toFixed(2).replace('.', ',')} kg</span></p>
+                                <p><strong>NF:</strong> <span>${label.invoiceNumber}</span></p>
+                            </div>
                             ${label.receiptTermNumber ? `<p><strong>TERMO:</strong> <span>${label.receiptTermNumber}</span></p>` : ''}
                         </div>
                         <div class="barcode-container">
-                            ${label.barcode ? `<svg id="barcode-${index}" class="barcode-svg"></svg>` : '<p style="font-size: 8pt; color: #ccc; margin-top: 5mm;">SEM CÓDIGO</p>'}
+                            ${label.barcode ? `<svg id="barcode-${index}" class="barcode-svg"></svg>` : '<p style="font-size: 7pt; color: #999; margin: 0;">SEM CÓDIGO DE BARRAS</p>'}
                         </div>
-                        <div class="footer">${new Date().toLocaleString('pt-BR')}</div>
+                        <div class="footer-label">GERADO EM ${new Date().toLocaleString('pt-BR')}</div>
                     </div>
                 `).join('')}
             </div>
@@ -136,11 +240,18 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     ${labels.map((label, index) => label.barcode ? `
                         try {
                             JsBarcode("#barcode-${index}", "${label.barcode}", {
-                                format: "CODE128", width: 2, height: 40, displayValue: true, fontSize: 10, margin: 0
+                                format: "CODE128", 
+                                width: 2, 
+                                height: 50, 
+                                displayValue: true, 
+                                fontSize: 12, 
+                                margin: 0,
+                                background: "transparent"
                             });
                         } catch (e) { console.error(e); }
                     ` : '').join('')}
-                    setTimeout(() => { window.print(); window.close(); }, 1000);
+                    // Abre o diálogo de impressão automaticamente após carregar
+                    setTimeout(() => { window.print(); }, 1000);
                 }
             </script>
         </body>
@@ -613,6 +724,11 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
     const [invoiceNumber, setInvoiceNumber] = useState(invoice.invoiceNumber);
     const [date, setDate] = useState(invoice.date);
     const [invoiceDate, setInvoiceDate] = useState(invoice.invoiceDate || invoice.date); // NOVO
+    const [itemSearch, setItemSearch] = useState('');
+
+    const filteredItems = useMemo(() => {
+        return items.filter(it => it.name.toLowerCase().includes(itemSearch.toLowerCase()));
+    }, [items, itemSearch]);
 
     React.useEffect(() => {
         const cleanBarcode = barcode.replace(/\D/g, '');
@@ -676,37 +792,57 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
                             <input type="text" value={receiptTermNumber} onChange={e => setReceiptTermNumber(e.target.value)} placeholder="Ex: 001/2026" className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-400" />
                         </div>
                     </div>
-                    <div className="max-h-80 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                        {items.map(item => {
+                    <div className="max-h-96 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                        <div className="sticky top-0 bg-white z-10 pb-2 space-y-2">
+                            <p className="text-xs font-bold text-gray-500 uppercase">Itens da Nota Fiscal:</p>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                </span>
+                                <input 
+                                    type="text" 
+                                    placeholder="Filtrar itens para editar..." 
+                                    value={itemSearch}
+                                    onChange={e => setItemSearch(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-teal-400 transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        {filteredItems.length > 0 ? filteredItems.map(item => {
                             const contract = supplier.contractItems.find(ci => ci.name === item.name);
                             const unit = getDisplayUnit(contract);
                             return (
-                                <div key={item.id} className="bg-gray-50 p-4 rounded-xl border space-y-3">
+                                <div key={item.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100 hover:border-teal-100 transition-colors space-y-3">
                                     <div className="flex gap-2 items-center">
                                         <div className="flex-1"><label className="text-[9px] font-black text-gray-400 uppercase">Item</label>
-                                            <select value={item.name} onChange={e => handleItemChange(item.id, 'name', e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white" required>
+                                            <select value={item.name} onChange={e => handleItemChange(item.id, 'name', e.target.value)} className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-400 outline-none" required>
                                                 <option value="">-- Selecione o Item --</option>
                                                 {availableContractItems.map(ci => <option key={ci.name} value={ci.name}>{ci.name}</option>)}
                                             </select>
                                         </div>
                                         <div className="w-28"><label className="text-[9px] font-black text-gray-400 uppercase">Qtd ({unit})</label>
-                                            <input type="text" value={item.kg} onChange={e => handleItemChange(item.id, 'kg', e.target.value)} placeholder="0,00" className="w-full p-2 border rounded-lg text-sm text-center font-mono" required />
+                                            <input type="text" value={item.kg} onChange={e => handleItemChange(item.id, 'kg', e.target.value)} placeholder="0,00" className="w-full p-2 border border-gray-200 rounded-lg text-sm text-center font-mono focus:ring-2 focus:ring-teal-400 outline-none bg-white" required />
                                         </div>
-                                        <button type="button" onClick={() => setItems(prev => prev.filter(it => it.id !== item.id))} className="text-red-400 hover:text-red-600 p-1 mt-4"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                        <button type="button" onClick={() => setItems(prev => prev.filter(it => it.id !== item.id))} className="text-red-400 hover:text-red-600 p-1 mt-4 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="text-[9px] font-black text-gray-400 uppercase">Lote</label>
-                                            <input type="text" value={item.lot} onChange={e => handleItemChange(item.id, 'lot', e.target.value.toUpperCase())} placeholder="LOTE" className="w-full p-2 border rounded-lg text-xs font-mono" />
+                                            <input type="text" value={item.lot} onChange={e => handleItemChange(item.id, 'lot', e.target.value.toUpperCase())} placeholder="LOTE" className="w-full p-2 border border-gray-200 rounded-lg text-xs font-mono focus:ring-2 focus:ring-teal-400 outline-none bg-white" />
                                         </div>
                                         <div>
                                             <label className="text-[9px] font-black text-gray-400 uppercase">Validade</label>
-                                            <input type="date" value={item.exp} onChange={e => handleItemChange(item.id, 'exp', e.target.value)} className="w-full p-2 border rounded-lg text-xs" />
+                                            <input type="date" value={item.exp} onChange={e => handleItemChange(item.id, 'exp', e.target.value)} className="w-full p-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-teal-400 outline-none bg-white" />
                                         </div>
                                     </div>
                                 </div>
                             );
-                        })}
+                        }) : (
+                            <div className="text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                                <p className="text-xs text-gray-400 font-bold uppercase">Nenhum item encontrado com "{itemSearch}"</p>
+                            </div>
+                        )}
                     </div>
                     <button type="button" onClick={() => setItems([...items, { id: `new-${Date.now()}`, name: '', kg: '', lot: '', exp: '' }])} className="w-full py-2 border-2 border-dashed border-teal-200 text-teal-600 font-bold rounded-lg text-xs uppercase hover:bg-teal-50 transition-colors">+ Adicionar Item à Nota</button>
                     <div className="flex justify-between items-center pt-4 border-t">
@@ -731,6 +867,11 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
     const [items, setItems] = useState(invoice.items.filter(it => (it.kg - (it.exitedQuantity || 0)) > 0).map((it, idx) => ({ id: `exit-${idx}`, name: it.name, kg: '0,00', maxKg: it.kg - (it.exitedQuantity || 0), lot: it.lotNumber, exp: it.expirationDate })));
     const [outboundNf, setOutboundNf] = useState('');
     const [exitDate, setExitDate] = useState(new Date().toISOString().split('T')[0]);
+    const [itemSearch, setItemSearch] = useState('');
+
+    const filteredItems = useMemo(() => {
+        return items.filter(it => it.name.toLowerCase().includes(itemSearch.toLowerCase()));
+    }, [items, itemSearch]);
 
     const handleItemChange = (id: string, value: string) => {
         setItems(prev => prev.map(it => it.id === id ? { ...it, kg: value.replace(/[^0-9,]/g, '') } : it));
@@ -779,18 +920,48 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
                         </div>
                     </div>
                     
-                    <div className="max-h-80 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">Selecione os itens e quantidades para saída:</p>
-                        {items.map(item => {
+                    <div className="max-h-96 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                        <div className="sticky top-0 bg-white z-10 pb-2 space-y-2">
+                            <div className="flex justify-between items-end">
+                                <p className="text-xs font-bold text-gray-500 uppercase">Selecione os itens e quantidades para saída:</p>
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        if (window.confirm('Deseja preencher a quantidade total para TODOS os itens desta nota?')) {
+                                            setItems(prev => prev.map(it => ({ ...it, kg: it.maxKg.toFixed(2).replace('.', ',') })));
+                                        }
+                                    }}
+                                    className="text-[10px] font-black text-red-600 hover:text-red-700 uppercase bg-red-50 px-3 py-1 rounded-lg border border-red-100 transition-all active:scale-95"
+                                >
+                                    Preencher Tudo (Saldo Total)
+                                </button>
+                            </div>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                </span>
+                                <input 
+                                    type="text" 
+                                    placeholder="Filtrar itens da nota..." 
+                                    value={itemSearch}
+                                    onChange={e => setItemSearch(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-red-400 transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        {filteredItems.length > 0 ? filteredItems.map(item => {
                             const contract = supplier.contractItems.find(ci => ci.name === item.name);
                             const unit = getDisplayUnit(contract);
                             return (
-                                <div key={item.id} className="bg-gray-50 p-4 rounded-xl border space-y-3">
+                                <div key={item.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100 hover:border-red-100 transition-colors space-y-3">
                                     <div className="flex gap-4 items-center">
                                         <div className="flex-1">
-                                            <p className="text-xs font-black text-gray-700 uppercase">{item.name}</p>
-                                            <p className="text-[10px] text-gray-400">Disponível: {item.maxKg.toFixed(2).replace('.', ',')} {unit}</p>
-                                            {item.lot && <p className="text-[10px] text-gray-400 font-mono">Lote: {item.lot}</p>}
+                                            <p className="text-xs font-black text-gray-700 uppercase leading-tight">{item.name}</p>
+                                            <div className="flex flex-wrap gap-2 mt-1">
+                                                <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-md">Disponível: {item.maxKg.toFixed(2).replace('.', ',')} {unit}</span>
+                                                {item.lot && <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">Lote: {item.lot}</span>}
+                                            </div>
                                         </div>
                                         <div className="w-32">
                                             <label className="text-[9px] font-black text-gray-400 uppercase">Qtd Saída ({unit})</label>
@@ -799,13 +970,17 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
                                                 value={item.kg} 
                                                 onChange={e => handleItemChange(item.id, e.target.value)} 
                                                 placeholder="0,00" 
-                                                className="w-full p-2 border rounded-lg text-sm text-center font-mono focus:ring-2 focus:ring-red-400 outline-none" 
+                                                className="w-full p-2 border border-gray-200 rounded-lg text-sm text-center font-mono focus:ring-2 focus:ring-red-400 outline-none bg-white" 
                                             />
                                         </div>
                                     </div>
                                 </div>
                             );
-                        })}
+                        }) : (
+                            <div className="text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                                <p className="text-xs text-gray-400 font-bold uppercase">Nenhum item encontrado com "{itemSearch}"</p>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex justify-end items-center pt-4 border-t space-x-2">
