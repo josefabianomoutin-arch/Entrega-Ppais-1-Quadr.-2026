@@ -81,15 +81,17 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     }
                     @media print {
                         header, footer { display: none !important; }
+                        body { margin: 0; padding: 0; width: 100mm; height: 63mm; }
                     }
                     body { 
                         font-family: Arial, sans-serif; 
                         margin: 0; 
                         padding: 0;
                         background: white;
+                        width: 100mm;
                     }
                     .page-container {
-                        width: 100%;
+                        width: 100mm;
                         margin: 0;
                         background: white;
                         display: flex;
@@ -99,15 +101,14 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     .label-card {
                         width: 100mm;
                         height: 63mm;
-                        border: 1px dashed #ccc;
                         padding: 4mm;
                         box-sizing: border-box;
                         display: block;
-                        margin: 0 auto 10mm auto;
+                        margin: 0;
                         text-align: center;
                         position: relative;
                         overflow: hidden;
-                        border-radius: 3mm;
+                        page-break-after: always;
                     }
                     h1 { font-size: 10pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; line-height: 1.2; }
                     h2 { font-size: 9pt; margin: 0 0 3mm 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -120,7 +121,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     
                     @media print {
                         body { background: white; margin: 0; padding: 0; }
-                        .page-container { width: 100%; margin: 0; display: block; }
+                        .page-container { width: 100mm; margin: 0; display: block; }
                         .label-card { border: none; margin: 0; padding: 4mm; width: 100mm; height: 63mm; page-break-after: always; border-radius: 0; }
                         .no-print { display: none; }
                     }
