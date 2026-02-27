@@ -341,12 +341,42 @@ const App: React.FC = () => {
   };
 
   const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, receiptTermNumber?: string, invoiceDate?: string) => {
-    const supplierRef = child(suppliersRef, supplierCpf);
+    const supplier = suppliers.find(s => s.cpf === supplierCpf);
+    if (!supplier) return { success: false, message: 'Fornecedor não encontrado.' };
+
     try {
+      // 1. Registrar no log do almoxarifado primeiro
+      const logEntries: { ref: any, entry: WarehouseMovement, lotId: string }[] = items.map((item, idx) => {
+        const newLogRef = push(warehouseLogRef);
+        const lotId = `lot-manual-${Date.now()}-${idx}`;
+        const entry: WarehouseMovement = {
+            id: newLogRef.key || `ent-man-${Date.now()}-${idx}`,
+            type: 'entrada',
+            timestamp: new Date().toISOString(),
+            date: invoiceDate || date,
+            itemName: item.name,
+            supplierName: supplier.name,
+            lotNumber: item.lotNumber || 'MANUAL',
+            quantity: item.kg,
+            inboundInvoice: String(invoiceNumber || '').trim(),
+            expirationDate: item.expirationDate,
+            barcode: barcode || '',
+            lotId: lotId,
+            deliveryId: ''
+        };
+        return { ref: newLogRef, entry, lotId };
+      });
+
+      // Salva todos os logs
+      await Promise.all(logEntries.map(le => set(le.ref, le.entry)));
+
+      // 2. Sincronizar com as entregas do fornecedor
+      const supplierRef = child(suppliersRef, supplierCpf);
       await runTransaction(supplierRef, (currentData: Supplier) => {
         if (currentData) {
           const deliveries = currentData.deliveries || [];
-          items.forEach((item, idx) => {
+          logEntries.forEach((le, idx) => {
+            const item = items[idx];
             deliveries.push({
               id: `manual-${Date.now()}-${idx}`,
               date,
@@ -360,7 +390,7 @@ const App: React.FC = () => {
               barcode: barcode,
               receiptTermNumber: receiptTermNumber,
               lots: [{
-                id: `lot-manual-${Date.now()}-${idx}`,
+                id: le.lotId,
                 lotNumber: item.lotNumber || 'MANUAL',
                 initialQuantity: item.kg,
                 remainingQuantity: item.kg,
@@ -372,8 +402,10 @@ const App: React.FC = () => {
         }
         return currentData;
       });
+
       return { success: true };
     } catch (e) {
+      console.error("Erro no lançamento manual:", e);
       return { success: false, message: 'Falha no lançamento manual.' };
     }
   };
@@ -675,6 +707,10 @@ const App: React.FC = () => {
              onRegisterEntry={handleRegisterWarehouseEntry} 
              onRegisterWithdrawal={handleRegisterWarehouseWithdrawal} 
              onResetExits={handleResetWarehouseExits}
+             onReopenInvoice={handleReopenInvoice}
+             onDeleteInvoice={handleDeleteInvoice}
+             onUpdateInvoiceItems={handleUpdateInvoiceItems}
+             onManualInvoiceEntry={handleManualInvoiceEntry}
              thirdPartyEntries={thirdPartyEntries}
              onRegisterThirdPartyEntry={async (l) => {
                  const r = push(thirdPartyEntriesRef);
