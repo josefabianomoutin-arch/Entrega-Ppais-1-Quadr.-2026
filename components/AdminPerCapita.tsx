@@ -1,9 +1,10 @@
 
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Supplier, PerCapitaConfig, WarehouseMovement } from '../types';
+import type { Supplier, PerCapitaConfig, WarehouseMovement, AcquisitionItem } from '../types';
 import { resolutionData } from './resolutionData';
 import AdminContractItems from './AdminContractItems';
+import AdminAcquisitionItems from './AdminAcquisitionItems';
 
 interface AdminPerCapitaProps {
   suppliers: Supplier[];
@@ -11,6 +12,9 @@ interface AdminPerCapitaProps {
   perCapitaConfig: PerCapitaConfig;
   onUpdatePerCapitaConfig: (config: PerCapitaConfig) => void;
   onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string, comprasCode?: string, becCode?: string }[]) => Promise<{ success: boolean, message: string }>;
+  onUpdateAcquisitionItem: (item: AcquisitionItem) => Promise<{ success: boolean, message: string }>;
+  onDeleteAcquisitionItem: (id: string) => Promise<{ success: boolean, message: string }>;
+  acquisitionItems: AcquisitionItem[];
 }
 
 const formatCurrency = (value: number) => {
@@ -91,7 +95,7 @@ const isHortifrutiOrPerishable = (itemName: string): boolean => {
     return allKeywords.some(keyword => lowerItemName.includes(keyword));
 };
 
-const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog, perCapitaConfig, onUpdatePerCapitaConfig, onUpdateContractForItem }) => {
+const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog, perCapitaConfig, onUpdatePerCapitaConfig, onUpdateContractForItem, onUpdateAcquisitionItem, onDeleteAcquisitionItem, acquisitionItems }) => {
     const [activeSubTab, setActiveSubTab] = useState<'CALCULO' | 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO'>('CALCULO');
     const [staffCount, setStaffCount] = useState<number>(0);
     const [inmateCount, setInmateCount] = useState<number>(0);
@@ -438,10 +442,11 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                         </h2>
                         <p className="text-gray-400 font-medium">Levantamento de informações iniciais para gestão de itens.</p>
                     </div>
-                    <AdminContractItems 
-                        suppliers={suppliers} 
-                        warehouseLog={warehouseLog}
-                        onUpdateContractForItem={onUpdateContractForItem}
+                    <AdminAcquisitionItems 
+                        category={activeSubTab} 
+                        items={acquisitionItems} 
+                        onUpdate={onUpdateAcquisitionItem} 
+                        onDelete={onDeleteAcquisitionItem} 
                     />
                 </div>
             )}
