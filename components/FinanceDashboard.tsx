@@ -1,7 +1,8 @@
 
 import React, { useMemo, useState } from 'react';
-import type { FinancialRecord, StandardMenu, DailyMenus, Supplier } from '../types';
+import type { FinancialRecord, StandardMenu, DailyMenus, Supplier, ThirdPartyEntryLog } from '../types';
 import MenuDashboard from './MenuDashboard';
+import AgendaChegadas from './AgendaChegadas';
 
 interface FinanceDashboardProps {
   records: FinancialRecord[];
@@ -10,6 +11,7 @@ interface FinanceDashboardProps {
   standardMenu?: StandardMenu;
   dailyMenus?: DailyMenus;
   suppliers?: Supplier[];
+  thirdPartyEntries?: ThirdPartyEntryLog[];
 }
 
 const PTRES_OPTIONS = ['380302', '380303', '380304', '380308', '380328'] as const;
@@ -26,14 +28,15 @@ const PTRES_DESCRIPTIONS: Record<string, string> = {
 const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
-type SubTab = 'recursos' | 'pagamentos' | 'saldos' | 'cardapio';
+type SubTab = 'recursos' | 'pagamentos' | 'saldos' | 'cardapio' | 'agenda';
 
-const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout, user, standardMenu, dailyMenus, suppliers }) => {
+const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout, user, standardMenu, dailyMenus, suppliers, thirdPartyEntries }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('pagamentos');
 
-  const isDouglas = useMemo(() => {
-    return user?.name.toUpperCase().includes('DOUGLAS');
+  const isFinanceAdmin = useMemo(() => {
+    const name = user?.name.toUpperCase() || '';
+    return name.includes('DOUGLAS') || name.includes('ALFREDO');
   }, [user]);
 
   const totalsGlobal = useMemo(() => {
@@ -116,13 +119,21 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout, 
             >
                 Saldos PTRES / Natureza
             </button>
-            {isDouglas && (
-                <button 
-                    onClick={() => setActiveSubTab('cardapio')}
-                    className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'cardapio' ? 'bg-amber-400 text-indigo-900 shadow-lg' : 'hover:bg-indigo-800 text-amber-200'}`}
-                >
-                    🍴 Cardápio Institucional
-                </button>
+            {isFinanceAdmin && (
+                <>
+                    <button 
+                        onClick={() => setActiveSubTab('cardapio')}
+                        className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'cardapio' ? 'bg-amber-400 text-indigo-900 shadow-lg' : 'hover:bg-indigo-800 text-amber-200'}`}
+                    >
+                        🍴 Cardápio Institucional
+                    </button>
+                    <button 
+                        onClick={() => setActiveSubTab('agenda')}
+                        className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'agenda' ? 'bg-indigo-500 text-white shadow-lg' : 'hover:bg-indigo-800 text-indigo-200'}`}
+                    >
+                        📅 Agenda de Chegadas
+                    </button>
+                </>
             )}
         </div>
       </div>
@@ -141,7 +152,17 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout, 
             </div>
         )}
 
-        {activeSubTab !== 'saldos' && activeSubTab !== 'cardapio' && (
+        {activeSubTab === 'agenda' && suppliers && thirdPartyEntries && (
+            <div className="animate-fade-in-up">
+                <AgendaChegadas 
+                    suppliers={suppliers} 
+                    thirdPartyEntries={thirdPartyEntries} 
+                    embedded={true} 
+                />
+            </div>
+        )}
+
+        {activeSubTab !== 'saldos' && activeSubTab !== 'cardapio' && activeSubTab !== 'agenda' && (
             <div className="flex justify-center">
                 <div className="w-full max-w-2xl relative">
                     <span className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-400">

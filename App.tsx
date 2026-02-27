@@ -99,10 +99,11 @@ const App: React.FC = () => {
       return true;
     }
 
-    const adminCpfs = ['15210361870', '29099022859', '29462706821'];
-    if (['ADMINISTRADOR', 'ADM', 'GALDINO', 'DOUGLAS'].some(n => cleanName.includes(n))) {
+    const adminCpfs = ['15210361870', '29099022859', '29462706821', '36554895876'];
+    if (['ADMINISTRADOR', 'ADM', 'GALDINO', 'DOUGLAS', 'ALFREDO'].some(n => cleanName.includes(n))) {
       if (adminCpfs.includes(numericPass)) {
-        setUser({ name: cleanName, cpf: numericPass, role: cleanName.includes('DOUGLAS') ? 'financeiro' : 'admin' });
+        const isFinanceAdmin = cleanName.includes('DOUGLAS') || cleanName.includes('ALFREDO');
+        setUser({ name: cleanName, cpf: numericPass, role: isFinanceAdmin ? 'financeiro' : 'admin' });
         return true;
       }
     }
@@ -699,6 +700,7 @@ const App: React.FC = () => {
              standardMenu={standardMenu}
              dailyMenus={dailyMenus}
              suppliers={suppliers}
+             thirdPartyEntries={thirdPartyEntries}
            />;
   }
 

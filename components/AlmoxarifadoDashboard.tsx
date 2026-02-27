@@ -3,6 +3,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import JsBarcode from 'jsbarcode';
 import type { Supplier, WarehouseMovement, ContractItem, ThirdPartyEntryLog } from '../types';
 import AdminInvoices from './AdminInvoices';
+import AgendaChegadas from './AgendaChegadas';
 
 interface AlmoxarifadoDashboardProps {
     suppliers: Supplier[];
@@ -546,97 +547,11 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                         onRegisterExit={onRegisterWithdrawal}
                     />
                 ) : activeTab === 'agenda' ? (
-                    <div className="space-y-6 animate-fade-in">
-                        {/* Seletor de Data Estilizado (Copiado da Subportaria) */}
-                        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100">
-                            <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                                <div>
-                                    <h2 className="text-2xl font-black text-indigo-950 uppercase tracking-tighter italic">Agenda de Chegadas</h2>
-                                    <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Visualização de Entregas Programadas</p>
-                                </div>
-                                <div className="flex items-center gap-4 w-full md:w-auto">
-                                    <div className="bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100">
-                                        <span className="text-xs font-black text-indigo-600 uppercase">{dailyDeliveries.length} Veículos</span>
-                                    </div>
-                                    <input 
-                                        type="date" 
-                                        value={selectedAgendaDate} 
-                                        onChange={e => setSelectedAgendaDate(e.target.value)}
-                                        className="p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 font-black text-indigo-900 transition-all text-sm"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Lista de Cards (Copiado da Subportaria) */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {dailyDeliveries.length > 0 ? dailyDeliveries.map(item => (
-                                <div 
-                                    key={item.id} 
-                                    className={`relative overflow-hidden bg-white rounded-[2rem] shadow-md border-2 transition-all ${
-                                        item.status === 'FATURADO' 
-                                            ? 'border-indigo-100 opacity-80' 
-                                            : item.arrivalTime 
-                                                ? 'border-green-200 bg-green-50/30' 
-                                                : 'border-red-500 bg-red-50'
-                                    }`}
-                                >
-                                    <div className={`absolute top-0 left-0 w-2 h-full ${
-                                        item.status === 'FATURADO' ? 'bg-indigo-900' : item.arrivalTime ? 'bg-green-500' : 'bg-red-600'
-                                    }`} />
-
-                                    <div className="p-5 pl-7">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className={`px-4 py-2 rounded-xl text-lg font-black font-mono shadow-sm ${
-                                                item.status === 'FATURADO' 
-                                                    ? 'bg-indigo-900 text-white' 
-                                                    : item.arrivalTime 
-                                                        ? 'bg-green-600 text-white' 
-                                                        : 'bg-red-600 text-white shadow-red-100'
-                                            }`}>
-                                                {item.time}
-                                            </div>
-                                            
-                                            <div className="text-right">
-                                                <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
-                                                    item.status === 'FATURADO' 
-                                                        ? 'bg-indigo-100 text-indigo-700' 
-                                                        : item.arrivalTime 
-                                                            ? 'bg-green-100 text-green-700' 
-                                                            : 'bg-red-100 text-red-700'
-                                                }`}>
-                                                    {item.status === 'FATURADO' ? '✓ Descarregado' : item.arrivalTime ? '● No Pátio' : '○ Aguardando'}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div className="mb-4">
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
-                                                {item.type === 'FORNECEDOR' ? 'Fornecedor' : 'Entrada Terceiros'}
-                                            </p>
-                                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight break-words leading-tight">{item.supplierName}</h3>
-                                            {item.type === 'TERCEIRO' && (
-                                                <p className="text-[10px] font-mono text-slate-400 mt-1">{item.supplierCpf}</p>
-                                            )}
-                                        </div>
-
-                                        {item.arrivalTime && (
-                                            <div className="flex items-center gap-2 bg-white/60 p-3 rounded-2xl border border-green-100">
-                                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                                <p className="text-xs font-bold text-green-700 uppercase">
-                                                    Entrada registrada às <span className="text-sm font-black">{item.arrivalTime}</span>
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )) : (
-                                <div className="md:col-span-2 text-center py-20 bg-white/50 rounded-[3rem] border-4 border-dashed border-slate-200">
-                                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest italic">Nenhum agendamento para esta data</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    <AgendaChegadas 
+                        suppliers={suppliers} 
+                        thirdPartyEntries={thirdPartyEntries} 
+                        embedded={true} 
+                    />
                 ) : (
                     <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden animate-fade-in">
                         <div className="p-6 md:p-8 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
