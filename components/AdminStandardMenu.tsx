@@ -161,9 +161,10 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                       color: #333; 
                       border-bottom: 1.5px solid #000; 
                       padding-bottom: 1mm; 
-                      white-space: nowrap; 
-                      overflow: hidden; 
-                      text-overflow: ellipsis;
+                      display: -webkit-box;
+                      -webkit-line-clamp: 2;
+                      -webkit-box-orient: vertical;
+                      overflow: hidden;
                       font-weight: 600;
                   }
                   .info { 
@@ -195,8 +196,8 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                       justify-content: center;
                   }
                   .barcode-svg { 
-                      width: 100% !important; 
-                      height: 18mm !important; 
+                      max-width: 90%; 
+                      height: 16mm !important; 
                   }
                   .footer-label { 
                       position: absolute; 
@@ -221,7 +222,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
               <div class="page-container">
                   <div class="label-card">
                       <h1>${lot.itemName}</h1>
-                      <h2>${lot.supplierName}</h2>
+                      <h2>${lot.supplierName || 'FORNECEDOR NÃO INFORMADO'}</h2>
                       <div class="info">
                           <p><strong>LOTE:</strong> <span>${lot.lotNumber}</span></p>
                           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;">
@@ -232,7 +233,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                               <p><strong>QTD:</strong> <span>${lot.quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</span></p>
                               <p><strong>NF:</strong> <span>${lot.invoiceNumber}</span></p>
                           </div>
-                          ${lot.receiptTermNumber ? `<p><strong>TERMO:</strong> <span>${lot.receiptTermNumber}</span></p>` : ''}
+                          ${lot.receiptTermNumber ? `<p><strong>NOTA DE EMPENHO:</strong> <span>${lot.receiptTermNumber}</span></p>` : ''}
                       </div>
                       <div class="barcode-container">
                           ${lot.barcode ? `<svg id="barcode" class="barcode-svg"></svg>` : '<p style="font-size: 7pt; color: #999; margin: 0;">SEM CÓDIGO DE BARRAS</p>'}
@@ -246,8 +247,8 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                           try {
                               JsBarcode("#barcode", "${lot.barcode}", {
                                   format: "CODE128", 
-                                  width: 2, 
-                                  height: 60, 
+                                  width: 1.2, 
+                                  height: 40, 
                                   displayValue: false, 
                                   margin: 0,
                                   background: "transparent"

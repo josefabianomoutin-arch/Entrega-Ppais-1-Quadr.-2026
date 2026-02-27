@@ -156,9 +156,10 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                         color: #333; 
                         border-bottom: 1.5px solid #000; 
                         padding-bottom: 1mm; 
-                        white-space: nowrap; 
-                        overflow: hidden; 
-                        text-overflow: ellipsis;
+                        display: -webkit-box;
+                        -webkit-line-clamp: 2;
+                        -webkit-box-orient: vertical;
+                        overflow: hidden;
                         font-weight: 600;
                     }
                     .info { 
@@ -190,8 +191,8 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                         justify-content: center;
                     }
                     .barcode-svg { 
-                        width: 100% !important; 
-                        height: 18mm !important; 
+                        max-width: 90%; 
+                        height: 16mm !important; 
                     }
                     .footer-label { 
                         position: absolute; 
@@ -217,7 +218,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     ${logs.map((log, index) => `
                         <div class="label-card">
                             <h1>${log.itemName}</h1>
-                            <h2>${log.supplierName}</h2>
+                            <h2>${log.supplierName || 'FORNECEDOR NÃO INFORMADO'}</h2>
                             <div class="info">
                                 <p><strong>LOTE:</strong> <span>${log.lotNumber}</span></p>
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;">
@@ -243,8 +244,8 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                             try {
                                 JsBarcode("#barcode-${index}", "${log.barcode}", {
                                     format: "CODE128", 
-                                    width: 2, 
-                                    height: 60, 
+                                    width: 1.2, 
+                                    height: 40, 
                                     displayValue: false, 
                                     margin: 0,
                                     background: "transparent"
