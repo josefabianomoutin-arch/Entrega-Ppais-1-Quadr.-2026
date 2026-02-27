@@ -137,7 +137,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     flex-direction: column;
                 }
                 h1 { 
-                    font-size: 11pt; 
+                    font-size: 10pt; 
                     font-weight: 800; 
                     margin: 0 0 1mm 0; 
                     text-transform: uppercase; 
@@ -149,7 +149,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     overflow: hidden;
                 }
                 h2 { 
-                    font-size: 9pt; 
+                    font-size: 8pt; 
                     margin: 0 0 2mm 0; 
                     color: #333; 
                     border-bottom: 1.5px solid #000; 
@@ -161,7 +161,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                 }
                 .info { 
                     text-align: left; 
-                    font-size: 9pt; 
+                    font-size: 8pt; 
                     flex: 1;
                 }
                 .info p { 
@@ -172,7 +172,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     line-height: 1.2;
                 }
                 .info strong { 
-                    font-size: 7.5pt; 
+                    font-size: 6.8pt; 
                     color: #555; 
                     text-transform: uppercase;
                 }
@@ -196,7 +196,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     bottom: 1mm; 
                     left: 0; 
                     right: 0; 
-                    font-size: 6pt; 
+                    font-size: 5.4pt; 
                     color: #666; 
                     text-align: center; 
                     font-weight: bold;
@@ -244,7 +244,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                                 width: 2, 
                                 height: 50, 
                                 displayValue: true, 
-                                fontSize: 12, 
+                                fontSize: 11, 
                                 margin: 0,
                                 background: "transparent"
                             });
