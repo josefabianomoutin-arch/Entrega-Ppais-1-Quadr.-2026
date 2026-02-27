@@ -59,7 +59,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
     const [receiptSupplierCpf, setReceiptSupplierCpf] = useState('');
     const [receiptInvoice, setReceiptInvoice] = useState('');
     const [receiptProcessoSei, setReceiptProcessoSei] = useState('');
-    const [receiptEditableDate, setReceiptEditableDate] = useState(new Date().toISOString().split('T')[0]);
 
     const [isScheduleReportOpen, setIsScheduleReportOpen] = useState(false);
     const [scheduleReportSeiNumber, setScheduleReportSeiNumber] = useState('');
@@ -309,8 +308,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
         });
 
         const totalInvoiceValue = items.reduce((sum, it) => sum + it.totalValue, 0);
-        const invoiceDate = receiptEditableDate; 
-        const receiptDate = receiptEditableDate;
+        const invoiceDate = deliveries.find(d => d.invoiceDate)?.invoiceDate || deliveries[0]?.date || ''; 
+        const receiptDate = invoiceDate; // Data do documento igual a data de recebimento (que é a data da NF)
         const barcode = deliveries.find(d => d.barcode)?.barcode || '';
         const receiptTermNumber = deliveries.find(d => d.receiptTermNumber)?.receiptTermNumber || '';
 
@@ -326,7 +325,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
             receiptTermNumber,
             processoSei: receiptProcessoSei
         };
-    }, [receiptSupplier, receiptInvoice, receiptProcessoSei, receiptEditableDate]);
+    }, [receiptSupplier, receiptInvoice, receiptProcessoSei]);
 
     const handlePrintReceipt = () => {
         if (!receiptData) return;
@@ -702,18 +701,6 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                                         value={receiptProcessoSei} 
                                         onChange={e => setReceiptProcessoSei(e.target.value)} 
                                         placeholder="Nº do Processo SEI"
-                                        className="w-full h-14 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-teal-100 transition-all text-sm" 
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                        4. Data de Recebimento
-                                    </label>
-                                    <input 
-                                        type="date" 
-                                        value={receiptEditableDate} 
-                                        onChange={e => setReceiptEditableDate(e.target.value)} 
                                         className="w-full h-14 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-teal-100 transition-all text-sm" 
                                     />
                                 </div>
