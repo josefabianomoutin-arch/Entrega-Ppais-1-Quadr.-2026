@@ -58,6 +58,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
     const [selectedAgendaDate, setSelectedAgendaDate] = useState(new Date().toISOString().split('T')[0]);
     const [receiptSupplierCpf, setReceiptSupplierCpf] = useState('');
     const [receiptInvoice, setReceiptInvoice] = useState('');
+    const [receiptProcessoSei, setReceiptProcessoSei] = useState('');
+    const [receiptEditableDate, setReceiptEditableDate] = useState(new Date().toISOString().split('T')[0]);
 
     const [isScheduleReportOpen, setIsScheduleReportOpen] = useState(false);
     const [scheduleReportSeiNumber, setScheduleReportSeiNumber] = useState('');
@@ -307,8 +309,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
         });
 
         const totalInvoiceValue = items.reduce((sum, it) => sum + it.totalValue, 0);
-        const invoiceDate = deliveries.find(d => d.invoiceDate)?.invoiceDate || deliveries[0]?.date || ''; 
-        const receiptDate = deliveries[0]?.date || ''; // Usando a data da entrega
+        const invoiceDate = receiptEditableDate; 
+        const receiptDate = receiptEditableDate;
         const barcode = deliveries.find(d => d.barcode)?.barcode || '';
         const receiptTermNumber = deliveries.find(d => d.receiptTermNumber)?.receiptTermNumber || '';
 
@@ -321,9 +323,10 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
             totalInvoiceValue,
             items,
             barcode,
-            receiptTermNumber
+            receiptTermNumber,
+            processoSei: receiptProcessoSei
         };
-    }, [receiptSupplier, receiptInvoice]);
+    }, [receiptSupplier, receiptInvoice, receiptProcessoSei, receiptEditableDate]);
 
     const handlePrintReceipt = () => {
         if (!receiptData) return;
@@ -414,6 +417,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                     <div class="info-section">
                         <div class="info-row"><span class="info-label">FORNECEDOR:</span> <span class="info-value">${receiptData.supplierName.toUpperCase()}</span></div>
                         <div class="info-row"><span class="info-label">C.N.P.J.:</span> <span class="info-value">${receiptData.supplierCpf}</span></div>
+                        <div class="info-row"><span class="info-label">PROCESSO SEI:</span> <span class="info-value">${receiptData.processoSei || 'N/A'}</span></div>
                         <div class="info-row"><span class="info-label">NOTA FISCAL Nº:</span> <span class="info-value">${receiptData.invoiceNumber}</span></div>
                         <div class="info-row"><span class="info-label">NOTA DE EMPENHO:</span> <span class="info-value">${receiptData.receiptTermNumber || 'N/A'}</span></div>
                         <div class="info-row"><span class="info-label">VALOR TOTAL NOTA FISCAL:</span> <span class="info-value">${formatCurrency(receiptData.totalInvoiceValue)}</span></div>
@@ -688,6 +692,31 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                                         {supplierInvoices.map(nf => <option key={nf} value={nf}>NF {nf}</option>)}
                                     </select>
                                 </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                        3. Processo SEI
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        value={receiptProcessoSei} 
+                                        onChange={e => setReceiptProcessoSei(e.target.value)} 
+                                        placeholder="Nº do Processo SEI"
+                                        className="w-full h-14 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-teal-100 transition-all text-sm" 
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                        4. Data de Recebimento
+                                    </label>
+                                    <input 
+                                        type="date" 
+                                        value={receiptEditableDate} 
+                                        onChange={e => setReceiptEditableDate(e.target.value)} 
+                                        className="w-full h-14 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-teal-100 transition-all text-sm" 
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -701,6 +730,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                                     <div className="space-y-2 uppercase text-sm">
                                         <p><span className="font-bold inline-block w-48">FORNECEDOR:</span> {receiptData.supplierName || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">C.N.P.J.:</span> {receiptData.supplierCpf || 'N/A'}</p>
+                                        <p><span className="font-bold inline-block w-48">PROCESSO SEI:</span> {receiptData.processoSei || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">NOTA FISCAL Nº:</span> {receiptData.invoiceNumber || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">NOTA DE EMPENHO:</span> {receiptData.receiptTermNumber || 'N/A'}</p>
                                         <p><span className="font-bold inline-block w-48">DATA NOTA FISCAL:</span> {(receiptData.invoiceDate || '').split('-').reverse().join('/') || 'N/A'}</p>
