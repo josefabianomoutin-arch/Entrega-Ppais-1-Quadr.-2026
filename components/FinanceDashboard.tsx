@@ -148,6 +148,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout, 
                     suppliers={suppliers} 
                     onLogout={onLogout} 
                     embedded={true}
+                    showPdfOnly={isFinanceAdmin}
                 />
             </div>
         )}

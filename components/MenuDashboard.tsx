@@ -9,12 +9,13 @@ interface MenuDashboardProps {
   suppliers: Supplier[];
   onLogout: () => void;
   embedded?: boolean;
+  showPdfOnly?: boolean;
 }
 
 const WEEK_DAYS_BR = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
 const MEAL_PERIODS = ['CAFÉ DA MANHÃ', 'ALMOÇO', 'JANTA', 'LANCHE NOITE'];
 
-const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus, suppliers, onLogout, embedded }) => {
+const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus, suppliers, onLogout, embedded, showPdfOnly }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
@@ -228,6 +229,98 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
     printWindow.document.close();
   };
 
+  const handleGenerateDailyPdf = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=1000');
+    if (!printWindow) return;
+
+    const dateFormatted = new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    
+    const menuHtml = MEAL_PERIODS.map(period => {
+      const items = groupedMenu[period] || [];
+      return `
+        <div class="period-section">
+          <div class="period-header">${period}</div>
+          <table class="menu-table">
+            <thead>
+              <tr>
+                <th>PREPARAÇÃO / ITEM</th>
+                <th>DETALHES</th>
+                <th>LOTE</th>
+                <th>NF</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.length > 0 ? items.map(row => {
+                const { lot, invoice } = findLotInfo(row.contractedItem || '');
+                return `
+                  <tr>
+                    <td><strong>${row.foodItem || row.contractedItem || 'N/A'}</strong></td>
+                    <td>${row.preparationDetails || '-'}</td>
+                    <td class="text-center">${lot}</td>
+                    <td class="text-center">${invoice}</td>
+                  </tr>
+                `;
+              }).join('') : '<tr><td colspan="4" class="text-center italic">Nenhum item cadastrado</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }).join('');
+
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Cardápio Institucional - ${dateFormatted}</title>
+          <style>
+            @page { size: A4; margin: 15mm; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.4; margin: 0; padding: 0; }
+            .header { text-align: center; border-bottom: 3px solid #1e1b4b; padding-bottom: 10px; margin-bottom: 20px; }
+            .header h1 { margin: 0; color: #1e1b4b; text-transform: uppercase; font-size: 22pt; letter-spacing: -1px; }
+            .header p { margin: 5px 0 0; font-weight: bold; color: #666; text-transform: uppercase; font-size: 10pt; }
+            .date-info { text-align: center; margin-bottom: 30px; background: #f8fafc; padding: 10px; border-radius: 10px; border: 1px solid #e2e8f0; }
+            .date-info h2 { margin: 0; color: #4338ca; text-transform: capitalize; font-size: 16pt; }
+            .period-section { margin-bottom: 25px; page-break-inside: avoid; }
+            .period-header { background: #1e1b4b; color: white; padding: 8px 15px; font-weight: bold; border-radius: 6px 6px 0 0; text-transform: uppercase; font-size: 12pt; }
+            .menu-table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; }
+            .menu-table th { background: #f1f5f9; text-align: left; padding: 10px; font-size: 9pt; text-transform: uppercase; border: 1px solid #e2e8f0; }
+            .menu-table td { padding: 10px; border: 1px solid #e2e8f0; font-size: 10pt; vertical-align: top; }
+            .text-center { text-align: center; }
+            .italic { font-style: italic; color: #999; }
+            .footer { margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 8pt; color: #94a3b8; text-align: center; text-transform: uppercase; }
+            .signature-area { margin-top: 50px; display: flex; justify-content: space-around; }
+            .signature-box { border-top: 1px solid #333; width: 200px; text-align: center; padding-top: 5px; font-size: 9pt; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Cardápio Institucional</h1>
+            <p>Penitenciária de Taiúva - Gestão de Alimentação</p>
+          </div>
+          <div class="date-info">
+            <h2>${dateFormatted}</h2>
+          </div>
+          ${menuHtml}
+          <div class="signature-area">
+            <div class="signature-box">Responsável pela Nutrição</div>
+            <div class="signature-box">Diretoria de Centro</div>
+          </div>
+          <div class="footer">
+            Sistema de Gestão Institucional - Gerado em ${new Date().toLocaleString('pt-BR')}
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   const changeDate = (days: number) => {
     const date = new Date(selectedDate + 'T12:00:00');
     date.setDate(date.getDate() + days);
@@ -296,21 +389,34 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
               className="px-6 py-4 bg-slate-50 border-2 border-indigo-50 rounded-2xl font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
             />
             <div className="flex gap-2">
-              <button 
-                onClick={toggleAllSelection}
-                className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black rounded-2xl transition-all active:scale-95 uppercase text-[10px] tracking-widest"
-              >
-                {selectedRows.size === currentMenu.filter(r => r.foodItem || r.contractedItem).length ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-                {selectedRows.size === currentMenu.filter(r => r.foodItem || r.contractedItem).length ? 'Desmarcar Todos' : 'Marcar Todos'}
-              </button>
-              <button 
-                onClick={handlePrintSelected}
-                disabled={selectedRows.size === 0}
-                className="flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-lg shadow-indigo-200 transition-all active:scale-95 uppercase text-xs tracking-widest disabled:bg-slate-300 disabled:shadow-none"
-              >
-                <Printer className="h-5 w-5" />
-                Imprimir Selecionadas ({selectedRows.size})
-              </button>
+              {!showPdfOnly && (
+                <button 
+                  onClick={toggleAllSelection}
+                  className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black rounded-2xl transition-all active:scale-95 uppercase text-[10px] tracking-widest"
+                >
+                  {selectedRows.size === currentMenu.filter(r => r.foodItem || r.contractedItem).length ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                  {selectedRows.size === currentMenu.filter(r => r.foodItem || r.contractedItem).length ? 'Desmarcar Todos' : 'Marcar Todos'}
+                </button>
+              )}
+              
+              {showPdfOnly ? (
+                <button 
+                  onClick={handleGenerateDailyPdf}
+                  className="flex items-center justify-center gap-3 px-10 py-4 bg-slate-800 hover:bg-slate-900 text-white font-black rounded-2xl shadow-lg shadow-slate-200 transition-all active:scale-95 uppercase text-xs tracking-widest"
+                >
+                  <Printer className="h-5 w-5" />
+                  Gerar PDF do Dia
+                </button>
+              ) : (
+                <button 
+                  onClick={handlePrintSelected}
+                  disabled={selectedRows.size === 0}
+                  className="flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-lg shadow-indigo-200 transition-all active:scale-95 uppercase text-xs tracking-widest disabled:bg-slate-300 disabled:shadow-none"
+                >
+                  <Printer className="h-5 w-5" />
+                  Imprimir Selecionadas ({selectedRows.size})
+                </button>
+              )}
             </div>
           </div>
         </div>
