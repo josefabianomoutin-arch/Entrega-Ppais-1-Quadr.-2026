@@ -12,7 +12,7 @@ interface InvoiceInfo {
     barcode?: string;
     date: string; // The earliest date associated with this invoice
     totalValue: number;
-    items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[];
+    items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string; exitedQuantity?: number }[];
 }
 
 interface AdminInvoicesProps {
@@ -471,6 +471,21 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
     const [receiptTermNumber, setReceiptTermNumber] = useState('');
     const [items, setItems] = useState<{ id: string; name: string; kg: string; lot: string; exp: string }[]>([{ id: 'init-1', name: '', kg: '', lot: '', exp: '' }]);
 
+    React.useEffect(() => {
+        const cleanBarcode = barcode.replace(/\D/g, '');
+        if (cleanBarcode.length === 44) {
+            const nfNumber = cleanBarcode.substring(25, 34);
+            setNf(parseInt(nfNumber, 10).toString());
+            
+            const yy = cleanBarcode.substring(2, 4);
+            const mm = cleanBarcode.substring(4, 6);
+            const year = parseInt(yy, 10) + 2000;
+            const month = mm.padStart(2, '0');
+            // We can't know the exact day from the barcode, so we set it to the 1st of the month
+            setInvoiceDate(`${year}-${month}-01`);
+        }
+    }, [barcode]);
+
     const selectedSupplier = useMemo(() => suppliers.find(s => s.cpf === selectedCpf), [suppliers, selectedCpf]);
     const availableContractItems = useMemo(() => selectedSupplier ? (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)) : [], [selectedSupplier]);
 
@@ -525,7 +540,7 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase">Chave de Acesso (Código de Barras)</label>
-                            <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="44 dígitos" className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-teal-400 font-mono" />
+                            <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }} placeholder="44 dígitos" className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-teal-400 font-mono" />
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase">Número da Nota de Empenho</label>
@@ -596,6 +611,20 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
     const [date, setDate] = useState(invoice.date);
     const [invoiceDate, setInvoiceDate] = useState(invoice.invoiceDate || invoice.date); // NOVO
 
+    React.useEffect(() => {
+        const cleanBarcode = barcode.replace(/\D/g, '');
+        if (cleanBarcode.length === 44 && !invoiceNumber) {
+            const nfNumber = cleanBarcode.substring(25, 34);
+            setInvoiceNumber(parseInt(nfNumber, 10).toString());
+            
+            const yy = cleanBarcode.substring(2, 4);
+            const mm = cleanBarcode.substring(4, 6);
+            const year = parseInt(yy, 10) + 2000;
+            const month = mm.padStart(2, '0');
+            setInvoiceDate(`${year}-${month}-01`);
+        }
+    }, [barcode, invoiceNumber]);
+
     const availableContractItems = useMemo(() => (supplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)), [supplier.contractItems]);
     const handleItemChange = (id: string, field: 'name' | 'kg' | 'lot' | 'exp', value: string) => { setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it)); };
     const totalValue = useMemo(() => items.reduce((sum, it) => {
@@ -637,7 +666,7 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
                         </div>
                         <div className="bg-gray-50 p-3 rounded-xl border space-y-1">
                             <label className="text-[9px] font-black text-gray-400 uppercase">Chave de Acesso</label>
-                            <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="44 dígitos" className="w-full p-2 border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-teal-400" />
+                            <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }} placeholder="44 dígitos" className="w-full p-2 border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-teal-400" />
                         </div>
                         <div className="bg-gray-50 p-3 rounded-xl border space-y-1">
                             <label className="text-[9px] font-black text-gray-400 uppercase">Nota de Empenho</label>
@@ -696,7 +725,7 @@ interface ExitInvoiceModalProps {
 }
 
 const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, onClose, onSave, isSaving }) => {
-    const [items, setItems] = useState(invoice.items.map((it, idx) => ({ id: `exit-${idx}`, name: it.name, kg: '0,00', maxKg: it.kg, lot: it.lotNumber, exp: it.expirationDate })));
+    const [items, setItems] = useState(invoice.items.filter(it => (it.kg - (it.exitedQuantity || 0)) > 0).map((it, idx) => ({ id: `exit-${idx}`, name: it.name, kg: '0,00', maxKg: it.kg - (it.exitedQuantity || 0), lot: it.lotNumber, exp: it.expirationDate })));
     const [outboundNf, setOutboundNf] = useState('');
     const [exitDate, setExitDate] = useState(new Date().toISOString().split('T')[0]);
 
