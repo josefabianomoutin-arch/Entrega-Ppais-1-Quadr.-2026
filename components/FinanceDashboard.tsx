@@ -1,10 +1,15 @@
 
 import React, { useMemo, useState } from 'react';
-import type { FinancialRecord } from '../types';
+import type { FinancialRecord, StandardMenu, DailyMenus, Supplier } from '../types';
+import MenuDashboard from './MenuDashboard';
 
 interface FinanceDashboardProps {
   records: FinancialRecord[];
   onLogout: () => void;
+  user?: { name: string; cpf: string; role: string };
+  standardMenu?: StandardMenu;
+  dailyMenus?: DailyMenus;
+  suppliers?: Supplier[];
 }
 
 const PTRES_OPTIONS = ['380302', '380303', '380304', '380308', '380328'] as const;
@@ -21,11 +26,15 @@ const PTRES_DESCRIPTIONS: Record<string, string> = {
 const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
-type SubTab = 'recursos' | 'pagamentos' | 'saldos';
+type SubTab = 'recursos' | 'pagamentos' | 'saldos' | 'cardapio';
 
-const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }) => {
+const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout, user, standardMenu, dailyMenus, suppliers }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('pagamentos');
+
+  const isDouglas = useMemo(() => {
+    return user?.name.toUpperCase().includes('DOUGLAS');
+  }, [user]);
 
   const totalsGlobal = useMemo(() => {
       return records.reduce((acc, curr) => ({
@@ -107,12 +116,32 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ records, onLogout }
             >
                 Saldos PTRES / Natureza
             </button>
+            {isDouglas && (
+                <button 
+                    onClick={() => setActiveSubTab('cardapio')}
+                    className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'cardapio' ? 'bg-amber-400 text-indigo-900 shadow-lg' : 'hover:bg-indigo-800 text-amber-200'}`}
+                >
+                    🍴 Cardápio Institucional
+                </button>
+            )}
         </div>
       </div>
 
       <main className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-12 animate-fade-in">
         
-        {activeSubTab !== 'saldos' && (
+        {activeSubTab === 'cardapio' && standardMenu && dailyMenus && suppliers && (
+            <div className="animate-fade-in-up">
+                <MenuDashboard 
+                    standardMenu={standardMenu} 
+                    dailyMenus={dailyMenus} 
+                    suppliers={suppliers} 
+                    onLogout={onLogout} 
+                    embedded={true}
+                />
+            </div>
+        )}
+
+        {activeSubTab !== 'saldos' && activeSubTab !== 'cardapio' && (
             <div className="flex justify-center">
                 <div className="w-full max-w-2xl relative">
                     <span className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-400">

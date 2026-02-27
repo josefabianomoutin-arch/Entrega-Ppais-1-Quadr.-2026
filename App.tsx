@@ -692,7 +692,14 @@ const App: React.FC = () => {
   }
 
   if (user.role === 'financeiro') {
-    return <FinanceDashboard records={financialRecords} onLogout={handleLogout} />;
+    return <FinanceDashboard 
+             records={financialRecords} 
+             onLogout={handleLogout} 
+             user={user}
+             standardMenu={standardMenu}
+             dailyMenus={dailyMenus}
+             suppliers={suppliers}
+           />;
   }
 
   if (user.role === 'cardapio') {

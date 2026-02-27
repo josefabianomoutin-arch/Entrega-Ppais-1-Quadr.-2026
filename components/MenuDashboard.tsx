@@ -8,12 +8,13 @@ interface MenuDashboardProps {
   dailyMenus: DailyMenus;
   suppliers: Supplier[];
   onLogout: () => void;
+  embedded?: boolean;
 }
 
 const WEEK_DAYS_BR = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
 const MEAL_PERIODS = ['CAFÉ DA MANHÃ', 'ALMOÇO', 'JANTA', 'LANCHE NOITE'];
 
-const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus, suppliers, onLogout }) => {
+const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus, suppliers, onLogout, embedded }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
@@ -235,27 +236,29 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className={`${embedded ? '' : 'min-h-screen'} bg-slate-50 flex flex-col`}>
       {/* Header */}
-      <header className="bg-indigo-900 text-white p-6 shadow-xl flex justify-between items-center sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-          <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md">
-            <Utensils className="h-8 w-8 text-amber-400" />
+      {!embedded && (
+        <header className="bg-indigo-900 text-white p-6 shadow-xl flex justify-between items-center sticky top-0 z-50">
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md">
+              <Utensils className="h-8 w-8 text-amber-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black uppercase tracking-tighter italic">Painel Cardápio</h1>
+              <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Gestão de Amostras e Alinhamento</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-black uppercase tracking-tighter italic">Painel Cardápio</h1>
-            <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Gestão de Amostras e Alinhamento</p>
-          </div>
-        </div>
-        <button 
-          onClick={onLogout}
-          className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white px-6 py-3 rounded-2xl font-black text-xs uppercase transition-all border border-red-500/20"
-        >
-          Sair
-        </button>
-      </header>
+          <button 
+            onClick={onLogout}
+            className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white px-6 py-3 rounded-2xl font-black text-xs uppercase transition-all border border-red-500/20"
+          >
+            Sair
+          </button>
+        </header>
+      )}
 
-      <main className="flex-1 p-4 md:p-8 max-w-6xl mx-auto w-full space-y-8">
+      <main className={`flex-1 p-4 md:p-8 ${embedded ? 'max-w-full' : 'max-w-6xl'} mx-auto w-full space-y-8`}>
         {/* Date Selector */}
         <div className="bg-white p-6 rounded-[2.5rem] shadow-2xl border border-indigo-50 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4">
@@ -382,9 +385,11 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
         </div>
       </main>
 
-      <footer className="p-8 text-center text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">
-        Sistema de Gestão Institucional &copy; 2026 - Penitenciária de Taiúva
-      </footer>
+      {!embedded && (
+        <footer className="p-8 text-center text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">
+          Sistema de Gestão Institucional &copy; 2026 - Penitenciária de Taiúva
+        </footer>
+      )}
     </div>
   );
 };
