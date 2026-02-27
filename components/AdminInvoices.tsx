@@ -226,7 +226,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
             inv.supplierCpf === invoice.supplierCpf && 
             inv.id !== invoice.id &&
             new Date(inv.date) < new Date(invoice.date) &&
-            inv.items.some(item => item.kg > 0)
+            inv.items.some(item => (item.kg - (item.exitedQuantity || 0)) > 0)
         );
 
         if (olderInvoices.length > 0) {
