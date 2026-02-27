@@ -81,56 +81,163 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
               <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
               <style>
                   @page { 
-                      size: A4; 
+                      size: 100mm 50mm; 
                       margin: 0; 
                   }
                   @media print {
-                      header, footer { display: none !important; }
+                      header, footer, .no-print { display: none !important; }
+                      body { margin: 0; padding: 0; width: 100mm; height: 50mm; }
+                      .label-card { border: none !important; box-shadow: none !important; page-break-after: always; }
                   }
                   body { 
-                      font-family: Arial, sans-serif; 
-                      margin: 10mm; 
+                      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                      margin: 0; 
                       padding: 0; 
-                      background: white; 
+                      background: #f0f0f0; 
                   }
-                  .page-container { width: 190mm; margin: 0 auto; background: white; display: flex; justify-content: center; padding-top: 10mm; }
-                  .label-card {
-                      width: 90mm; height: 60mm; border: 1px solid #000; padding: 5mm;
-                      box-sizing: border-box; display: inline-block; vertical-align: top;
-                      text-align: center; position: relative; overflow: hidden; border-radius: 4mm;
+                  .no-print {
+                      background: #1e1b4b;
+                      color: white;
+                      padding: 10px 20px;
+                      text-align: center;
+                      position: sticky;
+                      top: 0;
+                      z-index: 100;
+                      display: flex;
+                      justify-content: center;
+                      gap: 10px;
+                      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
                   }
-                  h1 { font-size: 14pt; font-weight: bold; margin: 0 0 2mm 0; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                  h2 { font-size: 10pt; margin: 0 0 3mm 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                  .info { text-align: left; font-size: 9pt; }
-                  .info p { margin: 1mm 0; display: flex; justify-content: space-between; border-bottom: 0.5px dashed #ddd; }
-                  .info strong { font-size: 7pt; color: #666; }
-                  .barcode-container { margin-top: 3mm; display: flex; flex-direction: column; align-items: center; }
-                  .barcode-svg { max-width: 100%; height: 15mm !important; }
-                  .footer { position: absolute; bottom: 2mm; left: 0; right: 0; font-size: 6pt; color: #999; }
+                  .no-print button {
+                      background: #fbbf24;
+                      color: #1e1b4b;
+                      border: none;
+                      padding: 8px 16px;
+                      border-radius: 6px;
+                      font-weight: bold;
+                      cursor: pointer;
+                      text-transform: uppercase;
+                      font-size: 12px;
+                  }
+                  .page-container { 
+                      display: flex; 
+                      flex-direction: column; 
+                      align-items: center; 
+                      padding: 20px;
+                      gap: 20px;
+                  }
                   @media print {
+                      .page-container { padding: 0; gap: 0; display: block; }
                       body { background: white; }
-                      .page-container { width: 100%; margin: 0; display: block; }
-                      .label-card { border: 1px solid #000; margin: 0 auto; page-break-inside: avoid; }
+                  }
+                  .label-card {
+                      width: 100mm; 
+                      height: 50mm; 
+                      padding: 5mm;
+                      box-sizing: border-box; 
+                      background: white;
+                      border: 1px solid #ddd;
+                      border-radius: 4px;
+                      position: relative; 
+                      overflow: hidden;
+                      display: flex;
+                      flex-direction: column;
+                  }
+                  h1 { 
+                      font-size: 10pt; 
+                      font-weight: 800; 
+                      margin: 0 0 1mm 0; 
+                      text-transform: uppercase; 
+                      line-height: 1.1;
+                      color: #000;
+                      display: -webkit-box;
+                      -webkit-line-clamp: 2;
+                      -webkit-box-orient: vertical;
+                      overflow: hidden;
+                  }
+                  h2 { 
+                      font-size: 8pt; 
+                      margin: 0 0 2mm 0; 
+                      color: #333; 
+                      border-bottom: 1.5px solid #000; 
+                      padding-bottom: 1mm; 
+                      white-space: nowrap; 
+                      overflow: hidden; 
+                      text-overflow: ellipsis;
+                      font-weight: 600;
+                  }
+                  .info { 
+                      text-align: left; 
+                      font-size: 8pt; 
+                      flex: 1;
+                  }
+                  .info p { 
+                      margin: 0.5mm 0; 
+                      display: flex; 
+                      justify-content: space-between; 
+                      border-bottom: 0.5px dashed #ccc; 
+                      line-height: 1.1;
+                  }
+                  .info strong { 
+                      font-size: 6.8pt; 
+                      color: #555; 
+                      text-transform: uppercase;
+                  }
+                  .info span {
+                      font-weight: 700;
+                      color: #000;
+                  }
+                  .barcode-container { 
+                      margin-top: 1mm; 
+                      display: flex; 
+                      flex-direction: column; 
+                      align-items: center; 
+                      justify-content: center;
+                  }
+                  .barcode-svg { 
+                      width: 100% !important; 
+                      height: 18mm !important; 
+                  }
+                  .footer-label { 
+                      position: absolute; 
+                      bottom: 1mm; 
+                      left: 0; 
+                      right: 0; 
+                      font-size: 5.4pt; 
+                      color: #666; 
+                      text-align: center; 
+                      font-weight: bold;
                   }
               </style>
           </head>
           <body>
+              <div class="no-print">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                      <span style="font-weight: bold; font-size: 14px;">Configuração de Impressão (100x50mm)</span>
+                      <button onclick="window.print()">Imprimir Etiquetas</button>
+                      <button onclick="window.close()" style="background: #ef4444; color: white;">Fechar</button>
+                  </div>
+              </div>
               <div class="page-container">
                   <div class="label-card">
                       <h1>${lot.itemName}</h1>
                       <h2>${lot.supplierName}</h2>
                       <div class="info">
                           <p><strong>LOTE:</strong> <span>${lot.lotNumber}</span></p>
-                          <p><strong>VAL:</strong> <span>${lot.expirationDate ? lot.expirationDate.split('-').reverse().join('/') : 'N/A'}</span></p>
-                          <p><strong>ENT:</strong> <span>${lot.date ? lot.date.split('-').reverse().join('/') : 'N/A'}</span></p>
-                          <p><strong>QTD:</strong> <span>${lot.quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</span></p>
-                          <p><strong>NF:</strong> <span>${lot.invoiceNumber}</span></p>
+                          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;">
+                              <p><strong>VAL:</strong> <span>${lot.expirationDate ? lot.expirationDate.split('-').reverse().join('/') : 'N/A'}</span></p>
+                              <p><strong>ENT:</strong> <span>${lot.date ? lot.date.split('-').reverse().join('/') : 'N/A'}</span></p>
+                          </div>
+                          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;">
+                              <p><strong>QTD:</strong> <span>${lot.quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</span></p>
+                              <p><strong>NF:</strong> <span>${lot.invoiceNumber}</span></p>
+                          </div>
                           ${lot.receiptTermNumber ? `<p><strong>TERMO:</strong> <span>${lot.receiptTermNumber}</span></p>` : ''}
                       </div>
                       <div class="barcode-container">
-                          ${lot.barcode ? `<svg id="barcode" class="barcode-svg"></svg>` : '<p style="font-size: 8pt; color: #ccc; margin-top: 5mm;">SEM CÓDIGO</p>'}
+                          ${lot.barcode ? `<svg id="barcode" class="barcode-svg"></svg>` : '<p style="font-size: 7pt; color: #999; margin: 0;">SEM CÓDIGO DE BARRAS</p>'}
                       </div>
-                      <div class="footer">${new Date().toLocaleString('pt-BR')}</div>
+                      <div class="footer-label">GERADO EM ${new Date().toLocaleString('pt-BR')}</div>
                   </div>
               </div>
               <script>
@@ -138,11 +245,16 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
                       ${lot.barcode ? `
                           try {
                               JsBarcode("#barcode", "${lot.barcode}", {
-                                  format: "CODE128", width: 2, height: 40, displayValue: true, fontSize: 10, margin: 0
+                                  format: "CODE128", 
+                                  width: 2, 
+                                  height: 60, 
+                                  displayValue: false, 
+                                  margin: 0,
+                                  background: "transparent"
                               });
                           } catch (e) { console.error(e); }
                       ` : ''}
-                      setTimeout(() => { window.print(); window.close(); }, 1000);
+                      setTimeout(() => { window.print(); }, 1000);
                   }
               </script>
           </body>
