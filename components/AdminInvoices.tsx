@@ -74,7 +74,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
             <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
             <style>
                 @page { 
-                    size: 100mm 63mm; 
+                    size: 100mm 63mm landscape; 
                     margin: 0; 
                 }
                 @media print {
