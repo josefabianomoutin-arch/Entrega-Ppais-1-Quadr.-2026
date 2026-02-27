@@ -165,11 +165,11 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     flex: 1;
                 }
                 .info p { 
-                    margin: 1mm 0; 
+                    margin: 0.5mm 0; 
                     display: flex; 
                     justify-content: space-between; 
                     border-bottom: 0.5px dashed #ccc; 
-                    line-height: 1.2;
+                    line-height: 1.1;
                 }
                 .info strong { 
                     font-size: 6.8pt; 
@@ -181,7 +181,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     color: #000;
                 }
                 .barcode-container { 
-                    margin-top: 2mm; 
+                    margin-top: 1mm; 
                     display: flex; 
                     flex-direction: column; 
                     align-items: center; 
@@ -189,7 +189,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                 }
                 .barcode-svg { 
                     width: 100% !important; 
-                    height: 14mm !important; 
+                    height: 18mm !important; 
                 }
                 .footer-label { 
                     position: absolute; 
@@ -242,9 +242,8 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                             JsBarcode("#barcode-${index}", "${label.barcode}", {
                                 format: "CODE128", 
                                 width: 2, 
-                                height: 50, 
-                                displayValue: true, 
-                                fontSize: 11, 
+                                height: 60, 
+                                displayValue: false, 
                                 margin: 0,
                                 background: "transparent"
                             });
