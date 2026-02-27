@@ -1,7 +1,7 @@
 
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Supplier, PerCapitaConfig, WarehouseMovement, AcquisitionItem } from '../types';
+import type { Supplier, PerCapitaConfig, WarehouseMovement } from '../types';
 import { resolutionData } from './resolutionData';
 import AdminContractItems from './AdminContractItems';
 
@@ -11,9 +11,6 @@ interface AdminPerCapitaProps {
   perCapitaConfig: PerCapitaConfig;
   onUpdatePerCapitaConfig: (config: PerCapitaConfig) => void;
   onUpdateContractForItem: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string, comprasCode?: string, becCode?: string }[]) => Promise<{ success: boolean, message: string }>;
-  onUpdateAcquisitionItem: (item: AcquisitionItem) => Promise<void>;
-  onDeleteAcquisitionItem: (id: string) => Promise<void>;
-  acquisitionItems: AcquisitionItem[];
 }
 
 const formatCurrency = (value: number) => {
@@ -94,7 +91,7 @@ const isHortifrutiOrPerishable = (itemName: string): boolean => {
     return allKeywords.some(keyword => lowerItemName.includes(keyword));
 };
 
-const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog, perCapitaConfig, onUpdatePerCapitaConfig, onUpdateContractForItem, onUpdateAcquisitionItem, onDeleteAcquisitionItem, acquisitionItems = [] }) => {
+const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog, perCapitaConfig, onUpdatePerCapitaConfig, onUpdateContractForItem }) => {
     const [activeSubTab, setActiveSubTab] = useState<'CALCULO' | 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO'>('CALCULO');
     const [staffCount, setStaffCount] = useState<number>(0);
     const [inmateCount, setInmateCount] = useState<number>(0);
@@ -433,21 +430,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
             )}
 
                 </>
-            ) : ['KIT PPL', 'PPAIS', 'ESTOCÁVEIS', 'PERECÍVEIS', 'AUTOMAÇÃO'].includes(activeSubTab) ? (
-                <div className="animate-fade-in">
-                    <div className="text-center mb-8">
-                        <h2 className="text-2xl font-black text-indigo-900 uppercase tracking-tighter">
-                            {activeSubTab === 'KIT PPL' ? 'KIT PPL - HIGIÊNE E VESTUÁRIO' : activeSubTab}
-                        </h2>
-                        <p className="text-gray-400 font-medium">Gestão simplificada de aquisição e estoque.</p>
-                    </div>
-                    <AdminAcquisitionItems 
-                        items={acquisitionItems}
-                        category={activeSubTab as any}
-                        onUpdate={onUpdateAcquisitionItem}
-                        onDelete={onDeleteAcquisitionItem}
-                    />
-                </div>
             ) : (
                 <div className="animate-fade-in">
                     <div className="text-center mb-8">
@@ -456,7 +438,11 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                         </h2>
                         <p className="text-gray-400 font-medium">Levantamento de informações iniciais para gestão de itens.</p>
                     </div>
-                    {/* Fallback if any other tab is added */}
+                    <AdminContractItems 
+                        suppliers={suppliers} 
+                        warehouseLog={warehouseLog}
+                        onUpdateContractForItem={onUpdateContractForItem}
+                    />
                 </div>
             )}
 

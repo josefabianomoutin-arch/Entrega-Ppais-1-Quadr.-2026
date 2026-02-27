@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Supplier, Delivery, ContractItem } from '../types';
+import type { Supplier, Delivery, ContractItem, WarehouseMovement } from '../types';
 
 interface InvoiceInfo {
     id: string;
@@ -147,7 +147,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
     printWindow.document.close();
 };
 
-const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, onReopenInvoice, onDeleteInvoice, onUpdateInvoiceItems, onManualInvoiceEntry, mode = 'admin', onRegisterExit }) => {
+const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, onReopenInvoice, onDeleteInvoice, onUpdateInvoiceItems, onManualInvoiceEntry, mode = 'admin', onRegisterExit }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortKey, setSortKey] = useState<'supplierName' | 'date' | 'totalValue'>('date');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
