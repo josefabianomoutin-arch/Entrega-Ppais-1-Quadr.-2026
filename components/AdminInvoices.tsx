@@ -74,12 +74,12 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
             <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
             <style>
                 @page { 
-                    size: 100mm 63mm; 
+                    size: 100mm 50mm; 
                     margin: 0; 
                 }
                 @media print {
                     header, footer, .no-print { display: none !important; }
-                    body { margin: 0; padding: 0; width: 100mm; height: 63mm; }
+                    body { margin: 0; padding: 0; width: 100mm; height: 50mm; }
                     .label-card { border: none !important; box-shadow: none !important; page-break-after: always; }
                 }
                 body { 
@@ -125,7 +125,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                 }
                 .label-card {
                     width: 100mm; 
-                    height: 63mm; 
+                    height: 50mm; 
                     padding: 5mm;
                     box-sizing: border-box; 
                     background: white;
@@ -206,7 +206,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
         <body>
             <div class="no-print">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-weight: bold; font-size: 14px;">Configuração de Impressão (100x63mm)</span>
+                    <span style="font-weight: bold; font-size: 14px;">Configuração de Impressão (100x50mm)</span>
                     <button onclick="window.print()">Imprimir Etiquetas</button>
                     <button onclick="window.close()" style="background: #ef4444; color: white;">Fechar</button>
                 </div>
