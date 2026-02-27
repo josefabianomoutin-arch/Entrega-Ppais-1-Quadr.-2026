@@ -66,13 +66,14 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
     const [selectedScheduleSuppliers, setSelectedScheduleSuppliers] = useState<string[]>([]);
 
     const dailyDeliveries = useMemo(() => {
-        const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'FATURADO' | 'TERCEIRO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO' }[] = [];
+        const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'CONCLUÍDO' | 'TERCEIRO' | 'CANCELADO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO' }[] = [];
         
         suppliers.forEach(s => {
             (s.deliveries || []).forEach(d => {
                 if (d.date === selectedAgendaDate) {
                     const isFaturado = d.item !== 'AGENDAMENTO PENDENTE';
-                    const existing = list.find(l => l.supplierName === s.name && l.time === d.time && l.status === (isFaturado ? 'FATURADO' : 'AGENDADO'));
+                    const status = isFaturado ? 'CONCLUÍDO' : 'AGENDADO';
+                    const existing = list.find(l => l.supplierName === s.name && l.time === d.time && l.status === status);
                     if (!existing) {
                         list.push({
                             id: d.id,
@@ -80,7 +81,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                             supplierCpf: s.cpf,
                             time: d.time,
                             arrivalTime: d.arrivalTime,
-                            status: isFaturado ? 'FATURADO' : 'AGENDADO',
+                            status: status,
                             type: 'FORNECEDOR'
                         });
                     }
@@ -90,13 +91,18 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
 
         (thirdPartyEntries || []).forEach(log => {
             if (log.date === selectedAgendaDate) {
+                let status: 'AGENDADO' | 'CONCLUÍDO' | 'TERCEIRO' | 'CANCELADO' = 'TERCEIRO';
+                if (log.status === 'concluido') status = 'CONCLUÍDO';
+                else if (log.status === 'cancelado') status = 'CANCELADO';
+                else if (log.status === 'agendado') status = 'AGENDADO';
+
                 list.push({
                     id: log.id,
                     supplierName: log.companyName,
                     supplierCpf: log.companyCnpj,
                     time: log.time || '00:00',
                     arrivalTime: log.arrivalTime,
-                    status: 'TERCEIRO',
+                    status: status,
                     type: 'TERCEIRO'
                 });
             }
@@ -106,7 +112,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
     }, [suppliers, thirdPartyEntries, selectedAgendaDate]);
 
     const weeklyDeliveries = useMemo(() => {
-        const list: { date: string; supplierName: string; time: string; status: 'AGENDADO' | 'FATURADO' | 'TERCEIRO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO'; itemName?: string }[] = [];
+        const list: { date: string; supplierName: string; time: string; status: 'AGENDADO' | 'CONCLUÍDO' | 'TERCEIRO' | 'CANCELADO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO'; itemName?: string }[] = [];
         
         const current = new Date(selectedAgendaDate + 'T12:00:00');
         const day = current.getDay();
@@ -129,7 +135,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                         date: d.date,
                         supplierName: s.name,
                         time: d.time,
-                        status: isFaturado ? 'FATURADO' : 'AGENDADO',
+                        status: isFaturado ? 'CONCLUÍDO' : 'AGENDADO',
                         type: 'FORNECEDOR',
                         itemName: d.item
                     });
@@ -139,12 +145,17 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
 
         (thirdPartyEntries || []).forEach(log => {
             if (weekDates.includes(log.date)) {
+                let status: 'AGENDADO' | 'CONCLUÍDO' | 'TERCEIRO' | 'CANCELADO' = 'TERCEIRO';
+                if (log.status === 'concluido') status = 'CONCLUÍDO';
+                else if (log.status === 'cancelado') status = 'CANCELADO';
+                else if (log.status === 'agendado') status = 'AGENDADO';
+
                 list.push({
                     id: log.id,
                     date: log.date,
                     supplierName: log.companyName,
                     time: log.time || '00:00',
-                    status: 'TERCEIRO',
+                    status: status,
                     type: 'TERCEIRO',
                     itemName: 'ENTRADA DE TERCEIROS'
                 });
@@ -723,13 +734,15 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                                             <td className="p-4 font-bold text-slate-900 uppercase text-xs">{item.supplierName}</td>
                                             <td className="p-4 text-center">
                                                 <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${ 
-                                                    item.status === 'FATURADO' 
+                                                    item.status === 'CONCLUÍDO' 
                                                         ? 'bg-indigo-100 text-indigo-700' 
-                                                        : item.status === 'TERCEIRO'
-                                                            ? 'bg-amber-100 text-amber-700'
-                                                            : 'bg-red-100 text-red-700'
+                                                        : item.status === 'CANCELADO'
+                                                            ? 'bg-red-100 text-red-700'
+                                                            : item.status === 'TERCEIRO'
+                                                                ? 'bg-amber-100 text-amber-700'
+                                                                : 'bg-gray-100 text-gray-600'
                                                 }`}>
-                                                    {item.status === 'FATURADO' ? '✓ Descarregado' : item.status === 'TERCEIRO' ? '● Terceiros' : '○ Aguardando'}
+                                                    {item.status}
                                                 </span>
                                             </td>
                                         </tr>

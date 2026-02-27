@@ -14,13 +14,14 @@ const AgendaChegadas: React.FC<AgendaChegadasProps> = ({ suppliers, thirdPartyEn
     const [searchTerm, setSearchTerm] = useState('');
 
     const dailyDeliveries = useMemo(() => {
-        const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'FATURADO' | 'TERCEIRO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO' }[] = [];
+        const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'CONCLUÍDO' | 'TERCEIRO' | 'CANCELADO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO' }[] = [];
         
         suppliers.forEach(s => {
             (s.deliveries || []).forEach(d => {
                 if (d.date === selectedAgendaDate) {
                     const isFaturado = d.item !== 'AGENDAMENTO PENDENTE';
-                    const existing = list.find(l => l.supplierName === s.name && l.time === d.time && l.status === (isFaturado ? 'FATURADO' : 'AGENDADO'));
+                    const status = isFaturado ? 'CONCLUÍDO' : 'AGENDADO';
+                    const existing = list.find(l => l.supplierName === s.name && l.time === d.time && l.status === status);
                     if (!existing) {
                         list.push({
                             id: d.id,
@@ -28,7 +29,7 @@ const AgendaChegadas: React.FC<AgendaChegadasProps> = ({ suppliers, thirdPartyEn
                             supplierCpf: s.cpf,
                             time: d.time,
                             arrivalTime: d.arrivalTime,
-                            status: isFaturado ? 'FATURADO' : 'AGENDADO',
+                            status: status,
                             type: 'FORNECEDOR'
                         });
                     }
@@ -38,13 +39,18 @@ const AgendaChegadas: React.FC<AgendaChegadasProps> = ({ suppliers, thirdPartyEn
 
         (thirdPartyEntries || []).forEach(log => {
             if (log.date === selectedAgendaDate) {
+                let status: 'AGENDADO' | 'CONCLUÍDO' | 'TERCEIRO' | 'CANCELADO' = 'TERCEIRO';
+                if (log.status === 'concluido') status = 'CONCLUÍDO';
+                else if (log.status === 'cancelado') status = 'CANCELADO';
+                else if (log.status === 'agendado') status = 'AGENDADO';
+
                 list.push({
                     id: log.id,
                     supplierName: log.companyName,
                     supplierCpf: log.companyCnpj,
                     time: log.time || '00:00',
                     arrivalTime: log.arrivalTime,
-                    status: 'TERCEIRO',
+                    status: status,
                     type: 'TERCEIRO'
                 });
             }
@@ -103,8 +109,8 @@ const AgendaChegadas: React.FC<AgendaChegadasProps> = ({ suppliers, thirdPartyEn
                         <Truck className="h-6 w-6" />
                     </div>
                     <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Agendado</p>
-                        <p className="text-xl font-black text-indigo-900">{dailyDeliveries.length}</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Ativo</p>
+                        <p className="text-xl font-black text-indigo-900">{dailyDeliveries.filter(d => d.status !== 'CANCELADO').length}</p>
                     </div>
                 </div>
                 <div className="bg-white p-6 rounded-3xl shadow-md border border-green-50 flex items-center gap-4">
@@ -113,7 +119,7 @@ const AgendaChegadas: React.FC<AgendaChegadasProps> = ({ suppliers, thirdPartyEn
                     </div>
                     <div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Já Chegaram</p>
-                        <p className="text-xl font-black text-green-700">{dailyDeliveries.filter(d => d.arrivalTime).length}</p>
+                        <p className="text-xl font-black text-green-700">{dailyDeliveries.filter(d => d.arrivalTime && d.status !== 'CANCELADO').length}</p>
                     </div>
                 </div>
                 <div className="bg-white p-6 rounded-3xl shadow-md border border-red-50 flex items-center gap-4">
@@ -122,7 +128,7 @@ const AgendaChegadas: React.FC<AgendaChegadasProps> = ({ suppliers, thirdPartyEn
                     </div>
                     <div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Pendentes</p>
-                        <p className="text-xl font-black text-red-700">{dailyDeliveries.filter(d => !d.arrivalTime).length}</p>
+                        <p className="text-xl font-black text-red-700">{dailyDeliveries.filter(d => !d.arrivalTime && d.status !== 'CANCELADO').length}</p>
                     </div>
                 </div>
             </div>
@@ -133,33 +139,41 @@ const AgendaChegadas: React.FC<AgendaChegadasProps> = ({ suppliers, thirdPartyEn
                     <div 
                         key={item.id} 
                         className={`relative overflow-hidden bg-white rounded-[2rem] shadow-md border-2 transition-all ${
-                            item.status === 'FATURADO' 
+                            item.status === 'CONCLUÍDO' 
                                 ? 'border-indigo-100 opacity-80' 
-                                : item.arrivalTime 
-                                    ? 'border-green-200 bg-green-50/30' 
-                                    : 'border-red-500 bg-red-50'
+                                : item.status === 'CANCELADO'
+                                    ? 'border-red-100 opacity-50 grayscale'
+                                    : item.arrivalTime 
+                                        ? 'border-green-200 bg-green-50/30' 
+                                        : 'border-red-500 bg-red-50'
                         }`}
                     >
                         <div className={`absolute top-0 left-0 w-2 h-full ${
-                            item.status === 'FATURADO' ? 'bg-indigo-900' : item.arrivalTime ? 'bg-green-500' : 'bg-red-600'
+                            item.status === 'CONCLUÍDO' ? 'bg-indigo-900' : 
+                            item.status === 'CANCELADO' ? 'bg-gray-400' :
+                            item.arrivalTime ? 'bg-green-500' : 'bg-red-600'
                         }`} />
 
                         <div className="p-5 pl-7">
                             <div className="flex justify-between items-start mb-4">
                                 <div className={`px-4 py-2 rounded-xl text-lg font-black font-mono shadow-sm ${
-                                    item.status === 'FATURADO' 
+                                    item.status === 'CONCLUÍDO' 
                                         ? 'bg-indigo-900 text-white' 
-                                        : item.arrivalTime 
-                                            ? 'bg-green-600 text-white' 
-                                            : 'bg-red-600 text-white shadow-red-100'
+                                        : item.status === 'CANCELADO'
+                                            ? 'bg-gray-400 text-white'
+                                            : item.arrivalTime 
+                                                ? 'bg-green-600 text-white' 
+                                                : 'bg-red-600 text-white shadow-red-100'
                                 }`}>
                                     {item.time}
                                 </div>
                                 
                                 <div className="text-right">
                                     <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${
-                                        item.status === 'FATURADO' ? 'bg-indigo-100 text-indigo-700' : 
+                                        item.status === 'CONCLUÍDO' ? 'bg-indigo-100 text-indigo-700' : 
+                                        item.status === 'CANCELADO' ? 'bg-red-100 text-red-700' :
                                         item.status === 'TERCEIRO' ? 'bg-amber-100 text-amber-700' : 
+                                        item.status === 'AGENDADO' && item.arrivalTime ? 'bg-green-100 text-green-700' :
                                         'bg-gray-100 text-gray-600'
                                     }`}>
                                         {item.status}
