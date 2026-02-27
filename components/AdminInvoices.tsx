@@ -126,7 +126,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                 .label-card {
                     width: 100mm; 
                     height: 50mm; 
-                    padding: 5mm;
+                    padding: 4mm;
                     box-sizing: border-box; 
                     background: white;
                     border: 1px solid #ddd;
@@ -137,7 +137,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     flex-direction: column;
                 }
                 h1 { 
-                    font-size: 10pt; 
+                    font-size: 9pt; 
                     font-weight: 800; 
                     margin: 0 0 1mm 0; 
                     text-transform: uppercase; 
@@ -149,10 +149,10 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     overflow: hidden;
                 }
                 h2 { 
-                    font-size: 8pt; 
-                    margin: 0 0 2mm 0; 
+                    font-size: 7.5pt; 
+                    margin: 0 0 1.5mm 0; 
                     color: #333; 
-                    border-bottom: 1.5px solid #000; 
+                    border-bottom: 1px solid #000; 
                     padding-bottom: 1mm; 
                     display: -webkit-box;
                     -webkit-line-clamp: 2;
@@ -162,8 +162,11 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                 }
                 .info { 
                     text-align: left; 
-                    font-size: 8pt; 
+                    font-size: 7.5pt; 
                     flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: flex-start;
                 }
                 .info p { 
                     margin: 0.5mm 0; 
@@ -173,7 +176,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     line-height: 1.1;
                 }
                 .info strong { 
-                    font-size: 6.8pt; 
+                    font-size: 6.5pt; 
                     color: #555; 
                     text-transform: uppercase;
                 }
@@ -182,7 +185,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                     color: #000;
                 }
                 .barcode-container { 
-                    margin-top: 1mm; 
+                    margin-top: auto; 
                     display: flex; 
                     flex-direction: column; 
                     align-items: center; 
@@ -190,17 +193,7 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                 }
                 .barcode-svg { 
                     max-width: 90%; 
-                    height: 16mm !important; 
-                }
-                .footer-label { 
-                    position: absolute; 
-                    bottom: 1mm; 
-                    left: 0; 
-                    right: 0; 
-                    font-size: 5.4pt; 
-                    color: #666; 
-                    text-align: center; 
-                    font-weight: bold;
+                    height: 14mm !important; 
                 }
             </style>
         </head>
@@ -232,7 +225,6 @@ const handlePrintLabels = (invoices: InvoiceInfo[]) => {
                         <div class="barcode-container">
                             ${label.barcode ? `<svg id="barcode-${index}" class="barcode-svg"></svg>` : '<p style="font-size: 7pt; color: #999; margin: 0;">SEM CÓDIGO DE BARRAS</p>'}
                         </div>
-                        <div class="footer-label">GERADO EM ${new Date().toLocaleString('pt-BR')}</div>
                     </div>
                 `).join('')}
             </div>
