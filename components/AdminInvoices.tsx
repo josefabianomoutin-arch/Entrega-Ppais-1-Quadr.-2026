@@ -351,7 +351,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
 
         for (const item of itemsToExit) {
             const payload = {
-                type: 'saida',
+                type: 'saída',
                 supplierCpf: exitingInvoice.supplierCpf,
                 supplierName: exitingInvoice.supplierName,
                 itemName: item.name,
@@ -856,7 +856,14 @@ interface ExitInvoiceModalProps {
 }
 
 const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, onClose, onSave, isSaving }) => {
-    const [items, setItems] = useState(invoice.items.filter(it => (it.kg - (it.exitedQuantity || 0)) > 0).map((it, idx) => ({ id: `exit-${idx}`, name: it.name, kg: '0,00', maxKg: it.kg - (it.exitedQuantity || 0), lot: it.lotNumber, exp: it.expirationDate })));
+    const [items, setItems] = useState(invoice.items.filter(it => (it.kg - (it.exitedQuantity || 0)) > 0.001).map((it, idx) => ({ 
+        id: `exit-${idx}`, 
+        name: it.name, 
+        kg: '0,00', 
+        maxKg: it.kg - (it.exitedQuantity || 0), 
+        lot: it.lotNumber, 
+        exp: it.expirationDate 
+    })));
     const [outboundNf, setOutboundNf] = useState('');
     const [exitDate, setExitDate] = useState(new Date().toISOString().split('T')[0]);
     const [itemSearch, setItemSearch] = useState('');
@@ -869,6 +876,10 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
         setItems(prev => prev.map(it => it.id === id ? { ...it, kg: value.replace(/[^0-9,]/g, '') } : it));
     };
 
+    const totalToExit = useMemo(() => {
+        return items.reduce((sum, it) => sum + (parseFloat(it.kg.replace(',', '.')) || 0), 0);
+    }, [items]);
+
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!outboundNf || !exitDate) return alert('Preencha a NF de Saída e a Data.');
@@ -876,8 +887,8 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
         const itemsToExit = items.map(it => {
             const kg = parseFloat(it.kg.replace(',', '.'));
             if (isNaN(kg) || kg <= 0) return null;
-            if (kg > it.maxKg) {
-                alert(`Quantidade de saída para ${it.name} excede a quantidade disponível (${it.maxKg} kg).`);
+            if (kg > it.maxKg + 0.001) {
+                alert(`Quantidade de saída para ${it.name} excede a quantidade disponível (${it.maxKg.toFixed(2).replace('.', ',')} kg).`);
                 return 'ERROR';
             }
             return { name: it.name, kg, lotNumber: it.lot, expirationDate: it.exp };
@@ -891,31 +902,54 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl p-6 animate-fade-in-up">
-                <div className="flex justify-between items-center mb-4 border-b pb-4">
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl p-8 animate-fade-in-up border-4 border-red-100 flex flex-col max-h-[90vh]">
+                <div className="flex justify-between items-start mb-6 border-b pb-6">
                     <div>
-                        <h2 className="text-xl font-bold text-red-800 uppercase">Registrar Saída - NF {invoice.invoiceNumber}</h2>
-                        <p className="text-xs text-gray-500 uppercase font-black">{invoice.supplierName}</p>
-                    </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-3xl font-light">&times;</button>
-                </div>
-                <form onSubmit={handleFormSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-red-50 p-3 rounded-xl border border-red-100 space-y-1">
-                            <label className="text-[9px] font-black text-red-400 uppercase">REQUISIÇÃO DO SISTEMA SAM</label>
-                            <input type="text" value={outboundNf} onChange={e => setOutboundNf(e.target.value)} placeholder="Requisição SAM" className="w-full p-2 border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-red-400" required />
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="p-2 bg-red-100 text-red-600 rounded-xl">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            </div>
+                            <h2 className="text-2xl font-black text-red-900 uppercase tracking-tighter">Registrar Saída de Materiais</h2>
                         </div>
-                        <div className="bg-red-50 p-3 rounded-xl border border-red-100 space-y-1">
-                            <label className="text-[9px] font-black text-red-400 uppercase">Data de Saída</label>
-                            <input type="date" value={exitDate} onChange={e => setExitDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400" required />
+                        <p className="text-xs text-gray-500 uppercase font-black tracking-widest flex items-center gap-2">
+                            <span className="text-red-600">NF ORIGEM: {invoice.invoiceNumber}</span>
+                            <span className="text-gray-300">|</span>
+                            <span>{invoice.supplierName}</span>
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-4xl font-light transition-colors">&times;</button>
+                </div>
+
+                <form onSubmit={handleFormSubmit} className="space-y-6 flex-1 flex flex-col overflow-hidden">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-red-50 p-5 rounded-3xl border-2 border-red-100 space-y-2 shadow-sm">
+                            <label className="text-[10px] font-black text-red-600 uppercase tracking-[0.2em] ml-1">REQUISIÇÃO DO SISTEMA SAM</label>
+                            <input 
+                                type="text" 
+                                value={outboundNf} 
+                                onChange={e => setOutboundNf(e.target.value)} 
+                                placeholder="Informe o número da requisição" 
+                                className="w-full h-12 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-red-100 transition-all text-sm" 
+                                required 
+                            />
+                        </div>
+                        <div className="bg-red-50 p-5 rounded-3xl border-2 border-red-100 space-y-2 shadow-sm">
+                            <label className="text-[10px] font-black text-red-600 uppercase tracking-[0.2em] ml-1">Data de Saída</label>
+                            <input 
+                                type="date" 
+                                value={exitDate} 
+                                onChange={e => setExitDate(e.target.value)} 
+                                className="w-full h-12 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-red-100 transition-all text-sm" 
+                                required 
+                            />
                         </div>
                     </div>
                     
-                    <div className="max-h-96 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                        <div className="sticky top-0 bg-white z-10 pb-2 space-y-2">
-                            <div className="flex justify-between items-end">
-                                <p className="text-xs font-bold text-gray-500 uppercase">Selecione os itens e quantidades para saída:</p>
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                        <div className="sticky top-0 bg-white z-10 pb-4 space-y-3">
+                            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest italic">Selecione os itens e quantidades para saída parcial ou total:</p>
                                 <button 
                                     type="button"
                                     onClick={() => {
@@ -923,61 +957,92 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
                                             setItems(prev => prev.map(it => ({ ...it, kg: it.maxKg.toFixed(2).replace('.', ',') })));
                                         }
                                     }}
-                                    className="text-[10px] font-black text-red-600 hover:text-red-700 uppercase bg-red-50 px-3 py-1 rounded-lg border border-red-100 transition-all active:scale-95"
+                                    className="w-full sm:w-auto text-[10px] font-black text-red-600 hover:bg-red-600 hover:text-white uppercase bg-white px-6 py-2.5 rounded-xl border-2 border-red-100 transition-all active:scale-95 shadow-sm"
                                 >
                                     Preencher Tudo (Saldo Total)
                                 </button>
                             </div>
                             <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                 </span>
                                 <input 
                                     type="text" 
-                                    placeholder="Filtrar itens da nota..." 
+                                    placeholder="Filtrar itens da nota fiscal..." 
                                     value={itemSearch}
                                     onChange={e => setItemSearch(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-red-400 transition-all"
+                                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-red-400 rounded-2xl outline-none font-bold transition-all shadow-inner text-sm"
                                 />
                             </div>
                         </div>
 
-                        {filteredItems.length > 0 ? filteredItems.map(item => {
-                            const contract = supplier.contractItems.find(ci => ci.name === item.name);
-                            const unit = getDisplayUnit(contract);
-                            return (
-                                <div key={item.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100 hover:border-red-100 transition-colors space-y-3">
-                                    <div className="flex gap-4 items-center">
-                                        <div className="flex-1">
-                                            <p className="text-xs font-black text-gray-700 uppercase leading-tight">{item.name}</p>
-                                            <div className="flex flex-wrap gap-2 mt-1">
-                                                <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-md">Disponível: {item.maxKg.toFixed(2).replace('.', ',')} {unit}</span>
-                                                {item.lot && <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">Lote: {item.lot}</span>}
+                        <div className="grid grid-cols-1 gap-4">
+                            {filteredItems.length > 0 ? filteredItems.map(item => {
+                                const contract = supplier.contractItems.find(ci => ci.name === item.name);
+                                const unit = getDisplayUnit(contract);
+                                const isFilled = parseFloat(item.kg.replace(',', '.')) > 0;
+                                return (
+                                    <div key={item.id} className={`p-5 rounded-[2rem] border-2 transition-all duration-300 ${isFilled ? 'bg-red-50 border-red-200 shadow-md' : 'bg-white border-gray-100 hover:border-red-100'}`}>
+                                        <div className="flex flex-col sm:flex-row gap-6 items-center">
+                                            <div className="flex-1 w-full">
+                                                <p className="text-sm font-black text-gray-800 uppercase leading-tight mb-2">{item.name}</p>
+                                                <div className="flex flex-wrap gap-3">
+                                                    <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-teal-100 shadow-sm">
+                                                        <span className="text-[9px] font-black text-teal-400 uppercase">Saldo:</span>
+                                                        <span className="text-xs font-black text-teal-700">{item.maxKg.toFixed(2).replace('.', ',')} {unit}</span>
+                                                    </div>
+                                                    {item.lot && (
+                                                        <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
+                                                            <span className="text-[9px] font-black text-gray-400 uppercase">Lote:</span>
+                                                            <span className="text-xs font-mono font-bold text-gray-600">{item.lot}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="w-full sm:w-44">
+                                                <label className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-1 block ml-1">Qtd Saída ({unit})</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={item.kg} 
+                                                    onChange={e => handleItemChange(item.id, e.target.value)} 
+                                                    placeholder="0,00" 
+                                                    className={`w-full h-12 px-4 border-2 rounded-2xl text-center font-black text-lg outline-none transition-all ${isFilled ? 'bg-white border-red-400 text-red-700 ring-4 ring-red-100' : 'bg-white border-gray-200 focus:border-red-400'}`} 
+                                                />
                                             </div>
                                         </div>
-                                        <div className="w-32">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase">Qtd Saída ({unit})</label>
-                                            <input 
-                                                type="text" 
-                                                value={item.kg} 
-                                                onChange={e => handleItemChange(item.id, e.target.value)} 
-                                                placeholder="0,00" 
-                                                className="w-full p-2 border border-gray-200 rounded-lg text-sm text-center font-mono focus:ring-2 focus:ring-red-400 outline-none bg-white" 
-                                            />
-                                        </div>
                                     </div>
+                                );
+                            }) : (
+                                <div className="text-center py-12 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
+                                    <p className="text-sm text-gray-400 font-black uppercase italic">Nenhum item encontrado com "{itemSearch}"</p>
                                 </div>
-                            );
-                        }) : (
-                            <div className="text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                                <p className="text-xs text-gray-400 font-bold uppercase">Nenhum item encontrado com "{itemSearch}"</p>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
 
-                    <div className="flex justify-end items-center pt-4 border-t space-x-2">
-                        <button type="button" onClick={onClose} className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm uppercase">Cancelar</button>
-                        <button type="submit" disabled={isSaving} className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold text-sm uppercase shadow-lg disabled:bg-gray-400">{isSaving ? 'Registrando...' : 'Confirmar Saída'}</button>
+                    <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t gap-6">
+                        <div className="flex items-center gap-4">
+                            <div className="text-right">
+                                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Total da Retirada</p>
+                                <p className="text-2xl font-black text-red-600 tracking-tighter">{totalToExit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-xs">UNIDADES</span></p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 w-full sm:w-auto">
+                            <button 
+                                type="button" 
+                                onClick={onClose} 
+                                className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 text-gray-600 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                type="submit" 
+                                disabled={isSaving || totalToExit <= 0} 
+                                className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-red-100 active:scale-95 disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
+                            >
+                                {isSaving ? 'Registrando...' : 'Confirmar Saída'}
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
