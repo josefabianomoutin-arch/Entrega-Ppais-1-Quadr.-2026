@@ -910,53 +910,53 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
 
     return (
         <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[100] p-4">
-            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl p-8 animate-fade-in-up border-4 border-red-100 flex flex-col max-h-[95vh] relative">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-6xl p-8 animate-fade-in-up border-4 border-red-100 flex flex-col h-[90vh] relative">
                 <div className="flex justify-between items-start mb-6 border-b pb-6">
                     <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            <div className="p-2 bg-red-100 text-red-600 rounded-xl">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <div className="flex items-center gap-4 mb-2">
+                            <div className="p-3 bg-red-100 text-red-600 rounded-2xl shadow-inner">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             </div>
-                            <h2 className="text-2xl font-black text-red-900 uppercase tracking-tighter">Registrar Saída de Materiais</h2>
+                            <h2 className="text-3xl font-black text-red-900 uppercase tracking-tighter">Registrar Saída de Materiais</h2>
                         </div>
-                        <p className="text-xs text-gray-500 uppercase font-black tracking-widest flex items-center gap-2">
-                            <span className="text-red-600">NF ORIGEM: {invoice.invoiceNumber}</span>
+                        <p className="text-xs text-gray-500 uppercase font-black tracking-[0.2em] flex items-center gap-3">
+                            <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded">NF ORIGEM: {invoice.invoiceNumber}</span>
                             <span className="text-gray-300">|</span>
                             <span>{invoice.supplierName}</span>
                         </p>
                     </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-4xl font-light transition-colors">&times;</button>
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-600 text-5xl font-light transition-all hover:rotate-90">&times;</button>
                 </div>
 
-                <form onSubmit={handleFormSubmit} className="space-y-6 flex-1 flex flex-col overflow-hidden">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-red-50 p-5 rounded-3xl border-2 border-red-100 space-y-2 shadow-sm">
-                            <label className="text-[10px] font-black text-red-600 uppercase tracking-[0.2em] ml-1">REQUISIÇÃO DO SISTEMA SAM</label>
+                <form onSubmit={handleFormSubmit} className="space-y-8 flex-1 flex flex-col overflow-hidden">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="bg-red-50 p-6 rounded-[2rem] border-2 border-red-100 space-y-2 shadow-sm">
+                            <label className="text-xs font-black text-red-600 uppercase tracking-[0.2em] ml-1">REQUISIÇÃO DO SISTEMA SAM</label>
                             <input 
                                 type="text" 
                                 value={outboundNf} 
                                 onChange={e => setOutboundNf(e.target.value)} 
                                 placeholder="Informe o número da requisição" 
-                                className="w-full h-12 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-red-100 transition-all text-sm" 
+                                className="w-full h-14 px-6 border-2 border-white rounded-2xl bg-white shadow-sm font-black text-lg outline-none focus:ring-4 focus:ring-red-100 transition-all" 
                                 required 
                             />
                         </div>
-                        <div className="bg-red-50 p-5 rounded-3xl border-2 border-red-100 space-y-2 shadow-sm">
-                            <label className="text-[10px] font-black text-red-600 uppercase tracking-[0.2em] ml-1">Data de Saída</label>
+                        <div className="bg-red-50 p-6 rounded-[2rem] border-2 border-red-100 space-y-2 shadow-sm">
+                            <label className="text-xs font-black text-red-600 uppercase tracking-[0.2em] ml-1">Data de Saída</label>
                             <input 
                                 type="date" 
                                 value={exitDate} 
                                 onChange={e => setExitDate(e.target.value)} 
-                                className="w-full h-12 px-4 border-2 border-white rounded-2xl bg-white shadow-sm font-bold outline-none focus:ring-4 focus:ring-red-100 transition-all text-sm" 
+                                className="w-full h-14 px-6 border-2 border-white rounded-2xl bg-white shadow-sm font-black text-lg outline-none focus:ring-4 focus:ring-red-100 transition-all" 
                                 required 
                             />
                         </div>
                     </div>
                     
-                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-                        <div className="sticky top-0 bg-white z-10 pb-4 space-y-3">
+                    <div className="flex-1 overflow-y-auto space-y-6 pr-4 custom-scrollbar">
+                        <div className="sticky top-0 bg-white z-10 pb-6 space-y-4">
                             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest italic">Selecione os itens e quantidades para saída parcial ou total:</p>
+                                <p className="text-sm font-black text-gray-400 uppercase tracking-widest italic">Selecione os itens e quantidades para saída parcial ou total:</p>
                                 <button 
                                     type="button"
                                     onClick={() => {
@@ -964,21 +964,21 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
                                             setItems(prev => prev.map(it => ({ ...it, kg: it.maxKg.toFixed(2).replace('.', ',') })));
                                         }
                                     }}
-                                    className="w-full sm:w-auto text-[10px] font-black text-red-600 hover:bg-red-600 hover:text-white uppercase bg-white px-6 py-2.5 rounded-xl border-2 border-red-100 transition-all active:scale-95 shadow-sm"
+                                    className="w-full sm:w-auto text-xs font-black text-red-600 hover:bg-red-600 hover:text-white uppercase bg-white px-8 py-3 rounded-2xl border-2 border-red-100 transition-all active:scale-95 shadow-md"
                                 >
                                     Preencher Tudo (Saldo Total)
                                 </button>
                             </div>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            <div className="relative group">
+                                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-red-400 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                 </span>
                                 <input 
                                     type="text" 
                                     placeholder="Filtrar itens da nota fiscal..." 
                                     value={itemSearch}
                                     onChange={e => setItemSearch(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-red-400 rounded-2xl outline-none font-bold transition-all shadow-inner text-sm"
+                                    className="w-full pl-16 pr-6 py-5 bg-gray-50 border-2 border-transparent focus:border-red-400 rounded-3xl outline-none font-bold transition-all shadow-inner text-lg"
                                 />
                             </div>
                         </div>
@@ -989,65 +989,68 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
                                 const unit = getDisplayUnit(contract);
                                 const isFilled = parseFloat(item.kg.replace(',', '.')) > 0;
                                 return (
-                                    <div key={item.id} className={`p-5 rounded-[2rem] border-2 transition-all duration-300 ${isFilled ? 'bg-red-50 border-red-200 shadow-md' : 'bg-white border-gray-100 hover:border-red-100'}`}>
-                                        <div className="flex flex-col sm:flex-row gap-6 items-center">
+                                    <div key={item.id} className={`p-6 rounded-[2.5rem] border-2 transition-all duration-500 ${isFilled ? 'bg-red-50 border-red-300 shadow-xl scale-[1.01]' : 'bg-white border-gray-100 hover:border-red-200 hover:bg-gray-50'}`}>
+                                        <div className="flex flex-col lg:flex-row gap-8 items-center">
                                             <div className="flex-1 w-full">
-                                                <p className="text-sm font-black text-gray-800 uppercase leading-tight mb-2">{item.name}</p>
-                                                <div className="flex flex-wrap gap-3">
-                                                    <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-teal-100 shadow-sm">
-                                                        <span className="text-[9px] font-black text-teal-400 uppercase">Saldo:</span>
-                                                        <span className="text-xs font-black text-teal-700">{item.maxKg.toFixed(2).replace('.', ',')} {unit}</span>
+                                                <p className="text-lg font-black text-gray-900 uppercase leading-tight mb-3 tracking-tight">{item.name}</p>
+                                                <div className="flex flex-wrap gap-4">
+                                                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border-2 border-teal-100 shadow-sm">
+                                                        <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest">Saldo Disponível:</span>
+                                                        <span className="text-sm font-black text-teal-700">{item.maxKg.toFixed(2).replace('.', ',')} {unit}</span>
                                                     </div>
                                                     {item.lot && (
-                                                        <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
-                                                            <span className="text-[9px] font-black text-gray-400 uppercase">Lote:</span>
-                                                            <span className="text-xs font-mono font-bold text-gray-600">{item.lot}</span>
+                                                        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border-2 border-gray-100 shadow-sm">
+                                                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Lote:</span>
+                                                            <span className="text-sm font-mono font-bold text-gray-600">{item.lot}</span>
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="w-full sm:w-44">
-                                                <label className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-1 block ml-1">Qtd Saída ({unit})</label>
+                                            <div className="w-full lg:w-64">
+                                                <label className="text-[10px] font-black text-red-500 uppercase tracking-[0.2em] mb-2 block ml-2">Quantidade para Saída ({unit})</label>
                                                 <input 
                                                     type="text" 
                                                     value={item.kg} 
                                                     onChange={e => handleItemChange(item.id, e.target.value)} 
                                                     placeholder="0,00" 
-                                                    className={`w-full h-12 px-4 border-2 rounded-2xl text-center font-black text-lg outline-none transition-all ${isFilled ? 'bg-white border-red-400 text-red-700 ring-4 ring-red-100' : 'bg-white border-gray-200 focus:border-red-400'}`} 
+                                                    className={`w-full h-16 px-6 border-4 rounded-[1.5rem] text-center font-black text-3xl outline-none transition-all ${isFilled ? 'bg-white border-red-500 text-red-700 ring-8 ring-red-100' : 'bg-white border-gray-200 focus:border-red-400'}`} 
                                                 />
                                             </div>
                                         </div>
                                     </div>
                                 );
                             }) : (
-                                <div className="text-center py-12 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
-                                    <p className="text-sm text-gray-400 font-black uppercase italic">Nenhum item encontrado com "{itemSearch}"</p>
+                                <div className="text-center py-20 bg-gray-50 rounded-[3rem] border-4 border-dashed border-gray-200">
+                                    <p className="text-lg text-gray-400 font-black uppercase italic tracking-widest">Nenhum item encontrado para "{itemSearch}"</p>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t gap-6">
-                        <div className="flex items-center gap-4">
-                            <div className="text-right">
-                                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Total da Retirada</p>
-                                <p className="text-2xl font-black text-red-600 tracking-tighter">{totalToExit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-xs">UNIDADES</span></p>
+                    <div className="flex flex-col sm:flex-row justify-between items-center pt-8 border-t-2 border-gray-100 gap-8">
+                        <div className="flex items-center gap-6">
+                            <div className="text-left">
+                                <p className="text-xs text-gray-400 font-black uppercase tracking-[0.3em] mb-1">Total da Retirada Atual</p>
+                                <div className="flex items-baseline gap-2">
+                                    <p className="text-5xl font-black text-red-600 tracking-tighter">{totalToExit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                    <span className="text-lg font-black text-red-400 uppercase">Unidades</span>
+                                </div>
                             </div>
                         </div>
-                        <div className="flex gap-3 w-full sm:w-auto">
+                        <div className="flex gap-4 w-full sm:w-auto">
                             <button 
                                 type="button" 
                                 onClick={onClose} 
-                                className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 text-gray-600 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95"
+                                className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 text-gray-600 px-10 py-5 rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] transition-all active:scale-95"
                             >
                                 Cancelar
                             </button>
                             <button 
                                 type="submit" 
                                 disabled={isSaving || totalToExit <= 0} 
-                                className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-red-100 active:scale-95 disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
+                                className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white px-14 py-5 rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] transition-all shadow-2xl shadow-red-200 active:scale-95 disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
                             >
-                                {isSaving ? 'Registrando...' : 'Confirmar Saída'}
+                                {isSaving ? 'Processando...' : 'Confirmar Saída'}
                             </button>
                         </div>
                     </div>
