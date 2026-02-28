@@ -435,6 +435,7 @@ const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> 
                             <option value="ESTOCÁVEIS">ESTOCÁVEIS</option>
                             <option value="PERECÍVEIS">PERECÍVEIS</option>
                             <option value="AUTOMAÇÃO">AUTOMAÇÃO</option>
+                            <option value="PRODUTOS DE LIMPEZA">PRODUTOS DE LIMPEZA</option>
                         </select>
                     </div>
 

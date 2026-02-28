@@ -4,7 +4,7 @@ import type { AcquisitionItem } from '../types';
 
 interface AdminAcquisitionItemsProps {
     items: AcquisitionItem[];
-    category: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO';
+    category: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'PRODUTOS DE LIMPEZA';
     onUpdate: (item: AcquisitionItem) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
 }
