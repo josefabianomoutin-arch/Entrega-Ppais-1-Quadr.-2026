@@ -399,7 +399,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
     };
 
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-xl max-w-7xl mx-auto border-t-8 border-teal-500 animate-fade-in">
+        <div className="bg-white p-6 rounded-2xl shadow-xl max-w-7xl mx-auto border-t-8 border-teal-500 animate-fade-in relative z-10">
             <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
                  <div>
                     <h2 className="text-3xl font-black text-teal-900 uppercase tracking-tighter">Consulta de Notas Fiscais</h2>
@@ -617,7 +617,7 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
     }, [items, selectedSupplier]);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[100] p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-6 animate-fade-in-up">
                 <div className="flex justify-between items-center mb-6 border-b pb-4">
                     <h2 className="text-2xl font-black text-teal-800 uppercase tracking-tighter">Lançamento de Nota Manual</h2>
@@ -693,7 +693,14 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
                     </div>
                 </form>
             </div>
-            <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }`}</style>
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 6px; } 
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+                .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+                .animate-fade-in-up { animation: fade-in-up 0.4s ease-out forwards; }
+                @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes fade-in-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+            `}</style>
         </div>
     );
 };
@@ -755,7 +762,7 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
         onSave(finalItems, barcode, invoiceNumber, date, receiptTermNumber, invoiceDate);
     };
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[100] p-4">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl p-6 animate-fade-in-up">
                 <div className="flex justify-between items-center mb-4 border-b pb-4">
                     <div><h2 className="text-xl font-bold text-gray-800">Editar NF {invoice.invoiceNumber}</h2><p className="text-xs text-gray-500 uppercase font-black">{invoice.supplierName}</p></div>
@@ -902,8 +909,8 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl p-8 animate-fade-in-up border-4 border-red-100 flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[100] p-4">
+            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl p-8 animate-fade-in-up border-4 border-red-100 flex flex-col max-h-[95vh] relative">
                 <div className="flex justify-between items-start mb-6 border-b pb-6">
                     <div>
                         <div className="flex items-center gap-3 mb-1">
