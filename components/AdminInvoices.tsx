@@ -445,8 +445,20 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                 <React.Fragment key={invoice.id}>
                                     <tr className="border-b hover:bg-gray-50 transition-colors">
                                         <td className="p-3">
-                                            <p className="font-bold text-gray-800 uppercase leading-none">{invoice.supplierName}</p>
-                                            <p className="text-[10px] font-mono text-gray-400 mt-1">{invoice.supplierCpf}</p>
+                                            <div className="flex items-center gap-4">
+                                                <div>
+                                                    <p className="font-bold text-gray-800 uppercase leading-none">{invoice.supplierName}</p>
+                                                    <p className="text-[10px] font-mono text-gray-400 mt-1">{invoice.supplierCpf}</p>
+                                                </div>
+                                                {invoice.items.some((it: any) => (it.exitedQuantity || 0) > 0) && (
+                                                    <div className="bg-amber-50 border-2 border-amber-200 px-4 py-2 rounded-xl shadow-sm">
+                                                        <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest leading-none mb-1">Saldo Restante</p>
+                                                        <p className="text-sm font-black text-amber-700 leading-none uppercase">
+                                                            {invoice.items.reduce((acc: number, it: any) => acc + Math.max(0, (it.kg || 0) - (it.exitedQuantity || 0)), 0).toFixed(2).replace('.', ',')} KG
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-3 font-mono">
                                             <div>{formatDate(invoice.date)}</div>
@@ -520,13 +532,35 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                             const remaining = Math.max(0, item.kg - (item.exitedQuantity || 0));
                                                             return (
                                                                 <li key={index} className="flex justify-between items-center p-2 border-b last:border-b-0">
-                                                                    <span className="font-semibold text-gray-700 uppercase">
+                                                                    <span className="font-semibold text-gray-700 uppercase flex items-center gap-3">
                                                                         {item.name} 
-                                                                        <span className="text-gray-400 font-normal ml-1">({(item.kg || 0).toFixed(2).replace('.',',')} Kg)</span>
+                                                                        <span className="text-gray-400 font-normal">({(item.kg || 0).toFixed(2).replace('.',',')} Kg)</span>
                                                                         {item.exitedQuantity > 0 && (
-                                                                            <span className="ml-2 text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                                                                                Saldo: {remaining.toFixed(2).replace('.',',')} Kg
-                                                                            </span>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                                                                    SALDO: {remaining.toFixed(2).replace('.',',')} Kg
+                                                                                </span>
+                                                                                {remaining > 0 && (
+                                                                                    <button 
+                                                                                        onClick={() => {
+                                                                                            const invToPrint = {
+                                                                                                ...invoice,
+                                                                                                items: [{
+                                                                                                    ...item,
+                                                                                                    kg: remaining // Print with remaining quantity
+                                                                                                }]
+                                                                                            };
+                                                                                            handlePrintLabels([invToPrint]);
+                                                                                        }}
+                                                                                        className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded transition-all"
+                                                                                        title="Imprimir etiqueta do saldo restante"
+                                                                                    >
+                                                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                                                        </svg>
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
                                                                         )}
                                                                     </span>
                                                                     <span className="font-mono text-gray-600">{formatCurrency(item.value)}</span>
