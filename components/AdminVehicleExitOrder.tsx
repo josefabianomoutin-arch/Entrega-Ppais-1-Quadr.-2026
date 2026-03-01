@@ -73,111 +73,113 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
             <head>
                 <title>Ordem de Saída de Veículo - ${order.plate}</title>
                 <style>
-                    @page { size: A4; margin: 15mm; }
-                    body { font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.4; color: #000; }
-                    .header { text-align: center; margin-bottom: 20px; position: relative; }
-                    .header h1 { font-size: 12pt; margin: 0; text-transform: uppercase; }
-                    .header h2 { font-size: 10pt; margin: 2px 0; font-weight: normal; }
-                    .header .logos { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-                    .logo-placeholder { width: 60px; height: 60px; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #999; }
+                    @page { size: A4; margin: 20mm; }
+                    body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.6; color: #000; margin: 0; padding: 0; }
+                    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                    .header h1 { font-size: 14pt; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
+                    .header h2 { font-size: 11pt; margin: 5px 0; font-weight: normal; font-style: italic; }
                     
-                    .title { text-align: center; font-weight: bold; font-size: 14pt; text-decoration: underline; margin: 20px 0; text-transform: uppercase; }
+                    .title { text-align: center; font-weight: bold; font-size: 16pt; margin: 30px 0; text-transform: uppercase; text-decoration: underline; }
                     
-                    .content-row { margin-bottom: 15px; }
-                    .field-label { font-weight: normal; }
-                    .field-value { border-bottom: 1px solid #000; display: inline-block; padding: 0 5px; min-width: 50px; font-weight: bold; text-transform: uppercase; }
+                    .content-section { margin-bottom: 25px; text-align: justify; }
+                    .field-value { border-bottom: 1px solid #000; display: inline-block; padding: 0 8px; font-weight: bold; text-transform: uppercase; }
                     
-                    .companions-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                    .companions-table td { border-bottom: 1px solid #000; padding: 5px 0; }
+                    .companions-section { margin-top: 30px; border: 1px solid #000; padding: 15px; border-radius: 5px; }
+                    .companions-title { font-weight: bold; text-transform: uppercase; font-size: 10pt; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                    .companions-table { width: 100%; border-collapse: collapse; }
+                    .companions-table td { padding: 8px 0; border-bottom: 1px dotted #ccc; }
+                    .companions-table tr:last-child td { border-bottom: none; }
                     
-                    .footer-note { font-size: 8pt; text-transform: uppercase; font-weight: bold; text-align: center; margin: 20px 0; line-height: 1.2; }
+                    .footer-note { font-size: 9pt; text-align: center; margin: 40px 0; padding: 15px; border: 1px dashed #666; background-color: #f9f9f9; line-height: 1.4; }
                     
-                    .signatures-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 30px; }
-                    .signature-box { border: 1px solid #000; padding: 10px; height: 100px; position: relative; }
-                    .signature-box .box-title { font-weight: bold; border-bottom: 1px solid #000; margin-bottom: 10px; padding-bottom: 5px; }
-                    .signature-box .signature-line { position: absolute; bottom: 10px; left: 10px; right: 10px; border-top: 1px solid #000; text-align: center; font-size: 8pt; padding-top: 2px; }
+                    .signatures-container { margin-top: 50px; }
+                    .signatures-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+                    .signature-box { border: 1px solid #000; padding: 15px; min-height: 100px; position: relative; display: flex; flex-direction: column; justify-content: space-between; }
+                    .signature-box .box-title { font-weight: bold; font-size: 9pt; text-transform: uppercase; margin-bottom: 10px; }
+                    .signature-line { border-top: 1px solid #000; text-align: center; font-size: 9pt; margin-top: 20px; padding-top: 5px; font-weight: bold; }
                     
-                    .obs-row { margin-top: 20px; font-weight: bold; }
+                    .date-location { text-align: right; margin: 30px 0; font-weight: bold; }
+                    
+                    .obs-footer { margin-top: 30px; font-size: 10pt; font-style: italic; border-top: 1px solid #eee; padding-top: 10px; }
                     
                     @media print {
                         .no-print { display: none; }
+                        body { -webkit-print-color-adjust: exact; }
                     }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <div class="logos">
-                        <div class="logo-placeholder">BRASÃO SP</div>
-                        <div>
-                            <h1>SECRETARIA DA ADMINISTRAÇÃO PENITENCIÁRIA</h1>
-                            <h2>Coordenadoria das Unidades Prisionais da Região Noroeste do Estado</h2>
-                            <h1 style="margin-top: 5px;">PENITENCIÁRIA DE TAIÚVA</h1>
-                        </div>
-                        <div class="logo-placeholder">LOGO SAP</div>
-                    </div>
+                    <h1>SECRETARIA DA ADMINISTRAÇÃO PENITENCIÁRIA</h1>
+                    <h2>Coordenadoria das Unidades Prisionais da Região Noroeste do Estado</h2>
+                    <h1 style="margin-top: 5px; font-size: 16pt;">PENITENCIÁRIA DE TAIÚVA</h1>
                 </div>
 
                 <div class="title">ORDEM DE SAÍDA DE VEÍCULO</div>
 
-                <div class="content-row">
-                    Veículo <span class="field-value" style="min-width: 150px;">${order.vehicle}</span>, 
+                <div class="content-section">
+                    Autorizo a saída do veículo <span class="field-value" style="min-width: 180px;">${order.vehicle}</span>, 
                     placa <span class="field-value" style="min-width: 100px;">${order.plate}</span>, 
-                    patrimônio <span class="field-value" style="min-width: 80px;">${order.assetNumber}</span> sob
+                    patrimônio <span class="field-value" style="min-width: 80px;">${order.assetNumber}</span>, sob a 
+                    responsabilidade do funcionário <span class="field-value" style="min-width: 280px;">${order.responsibleServer}</span>, 
+                    ocupante do cargo de <span class="field-value" style="min-width: 200px;">${order.serverRole}</span>.
                 </div>
                 
-                <div class="content-row">
-                    a responsabilidade do funcionário <span class="field-value" style="min-width: 300px;">${order.responsibleServer}</span> cargo
-                </div>
-                
-                <div class="content-row">
-                    <span class="field-value" style="min-width: 250px;">${order.serverRole}</span>, está autorizado a deixar a área deste
-                </div>
-                
-                <div class="content-row">
-                    estabelecimento para ir a(o) <span class="field-value" style="min-width: 350px;">${order.destination}</span>
+                <div class="content-section">
+                    O referido deslocamento tem como destino a cidade/local de: <span class="field-value" style="min-width: 350px;">${order.destination}</span>.
                 </div>
 
-                <div class="content-row" style="text-align: center; margin-top: 30px;">
-                    TAIÚVA, <span class="field-value" style="min-width: 30px;">${day}</span> de <span class="field-value" style="min-width: 120px;">${month}</span> de <span class="field-value" style="min-width: 50px;">${year}</span>
+                <div class="date-location">
+                    TAIÚVA, <span class="field-value" style="min-width: 30px;">${day}</span> de <span class="field-value" style="min-width: 120px;">${month}</span> de <span class="field-value" style="min-width: 50px;">${year}</span>.
                 </div>
 
-                <table class="companions-table">
-                    ${order.companions.map((c, i) => `
-                        <tr>
-                            <td style="width: 120px;">Acompanhante (${i + 1}):</td>
-                            <td><span style="font-weight: bold; text-transform: uppercase;">${c.name}</span></td>
-                            <td style="width: 40px; text-align: right;">RG:</td>
-                            <td style="width: 150px;"><span style="font-weight: bold;">${c.rg}</span></td>
-                        </tr>
-                    `).join('')}
-                </table>
+                <div class="companions-section">
+                    <div class="companions-title">Acompanhantes da Missão</div>
+                    <table class="companions-table">
+                        ${order.companions.filter(c => c.name.trim() !== '').map((c, i) => `
+                            <tr>
+                                <td style="width: 30px; font-weight: bold;">${i + 1}.</td>
+                                <td><span style="font-weight: bold; text-transform: uppercase;">${c.name}</span></td>
+                                <td style="width: 40px; text-align: right; padding-right: 10px;">RG:</td>
+                                <td style="width: 150px;"><span style="font-weight: bold;">${c.rg}</span></td>
+                            </tr>
+                        `).join('') || '<tr><td colspan="4" style="text-align: center; color: #999;">Nenhum acompanhante registrado</td></tr>'}
+                    </table>
+                </div>
 
                 <div class="footer-note">
-                    PARA FINS DE PROTOCOLIZAÇÃO DA DIÁRIA, APRESENTAR ESTE DOCUMENTO JUNTO COM A SOLICITAÇÃO DE DIÁRIA E FCT DENTRO DO PRAZO DE 3 DIAS ÚTEIS APÓS O REGRESSO
+                    <strong>IMPORTANTE:</strong> PARA FINS DE PROTOCOLIZAÇÃO DA DIÁRIA, APRESENTAR ESTE DOCUMENTO JUNTO COM A SOLICITAÇÃO DE DIÁRIA E FCT DENTRO DO PRAZO DE 3 DIAS ÚTEIS APÓS O REGRESSO.
                 </div>
 
-                <div class="signatures-grid">
-                    <div class="signature-box">
-                        <div class="box-title">SAÍDA EM ____/____/____</div>
-                        <div>HORÁRIO: ___________</div>
-                        <div class="signature-line">Ass. Fun. Sub-Portaria</div>
+                <div class="signatures-container">
+                    <div class="signatures-grid">
+                        <div class="signature-box">
+                            <div class="box-title">Registro de Saída</div>
+                            <div>DATA: ____/____/____</div>
+                            <div>HORÁRIO: ___________</div>
+                            <div class="signature-line">Ass. Funcionário Sub-Portaria</div>
+                        </div>
+                        <div class="signature-box">
+                            <div class="box-title">Autorização Superior</div>
+                            <div style="flex-grow: 1;"></div>
+                            <div class="signature-line">Diretor Responsável</div>
+                        </div>
                     </div>
-                    <div style="text-align: center; display: flex; flex-direction: column; justify-content: flex-end;">
-                        <div style="border-top: 1px solid #000; width: 200px; margin: 0 auto;"></div>
-                        <div style="font-size: 9pt; font-weight: bold; margin-top: 5px;">Diretor Responsável</div>
-                    </div>
-                </div>
 
-                <div class="signatures-grid">
-                    <div class="signature-box">
-                        <div class="box-title">RETORNO EM ____/____/____</div>
-                        <div>HORÁRIO: ___________</div>
-                        <div class="signature-line">Ass. Fun. Sub-Portaria</div>
+                    <div class="signatures-grid">
+                        <div class="signature-box">
+                            <div class="box-title">Registro de Retorno</div>
+                            <div>DATA: ____/____/____</div>
+                            <div>HORÁRIO: ___________</div>
+                            <div class="signature-line">Ass. Funcionário Sub-Portaria</div>
+                        </div>
+                        <div style="display: flex; align-items: flex-end; padding-bottom: 5px;">
+                            <div class="obs-footer">
+                                <strong>Obs:</strong> Anexar FCT nº. <span class="field-value" style="min-width: 120px;">${order.fctNumber}</span>
+                                ${order.observations ? `<br><strong>Notas:</strong> ${order.observations}` : ''}
+                            </div>
+                        </div>
                     </div>
-                </div>
-
-                <div class="obs-row">
-                    Obs: Anexar FCT nº. <span class="field-value" style="min-width: 150px;">${order.fctNumber}</span>
                 </div>
                 
                 <script>
