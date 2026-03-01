@@ -244,7 +244,8 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
             <thead>
               <tr>
                 <th>PREPARAÇÃO / ITEM</th>
-                <th>DETALHES</th>
+                <th>PESO/QUANTIDADE UNITÁRIO</th>
+                <th>PESO/QUANTIDADE TOTAL</th>
                 <th>LOTE</th>
                 <th>NF</th>
               </tr>
@@ -255,12 +256,13 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
                 return `
                   <tr>
                     <td><strong>${row.foodItem || row.contractedItem || 'N/A'}</strong></td>
-                    <td>${row.preparationDetails || '-'}</td>
+                    <td class="text-center">-</td>
+                    <td class="text-center">-</td>
                     <td class="text-center">${lot}</td>
                     <td class="text-center">${invoice}</td>
                   </tr>
                 `;
-              }).join('') : '<tr><td colspan="4" class="text-center italic">Nenhum item cadastrado</td></tr>'}
+              }).join('') : '<tr><td colspan="5" class="text-center italic">Nenhum item cadastrado</td></tr>'}
             </tbody>
           </table>
         </div>
