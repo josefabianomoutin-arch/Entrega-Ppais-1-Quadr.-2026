@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, FinancialRecord, Delivery, ThirdPartyEntryLog, AcquisitionItem, VehicleExitOrder } from '../types';
+import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, FinancialRecord, Delivery, ThirdPartyEntryLog, AcquisitionItem, VehicleExitOrder, VehicleAsset, DriverAsset } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import AdminContractItems from './AdminContractItems';
 import WeekSelector from './WeekSelector';
@@ -68,6 +68,14 @@ interface AdminDashboardProps {
   onRegisterVehicleExitOrder: (order: Omit<VehicleExitOrder, 'id'>) => Promise<{ success: boolean; message: string }>;
   onUpdateVehicleExitOrder: (order: VehicleExitOrder) => Promise<{ success: boolean; message: string }>;
   onDeleteVehicleExitOrder: (id: string) => Promise<void>;
+  vehicleAssets: VehicleAsset[];
+  onRegisterVehicleAsset: (asset: Omit<VehicleAsset, 'id'>) => Promise<{ success: boolean; message: string }>;
+  onUpdateVehicleAsset: (asset: VehicleAsset) => Promise<{ success: boolean; message: string }>;
+  onDeleteVehicleAsset: (id: string) => Promise<void>;
+  driverAssets: DriverAsset[];
+  onRegisterDriverAsset: (asset: Omit<DriverAsset, 'id'>) => Promise<{ success: boolean; message: string }>;
+  onUpdateDriverAsset: (asset: DriverAsset) => Promise<{ success: boolean; message: string }>;
+  onDeleteDriverAsset: (id: string) => Promise<void>;
 }
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -84,6 +92,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     cleaningLogs = [], 
     thirdPartyEntries = [], 
     vehicleExitOrders = [],
+    vehicleAssets = [],
+    driverAssets = [],
     directorWithdrawals = [], 
     standardMenu, 
     dailyMenus, 
@@ -245,7 +255,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'perCapita': return <AdminPerCapita suppliers={suppliers} warehouseLog={warehouseLog} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={props.onUpdatePerCapitaConfig} onUpdateContractForItem={onUpdateContractForItem} onUpdateAcquisitionItem={props.onUpdateAcquisitionItem} onDeleteAcquisitionItem={props.onDeleteAcquisitionItem} acquisitionItems={acquisitionItems} />;
       case 'cleaning': return <AdminCleaningLog logs={cleaningLogs} onRegister={props.onRegisterCleaningLog} onDelete={props.onDeleteCleaningLog} />;
       case 'thirdPartyEntry': return <AdminThirdPartyEntry logs={thirdPartyEntries} onRegister={props.onRegisterThirdPartyEntry} onUpdate={props.onUpdateThirdPartyEntry} onDelete={props.onDeleteThirdPartyEntry} />;
-      case 'vehicleExitOrder': return <AdminVehicleExitOrder orders={vehicleExitOrders} onRegister={props.onRegisterVehicleExitOrder} onUpdate={props.onUpdateVehicleExitOrder} onDelete={props.onDeleteVehicleExitOrder} />;
+      case 'vehicleExitOrder': return <AdminVehicleExitOrder 
+          orders={vehicleExitOrders} 
+          onRegister={props.onRegisterVehicleExitOrder} 
+          onUpdate={props.onUpdateVehicleExitOrder} 
+          onDelete={props.onDeleteVehicleExitOrder}
+          vehicleAssets={vehicleAssets}
+          onRegisterVehicleAsset={props.onRegisterVehicleAsset}
+          onUpdateVehicleAsset={props.onUpdateVehicleAsset}
+          onDeleteVehicleAsset={props.onDeleteVehicleAsset}
+          driverAssets={driverAssets}
+          onRegisterDriverAsset={props.onRegisterDriverAsset}
+          onUpdateDriverAsset={props.onUpdateDriverAsset}
+          onDeleteDriverAsset={props.onDeleteDriverAsset}
+      />;
       case 'analytics': return <AdminAnalytics suppliers={suppliers} warehouseLog={warehouseLog} />;
       case 'menu': return <AdminStandardMenu suppliers={suppliers} template={props.standardMenu} dailyMenus={props.dailyMenus} onUpdateDailyMenus={props.onUpdateDailyMenu} inmateCount={perCapitaConfig.inmateCount || 0} />;
       case 'almoxarifado': return <WarehouseMovementForm suppliers={suppliers} warehouseLog={warehouseLog} onRegisterEntry={props.onRegisterEntry} onRegisterWithdrawal={props.onRegisterWithdrawal} />;

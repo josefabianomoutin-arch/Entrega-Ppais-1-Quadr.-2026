@@ -172,6 +172,21 @@ export interface AcquisitionItem {
   category: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'PRODUTOS DE LIMPEZA';
 }
 
+export interface VehicleAsset {
+  id: string;
+  model: string;
+  plate: string;
+  assetNumber: string;
+}
+
+export interface DriverAsset {
+  id: string;
+  name: string;
+  role: string;
+  cnhCategory: string; // A, B, C, D, E or combinations
+  isFitToDrive: boolean;
+}
+
 export interface VehicleExitOrder {
   id: string;
   date: string;

@@ -1,15 +1,30 @@
 
 import React, { useState, useMemo } from 'react';
-import { VehicleExitOrder } from '../types';
+import { VehicleExitOrder, VehicleAsset, DriverAsset } from '../types';
 
 interface AdminVehicleExitOrderProps {
     orders: VehicleExitOrder[];
     onRegister: (order: Omit<VehicleExitOrder, 'id'>) => Promise<{ success: boolean; message: string }>;
     onUpdate: (order: VehicleExitOrder) => Promise<{ success: boolean; message: string }>;
     onDelete: (id: string) => Promise<void>;
+    vehicleAssets: VehicleAsset[];
+    onRegisterVehicleAsset: (asset: Omit<VehicleAsset, 'id'>) => Promise<{ success: boolean; message: string }>;
+    onUpdateVehicleAsset: (asset: VehicleAsset) => Promise<{ success: boolean; message: string }>;
+    onDeleteVehicleAsset: (id: string) => Promise<void>;
+    driverAssets: DriverAsset[];
+    onRegisterDriverAsset: (asset: Omit<DriverAsset, 'id'>) => Promise<{ success: boolean; message: string }>;
+    onUpdateDriverAsset: (asset: DriverAsset) => Promise<{ success: boolean; message: string }>;
+    onDeleteDriverAsset: (id: string) => Promise<void>;
 }
 
-const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ orders, onRegister, onUpdate, onDelete }) => {
+const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ 
+    orders, onRegister, onUpdate, onDelete,
+    vehicleAssets, onRegisterVehicleAsset, onUpdateVehicleAsset, onDeleteVehicleAsset,
+    driverAssets, onRegisterDriverAsset, onUpdateDriverAsset, onDeleteDriverAsset
+}) => {
+    const [activeSubTab, setActiveSubTab] = useState<'orders' | 'assets'>('orders');
+    const [activeAssetTab, setActiveAssetTab] = useState<'vehicles' | 'drivers'>('vehicles');
+    
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<VehicleExitOrder | null>(null);
     const [formData, setFormData] = useState<Omit<VehicleExitOrder, 'id'>>({
@@ -23,6 +38,24 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ orders, o
         fctNumber: '',
         companions: [{ name: '', rg: '' }, { name: '', rg: '' }, { name: '', rg: '' }],
         observations: ''
+    });
+
+    // Asset Modals State
+    const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+    const [editingVehicle, setEditingVehicle] = useState<VehicleAsset | null>(null);
+    const [vehicleFormData, setVehicleFormData] = useState<Omit<VehicleAsset, 'id'>>({
+        model: '',
+        plate: '',
+        assetNumber: ''
+    });
+
+    const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+    const [editingDriver, setEditingDriver] = useState<DriverAsset | null>(null);
+    const [driverFormData, setDriverFormData] = useState<Omit<DriverAsset, 'id'>>({
+        name: '',
+        role: '',
+        cnhCategory: 'B',
+        isFitToDrive: true
     });
 
     const handlePrint = (order: VehicleExitOrder) => {
@@ -201,6 +234,30 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ orders, o
         setIsModalOpen(true);
     };
 
+    const handleVehicleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (editingVehicle) {
+            await onUpdateVehicleAsset({ ...vehicleFormData, id: editingVehicle.id });
+        } else {
+            await onRegisterVehicleAsset(vehicleFormData);
+        }
+        setIsVehicleModalOpen(false);
+        setEditingVehicle(null);
+        setVehicleFormData({ model: '', plate: '', assetNumber: '' });
+    };
+
+    const handleDriverSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (editingDriver) {
+            await onUpdateDriverAsset({ ...driverFormData, id: editingDriver.id });
+        } else {
+            await onRegisterDriverAsset(driverFormData);
+        }
+        setIsDriverModalOpen(false);
+        setEditingDriver(null);
+        setDriverFormData({ name: '', role: '', cnhCategory: 'B', isFitToDrive: true });
+    };
+
     return (
         <div className="space-y-6 animate-fade-in pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -208,64 +265,189 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ orders, o
                     <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter italic">Ordem de Saída de Veículo</h2>
                     <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest mt-1">Gestão de Deslocamentos Oficiais</p>
                 </div>
-                <button 
-                    onClick={() => { setEditingOrder(null); setIsModalOpen(true); }}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-8 rounded-2xl transition-all shadow-lg shadow-indigo-100 active:scale-95 uppercase text-[10px] tracking-widest flex items-center gap-2"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    Nova Ordem
-                </button>
-            </div>
-
-            <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50 text-[10px] uppercase text-gray-400 font-black">
-                            <tr>
-                                <th className="p-4 text-left">Data</th>
-                                <th className="p-4 text-left">Veículo / Placa</th>
-                                <th className="p-4 text-left">Responsável</th>
-                                <th className="p-4 text-left">Destino</th>
-                                <th className="p-4 text-left">FCT</th>
-                                <th className="p-4 text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {orders.length > 0 ? orders.sort((a,b) => b.date.localeCompare(a.date)).map(order => (
-                                <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="p-4 font-bold text-gray-600">{order.date.split('-').reverse().join('/')}</td>
-                                    <td className="p-4">
-                                        <div className="font-black text-gray-800 uppercase">{order.vehicle}</div>
-                                        <div className="text-[10px] text-indigo-500 font-mono">{order.plate}</div>
-                                    </td>
-                                    <td className="p-4">
-                                        <div className="font-bold text-gray-700 uppercase">{order.responsibleServer}</div>
-                                        <div className="text-[10px] text-gray-400 uppercase">{order.serverRole}</div>
-                                    </td>
-                                    <td className="p-4 font-bold text-gray-600 uppercase">{order.destination}</td>
-                                    <td className="p-4 font-mono text-gray-500">{order.fctNumber}</td>
-                                    <td className="p-4">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <button onClick={() => handlePrint(order)} className="p-2 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors" title="Imprimir">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                                            </button>
-                                            <button onClick={() => handleEdit(order)} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors" title="Editar">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                            </button>
-                                            <button onClick={() => { if(window.confirm('Excluir esta ordem?')) onDelete(order.id); }} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors" title="Excluir">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )) : (
-                                <tr><td colSpan={6} className="p-20 text-center text-gray-400 italic font-bold uppercase tracking-widest">Nenhuma ordem registrada</td></tr>
-                            )}
-                        </tbody>
-                    </table>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => setActiveSubTab('orders')}
+                        className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeSubTab === 'orders' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                    >
+                        Ordens
+                    </button>
+                    <button 
+                        onClick={() => setActiveSubTab('assets')}
+                        className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeSubTab === 'assets' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                    >
+                        Cadastros
+                    </button>
                 </div>
             </div>
 
+            {activeSubTab === 'orders' ? (
+                <>
+                    <div className="flex justify-end">
+                        <button 
+                            onClick={() => { setEditingOrder(null); setIsModalOpen(true); }}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-8 rounded-2xl transition-all shadow-lg shadow-indigo-100 active:scale-95 uppercase text-[10px] tracking-widest flex items-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                            Nova Ordem
+                        </button>
+                    </div>
+
+                    <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50 text-[10px] uppercase text-gray-400 font-black">
+                                    <tr>
+                                        <th className="p-4 text-left">Data</th>
+                                        <th className="p-4 text-left">Veículo / Placa</th>
+                                        <th className="p-4 text-left">Responsável</th>
+                                        <th className="p-4 text-left">Destino</th>
+                                        <th className="p-4 text-left">FCT</th>
+                                        <th className="p-4 text-center">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {orders.length > 0 ? orders.sort((a,b) => b.date.localeCompare(a.date)).map(order => (
+                                        <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="p-4 font-bold text-gray-600">{order.date.split('-').reverse().join('/')}</td>
+                                            <td className="p-4">
+                                                <div className="font-black text-gray-800 uppercase">{order.vehicle}</div>
+                                                <div className="text-[10px] text-indigo-500 font-mono">{order.plate}</div>
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="font-bold text-gray-700 uppercase">{order.responsibleServer}</div>
+                                                <div className="text-[10px] text-gray-400 uppercase">{order.serverRole}</div>
+                                            </td>
+                                            <td className="p-4 font-bold text-gray-600 uppercase">{order.destination}</td>
+                                            <td className="p-4 font-mono text-gray-500">{order.fctNumber}</td>
+                                            <td className="p-4">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button onClick={() => handlePrint(order)} className="p-2 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors" title="Imprimir">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                                    </button>
+                                                    <button onClick={() => handleEdit(order)} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors" title="Editar">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                    </button>
+                                                    <button onClick={() => { if(window.confirm('Excluir esta ordem?')) onDelete(order.id); }} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors" title="Excluir">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )) : (
+                                        <tr><td colSpan={6} className="p-20 text-center text-gray-400 italic font-bold uppercase tracking-widest">Nenhuma ordem registrada</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <div className="space-y-6">
+                    <div className="flex gap-4 border-b border-gray-100 pb-2">
+                        <button 
+                            onClick={() => setActiveAssetTab('vehicles')}
+                            className={`px-4 py-2 font-black text-[9px] uppercase tracking-widest transition-all ${activeAssetTab === 'vehicles' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                            Veículos
+                        </button>
+                        <button 
+                            onClick={() => setActiveAssetTab('drivers')}
+                            className={`px-4 py-2 font-black text-[9px] uppercase tracking-widest transition-all ${activeAssetTab === 'drivers' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                            Motoristas / Acompanhantes
+                        </button>
+                    </div>
+
+                    {activeAssetTab === 'vehicles' ? (
+                        <div className="space-y-4">
+                            <div className="flex justify-end">
+                                <button 
+                                    onClick={() => { setEditingVehicle(null); setVehicleFormData({ model: '', plate: '', assetNumber: '' }); setIsVehicleModalOpen(true); }}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2 px-6 rounded-xl transition-all shadow-lg shadow-emerald-100 active:scale-95 uppercase text-[9px] tracking-widest flex items-center gap-2"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                    Novo Veículo
+                                </button>
+                            </div>
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-50 text-[9px] uppercase text-gray-400 font-black">
+                                        <tr>
+                                            <th className="p-3 text-left">Modelo</th>
+                                            <th className="p-3 text-left">Placa</th>
+                                            <th className="p-3 text-left">Patrimônio</th>
+                                            <th className="p-3 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {vehicleAssets.map(v => (
+                                            <tr key={v.id} className="hover:bg-gray-50">
+                                                <td className="p-3 font-bold text-gray-700 uppercase">{v.model}</td>
+                                                <td className="p-3 font-mono text-indigo-600 font-bold">{v.plate}</td>
+                                                <td className="p-3 text-gray-500">{v.assetNumber}</td>
+                                                <td className="p-3">
+                                                    <div className="flex justify-center gap-2">
+                                                        <button onClick={() => { setEditingVehicle(v); setVehicleFormData({ model: v.model, plate: v.plate, assetNumber: v.assetNumber }); setIsVehicleModalOpen(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                                                        <button onClick={() => { if(window.confirm('Excluir veículo?')) onDeleteVehicleAsset(v.id); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="flex justify-end">
+                                <button 
+                                    onClick={() => { setEditingDriver(null); setDriverFormData({ name: '', role: '', cnhCategory: 'B', isFitToDrive: true }); setIsDriverModalOpen(true); }}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2 px-6 rounded-xl transition-all shadow-lg shadow-emerald-100 active:scale-95 uppercase text-[9px] tracking-widest flex items-center gap-2"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                    Novo Motorista / Acompanhante
+                                </button>
+                            </div>
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-50 text-[9px] uppercase text-gray-400 font-black">
+                                        <tr>
+                                            <th className="p-3 text-left">Nome</th>
+                                            <th className="p-3 text-left">Cargo</th>
+                                            <th className="p-3 text-center">CNH</th>
+                                            <th className="p-3 text-center">Status</th>
+                                            <th className="p-3 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {driverAssets.map(d => (
+                                            <tr key={d.id} className="hover:bg-gray-50">
+                                                <td className="p-3 font-bold text-gray-700 uppercase">{d.name}</td>
+                                                <td className="p-3 text-gray-500 uppercase text-[10px]">{d.role}</td>
+                                                <td className="p-3 text-center font-black text-indigo-600">{d.cnhCategory}</td>
+                                                <td className="p-3 text-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${d.isFitToDrive ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                                                        {d.isFitToDrive ? 'Apto' : 'Inapto'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3">
+                                                    <div className="flex justify-center gap-2">
+                                                        <button onClick={() => { setEditingDriver(d); setDriverFormData({ name: d.name, role: d.role, cnhCategory: d.cnhCategory, isFitToDrive: d.isFitToDrive }); setIsDriverModalOpen(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                                                        <button onClick={() => { if(window.confirm('Excluir motorista?')) onDeleteDriverAsset(d.id); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Nova Ordem Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-2 md:p-4">
                     <div className="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto custom-scrollbar border border-white/20">
@@ -296,12 +478,24 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ orders, o
                                         <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Veículo (Modelo)</label>
                                         <input 
                                             type="text" 
+                                            list="vehicle-models"
                                             required
                                             placeholder="Ex: VW CARGO"
                                             value={formData.vehicle}
-                                            onChange={e => setFormData({ ...formData, vehicle: e.target.value.toUpperCase() })}
+                                            onChange={e => {
+                                                const val = e.target.value.toUpperCase();
+                                                const found = vehicleAssets.find(v => v.model === val);
+                                                if (found) {
+                                                    setFormData({ ...formData, vehicle: found.model, plate: found.plate, assetNumber: found.assetNumber });
+                                                } else {
+                                                    setFormData({ ...formData, vehicle: val });
+                                                }
+                                            }}
                                             className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
                                         />
+                                        <datalist id="vehicle-models">
+                                            {vehicleAssets.map(v => <option key={v.id} value={v.model}>{v.plate}</option>)}
+                                        </datalist>
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Placa</label>
@@ -332,12 +526,24 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ orders, o
                                         <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Funcionário Responsável</label>
                                         <input 
                                             type="text" 
+                                            list="driver-names"
                                             required
                                             placeholder="Nome Completo"
                                             value={formData.responsibleServer}
-                                            onChange={e => setFormData({ ...formData, responsibleServer: e.target.value.toUpperCase() })}
+                                            onChange={e => {
+                                                const val = e.target.value.toUpperCase();
+                                                const found = driverAssets.find(d => d.name === val);
+                                                if (found) {
+                                                    setFormData({ ...formData, responsibleServer: found.name, serverRole: found.role });
+                                                } else {
+                                                    setFormData({ ...formData, responsibleServer: val });
+                                                }
+                                            }}
                                             className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
                                         />
+                                        <datalist id="driver-names">
+                                            {driverAssets.map(d => <option key={d.id} value={d.name}>{d.role}</option>)}
+                                        </datalist>
                                     </div>
                                 </div>
 
@@ -443,6 +649,99 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ orders, o
                                         {editingOrder ? 'Salvar Alterações' : 'Confirmar Registro'}
                                     </button>
                                 </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Vehicle Asset Modal */}
+            {isVehicleModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-md border border-white/20">
+                        <div className="p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter italic">{editingVehicle ? 'Editar Veículo' : 'Novo Veículo'}</h3>
+                                <button onClick={() => setIsVehicleModalOpen(false)} className="p-2 bg-gray-100 text-gray-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                            <form onSubmit={handleVehicleSubmit} className="space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Modelo</label>
+                                    <input type="text" required value={vehicleFormData.model} onChange={e => setVehicleFormData({ ...vehicleFormData, model: e.target.value.toUpperCase() })} className="w-full h-10 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 outline-none text-xs" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Placa</label>
+                                        <input type="text" required value={vehicleFormData.plate} onChange={e => setVehicleFormData({ ...vehicleFormData, plate: e.target.value.toUpperCase() })} className="w-full h-10 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 outline-none text-xs font-mono" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Patrimônio</label>
+                                        <input type="text" required value={vehicleFormData.assetNumber} onChange={e => setVehicleFormData({ ...vehicleFormData, assetNumber: e.target.value.toUpperCase() })} className="w-full h-10 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 outline-none text-xs" />
+                                    </div>
+                                </div>
+                                <button type="submit" className="w-full h-12 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 transition-all uppercase text-[10px] tracking-widest mt-4">
+                                    {editingVehicle ? 'Salvar Alterações' : 'Cadastrar Veículo'}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Driver Asset Modal */}
+            {isDriverModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-md border border-white/20">
+                        <div className="p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter italic">{editingDriver ? 'Editar Motorista' : 'Novo Motorista'}</h3>
+                                <button onClick={() => setIsDriverModalOpen(false)} className="p-2 bg-gray-100 text-gray-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                            <form onSubmit={handleDriverSubmit} className="space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Nome Completo</label>
+                                    <input type="text" required value={driverFormData.name} onChange={e => setDriverFormData({ ...driverFormData, name: e.target.value.toUpperCase() })} className="w-full h-10 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 outline-none text-xs" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Cargo</label>
+                                    <input type="text" required value={driverFormData.role} onChange={e => setDriverFormData({ ...driverFormData, role: e.target.value.toUpperCase() })} className="w-full h-10 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 outline-none text-xs" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Categoria CNH</label>
+                                        <select value={driverFormData.cnhCategory} onChange={e => setDriverFormData({ ...driverFormData, cnhCategory: e.target.value })} className="w-full h-10 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 outline-none text-xs">
+                                            <option value="A">A</option>
+                                            <option value="B">B</option>
+                                            <option value="C">C</option>
+                                            <option value="D">D</option>
+                                            <option value="E">E</option>
+                                            <option value="AB">AB</option>
+                                            <option value="AC">AC</option>
+                                            <option value="AD">AD</option>
+                                            <option value="AE">AE</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Apto a Dirigir?</label>
+                                        <div className="flex items-center h-10 gap-4">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="radio" checked={driverFormData.isFitToDrive} onChange={() => setDriverFormData({ ...driverFormData, isFitToDrive: true })} className="w-4 h-4 text-indigo-600" />
+                                                <span className="text-[10px] font-black uppercase text-emerald-600">Sim</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="radio" checked={!driverFormData.isFitToDrive} onChange={() => setDriverFormData({ ...driverFormData, isFitToDrive: false })} className="w-4 h-4 text-red-600" />
+                                                <span className="text-[10px] font-black uppercase text-red-600">Não</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" className="w-full h-12 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 transition-all uppercase text-[10px] tracking-widest mt-4">
+                                    {editingDriver ? 'Salvar Alterações' : 'Cadastrar Motorista'}
+                                </button>
                             </form>
                         </div>
                     </div>
