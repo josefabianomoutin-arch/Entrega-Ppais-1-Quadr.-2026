@@ -4,7 +4,7 @@ import { VehicleExitOrder, VehicleAsset, DriverAsset } from '../types';
 
 interface AdminVehicleExitOrderProps {
     orders: VehicleExitOrder[];
-    onRegister: (order: Omit<VehicleExitOrder, 'id'>) => Promise<{ success: boolean; message: string }>;
+    onRegister: (order: Omit<VehicleExitOrder, 'id'>) => Promise<{ success: boolean; message: string; id?: string }>;
     onUpdate: (order: VehicleExitOrder) => Promise<{ success: boolean; message: string }>;
     onDelete: (id: string) => Promise<void>;
     vehicleAssets: VehicleAsset[];

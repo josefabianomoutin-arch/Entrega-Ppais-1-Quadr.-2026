@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import type { VehicleExitOrder, VehicleAsset, DriverAsset } from '../types';
 import AdminVehicleExitOrder from './AdminVehicleExitOrder';
 
@@ -7,13 +7,13 @@ interface VehicleOrderDashboardProps {
   orders: VehicleExitOrder[];
   vehicleAssets: VehicleAsset[];
   driverAssets: DriverAsset[];
-  onRegister: (order: VehicleExitOrder) => Promise<{ success: boolean; message: string }>;
+  onRegister: (order: Omit<VehicleExitOrder, 'id'>) => Promise<{ success: boolean; message: string; id?: string }>;
   onUpdate: (order: VehicleExitOrder) => Promise<{ success: boolean; message: string }>;
   onDelete: (id: string) => Promise<void>;
-  onRegisterVehicleAsset: (asset: VehicleAsset) => Promise<{ success: boolean; message: string }>;
+  onRegisterVehicleAsset: (asset: Omit<VehicleAsset, 'id'>) => Promise<{ success: boolean; message: string }>;
   onUpdateVehicleAsset: (asset: VehicleAsset) => Promise<{ success: boolean; message: string }>;
   onDeleteVehicleAsset: (id: string) => Promise<void>;
-  onRegisterDriverAsset: (asset: DriverAsset) => Promise<{ success: boolean; message: string }>;
+  onRegisterDriverAsset: (asset: Omit<DriverAsset, 'id'>) => Promise<{ success: boolean; message: string }>;
   onUpdateDriverAsset: (asset: DriverAsset) => Promise<{ success: boolean; message: string }>;
   onDeleteDriverAsset: (id: string) => Promise<void>;
   onLogout: () => void;
@@ -36,6 +36,23 @@ const VehicleOrderDashboard: React.FC<VehicleOrderDashboardProps> = ({
   onLogout,
   role
 }) => {
+  const [sessionOrderIds, setSessionOrderIds] = useState<string[]>([]);
+
+  const filteredOrders = useMemo(() => {
+    if (role === 'ordem_saida') {
+      return orders.filter(o => sessionOrderIds.includes(o.id));
+    }
+    return orders;
+  }, [orders, sessionOrderIds, role]);
+
+  const handleRegister = async (order: Omit<VehicleExitOrder, 'id'>) => {
+    const response = await onRegister(order);
+    if (response.success && response.id) {
+      setSessionOrderIds(prev => [...prev, response.id!]);
+    }
+    return response;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-indigo-950 text-white p-4 shadow-xl flex justify-between items-center sticky top-0 z-50 border-b border-indigo-800">
@@ -57,10 +74,10 @@ const VehicleOrderDashboard: React.FC<VehicleOrderDashboardProps> = ({
 
       <main className="p-4 max-w-7xl mx-auto">
         <AdminVehicleExitOrder 
-          orders={orders}
+          orders={filteredOrders}
           vehicleAssets={vehicleAssets}
           driverAssets={driverAssets}
-          onRegister={onRegister}
+          onRegister={handleRegister}
           onUpdate={role === 'ordem_saida' ? async () => ({ success: false, message: 'Não permitido' }) : onUpdate}
           onDelete={onDelete}
           onRegisterVehicleAsset={role === 'ordem_saida' ? async () => ({ success: false, message: 'Não permitido' }) : onRegisterVehicleAsset}

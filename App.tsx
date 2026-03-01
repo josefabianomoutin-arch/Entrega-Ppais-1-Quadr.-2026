@@ -797,8 +797,9 @@ const App: React.FC = () => {
              vehicleExitOrders={vehicleExitOrders}
              onRegisterVehicleExitOrder={async (order) => {
                  const r = push(vehicleExitOrdersRef);
-                 await set(r, { ...order, id: r.key });
-                 return { success: true, message: 'Ok' };
+                 const id = r.key || `order-${Date.now()}`;
+                 await set(r, { ...order, id });
+                 return { success: true, message: 'Ok', id };
              }}
              onUpdateVehicleExitOrder={async (order) => {
                  await set(child(vehicleExitOrdersRef, order.id), order);
@@ -841,8 +842,9 @@ const App: React.FC = () => {
         driverAssets={driverAssets}
         onRegister={async (order) => {
           const r = push(vehicleExitOrdersRef);
-          await set(r, { ...order, id: r.key });
-          return { success: true, message: 'Ok' };
+          const id = r.key || `order-${Date.now()}`;
+          await set(r, { ...order, id });
+          return { success: true, message: 'Ok', id };
         }}
         onUpdate={async (order) => {
           await set(child(vehicleExitOrdersRef, order.id), order);
