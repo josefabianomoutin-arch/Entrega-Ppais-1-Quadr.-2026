@@ -22,7 +22,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
   const isStringLogin = useMemo(() => {
     const nameTrimmed = loginName.trim().toUpperCase();
-    return ['ITESP', 'ALMOXARIFADO', 'ALMOX', 'FINANCEIRO', 'SUBPORTARIA'].includes(nameTrimmed);
+    return ['ITESP', 'ALMOXARIFADO', 'ALMOX', 'FINANCEIRO', 'SUBPORTARIA', 'INFRAESTRUTURA', 'ORDEM DE SAIDA'].includes(nameTrimmed);
   }, [loginName]);
 
   const passwordPlaceholder = useMemo(() => {

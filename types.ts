@@ -205,4 +205,4 @@ export interface VehicleExitOrder {
   observations?: string;
 }
 
-export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria' | 'cardapio';
+export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria' | 'cardapio' | 'infraestrutura' | 'ordem_saida';

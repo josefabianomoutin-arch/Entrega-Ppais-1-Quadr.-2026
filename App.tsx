@@ -9,6 +9,7 @@ import ItespDashboard from './components/ItespDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 import SubportariaDashboard from './components/SubportariaDashboard';
 import MenuDashboard from './components/MenuDashboard';
+import VehicleOrderDashboard from './components/VehicleOrderDashboard';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, onValue, set, runTransaction, push, child, update, remove, get } from 'firebase/database';
 import { firebaseConfig } from './firebaseConfig';
@@ -146,6 +147,14 @@ const App: React.FC = () => {
     }
     if (cleanName === 'SEGURANÇA EXTERNA' && rawPass === 'externa2026') {
       setUser({ name: 'SEGURANÇA EXTERNA', cpf: 'externa2026', role: 'subportaria' });
+      return true;
+    }
+    if (cleanName === 'INFRAESTRUTURA' && rawPass === 'infra2026') {
+      setUser({ name: 'INFRAESTRUTURA', cpf: 'infra2026', role: 'infraestrutura' });
+      return true;
+    }
+    if (cleanName === 'ORDEM DE SAIDA' && rawPass === 'saida2026') {
+      setUser({ name: 'ORDEM DE SAIDA', cpf: 'saida2026', role: 'ordem_saida' });
       return true;
     }
 
@@ -820,6 +829,48 @@ const App: React.FC = () => {
           await set(child(vehicleExitOrdersRef, order.id), order);
           return { success: true, message: 'Atualizado' };
         }}
+      />
+    );
+  }
+
+  if (user.role === 'infraestrutura' || user.role === 'ordem_saida') {
+    return (
+      <VehicleOrderDashboard 
+        orders={vehicleExitOrders}
+        vehicleAssets={vehicleAssets}
+        driverAssets={driverAssets}
+        onRegister={async (order) => {
+          const r = push(vehicleExitOrdersRef);
+          await set(r, { ...order, id: r.key });
+          return { success: true, message: 'Ok' };
+        }}
+        onUpdate={async (order) => {
+          await set(child(vehicleExitOrdersRef, order.id), order);
+          return { success: true, message: 'Atualizado' };
+        }}
+        onDelete={async (id) => remove(child(vehicleExitOrdersRef, id))}
+        onRegisterVehicleAsset={async (v) => {
+          const r = push(vehicleAssetsRef);
+          await set(r, { ...v, id: r.key });
+          return { success: true, message: 'Ok' };
+        }}
+        onUpdateVehicleAsset={async (v) => {
+          await set(child(vehicleAssetsRef, v.id), v);
+          return { success: true, message: 'Atualizado' };
+        }}
+        onDeleteVehicleAsset={async (id) => remove(child(vehicleAssetsRef, id))}
+        onRegisterDriverAsset={async (d) => {
+          const r = push(driverAssetsRef);
+          await set(r, { ...d, id: r.key });
+          return { success: true, message: 'Ok' };
+        }}
+        onUpdateDriverAsset={async (d) => {
+          await set(child(driverAssetsRef, d.id), d);
+          return { success: true, message: 'Atualizado' };
+        }}
+        onDeleteDriverAsset={async (id) => remove(child(driverAssetsRef, id))}
+        onLogout={handleLogout}
+        role={user.role}
       />
     );
   }
