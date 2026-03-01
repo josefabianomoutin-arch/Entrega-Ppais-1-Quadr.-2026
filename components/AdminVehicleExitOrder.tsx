@@ -267,115 +267,115 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ orders, o
             </div>
 
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 md:p-4">
-                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-y-auto custom-scrollbar border border-white/20">
-                        <div className="p-6 md:p-8">
-                            <div className="flex justify-between items-center mb-6 border-b pb-4">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-2 md:p-4">
+                    <div className="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto custom-scrollbar border border-white/20">
+                        <div className="p-4 md:p-6">
+                            <div className="flex justify-between items-center mb-4 border-b pb-3">
                                 <div>
-                                    <h3 className="text-xl md:text-2xl font-black text-gray-900 uppercase tracking-tighter italic">{editingOrder ? 'Editar Ordem' : 'Nova Ordem de Saída'}</h3>
-                                    <p className="text-gray-400 font-bold text-[9px] uppercase tracking-widest mt-0.5">Preencha os dados do deslocamento</p>
+                                    <h3 className="text-lg md:text-xl font-black text-gray-900 uppercase tracking-tighter italic">{editingOrder ? 'Editar Ordem' : 'Nova Ordem de Saída'}</h3>
+                                    <p className="text-gray-400 font-bold text-[8px] uppercase tracking-widest mt-0.5">Preencha os dados do deslocamento</p>
                                 </div>
-                                <button onClick={() => setIsModalOpen(false)} className="p-2 bg-gray-100 text-gray-400 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                <button onClick={() => setIsModalOpen(false)} className="p-1.5 bg-gray-100 text-gray-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Data</label>
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Data</label>
                                         <input 
                                             type="date" 
                                             required
                                             value={formData.date}
                                             onChange={e => setFormData({ ...formData, date: e.target.value })}
-                                            className="w-full h-11 px-4 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-sm"
+                                            className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
                                         />
                                     </div>
                                     <div className="space-y-1 md:col-span-2">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Veículo (Modelo)</label>
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Veículo (Modelo)</label>
                                         <input 
                                             type="text" 
                                             required
                                             placeholder="Ex: VW CARGO"
                                             value={formData.vehicle}
                                             onChange={e => setFormData({ ...formData, vehicle: e.target.value.toUpperCase() })}
-                                            className="w-full h-11 px-4 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-sm"
+                                            className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Placa</label>
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Placa</label>
                                         <input 
                                             type="text" 
                                             required
                                             placeholder="Ex: FSP4J81"
                                             value={formData.plate}
                                             onChange={e => setFormData({ ...formData, plate: e.target.value.toUpperCase() })}
-                                            className="w-full h-11 px-4 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-sm font-mono"
+                                            className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs font-mono"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Patrimônio</label>
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Patrimônio</label>
                                         <input 
                                             type="text" 
                                             required
                                             placeholder="Ex: 1710"
                                             value={formData.assetNumber}
                                             onChange={e => setFormData({ ...formData, assetNumber: e.target.value.toUpperCase() })}
-                                            className="w-full h-11 px-4 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-sm"
+                                            className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
                                         />
                                     </div>
                                     <div className="space-y-1 md:col-span-3">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Funcionário Responsável</label>
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Funcionário Responsável</label>
                                         <input 
                                             type="text" 
                                             required
                                             placeholder="Nome Completo"
                                             value={formData.responsibleServer}
                                             onChange={e => setFormData({ ...formData, responsibleServer: e.target.value.toUpperCase() })}
-                                            className="w-full h-11 px-4 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-sm"
+                                            className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Cargo</label>
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Cargo</label>
                                         <input 
                                             type="text" 
                                             required
                                             placeholder="Ex: POLICIAL PENAL"
                                             value={formData.serverRole}
                                             onChange={e => setFormData({ ...formData, serverRole: e.target.value.toUpperCase() })}
-                                            className="w-full h-11 px-4 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-sm"
+                                            className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Destino</label>
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Destino</label>
                                         <input 
                                             type="text" 
                                             required
                                             placeholder="Ex: ARARAQUARA - SP"
                                             value={formData.destination}
                                             onChange={e => setFormData({ ...formData, destination: e.target.value.toUpperCase() })}
-                                            className="w-full h-11 px-4 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-sm"
+                                            className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-4">
-                                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-3">
+                                    <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                                         Acompanhantes
                                     </label>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         {formData.companions.map((c, i) => (
-                                            <div key={i} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm space-y-2">
+                                            <div key={i} className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm space-y-1.5">
                                                 <div className="space-y-0.5">
-                                                    <label className="text-[8px] font-black text-gray-400 uppercase">Nome ({i + 1})</label>
+                                                    <label className="text-[7px] font-black text-gray-400 uppercase">Nome ({i + 1})</label>
                                                     <input 
                                                         type="text" 
                                                         value={c.name}
@@ -384,11 +384,11 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ orders, o
                                                             newCompanions[i].name = e.target.value.toUpperCase();
                                                             setFormData({ ...formData, companions: newCompanions });
                                                         }}
-                                                        className="w-full h-9 px-3 border border-gray-100 rounded-lg bg-gray-50 font-bold outline-none focus:border-indigo-500 transition-all text-xs"
+                                                        className="w-full h-8 px-2 border border-gray-100 rounded-lg bg-gray-50 font-bold outline-none focus:border-indigo-500 transition-all text-[10px]"
                                                     />
                                                 </div>
                                                 <div className="space-y-0.5">
-                                                    <label className="text-[8px] font-black text-gray-400 uppercase">RG</label>
+                                                    <label className="text-[7px] font-black text-gray-400 uppercase">RG</label>
                                                     <input 
                                                         type="text" 
                                                         value={c.rg}
@@ -397,7 +397,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ orders, o
                                                             newCompanions[i].rg = e.target.value.toUpperCase();
                                                             setFormData({ ...formData, companions: newCompanions });
                                                         }}
-                                                        className="w-full h-9 px-3 border border-gray-100 rounded-lg bg-gray-50 font-bold outline-none focus:border-indigo-500 transition-all text-xs"
+                                                        className="w-full h-8 px-2 border border-gray-100 rounded-lg bg-gray-50 font-bold outline-none focus:border-indigo-500 transition-all text-[10px]"
                                                     />
                                                 </div>
                                             </div>
@@ -405,40 +405,40 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ orders, o
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Número da FCT (Anexar)</label>
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Número da FCT (Anexar)</label>
                                         <input 
                                             type="text" 
                                             placeholder="Ex: 1630/2025"
                                             value={formData.fctNumber}
                                             onChange={e => setFormData({ ...formData, fctNumber: e.target.value.toUpperCase() })}
-                                            className="w-full h-11 px-4 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-sm font-mono"
+                                            className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs font-mono"
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Observações</label>
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Observações</label>
                                         <input 
                                             type="text" 
                                             placeholder="Opcional"
                                             value={formData.observations}
                                             onChange={e => setFormData({ ...formData, observations: e.target.value.toUpperCase() })}
-                                            className="w-full h-11 px-4 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-sm"
+                                            className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="flex gap-3 pt-2">
+                                <div className="flex gap-3 pt-1">
                                     <button 
                                         type="button"
                                         onClick={() => setIsModalOpen(false)}
-                                        className="flex-1 h-12 bg-gray-100 text-gray-500 font-black rounded-xl hover:bg-gray-200 transition-all uppercase text-[10px] tracking-widest"
+                                        className="flex-1 h-10 bg-gray-100 text-gray-500 font-black rounded-xl hover:bg-gray-200 transition-all uppercase text-[9px] tracking-widest"
                                     >
                                         Cancelar
                                     </button>
                                     <button 
                                         type="submit"
-                                        className="flex-[2] h-12 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 uppercase text-[10px] tracking-widest active:scale-95"
+                                        className="flex-[2] h-10 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 uppercase text-[9px] tracking-widest active:scale-95"
                                     >
                                         {editingOrder ? 'Salvar Alterações' : 'Confirmar Registro'}
                                     </button>
