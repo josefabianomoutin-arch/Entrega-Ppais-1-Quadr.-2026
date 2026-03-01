@@ -256,8 +256,8 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
                 return `
                   <tr>
                     <td><strong>${row.foodItem || row.contractedItem || 'N/A'}</strong></td>
-                    <td class="text-center">-</td>
-                    <td class="text-center">-</td>
+                    <td class="text-center">${row.unitWeight || '-'}</td>
+                    <td class="text-center">${row.totalWeight || '-'}</td>
                     <td class="text-center">${lot}</td>
                     <td class="text-center">${invoice}</td>
                   </tr>
