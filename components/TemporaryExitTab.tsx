@@ -10,6 +10,7 @@ interface TemporaryExitTabProps {
   logs: TemporaryExitLog[];
   onSaveInmate: (inmate: TemporaryExitInmate) => Promise<{ success: boolean }>;
   onDeleteInmate: (id: string) => Promise<void>;
+  onClearAllInmates: () => Promise<{ success: boolean }>;
   onRegisterLog: (log: Omit<TemporaryExitLog, 'id'>) => Promise<{ success: boolean }>;
   onBulkUpdateInmates: (inmates: TemporaryExitInmate[]) => Promise<{ success: boolean }>;
 }
@@ -20,6 +21,7 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
   logs, 
   onSaveInmate, 
   onDeleteInmate, 
+  onClearAllInmates,
   onRegisterLog, 
   onBulkUpdateInmates 
 }) => {
@@ -386,12 +388,31 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
                 </select>
 
                 {isAdmin && (
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center gap-2 transition-all active:scale-95"
-                  >
-                    <Upload className="h-4 w-4" /> Importar Excel
-                  </button>
+                  <>
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center gap-2 transition-all active:scale-95"
+                    >
+                      <Upload className="h-4 w-4" /> Importar Excel
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        if (window.confirm('TEM CERTEZA QUE DESEJA EXCLUIR TODOS OS DADOS IMPORTADOS? ESTA AÇÃO NÃO PODE SER DESFEITA.')) {
+                          await onClearAllInmates();
+                          await onRegisterLog({
+                            timestamp: new Date().toISOString(),
+                            user: user.name,
+                            action: 'LIMPEZA GERAL',
+                            details: 'Todos os registros de saída temporária foram excluídos.'
+                          });
+                          alert('Todos os dados foram excluídos com sucesso.');
+                        }
+                      }}
+                      className="h-12 px-6 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center gap-2 transition-all active:scale-95"
+                    >
+                      <Trash2 className="h-4 w-4" /> Limpar Dados
+                    </button>
+                  </>
                 )}
                 <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".xlsx, .xls" />
               </div>

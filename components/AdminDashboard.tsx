@@ -82,6 +82,7 @@ interface AdminDashboardProps {
   temporaryExitLogs: TemporaryExitLog[];
   onSaveTemporaryExitInmate: (inmate: TemporaryExitInmate) => Promise<{ success: boolean }>;
   onDeleteTemporaryExitInmate: (id: string) => Promise<void>;
+  onClearAllTemporaryExitInmates: () => Promise<{ success: boolean }>;
   onRegisterTemporaryExitLog: (log: Omit<TemporaryExitLog, 'id'>) => Promise<{ success: boolean }>;
   onBulkUpdateTemporaryExitInmates: (inmates: TemporaryExitInmate[]) => Promise<{ success: boolean }>;
 }
@@ -292,6 +293,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         logs={props.temporaryExitLogs}
         onSaveInmate={props.onSaveTemporaryExitInmate}
         onDeleteInmate={props.onDeleteTemporaryExitInmate}
+        onClearAllInmates={props.onClearAllTemporaryExitInmates}
         onRegisterLog={props.onRegisterTemporaryExitLog}
         onBulkUpdateInmates={props.onBulkUpdateTemporaryExitInmates}
       />;

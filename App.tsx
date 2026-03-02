@@ -785,6 +785,10 @@ const App: React.FC = () => {
           return { success: true };
         }}
         onDeleteTemporaryExitInmate={async (id) => remove(child(temporaryExitInmatesRef, id))}
+        onClearAllTemporaryExitInmates={async () => {
+          await remove(temporaryExitInmatesRef);
+          return { success: true };
+        }}
         onRegisterTemporaryExitLog={async (log) => {
           const r = push(temporaryExitLogsRef);
           await set(r, { ...log, id: r.key });
