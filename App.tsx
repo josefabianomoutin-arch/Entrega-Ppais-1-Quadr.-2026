@@ -819,6 +819,32 @@ const App: React.FC = () => {
              vehicleExitOrders={vehicleExitOrders}
              vehicleAssets={vehicleAssets}
              driverAssets={driverAssets}
+             temporaryExitInmates={temporaryExitInmates}
+             temporaryExitLogs={temporaryExitLogs}
+             onSaveTemporaryExitInmate={async (inmate) => {
+               const id = inmate.id || push(temporaryExitInmatesRef).key;
+               await set(child(temporaryExitInmatesRef, id!), { ...inmate, id });
+               return { success: true };
+             }}
+             onDeleteTemporaryExitInmate={async (id) => remove(child(temporaryExitInmatesRef, id))}
+             onClearAllTemporaryExitInmates={async () => {
+               await remove(temporaryExitInmatesRef);
+               return { success: true };
+             }}
+             onRegisterTemporaryExitLog={async (log) => {
+               const r = push(temporaryExitLogsRef);
+               await set(r, { ...log, id: r.key });
+               return { success: true };
+             }}
+             onBulkUpdateTemporaryExitInmates={async (inmates) => {
+               const updates: any = {};
+               inmates.forEach(inmate => {
+                 const id = inmate.id || push(temporaryExitInmatesRef).key;
+                 updates[id] = { ...inmate, id };
+               });
+               await update(temporaryExitInmatesRef, updates);
+               return { success: true };
+             }}
            />;
   }
 

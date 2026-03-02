@@ -1,6 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
-import type { FinancialRecord, StandardMenu, DailyMenus, Supplier, ThirdPartyEntryLog, VehicleExitOrder, VehicleAsset, DriverAsset } from '../types';
+import TemporaryExitTab from './TemporaryExitTab';
+import type { FinancialRecord, StandardMenu, DailyMenus, Supplier, ThirdPartyEntryLog, VehicleExitOrder, VehicleAsset, DriverAsset, TemporaryExitInmate, TemporaryExitLog } from '../types';
 import MenuDashboard from './MenuDashboard';
 import AgendaChegadas from './AgendaChegadas';
 import AdminVehicleExitOrder from './AdminVehicleExitOrder';
@@ -16,6 +17,13 @@ interface FinanceDashboardProps {
   vehicleExitOrders?: VehicleExitOrder[];
   vehicleAssets?: VehicleAsset[];
   driverAssets?: DriverAsset[];
+  temporaryExitInmates?: TemporaryExitInmate[];
+  temporaryExitLogs?: TemporaryExitLog[];
+  onSaveTemporaryExitInmate?: (inmate: TemporaryExitInmate) => Promise<{ success: boolean }>;
+  onDeleteTemporaryExitInmate?: (id: string) => Promise<void>;
+  onClearAllTemporaryExitInmates?: () => Promise<{ success: boolean }>;
+  onRegisterTemporaryExitLog?: (log: Omit<TemporaryExitLog, 'id'>) => Promise<{ success: boolean }>;
+  onBulkUpdateTemporaryExitInmates?: (inmates: TemporaryExitInmate[]) => Promise<{ success: boolean }>;
 }
 
 const PTRES_OPTIONS = ['380302', '380303', '380304', '380308', '380328'] as const;
@@ -32,7 +40,7 @@ const PTRES_DESCRIPTIONS: Record<string, string> = {
 const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
-type SubTab = 'recursos' | 'pagamentos' | 'saldos' | 'cardapio' | 'agenda' | 'vehicles';
+type SubTab = 'recursos' | 'pagamentos' | 'saldos' | 'cardapio' | 'agenda' | 'vehicles' | 'temporaryExit';
 
 const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ 
     records, 
@@ -44,7 +52,14 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
     thirdPartyEntries,
     vehicleExitOrders,
     vehicleAssets,
-    driverAssets
+    driverAssets,
+    temporaryExitInmates,
+    temporaryExitLogs,
+    onSaveTemporaryExitInmate,
+    onDeleteTemporaryExitInmate,
+    onClearAllTemporaryExitInmates,
+    onRegisterTemporaryExitLog,
+    onBulkUpdateTemporaryExitInmates
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('pagamentos');
@@ -154,6 +169,12 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
                     >
                         🚗 Saída de Veículos
                     </button>
+                    <button 
+                        onClick={() => setActiveSubTab('temporaryExit')}
+                        className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'temporaryExit' ? 'bg-rose-500 text-white shadow-lg' : 'hover:bg-indigo-800 text-rose-200'}`}
+                    >
+                        🚪 Saída Temporária
+                    </button>
                 </>
             )}
         </div>
@@ -204,7 +225,22 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
             </div>
         )}
 
-        {activeSubTab !== 'saldos' && activeSubTab !== 'cardapio' && activeSubTab !== 'agenda' && activeSubTab !== 'vehicles' && (
+        {activeSubTab === 'temporaryExit' && temporaryExitInmates && temporaryExitLogs && onSaveTemporaryExitInmate && onDeleteTemporaryExitInmate && onClearAllTemporaryExitInmates && onRegisterTemporaryExitLog && onBulkUpdateTemporaryExitInmates && (
+            <div className="animate-fade-in-up">
+                <TemporaryExitTab 
+                    user={{ name: user?.name || '', cpf: user?.cpf || '', role: 'admin' }}
+                    inmates={temporaryExitInmates}
+                    logs={temporaryExitLogs}
+                    onSaveInmate={onSaveTemporaryExitInmate}
+                    onDeleteInmate={onDeleteTemporaryExitInmate}
+                    onClearAllInmates={onClearAllTemporaryExitInmates}
+                    onRegisterLog={onRegisterTemporaryExitLog}
+                    onBulkUpdateInmates={onBulkUpdateTemporaryExitInmates}
+                />
+            </div>
+        )}
+
+        {activeSubTab !== 'saldos' && activeSubTab !== 'cardapio' && activeSubTab !== 'agenda' && activeSubTab !== 'vehicles' && activeSubTab !== 'temporaryExit' && (
             <div className="flex justify-center">
                 <div className="w-full max-w-2xl relative">
                     <span className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-400">
