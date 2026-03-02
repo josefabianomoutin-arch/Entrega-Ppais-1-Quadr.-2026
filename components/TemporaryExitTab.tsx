@@ -135,6 +135,9 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
             familiar: String(row['FAMILIAR'] || existing?.familiar || ''),
             parentesco: String(row['PARENTESCO'] || existing?.parentesco || ''),
             transporte: String(row['TRANSPORTE'] || existing?.transporte || ''),
+            situacao: String(row['SITUACAO'] || row['Situação'] || existing?.situacao || ''),
+            conclusao: String(row['CONCLUSAO'] || row['Conclusão'] || existing?.conclusao || ''),
+            observacoesGerais: String(row['OBSERVACOES GERAIS'] || row['Observações Gerais'] || existing?.observacoesGerais || ''),
             opinions: existing?.opinions || {},
             finalStatus: existing?.finalStatus || 'PENDENTE',
           };
@@ -185,7 +188,21 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
     const dataToExport = filteredInmates.map(i => ({
       'NOME': i.nome,
       'MATRÍCULA': i.matricula,
-      'PAVILHÃO': i.pavilhao,
+      'PEC/EXECUÇÃO': i.pecExecucao,
+      'DATA LAPSO': i.dataLapso,
+      'LAPSO': i.lapso,
+      'DATA DELITO': i.dataDelito,
+      'PECÚLIO DISPONÍVEL': i.peculioDisponivel,
+      'SITUAÇÃO': i.situacao,
+      'VISITA ATIVA': i.visitaAtiva,
+      'ENDEREÇO': i.endereco,
+      'CIDADE': i.cidade,
+      'ESTADO': i.estado,
+      'FAMILIAR': i.familiar,
+      'PARENTESCO': i.parentesco,
+      'TRANSPORTE': i.transporte,
+      'CONCLUSÃO': i.conclusao,
+      'OBSERVAÇÕES GERAIS': i.observacoesGerais,
       'STATUS FINAL': i.finalStatus,
       'SIMIC': i.opinions.simic?.status || 'PENDENTE',
       'SEGURANÇA': i.opinions.seguranca?.status || 'PENDENTE',
@@ -231,12 +248,14 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
               <tr>
                 <th>Nome</th>
                 <th>Matrícula</th>
-                <th>Pavilhão</th>
+                <th>PEC/Execução</th>
+                <th>Data Lapso</th>
+                <th>Lapso</th>
+                <th>Pecúlio Disp.</th>
+                <th>Situação</th>
+                <th>Visita Ativa</th>
+                <th>Conclusão</th>
                 <th>Status Final</th>
-                <th>Simic</th>
-                <th>Segurança</th>
-                <th>Pecúlio</th>
-                <th>Reintegração</th>
               </tr>
             </thead>
             <tbody>
@@ -244,12 +263,14 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
                 <tr>
                   <td>${i.nome}</td>
                   <td>${i.matricula}</td>
-                  <td>${i.pavilhao || '-'}</td>
+                  <td>${i.pecExecucao || '-'}</td>
+                  <td>${i.dataLapso || '-'}</td>
+                  <td>${i.lapso || '-'}</td>
+                  <td>${i.peculioDisponivel || '-'}</td>
+                  <td>${i.situacao || '-'}</td>
+                  <td>${i.visitaAtiva || '-'}</td>
+                  <td>${i.conclusao || '-'}</td>
                   <td class="status-${i.finalStatus.replace(' ', '-')}">${i.finalStatus}</td>
-                  <td>${i.opinions.simic?.status || 'PENDENTE'}</td>
-                  <td>${i.opinions.seguranca?.status || 'PENDENTE'}</td>
-                  <td>${i.opinions.peculio?.status || 'PENDENTE'}</td>
-                  <td>${i.opinions.reintegracao?.status || 'PENDENTE'}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -280,18 +301,22 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
             >
               Lista de Custodiados
             </button>
-            <button 
-              onClick={() => setActiveSubTab('logs')}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeSubTab === 'logs' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 bg-gray-100 hover:bg-gray-200'}`}
-            >
-              Logs de Ações
-            </button>
-            <button 
-              onClick={() => setActiveSubTab('reports')}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeSubTab === 'reports' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 bg-gray-100 hover:bg-gray-200'}`}
-            >
-              Relatórios
-            </button>
+            {isAdmin && (
+              <>
+                <button 
+                  onClick={() => setActiveSubTab('logs')}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeSubTab === 'logs' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 bg-gray-100 hover:bg-gray-200'}`}
+                >
+                  Logs de Ações
+                </button>
+                <button 
+                  onClick={() => setActiveSubTab('reports')}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeSubTab === 'reports' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 bg-gray-100 hover:bg-gray-200'}`}
+                >
+                  Relatórios
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -363,26 +388,49 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="p-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Custodiado</th>
-                    <th className="p-6 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Pavilhão</th>
-                    <th className="p-6 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Status Final</th>
-                    <th className="p-6 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Pareceres</th>
-                    <th className="p-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Ações</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Nome</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Matrícula</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">PEC/Execução</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Data Lapso</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Lapso</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Data Delito</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Pecúlio Disp.</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Situação</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Visita Ativa</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Endereço</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Cidade</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Estado</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Familiar</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Parentesco</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Transporte</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Conclusão</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Obs. Gerais</th>
+                    <th className="p-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Status Final</th>
+                    <th className="p-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Pareceres</th>
+                    <th className="p-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap sticky right-0 bg-gray-50 z-10">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {filteredInmates.map(inmate => (
                     <tr key={inmate.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="p-6">
-                        <p className="font-black text-gray-800 uppercase text-sm">{inmate.nome}</p>
-                        <p className="text-[10px] font-mono text-gray-400 font-bold">MAT: {inmate.matricula}</p>
-                      </td>
-                      <td className="p-6 text-center">
-                        <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase">
-                          {inmate.pavilhao || 'N/A'}
-                        </span>
-                      </td>
-                      <td className="p-6 text-center">
+                      <td className="p-4 whitespace-nowrap font-black text-gray-800 text-xs">{inmate.nome}</td>
+                      <td className="p-4 whitespace-nowrap font-mono text-gray-500 text-xs">{inmate.matricula}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.pecExecucao || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.dataLapso || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.lapso || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.dataDelito || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.peculioDisponivel || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.situacao || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.visitaAtiva || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs truncate max-w-[150px]" title={inmate.endereco}>{inmate.endereco || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.cidade || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.estado || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.familiar || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.parentesco || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.transporte || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.conclusao || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs truncate max-w-[150px]" title={inmate.observacoesGerais}>{inmate.observacoesGerais || '-'}</td>
+                      <td className="p-4 text-center whitespace-nowrap">
                         <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm ${
                           inmate.finalStatus === 'AUTORIZADO' ? 'bg-emerald-100 text-emerald-700' :
                           inmate.finalStatus === 'NÃO AUTORIZADO' ? 'bg-rose-100 text-rose-700' :
@@ -391,7 +439,7 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
                           {inmate.finalStatus}
                         </span>
                       </td>
-                      <td className="p-6">
+                      <td className="p-4 whitespace-nowrap">
                         <div className="flex justify-center gap-1">
                           {['simic', 'seguranca', 'peculio', 'reintegracao'].map(sector => {
                             const opinion = inmate.opinions[sector as keyof typeof inmate.opinions];
@@ -407,7 +455,7 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
                           })}
                         </div>
                       </td>
-                      <td className="p-6 text-right">
+                      <td className="p-4 text-right whitespace-nowrap sticky right-0 bg-white z-10 border-l border-gray-50">
                         <div className="flex justify-end gap-2">
                           <button 
                             onClick={() => { setEditingInmate(inmate); setIsEditModalOpen(true); }}
@@ -438,7 +486,7 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
                   ))}
                   {filteredInmates.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="p-20 text-center">
+                      <td colSpan={20} className="p-20 text-center">
                         <div className="flex flex-col items-center gap-4">
                           <Search className="h-12 w-12 text-gray-200" />
                           <p className="text-gray-400 font-black uppercase text-sm">Nenhum custodiado encontrado</p>
@@ -692,6 +740,16 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
                       />
                     </div>
                     <div className="space-y-1">
+                      <label className="text-[9px] font-black text-gray-400 uppercase">Estado</label>
+                      <input 
+                        type="text" 
+                        value={editingInmate.estado || ''} 
+                        onChange={(e) => setEditingInmate({...editingInmate, estado: e.target.value})}
+                        disabled={!canEditField('estado')}
+                        className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold disabled:bg-gray-100"
+                      />
+                    </div>
+                    <div className="space-y-1">
                       <label className="text-[9px] font-black text-gray-400 uppercase">Familiar</label>
                       <input 
                         type="text" 
@@ -701,9 +759,68 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
                         className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold disabled:bg-gray-100"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-gray-400 uppercase">Parentesco</label>
+                      <input 
+                        type="text" 
+                        value={editingInmate.parentesco || ''} 
+                        onChange={(e) => setEditingInmate({...editingInmate, parentesco: e.target.value})}
+                        disabled={!canEditField('parentesco')}
+                        className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold disabled:bg-gray-100"
+                      />
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <label className="text-[9px] font-black text-gray-400 uppercase">Transporte</label>
+                      <input 
+                        type="text" 
+                        value={editingInmate.transporte || ''} 
+                        onChange={(e) => setEditingInmate({...editingInmate, transporte: e.target.value})}
+                        disabled={!canEditField('transporte')}
+                        className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold disabled:bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* INFORMAÇÕES GERAIS SECTION */}
+                <div className={`p-6 rounded-3xl border-2 ${isAdmin ? 'border-indigo-400 bg-indigo-50/30' : 'border-gray-100 bg-gray-50/30'} md:col-span-2`}>
+                  <h4 className="text-xs font-black text-indigo-900 uppercase mb-4 border-b pb-2 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-indigo-600 rounded-full"></div> Informações Gerais
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-gray-400 uppercase">Situação</label>
+                      <input 
+                        type="text" 
+                        value={editingInmate.situacao || ''} 
+                        onChange={(e) => setEditingInmate({...editingInmate, situacao: e.target.value})}
+                        disabled={!canEditField('situacao')}
+                        className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold disabled:bg-gray-100"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-gray-400 uppercase">Conclusão</label>
+                      <input 
+                        type="text" 
+                        value={editingInmate.conclusao || ''} 
+                        onChange={(e) => setEditingInmate({...editingInmate, conclusao: e.target.value})}
+                        disabled={!canEditField('conclusao')}
+                        className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold disabled:bg-gray-100"
+                      />
+                    </div>
+                    <div className="space-y-1 md:col-span-3">
+                      <label className="text-[9px] font-black text-gray-400 uppercase">Observações Gerais</label>
+                      <textarea 
+                        value={editingInmate.observacoesGerais || ''} 
+                        onChange={(e) => setEditingInmate({...editingInmate, observacoesGerais: e.target.value})}
+                        disabled={!canEditField('observacoesGerais')}
+                        className="w-full h-20 p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold disabled:bg-gray-100 resize-none"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
+
 
               {/* OPINION INPUT (FOR CURRENT SECTOR) */}
               {!isAdmin && (
