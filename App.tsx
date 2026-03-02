@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem, FinancialRecord, UserRole, ThirdPartyEntryLog, AcquisitionItem, VehicleExitOrder, VehicleAsset, DriverAsset } from './types';
+import { Supplier, Delivery, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, MenuRow, ContractItem, FinancialRecord, UserRole, ThirdPartyEntryLog, AcquisitionItem, VehicleExitOrder, VehicleAsset, DriverAsset, TemporaryExitInmate, TemporaryExitLog } from './types';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -30,6 +30,8 @@ const acquisitionItemsRef = ref(database, 'acquisitionItems');
 const vehicleExitOrdersRef = ref(database, 'vehicleExitOrders');
 const vehicleAssetsRef = ref(database, 'vehicleAssets');
 const driverAssetsRef = ref(database, 'driverAssets');
+const temporaryExitInmatesRef = ref(database, 'temporaryExitInmates');
+const temporaryExitLogsRef = ref(database, 'temporaryExitLogs');
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{ name: string; cpf: string; role: UserRole } | null>(null);
@@ -46,6 +48,8 @@ const App: React.FC = () => {
   const [vehicleExitOrders, setVehicleExitOrders] = useState<VehicleExitOrder[]>([]);
   const [vehicleAssets, setVehicleAssets] = useState<VehicleAsset[]>([]);
   const [driverAssets, setDriverAssets] = useState<DriverAsset[]>([]);
+  const [temporaryExitInmates, setTemporaryExitInmates] = useState<TemporaryExitInmate[]>([]);
+  const [temporaryExitLogs, setTemporaryExitLogs] = useState<TemporaryExitLog[]>([]);
 
   useEffect(() => {
     onValue(suppliersRef, (snapshot) => {
@@ -105,6 +109,14 @@ const App: React.FC = () => {
       const data = snapshot.val();
       setDriverAssets(data ? Object.values(data) : []);
     });
+    onValue(temporaryExitInmatesRef, (snapshot) => {
+      const data = snapshot.val();
+      setTemporaryExitInmates(data ? Object.values(data) : []);
+    });
+    onValue(temporaryExitLogsRef, (snapshot) => {
+      const data = snapshot.val();
+      setTemporaryExitLogs(data ? Object.values(data) : []);
+    });
   }, []);
 
   const handleLogin = (nameInput: string, passwordInput: string) => {
@@ -155,6 +167,22 @@ const App: React.FC = () => {
     }
     if (cleanName === 'ORDEM DE SAIDA' && rawPass === 'saida2026') {
       setUser({ name: 'ORDEM DE SAIDA', cpf: 'saida2026', role: 'ordem_saida' });
+      return true;
+    }
+    if ((cleanName === 'SIMIC') && rawPass === 'simic2026') {
+      setUser({ name: 'SIMIC', cpf: 'simic2026', role: 'simic' });
+      return true;
+    }
+    if ((cleanName === 'SEGURANÇA' || cleanName === 'SEGURANCA') && rawPass === 'segurança2026') {
+      setUser({ name: 'SEGURANÇA', cpf: 'segurança2026', role: 'seguranca' });
+      return true;
+    }
+    if ((cleanName === 'PECULIO' || cleanName === 'PECÚLIO') && rawPass === 'peculio2026') {
+      setUser({ name: 'PECULIO', cpf: 'peculio2026', role: 'peculio' });
+      return true;
+    }
+    if ((cleanName === 'REINTEGRAÇÃO' || cleanName === 'REINTEGRACAO') && rawPass === 'reintegraçao2026') {
+      setUser({ name: 'REINTEGRAÇÃO', cpf: 'reintegraçao2026', role: 'reintegracao' });
       return true;
     }
 
@@ -608,9 +636,10 @@ const App: React.FC = () => {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  if (user.role === 'admin') {
+  if (user.role === 'admin' || user.role === 'simic' || user.role === 'seguranca' || user.role === 'peculio' || user.role === 'reintegracao') {
     return (
       <AdminDashboard 
+        user={user}
         suppliers={suppliers} 
         onRegister={handleRegisterSupplier}
         onUpdateSupplier={handleUpdateSupplier}
@@ -748,6 +777,28 @@ const App: React.FC = () => {
         onResetData={async () => { if(window.confirm('CUIDADO: Isso apagará tudo permanentemente. Continuar?')) await set(rootRef, null); }}
         registrationStatus={null}
         onClearRegistrationStatus={() => {}}
+        temporaryExitInmates={temporaryExitInmates}
+        temporaryExitLogs={temporaryExitLogs}
+        onSaveTemporaryExitInmate={async (inmate) => {
+          const id = inmate.id || push(temporaryExitInmatesRef).key;
+          await set(child(temporaryExitInmatesRef, id!), { ...inmate, id });
+          return { success: true };
+        }}
+        onDeleteTemporaryExitInmate={async (id) => remove(child(temporaryExitInmatesRef, id))}
+        onRegisterTemporaryExitLog={async (log) => {
+          const r = push(temporaryExitLogsRef);
+          await set(r, { ...log, id: r.key });
+          return { success: true };
+        }}
+        onBulkUpdateTemporaryExitInmates={async (inmates) => {
+          const updates: any = {};
+          inmates.forEach(inmate => {
+            const id = inmate.id || push(temporaryExitInmatesRef).key;
+            updates[id] = { ...inmate, id };
+          });
+          await update(temporaryExitInmatesRef, updates);
+          return { success: true };
+        }}
       />
     );
   }

@@ -205,4 +205,44 @@ export interface VehicleExitOrder {
   observations?: string;
 }
 
-export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria' | 'cardapio' | 'infraestrutura' | 'ordem_saida';
+export interface TemporaryExitInmate {
+  id: string;
+  nome: string;
+  matricula: string;
+  pavilhao?: string;
+  pecExecucao?: string;
+  dataLapso?: string;
+  lapso?: string;
+  dataDelito?: string;
+  peculioDisponivel?: string;
+  situacao?: string;
+  visitaAtiva?: string;
+  endereco?: string;
+  cidade?: string;
+  estado?: string;
+  familiar?: string;
+  parentesco?: string;
+  transporte?: string;
+  conclusao?: string;
+  observacoesGerais?: string;
+  
+  // Opinions by sector
+  opinions: {
+    simic?: { status: 'Favorável' | 'Desfavorável' | ''; observations: string; timestamp: string };
+    seguranca?: { status: 'Favorável' | 'Desfavorável' | ''; observations: string; timestamp: string };
+    peculio?: { status: 'Favorável' | 'Desfavorável' | ''; observations: string; timestamp: string };
+    reintegracao?: { status: 'Favorável' | 'Desfavorável' | ''; observations: string; timestamp: string };
+  };
+  
+  finalStatus: 'AUTORIZADO' | 'NÃO AUTORIZADO' | 'PENDENTE';
+}
+
+export interface TemporaryExitLog {
+  id: string;
+  timestamp: string;
+  user: string;
+  action: string;
+  details: string;
+}
+
+export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria' | 'cardapio' | 'infraestrutura' | 'ordem_saida' | 'simic' | 'seguranca' | 'peculio' | 'reintegracao';
