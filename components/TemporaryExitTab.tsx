@@ -552,13 +552,15 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
                       </td>
                       <td className="p-4 text-right whitespace-nowrap sticky right-0 bg-white z-10 border-l border-gray-50">
                         <div className="flex justify-end gap-2">
-                          <button 
-                            onClick={() => { setEditingInmate(inmate); setIsEditModalOpen(true); }}
-                            className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
-                            title="Editar Parecer"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
+                          {user.role !== 'readonly' && (
+                            <button 
+                              onClick={() => { setEditingInmate(inmate); setIsEditModalOpen(true); }}
+                              className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                              title="Editar Parecer"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                          )}
                           <button 
                             onClick={() => { setHistoryInmateId(inmate.id); setIsHistoryModalOpen(true); }}
                             className="p-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-600 hover:text-white transition-all shadow-sm"

@@ -245,4 +245,4 @@ export interface TemporaryExitLog {
   details: string;
 }
 
-export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria' | 'cardapio' | 'infraestrutura' | 'ordem_saida' | 'simic' | 'seguranca' | 'peculio' | 'reintegracao';
+export type UserRole = 'admin' | 'supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria' | 'cardapio' | 'infraestrutura' | 'ordem_saida' | 'simic' | 'seguranca' | 'peculio' | 'reintegracao' | 'readonly';

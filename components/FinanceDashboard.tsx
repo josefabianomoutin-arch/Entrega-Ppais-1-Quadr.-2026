@@ -228,7 +228,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
         {activeSubTab === 'temporaryExit' && temporaryExitInmates && temporaryExitLogs && onSaveTemporaryExitInmate && onDeleteTemporaryExitInmate && onClearAllTemporaryExitInmates && onRegisterTemporaryExitLog && onBulkUpdateTemporaryExitInmates && (
             <div className="animate-fade-in-up">
                 <TemporaryExitTab 
-                    user={{ name: user?.name || '', cpf: user?.cpf || '', role: 'admin' }}
+                    user={{ name: user?.name || '', cpf: user?.cpf || '', role: (user?.name || '').toUpperCase().includes('DOUGLAS') ? 'readonly' : 'admin' }}
                     inmates={temporaryExitInmates}
                     logs={temporaryExitLogs}
                     onSaveInmate={onSaveTemporaryExitInmate}
