@@ -96,6 +96,29 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
     return Array.from(p).sort();
   }, [inmates]);
 
+  const parseExcelDate = (excelDate: any): string => {
+    if (!excelDate) return '';
+    if (typeof excelDate === 'number') {
+      // Excel dates are days since 1899-12-30
+      const date = new Date((excelDate - 25569) * 86400 * 1000);
+      // Adjust for timezone offset to prevent day shifting
+      const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+      const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
+      return adjustedDate.toISOString().split('T')[0];
+    }
+    
+    // If it's already a string, try to parse it or return as is
+    const strDate = String(excelDate).trim();
+    if (strDate.includes('/')) {
+      const parts = strDate.split('/');
+      if (parts.length === 3) {
+        // Assume DD/MM/YYYY
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+    return strDate;
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -126,9 +149,9 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
             matricula: matricula,
             pavilhao: String(row['PAVILHAO'] || row['Pavilhão'] || existing?.pavilhao || ''),
             pecExecucao: String(row['PEC'] || row['PEC/EXECUÇÃO'] || existing?.pecExecucao || ''),
-            dataLapso: String(row['DATA LAPSO'] || existing?.dataLapso || ''),
+            dataLapso: parseExcelDate(row['DATA LAPSO']) || existing?.dataLapso || '',
             lapso: String(row['LAPSO'] || existing?.lapso || ''),
-            dataDelito: String(row['DATA DELITO'] || existing?.dataDelito || ''),
+            dataDelito: parseExcelDate(row['DATA DELITO']) || existing?.dataDelito || '',
             peculioDisponivel: String(row['PECULIO'] || row['PECÚLIO'] || existing?.peculioDisponivel || ''),
             visitaAtiva: String(row['VISITA ATIVA'] || existing?.visitaAtiva || ''),
             endereco: String(row['ENDERECO'] || row['Endereço'] || existing?.endereco || ''),
@@ -253,6 +276,7 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
                 <th>PEC/Execução</th>
                 <th>Data Lapso</th>
                 <th>Lapso</th>
+                <th>Data Delito</th>
                 <th>Pecúlio Disp.</th>
                 <th>Situação</th>
                 <th>Visita Ativa</th>
@@ -266,8 +290,9 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
                   <td>${i.nome}</td>
                   <td>${i.matricula}</td>
                   <td>${i.pecExecucao || '-'}</td>
-                  <td>${i.dataLapso || '-'}</td>
+                  <td>${i.dataLapso ? new Date(i.dataLapso + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}</td>
                   <td>${i.lapso || '-'}</td>
+                  <td>${i.dataDelito ? new Date(i.dataDelito + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}</td>
                   <td>${i.peculioDisponivel || '-'}</td>
                   <td>${i.situacao || '-'}</td>
                   <td>${i.visitaAtiva || '-'}</td>
@@ -418,9 +443,9 @@ const TemporaryExitTab: React.FC<TemporaryExitTabProps> = ({
                       <td className="p-4 whitespace-nowrap font-black text-gray-800 text-xs">{inmate.nome}</td>
                       <td className="p-4 whitespace-nowrap font-mono text-gray-500 text-xs">{inmate.matricula}</td>
                       <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.pecExecucao || '-'}</td>
-                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.dataLapso || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.dataLapso ? new Date(inmate.dataLapso + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}</td>
                       <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.lapso || '-'}</td>
-                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.dataDelito || '-'}</td>
+                      <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.dataDelito ? new Date(inmate.dataDelito + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}</td>
                       <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.peculioDisponivel || '-'}</td>
                       <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.situacao || '-'}</td>
                       <td className="p-4 whitespace-nowrap text-gray-600 text-xs">{inmate.visitaAtiva || '-'}</td>
