@@ -166,9 +166,11 @@ export interface AcquisitionItem {
   name: string;
   comprasCode?: string;
   becCode?: string;
+  expenseNature?: string;
   unit: string;
   acquiredQuantity: number;
   stockBalance: number;
+  unitValue?: number;
   category: 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'PRODUTOS DE LIMPEZA';
 }
 

@@ -18,9 +18,11 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
     const [name, setName] = useState('');
     const [comprasCode, setComprasCode] = useState('');
     const [becCode, setBecCode] = useState('');
+    const [expenseNature, setExpenseNature] = useState('');
     const [unit, setUnit] = useState('un');
     const [acquiredQuantity, setAcquiredQuantity] = useState('0');
     const [stockBalance, setStockBalance] = useState('0');
+    const [unitValue, setUnitValue] = useState('0');
 
     const filteredItems = items.filter(item => 
         item.category === category &&
@@ -37,9 +39,11 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
             name: name.toUpperCase(),
             comprasCode,
             becCode,
+            expenseNature,
             unit,
             acquiredQuantity: parseFloat(acquiredQuantity.replace(',', '.')) || 0,
             stockBalance: parseFloat(stockBalance.replace(',', '.')) || 0,
+            unitValue: parseFloat(unitValue.replace(',', '.')) || 0,
             category
         };
 
@@ -51,9 +55,11 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
         setName('');
         setComprasCode('');
         setBecCode('');
+        setExpenseNature('');
         setUnit('un');
         setAcquiredQuantity('0');
         setStockBalance('0');
+        setUnitValue('0');
         setIsAdding(false);
         setEditingId(null);
     };
@@ -62,9 +68,11 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
         setName(item.name);
         setComprasCode(item.comprasCode || '');
         setBecCode(item.becCode || '');
+        setExpenseNature(item.expenseNature || '');
         setUnit(item.unit);
         setAcquiredQuantity(String(item.acquiredQuantity).replace('.', ','));
         setStockBalance(String(item.stockBalance).replace('.', ','));
+        setUnitValue(String(item.unitValue || 0).replace('.', ','));
         setEditingId(item.id);
         setIsAdding(true);
     };
@@ -97,9 +105,12 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                         <tr className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">
                             <th className="p-5 text-left">Produto para aquisição</th>
                             <th className="p-5 text-center">Cod. Compras / BEC</th>
+                            <th className="p-5 text-center">Natureza de Despesa</th>
                             <th className="p-5 text-center">Unid.</th>
                             <th className="p-5 text-right">Qtd. Adquirida</th>
                             <th className="p-5 text-right">Saldo Estoque</th>
+                            <th className="p-5 text-right">Valor Unit.</th>
+                            <th className="p-5 text-right">Valor Total</th>
                             <th className="p-5 text-center">Ações</th>
                         </tr>
                     </thead>
@@ -113,6 +124,9 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                                         <span className="text-[10px] font-bold text-gray-400">B: {item.becCode || '---'}</span>
                                     </div>
                                 </td>
+                                <td className="p-5 text-center font-mono font-bold text-gray-500 text-[10px]">
+                                    {item.expenseNature || '---'}
+                                </td>
                                 <td className="p-5 text-center">
                                     <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-[10px] font-black uppercase">{item.unit}</span>
                                 </td>
@@ -121,6 +135,12 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                                 </td>
                                 <td className="p-5 text-right font-mono font-bold text-green-600">
                                     {item.stockBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="p-5 text-right font-mono font-bold text-gray-600">
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitValue || 0)}
+                                </td>
+                                <td className="p-5 text-right font-mono font-bold text-indigo-900">
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((item.unitValue || 0) * item.stockBalance)}
                                 </td>
                                 <td className="p-5 text-center">
                                     <div className="flex justify-center gap-2">
@@ -142,7 +162,7 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                         ))}
                         {filteredItems.length === 0 && (
                             <tr>
-                                <td colSpan={6} className="p-10 text-center text-gray-400 font-medium italic">Nenhum produto cadastrado nesta categoria.</td>
+                                <td colSpan={9} className="p-10 text-center text-gray-400 font-medium italic">Nenhum produto cadastrado nesta categoria.</td>
                             </tr>
                         )}
                     </tbody>
@@ -189,22 +209,34 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                                     />
                                 </div>
                             </div>
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Unidade</label>
-                                <select 
-                                    value={unit} 
-                                    onChange={e => setUnit(e.target.value)}
-                                    className="w-full p-4 border-2 border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all appearance-none bg-white"
-                                >
-                                    <option value="un">Unidade (un)</option>
-                                    <option value="kg">Quilograma (kg)</option>
-                                    <option value="litro">Litro (L)</option>
-                                    <option value="caixa">Caixa (cx)</option>
-                                    <option value="embalagem">Embalagem (emb)</option>
-                                    <option value="dz">Dúzia (dz)</option>
-                                </select>
-                            </div>
                             <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Natureza de Despesa</label>
+                                    <input 
+                                        type="text" 
+                                        value={expenseNature} 
+                                        onChange={e => setExpenseNature(e.target.value)} 
+                                        className="w-full p-4 border-2 border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all"
+                                        placeholder="Ex: 339030"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Unidade</label>
+                                    <select 
+                                        value={unit} 
+                                        onChange={e => setUnit(e.target.value)}
+                                        className="w-full p-4 border-2 border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all appearance-none bg-white"
+                                    >
+                                        <option value="un">Unidade (un)</option>
+                                        <option value="kg">Quilograma (kg)</option>
+                                        <option value="litro">Litro (L)</option>
+                                        <option value="caixa">Caixa (cx)</option>
+                                        <option value="embalagem">Embalagem (emb)</option>
+                                        <option value="dz">Dúzia (dz)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
                                 <div>
                                     <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Qtd. Adquirida</label>
                                     <input 
@@ -220,6 +252,15 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                                         type="text" 
                                         value={stockBalance} 
                                         onChange={e => setStockBalance(e.target.value)} 
+                                        className="w-full p-4 border-2 border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all text-right font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Valor Unitário</label>
+                                    <input 
+                                        type="text" 
+                                        value={unitValue} 
+                                        onChange={e => setUnitValue(e.target.value)} 
                                         className="w-full p-4 border-2 border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all text-right font-mono"
                                     />
                                 </div>
