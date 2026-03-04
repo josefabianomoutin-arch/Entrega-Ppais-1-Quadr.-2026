@@ -1,8 +1,9 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { GoogleGenAI } from "@google/genai";
 import type { Supplier, Delivery, ThirdPartyEntryLog, VehicleExitOrder, VehicleAsset, DriverAsset } from '../types';
 import AdminVehicleExitOrder from './AdminVehicleExitOrder';
-import { Camera, CheckCircle, XCircle, RefreshCw, UserCheck } from 'lucide-react';
+import { Camera, CheckCircle, XCircle, RefreshCw, UserCheck, AlertTriangle } from 'lucide-react';
 
 interface SubportariaDashboardProps {
   suppliers: Supplier[];
@@ -42,6 +43,7 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
     const [verificationStatus, setVerificationStatus] = useState<'idle' | 'verifying' | 'success' | 'failed'>('idle');
+    const [verificationResult, setVerificationResult] = useState<{ match: boolean; confidence: number; reason: string } | null>(null);
     
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -50,6 +52,7 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({
         setIsCameraActive(true);
         setCapturedPhoto(null);
         setVerificationStatus('idle');
+        setVerificationResult(null);
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
             if (videoRef.current) {
@@ -72,8 +75,8 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({
         setIsCameraActive(false);
     };
 
-    const handleVerify = () => {
-        if (videoRef.current && canvasRef.current) {
+    const handleVerify = async () => {
+        if (videoRef.current && canvasRef.current && verifyingLog?.photo) {
             const context = canvasRef.current.getContext('2d');
             if (context) {
                 canvasRef.current.width = videoRef.current.videoWidth;
@@ -83,11 +86,37 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({
                 setCapturedPhoto(photoData);
                 stopCamera();
                 
-                // Simular verificação
                 setVerificationStatus('verifying');
-                setTimeout(() => {
-                    setVerificationStatus('success');
-                }, 2000);
+                
+                try {
+                    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+                    const refBase64 = verifyingLog.photo.split(',')[1];
+                    const capBase64 = photoData.split(',')[1];
+
+                    const response = await ai.models.generateContent({
+                        model: "gemini-3-flash-preview",
+                        contents: [
+                            {
+                                parts: [
+                                    { text: "Compare estas duas fotos. Elas são da mesma pessoa? Responda com um objeto JSON: { \"match\": boolean, \"confidence\": number (0-100), \"reason\": string }. Responda em Português." },
+                                    { inlineData: { mimeType: "image/jpeg", data: refBase64 } },
+                                    { inlineData: { mimeType: "image/jpeg", data: capBase64 } }
+                                ]
+                            }
+                        ],
+                        config: {
+                            responseMimeType: "application/json"
+                        }
+                    });
+
+                    const result = JSON.parse(response.text || '{}');
+                    setVerificationResult(result);
+                    setVerificationStatus(result.match ? 'success' : 'failed');
+                } catch (e) {
+                    console.error("Error in facial recognition:", e);
+                    setVerificationStatus('failed');
+                    setVerificationResult({ match: false, confidence: 0, reason: "Erro ao processar biometria facial." });
+                }
             }
         }
     };
@@ -99,6 +128,7 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({
             setVerifyingLog(null);
             setCapturedPhoto(null);
             setVerificationStatus('idle');
+            setVerificationResult(null);
         }
     };
 
@@ -433,7 +463,15 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({
                                             <div className="absolute inset-0 bg-green-500/80 backdrop-blur-sm flex flex-col items-center justify-center text-white animate-fade-in">
                                                 <CheckCircle className="h-20 w-20 mb-4" />
                                                 <p className="text-xl font-black uppercase tracking-widest">Identidade Confirmada</p>
-                                                <p className="text-[10px] font-bold uppercase mt-2">Compatibilidade: 98.4%</p>
+                                                <p className="text-[10px] font-bold uppercase mt-2">Compatibilidade: {verificationResult?.confidence}%</p>
+                                            </div>
+                                        )}
+
+                                        {verificationStatus === 'failed' && (
+                                            <div className="absolute inset-0 bg-red-600/80 backdrop-blur-sm flex flex-col items-center justify-center text-white animate-fade-in p-6 text-center">
+                                                <AlertTriangle className="h-20 w-20 mb-4" />
+                                                <p className="text-xl font-black uppercase tracking-widest">Falha na Identificação</p>
+                                                <p className="text-[10px] font-bold uppercase mt-2">{verificationResult?.reason || 'As fotos não correspondem.'}</p>
                                             </div>
                                         )}
                                     </div>
