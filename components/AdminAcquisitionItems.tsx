@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
-import type { AcquisitionItem } from '../types';
+import React, { useState, useMemo } from 'react';
+import type { AcquisitionItem, Supplier } from '../types';
+import { ManageContractSuppliersModal } from './AdminContractItems';
 
 interface AdminAcquisitionItemsProps {
     items: AcquisitionItem[];
@@ -8,12 +9,15 @@ interface AdminAcquisitionItemsProps {
     onUpdate: (item: AcquisitionItem) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
     contractItems?: string[]; // Lista de nomes de itens do contrato para vinculação
+    suppliers?: Supplier[];
+    onUpdateContractForItem?: (itemName: string, assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string, comprasCode?: string, becCode?: string }[]) => Promise<{ success: boolean, message: string }>;
 }
 
-const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, category, onUpdate, onDelete, contractItems = [] }) => {
+const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, category, onUpdate, onDelete, contractItems = [], suppliers = [], onUpdateContractForItem }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [manageItem, setManageItem] = useState<AcquisitionItem | null>(null);
 
     // Form state
     const [name, setName] = useState('');
@@ -159,6 +163,13 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                                 </td>
                                 <td className="p-5 text-center sticky right-0 bg-white group-hover:bg-indigo-50 transition-colors z-10 border-l border-gray-100 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
                                     <div className="flex justify-center gap-2">
+                                        <button 
+                                            onClick={() => setManageItem(item)}
+                                            className="bg-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all shadow-sm"
+                                            title="Vincular Fornecedores"
+                                        >
+                                            Vincular
+                                        </button>
                                         <button 
                                             onClick={() => startEdit(item)}
                                             className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-all"
@@ -308,6 +319,33 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                         </div>
                     </div>
                 </div>
+            )}
+
+            {manageItem && onUpdateContractForItem && (
+                <ManageContractSuppliersModal 
+                    itemName={manageItem.name} 
+                    currentSuppliers={suppliers.flatMap(s => 
+                        (s.contractItems || [])
+                            .filter(ci => ci.name === manageItem.name)
+                            .map(ci => ({
+                                supplierName: s.name,
+                                supplierCpf: s.cpf,
+                                amount: ci.totalKg,
+                                price: ci.valuePerKg
+                            }))
+                    )} 
+                    allSuppliers={suppliers} 
+                    unit={`${manageItem.unit}-1`}
+                    category={manageItem.category}
+                    comprasCode={manageItem.comprasCode}
+                    becCode={manageItem.becCode}
+                    onClose={() => setManageItem(null)} 
+                    onSave={async (assignments) => {
+                        const res = await onUpdateContractForItem(manageItem.name, assignments);
+                        if (res.success) setManageItem(null);
+                        else alert(res.message);
+                    }}
+                />
             )}
         </div>
     );

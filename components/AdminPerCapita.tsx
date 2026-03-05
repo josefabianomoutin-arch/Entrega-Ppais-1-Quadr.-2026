@@ -462,6 +462,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                         onUpdate={onUpdateAcquisitionItem} 
                         onDelete={onDeleteAcquisitionItem} 
                         contractItems={allContractItemNames}
+                        suppliers={suppliers}
+                        onUpdateContractForItem={onUpdateContractForItem}
                     />
                 </div>
             )}

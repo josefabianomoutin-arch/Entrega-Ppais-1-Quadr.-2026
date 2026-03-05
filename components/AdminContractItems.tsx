@@ -336,7 +336,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
 };
 
 // --- Modal de Gestão de Fornecedores por Item ---
-interface ManageContractSuppliersModalProps {
+export interface ManageContractSuppliersModalProps {
     itemName: string;
     currentSuppliers: { supplierName: string, supplierCpf: string, amount: number, price: number }[];
     allSuppliers: Supplier[];
@@ -348,7 +348,7 @@ interface ManageContractSuppliersModalProps {
     onSave: (assignments: { supplierCpf: string, totalKg: number, valuePerKg: number, unit?: string, category?: string, comprasCode?: string, becCode?: string }[]) => Promise<void>;
 }
 
-const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> = ({ itemName, currentSuppliers, allSuppliers, unit, category, comprasCode, becCode, onClose, onSave }) => {
+export const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModalProps> = ({ itemName, currentSuppliers, allSuppliers, unit, category, comprasCode, becCode, onClose, onSave }) => {
     const [assignments, setAssignments] = useState(() => currentSuppliers.map(s => ({
         supplierCpf: s.supplierCpf,
         supplierName: s.supplierName,
