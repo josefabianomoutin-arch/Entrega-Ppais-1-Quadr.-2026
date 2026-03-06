@@ -150,6 +150,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
           <table>
             <thead>
               <tr>
+                <th style="width: 30px; text-align: center;">#</th>
                 <th>Data</th>
                 <th>Mês/Semana</th>
                 <th>Destinatário</th>
@@ -161,8 +162,9 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
               </tr>
             </thead>
             <tbody>
-              ${logs.flatMap(l => l.items.map(item => `
+              ${logs.flatMap(l => l.items.map((item, index) => `
                 <tr>
+                  <td style="text-align: center;">${index + 1}</td>
                   <td>${new Date(l.date + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
                   <td>${l.month} / S${l.week}</td>
                   <td>${l.recipient}</td>
@@ -176,7 +178,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
             </tbody>
             <tfoot>
                <tr style="font-weight: bold; background-color: #eee;">
-                  <td colspan="7" style="text-align: right">TOTAL GERAL DO RELATÓRIO:</td>
+                  <td colspan="8" style="text-align: right">TOTAL GERAL DO RELATÓRIO:</td>
                   <td>${formatCurrency(logs.reduce((acc, curr) => acc + curr.totalValue, 0))}</td>
                </tr>
             </tfoot>
@@ -311,10 +313,36 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
             Gerar PDF para Impressão
           </button>
         </div>
-        <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-inner">
-          <table className="w-full text-sm">
+        <div className="border border-gray-100 rounded-xl flex flex-col shadow-inner">
+          <div 
+              className="overflow-x-auto custom-scrollbar"
+              onScroll={(e) => {
+                  const bottomScroll = document.getElementById('director-bottom-scroll');
+                  if (bottomScroll) bottomScroll.scrollLeft = e.currentTarget.scrollLeft;
+              }}
+          >
+              <div id="director-top-dummy" style={{ height: '1px' }}></div>
+          </div>
+          <div 
+              id="director-bottom-scroll"
+              className="overflow-x-auto custom-scrollbar"
+              onScroll={(e) => {
+                  const topScroll = e.currentTarget.previousElementSibling;
+                  if (topScroll) topScroll.scrollLeft = e.currentTarget.scrollLeft;
+              }}
+          >
+          <table 
+              className="w-full text-sm"
+              ref={(el) => {
+                  if (el) {
+                      const dummy = document.getElementById('director-top-dummy');
+                      if (dummy) dummy.style.width = `${el.offsetWidth}px`;
+                  }
+              }}
+          >
             <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest border-b">
               <tr>
+                <th className="p-4 text-center w-12">#</th>
                 <th className="p-4 text-left">Data</th>
                 <th className="p-4 text-left">Referência</th>
                 <th className="p-4 text-left">Destinatário</th>
@@ -324,8 +352,9 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {logs.length > 0 ? logs.map(log => (
+              {logs.length > 0 ? logs.map((log, idx) => (
                 <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="p-4 text-center font-bold text-gray-400">{idx + 1}</td>
                   <td className="p-4 font-mono font-bold text-gray-700">{new Date(log.date + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
                   <td className="p-4">
                     <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-[10px] font-bold">
@@ -352,10 +381,11 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan={6} className="p-20 text-center text-gray-400 italic">Nenhum registro de envio para diretoria localizado.</td></tr>
+                <tr><td colSpan={7} className="p-20 text-center text-gray-400 italic">Nenhum registro de envio para diretoria localizado.</td></tr>
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

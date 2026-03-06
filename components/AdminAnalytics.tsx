@@ -194,6 +194,72 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                         className="w-full lg:w-64 border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400"
                     />
                     <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                        <button 
+                            onClick={() => {
+                                const printContent = `
+                                    <html>
+                                        <head>
+                                            <title>Auditoria Analítica</title>
+                                            <style>
+                                                @page { size: A4 landscape; margin: 10mm; }
+                                                body { font-family: Arial, sans-serif; font-size: 10px; }
+                                                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                                                th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+                                                th { background-color: #f3f4f6; text-transform: uppercase; font-size: 9px; }
+                                                .text-center { text-align: center; }
+                                                .text-right { text-align: right; }
+                                                h2 { text-align: center; text-transform: uppercase; margin-bottom: 5px; }
+                                                .header-info { text-align: center; color: #666; margin-bottom: 20px; font-size: 11px; }
+                                            </style>
+                                        </head>
+                                        <body>
+                                            <h2>AUDITORIA ANALÍTICA: META MENSAL VS. NOTAS FISCAIS</h2>
+                                            <div class="header-info">Data de emissão: ${new Date().toLocaleDateString('pt-BR')}</div>
+                                            <table>
+                                                <thead>
+                                                    <tr>
+                                                        <th class="text-center">#</th>
+                                                        <th>Fornecedor</th>
+                                                        <th>Produto</th>
+                                                        <th class="text-center">Mês</th>
+                                                        <th class="text-right">Meta Contratual</th>
+                                                        <th class="text-right">Notas Fiscais</th>
+                                                        <th class="text-right">Diferença (Falta)</th>
+                                                        <th class="text-right">Prejuízo</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    ${filteredData.map((item, index) => `
+                                                        <tr>
+                                                            <td class="text-center">${index + 1}</td>
+                                                            <td>${item.supplierReal}<br><small>${item.supplierCpf}</small></td>
+                                                            <td>${item.itemReal}</td>
+                                                            <td class="text-center">${item.month}</td>
+                                                            <td class="text-right">${item.contractedKgMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
+                                                            <td class="text-right">${item.receivedKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</td>
+                                                            <td class="text-right">${item.shortfallKg > 0.001 ? item.shortfallKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : "0,00"}</td>
+                                                            <td class="text-right">${item.financialLoss > 0 ? formatCurrency(item.financialLoss) : "R$ 0,00"}</td>
+                                                        </tr>
+                                                    `).join('')}
+                                                </tbody>
+                                            </table>
+                                            <script>
+                                                window.onload = () => { window.print(); };
+                                            </script>
+                                        </body>
+                                    </html>
+                                `;
+                                const win = window.open('', '_blank');
+                                if (win) {
+                                    win.document.write(printContent);
+                                    win.document.close();
+                                }
+                            }}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-black py-2 px-4 rounded-lg shadow-sm transition-all active:scale-95 uppercase text-xs tracking-widest flex items-center justify-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                            Imprimir PDF
+                        </button>
                         <select value={selectedSupplierName} onChange={(e) => setSelectedSupplierName(e.target.value)} className="border rounded-lg px-3 py-2 text-sm bg-white font-bold text-gray-700">
                             <option value="all">Todos os Fornecedores</option>
                             {supplierOptions.map(option => <option key={option.value} value={option.value}>{option.displayName}</option>)}
@@ -205,10 +271,36 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                     </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border">
-                    <table className="w-full text-sm">
+                <div className="border border-gray-100 rounded-xl flex flex-col shadow-inner">
+                    <div 
+                        className="overflow-x-auto custom-scrollbar"
+                        onScroll={(e) => {
+                            const bottomScroll = document.getElementById('analytics-bottom-scroll');
+                            if (bottomScroll) bottomScroll.scrollLeft = e.currentTarget.scrollLeft;
+                        }}
+                    >
+                        <div id="analytics-top-dummy" style={{ height: '1px' }}></div>
+                    </div>
+                    <div 
+                        id="analytics-bottom-scroll"
+                        className="overflow-x-auto custom-scrollbar"
+                        onScroll={(e) => {
+                            const topScroll = e.currentTarget.previousElementSibling;
+                            if (topScroll) topScroll.scrollLeft = e.currentTarget.scrollLeft;
+                        }}
+                    >
+                    <table 
+                        className="w-full text-sm"
+                        ref={(el) => {
+                            if (el) {
+                                const dummy = document.getElementById('analytics-top-dummy');
+                                if (dummy) dummy.style.width = `${el.offsetWidth}px`;
+                            }
+                        }}
+                    >
                         <thead className="bg-gray-50 text-gray-500 text-[10px] uppercase font-black tracking-widest border-b">
                             <tr>
+                                <th className="p-4 text-center w-12">#</th>
                                 <th className="p-4 text-left">Fornecedor</th>
                                 <th className="p-4 text-left">Produto</th>
                                 <th className="p-4 text-center">Mês</th>
@@ -219,8 +311,9 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {filteredData.length > 0 ? filteredData.map((item) => (
+                            {filteredData.length > 0 ? filteredData.map((item, idx) => (
                                 <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${item.shortfallKg > 0.001 ? 'bg-red-50/10' : ''}`}>
+                                    <td className="p-4 text-center font-bold text-gray-400">{idx + 1}</td>
                                     <td className="p-4">
                                         <p className="font-bold text-gray-800 uppercase text-xs leading-none">{item.supplierReal}</p>
                                         <p className="text-[9px] font-mono text-gray-400 mt-1">{item.supplierCpf}</p>
@@ -239,13 +332,14 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                                     </td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan={7} className="p-20 text-center text-gray-400 italic">Nenhum dado encontrado para os filtros selecionados.</td></tr>
+                                <tr><td colSpan={8} className="p-20 text-center text-gray-400 italic">Nenhum dado encontrado para os filtros selecionados.</td></tr>
                             )}
                         </tbody>
                     </table>
                 </div>
             </div>
-            <style>{`
+        </div>
+        <style>{`
                 @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
                 .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
             `}</style>

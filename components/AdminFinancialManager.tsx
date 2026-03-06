@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { FinancialRecord } from '../types';
 
 interface AdminFinancialManagerProps {
@@ -21,6 +21,153 @@ const PTRES_DESCRIPTIONS: Record<string, string> = {
 
 const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+
+const PtresTable: React.FC<{ ptres: string, ptresRecords: FinancialRecord[], formData: Partial<FinancialRecord>, handleEdit: (r: FinancialRecord) => void, onDelete: (id: string) => void }> = ({ ptres, ptresRecords, formData, handleEdit, onDelete }) => {
+    const topScrollRef = useRef<HTMLDivElement>(null);
+    const bottomScrollRef = useRef<HTMLDivElement>(null);
+    const tableRef = useRef<HTMLTableElement>(null);
+
+    useEffect(() => {
+        const topScroll = topScrollRef.current;
+        const bottomScroll = bottomScrollRef.current;
+        if (!topScroll || !bottomScroll) return;
+
+        const handleTopScroll = () => {
+            bottomScroll.scrollLeft = topScroll.scrollLeft;
+        };
+        const handleBottomScroll = () => {
+            topScroll.scrollLeft = bottomScroll.scrollLeft;
+        };
+
+        topScroll.addEventListener('scroll', handleTopScroll);
+        bottomScroll.addEventListener('scroll', handleBottomScroll);
+
+        return () => {
+            topScroll.removeEventListener('scroll', handleTopScroll);
+            bottomScroll.removeEventListener('scroll', handleBottomScroll);
+        };
+    }, []);
+
+    useEffect(() => {
+        const topScroll = topScrollRef.current;
+        const table = tableRef.current;
+        if (!topScroll || !table) return;
+
+        const resizeObserver = new ResizeObserver(() => {
+            if (topScroll.firstChild) {
+                (topScroll.firstChild as HTMLElement).style.width = `${table.offsetWidth}px`;
+            }
+        });
+
+        resizeObserver.observe(table);
+        return () => resizeObserver.disconnect();
+    }, [ptresRecords]);
+
+    const ptresTotals = ptresRecords.reduce((acc, r) => ({
+        rec: acc.rec + (r.tipo === 'RECURSO' ? (Number(r.valorRecebido) || 0) : 0),
+        gast: acc.gast + (r.tipo === 'DESPESA' ? Number(r.valorUtilizado) : 0)
+    }), { rec: 0, gast: 0 });
+
+    return (
+        <div className="animate-fade-in-up">
+            <div className="flex items-center justify-between mb-4 border-b-2 border-gray-200 pb-2 px-2">
+                <div className="flex flex-col">
+                    <div className="flex items-baseline gap-3">
+                        <h3 className="text-2xl font-black text-gray-800 tracking-tighter italic">Histórico PTRES {ptres}</h3>
+                        <span className="text-[10px] font-black bg-gray-200 text-gray-600 px-3 py-1 rounded-full uppercase tracking-widest">
+                            {ptresRecords.length} Movimentos
+                        </span>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <p className="text-[10px] font-black text-gray-400 uppercase">Saldo do Grupo</p>
+                    <p className={`font-black ${ptresTotals.rec - ptresTotals.gast >= 0 ? 'text-indigo-600' : 'text-red-700'}`}>
+                        {formatCurrency(ptresTotals.rec - ptresTotals.gast)}
+                    </p>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div 
+                    ref={topScrollRef} 
+                    className="overflow-x-auto overflow-y-hidden custom-scrollbar border-b border-gray-100" 
+                    style={{ height: '12px' }}
+                >
+                    <div style={{ height: '1px' }}></div>
+                </div>
+                <div ref={bottomScrollRef} className="overflow-x-auto custom-scrollbar">
+                    <table ref={tableRef} className="w-full text-sm">
+                        <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                            <tr>
+                                <th className="p-3 text-center w-12">#</th>
+                                <th className="p-3 text-left">Tipo</th>
+                                <th className="p-3 text-left">Natureza / Modalidade</th>
+                                <th className="p-3 text-left">Descrição</th>
+                                <th className="p-3 text-left">Processo / Empenho</th>
+                                <th className="p-3 text-left">Data</th>
+                                <th className="p-3 text-left">Status</th>
+                                <th className="p-3 text-right">Valor</th>
+                                <th className="p-3 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {ptresRecords.sort((a, b) => new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime()).map((r, index) => {
+                                const statusUpper = (r.status || '').toUpperCase().trim();
+                                const isFinalizado = ['FINALIZADO', 'CONCLUIDO', 'CONCLUÍDO'].includes(statusUpper);
+                                const isEmAndamentoEmpenhado = statusUpper === 'EM ANDAMENTO' && !!r.numeroEmpenho;
+                                
+                                return (
+                                    <tr key={r.id || `admin-rec-${index}`} className={`border-b hover:bg-gray-50 transition-colors ${formData.id === r.id ? 'bg-orange-50' : ''}`}>
+                                        <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
+                                        <td className="p-3">
+                                            <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase border shadow-sm ${isFinalizado ? 'bg-green-100 text-green-700 border-green-200' : isEmAndamentoEmpenhado ? 'bg-orange-100 text-orange-700 border-orange-200' : (r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100')}`}>
+                                                {r.tipo}
+                                            </span>
+                                        </td>
+                                        <td className="p-3">
+                                            <div className="text-[10px] font-bold text-gray-600">NAT: {r.natureza}</div>
+                                            {r.tipo === 'DESPESA' && <div className={`text-[10px] font-black uppercase mt-1 ${isFinalizado ? 'text-green-600' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-indigo-500'}`}>{r.modalidade || 'DISPENSA'}</div>}
+                                        </td>
+                                        <td className="p-3 max-w-xs">
+                                            <div className="text-sm font-bold text-gray-800 uppercase truncate" title={r.descricao}>{r.descricao || 'N/A'}</div>
+                                            <div className="text-[8px] font-mono text-gray-300 uppercase mt-1">ID: ...{r.id?.slice(-4)}</div>
+                                        </td>
+                                        <td className="p-3 text-[9px] font-bold uppercase text-gray-500">
+                                            {r.numeroProcesso && <div className="mb-1">PROC: <span className={isFinalizado ? "text-green-700 font-black" : isEmAndamentoEmpenhado ? "text-orange-700 font-black" : "text-gray-800"}>{r.numeroProcesso}</span></div>}
+                                            {r.numeroEmpenho && <div className="mb-1">EMP: <span className={isEmAndamentoEmpenhado ? "text-orange-700 font-black" : "text-gray-800"}>{r.numeroEmpenho}</span></div>}
+                                            {r.notaCredito && <div>CRÉD: <span className="text-gray-800">{r.notaCredito}</span></div>}
+                                        </td>
+                                        <td className="p-3 font-mono text-[10px] text-gray-600">
+                                            {(r.dataRecebimento || r.dataPagamento || '-').split('-').reverse().join('/')}
+                                            {(!isFinalizado && r.dataFinalizacaoProcesso) && <div className="text-[8px] mt-1 text-gray-400">PREV: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</div>}
+                                            {(isFinalizado && r.dataFinalizacaoProcesso) && <div className="text-[8px] mt-1 text-green-600 font-bold">CONCL: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</div>}
+                                        </td>
+                                        <td className="p-3">
+                                            <span className={`text-[10px] font-black ${isFinalizado ? 'text-green-700' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-indigo-600'}`}>{r.status || 'PENDENTE'}</span>
+                                        </td>
+                                        <td className={`p-3 text-right font-black ${isFinalizado ? 'text-green-700' : isEmAndamentoEmpenhado ? 'text-orange-700' : (r.tipo === 'RECURSO' ? 'text-indigo-700' : 'text-red-700')}`}>
+                                            {r.tipo === 'RECURSO' ? formatCurrency(r.valorRecebido) : formatCurrency(r.valorUtilizado)}
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button onClick={() => handleEdit(r)} className={`p-2 rounded-lg transition-all ${formData.id === r.id ? 'bg-orange-500 text-white' : (isFinalizado ? 'bg-green-100 text-green-700 hover:bg-green-600 hover:text-white' : isEmAndamentoEmpenhado ? 'bg-orange-100 text-orange-700 hover:bg-orange-600 hover:text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white')}`} title="Editar">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                </button>
+                                                <button onClick={() => { if(window.confirm('Excluir este registro?')) onDelete(r.id); }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all" title="Excluir">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, onSave, onDelete }) => {
   const initialFormState: Partial<FinancialRecord> = {
@@ -49,6 +196,100 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
   const [isSaving, setIsSaving] = useState(false);
   
   const isEditing = !!formData.id;
+
+  const handlePrintPDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Relatório Financeiro</title>
+            <style>
+                body { font-family: sans-serif; padding: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 10px; }
+                th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                h1 { color: #333; font-size: 18px; }
+                h2 { color: #555; font-size: 14px; margin-top: 30px; }
+                .text-right { text-align: right; }
+                .text-center { text-align: center; }
+                .font-bold { font-weight: bold; }
+                .text-green-600 { color: #16a34a; }
+                .text-red-600 { color: #dc2626; }
+                .text-indigo-600 { color: #4f46e5; }
+                @media print {
+                    @page { size: A4 landscape; margin: 10mm; }
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Relatório Financeiro</h1>
+            <p>Data de Emissão: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
+            
+            ${PTRES_OPTIONS.map(ptres => {
+                const ptresRecords = records.filter(r => r.ptres.trim() === ptres);
+                if (ptresRecords.length === 0) return '';
+
+                const ptresTotals = ptresRecords.reduce((acc, r) => ({
+                    rec: acc.rec + (r.tipo === 'RECURSO' ? (Number(r.valorRecebido) || 0) : 0),
+                    gast: acc.gast + (r.tipo === 'DESPESA' ? Number(r.valorUtilizado) : 0)
+                }), { rec: 0, gast: 0 });
+
+                return `
+                    <h2>PTRES ${ptres} - Saldo: ${formatCurrency(ptresTotals.rec - ptresTotals.gast)}</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="text-center">#</th>
+                                <th>Tipo</th>
+                                <th>Natureza</th>
+                                <th>Modalidade</th>
+                                <th>Descrição</th>
+                                <th>Processo / Empenho</th>
+                                <th>Data</th>
+                                <th>Status</th>
+                                <th class="text-right">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${ptresRecords.sort((a, b) => new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime()).map((r, index) => `
+                                <tr>
+                                    <td class="text-center">${index + 1}</td>
+                                    <td class="font-bold ${r.tipo === 'RECURSO' ? 'text-indigo-600' : 'text-red-600'}">${r.tipo}</td>
+                                    <td>${r.natureza}</td>
+                                    <td>${r.modalidade || '-'}</td>
+                                    <td>${r.descricao || '-'}</td>
+                                    <td>
+                                        ${r.numeroProcesso ? `Proc: ${r.numeroProcesso}<br>` : ''}
+                                        ${r.numeroEmpenho ? `Emp: ${r.numeroEmpenho}<br>` : ''}
+                                        ${r.notaCredito ? `Créd: ${r.notaCredito}` : ''}
+                                    </td>
+                                    <td>${(r.dataRecebimento || r.dataPagamento || '-').split('-').reverse().join('/')}</td>
+                                    <td>${r.status || 'PENDENTE'}</td>
+                                    <td class="text-right font-bold ${r.tipo === 'RECURSO' ? 'text-indigo-600' : 'text-red-600'}">
+                                        ${r.tipo === 'RECURSO' ? formatCurrency(r.valorRecebido) : formatCurrency(r.valorUtilizado)}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }).join('')}
+            <script>
+                window.onload = () => {
+                    window.print();
+                    window.close();
+                }
+            </script>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
 
   const linkedBalances = useMemo(() => {
     return PTRES_OPTIONS.map(p => {
@@ -306,118 +547,28 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
 
       {/* 3. VISUALIZAÇÃO DOS GASTOS AGRUPADOS POR PTRES */}
       <div className="space-y-16">
+        <div className="flex justify-end mb-4">
+            <button 
+                onClick={handlePrintPDF}
+                className="bg-gray-800 hover:bg-gray-900 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                Imprimir PDF
+            </button>
+        </div>
         {PTRES_OPTIONS.map(ptres => {
           const ptresRecords = records.filter(r => r.ptres.trim() === ptres);
           if (ptresRecords.length === 0) return null;
 
-          const ptresTotals = ptresRecords.reduce((acc, r) => ({
-            rec: acc.rec + (r.tipo === 'RECURSO' ? (Number(r.valorRecebido) || 0) : 0),
-            gast: acc.gast + (r.tipo === 'DESPESA' ? Number(r.valorUtilizado) : 0)
-          }), { rec: 0, gast: 0 });
-
           return (
-            <div key={ptres} className="animate-fade-in-up">
-              <div className="flex items-center justify-between mb-4 border-b-2 border-gray-200 pb-2 px-2">
-                <div className="flex flex-col">
-                  <div className="flex items-baseline gap-3">
-                    <h3 className="text-2xl font-black text-gray-800 tracking-tighter italic">Histórico PTRES {ptres}</h3>
-                    <span className="text-[10px] font-black bg-gray-200 text-gray-600 px-3 py-1 rounded-full uppercase tracking-widest">
-                      {ptresRecords.length} Movimentos
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-gray-400 uppercase">Saldo do Grupo</p>
-                  <p className={`font-black ${ptresTotals.rec - ptresTotals.gast >= 0 ? 'text-indigo-600' : 'text-red-700'}`}>
-                    {formatCurrency(ptresTotals.rec - ptresTotals.gast)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                {ptresRecords.sort((a, b) => {
-                  return new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime();
-                }).map((r, index) => {
-                  const statusUpper = (r.status || '').toUpperCase().trim();
-                  // Lógica robusta para detectar finalização
-                  const isFinalizado = ['FINALIZADO', 'CONCLUIDO', 'CONCLUÍDO'].includes(statusUpper);
-                  const isEmAndamentoEmpenhado = statusUpper === 'EM ANDAMENTO' && !!r.numeroEmpenho;
-                  
-                  return (
-                    <div key={r.id || `admin-rec-${index}`} className={`group bg-white p-6 rounded-3xl border-l-[12px] shadow-sm hover:shadow-md transition-all ${isFinalizado ? 'border-green-600 bg-green-50/10' : isEmAndamentoEmpenhado ? 'border-orange-500 bg-orange-50/10' : (r.tipo === 'RECURSO' ? 'border-indigo-500' : 'border-red-500')} ${formData.id === r.id ? 'ring-4 ring-orange-300' : ''}`}>
-                      <div className="flex flex-col lg:flex-row justify-between gap-6">
-                        <div className="flex-1 space-y-4">
-                          <div className="flex justify-between">
-                              <div className="flex items-center gap-3">
-                              <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase border shadow-sm ${isFinalizado ? 'bg-green-100 text-green-700 border-green-200' : isEmAndamentoEmpenhado ? 'bg-orange-100 text-orange-700 border-orange-200' : (r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100')}`}>
-                                  {r.tipo}
-                              </span>
-                              <span className="text-[10px] font-bold text-gray-400">NATUREZA: {r.natureza}</span>
-                              {r.tipo === 'DESPESA' && <span className={`text-[10px] font-black uppercase ${isFinalizado ? 'text-green-600' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-indigo-500'}`}>{r.modalidade || 'DISPENSA'}</span>}
-                              </div>
-                              <span className="text-[8px] font-mono text-gray-300 uppercase">ID: ...{r.id?.slice(-4)}</span>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Descrição do Objeto</p>
-                            <p className="text-sm font-bold text-gray-800 leading-relaxed uppercase">{r.descricao || 'N/A'}</p>
-                            
-                            <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-gray-50 text-[9px] font-bold uppercase text-gray-400">
-                               {r.numeroProcesso && <span>PROCESSO: <span className={isFinalizado ? "text-green-700 font-black" : isEmAndamentoEmpenhado ? "text-orange-700 font-black" : "text-gray-600"}>{r.numeroProcesso}</span></span>}
-                               
-                               {/* BANNER DE DESTAQUE PARA FINALIZADO OU EM ANDAMENTO COM EMPENHO */}
-                               {(isFinalizado && r.dataFinalizacaoProcesso) && (
-                                   <span className="flex items-center gap-2 text-green-700 bg-green-100 px-3 py-1.5 rounded-lg border border-green-200 text-sm font-black scale-105">
-                                       ✅ PROCESSO CONCLUÍDO EM: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}
-                                   </span>
-                               )}
-
-                               {(isEmAndamentoEmpenhado && r.numeroEmpenho) && (
-                                   <span className="flex items-center gap-2 text-orange-700 bg-orange-100 px-3 py-1.5 rounded-lg border border-orange-200 text-sm font-black scale-105">
-                                       📑 EMPENHO Nº: {r.numeroEmpenho}
-                                   </span>
-                               )}
-
-                               {/* INFO NORMAL CASO NÃO SEJA O BANNER PRINCIPAL */}
-                               {(!isEmAndamentoEmpenhado && r.numeroEmpenho) && <span>EMPENHO: {r.numeroEmpenho}</span>}
-                               {r.notaCredito && <span> | CRÉDITO: {r.notaCredito}</span>}
-                               {(!isFinalizado && r.dataFinalizacaoProcesso) && <span>DATA PREV.: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</span>}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className={`lg:w-64 p-4 rounded-2xl space-y-3 flex flex-col justify-center ${isFinalizado ? 'bg-green-50' : isEmAndamentoEmpenhado ? 'bg-orange-50' : 'bg-gray-50'}`}>
-                          <div className={`flex justify-between items-end border-b pb-2 ${isFinalizado ? 'border-green-200' : isEmAndamentoEmpenhado ? 'border-orange-200' : 'border-gray-200'}`}>
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Valor</p>
-                            <p className={`text-lg font-black ${isFinalizado ? 'text-green-700' : isEmAndamentoEmpenhado ? 'text-orange-700' : (r.tipo === 'RECURSO' ? 'text-indigo-700' : 'text-red-700')}`}>
-                              {r.tipo === 'RECURSO' ? formatCurrency(r.valorRecebido) : formatCurrency(r.valorUtilizado)}
-                            </p>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Data</p>
-                              <p className={`text-10px font-mono font-bold ${isFinalizado ? 'text-green-800' : isEmAndamentoEmpenhado ? 'text-orange-800' : 'text-gray-600'}`}>{(r.dataRecebimento || r.dataPagamento || '-').split('-').reverse().join('/')}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Status</p>
-                              <p className={`text-[10px] font-black ${isFinalizado ? 'text-green-700' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-indigo-600'}`}>{r.status || 'PENDENTE'}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="lg:w-16 flex lg:flex-col justify-end lg:justify-center gap-2">
-                          <button onClick={() => handleEdit(r)} className={`p-3 rounded-2xl transition-all ${formData.id === r.id ? 'bg-orange-500 text-white' : (isFinalizado ? 'bg-green-100 text-green-700 hover:bg-green-600 hover:text-white' : isEmAndamentoEmpenhado ? 'bg-orange-100 text-orange-700 hover:bg-orange-600 hover:text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white')}`}>
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                          </button>
-                          <button onClick={() => { if(window.confirm('Excluir este registro?')) onDelete(r.id); }} className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <PtresTable
+              key={ptres}
+              ptres={ptres}
+              ptresRecords={ptresRecords}
+              formData={formData}
+              handleEdit={handleEdit}
+              onDelete={onDelete}
+            />
           );
         })}
       </div>

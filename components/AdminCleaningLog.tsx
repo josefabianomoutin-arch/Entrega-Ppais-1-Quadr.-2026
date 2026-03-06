@@ -344,6 +344,7 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
       <style>{`

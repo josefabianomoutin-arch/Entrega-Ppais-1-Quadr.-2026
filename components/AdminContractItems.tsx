@@ -346,6 +346,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                         >
                             <thead className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">
                             <tr>
+                                <th className="p-4 text-center w-12">#</th>
                                 <th className="p-4 text-left">Produto do Contrato</th>
                                 <th className="p-4 text-center">Unid.</th>
                                 <th className="p-4 text-right">Meta Total</th>
@@ -362,6 +363,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                                 
                                 return (
                                     <tr key={idx} className="hover:bg-green-50/30 transition-colors">
+                                        <td className="p-4 text-center font-bold text-gray-400">{idx + 1}</td>
                                         <td className="p-4">
                                             <p className="font-black text-gray-800 uppercase text-xs mb-1.5">{item.name}</p>
                                             <div className="flex flex-wrap gap-1">

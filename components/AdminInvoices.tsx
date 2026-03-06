@@ -320,6 +320,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                 <table>
                     <thead>
                         <tr>
+                            <th class="text-center" style="width: 30px;">#</th>
                             <th>Fornecedor</th>
                             <th>Data</th>
                             <th>Nº Nota Fiscal</th>
@@ -328,8 +329,9 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                         </tr>
                     </thead>
                     <tbody>
-                        ${filteredAndSortedInvoices.map(invoice => `
+                        ${filteredAndSortedInvoices.map((invoice, index) => `
                             <tr>
+                                <td class="text-center">${index + 1}</td>
                                 <td>
                                     <div class="font-bold">${invoice.supplierName}</div>
                                     <div class="text-xs text-gray-500">${invoice.supplierCpf}</div>
@@ -584,6 +586,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                     <table ref={tableRef} className="w-full text-sm">
                         <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                         <tr>
+                            <th className="p-3 text-center w-12">#</th>
                             <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('supplierName')}>Fornecedor</th>
                             <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('date')}>Data</th>
                             <th className="p-3 text-left">Nº Nota Fiscal</th>
@@ -593,11 +596,12 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredAndSortedInvoices.length > 0 ? filteredAndSortedInvoices.map(invoice => {
+                        {filteredAndSortedInvoices.length > 0 ? filteredAndSortedInvoices.map((invoice, index) => {
                             const isExpanded = expandedInvoiceId === invoice.id;
                             return (
                                 <React.Fragment key={invoice.id}>
                                     <tr className="border-b hover:bg-gray-50 transition-colors">
+                                        <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
                                         <td className="p-3">
                                             <div className="flex items-center gap-4">
                                                 <div>
@@ -678,7 +682,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                     </tr>
                                     {isExpanded && (
                                         <tr className="bg-gray-100">
-                                            <td colSpan={6} className="p-4">
+                                            <td colSpan={7} className="p-4">
                                                 <div className="bg-white p-4 rounded-lg shadow-inner">
                                                     <h4 className="text-xs font-bold uppercase text-gray-600 mb-2">Detalhamento da NF {invoice.invoiceNumber}</h4>
                                                     <ul className="space-y-1 text-xs">
@@ -728,7 +732,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                     )}
                                 </React.Fragment>
                             )
-                        }) : (<tr><td colSpan={6} className="p-8 text-center text-gray-400 italic">Nenhuma nota fiscal registrada.</td></tr>)}
+                        }) : (<tr><td colSpan={7} className="p-8 text-center text-gray-400 italic">Nenhuma nota fiscal registrada.</td></tr>)}
                     </tbody>
                 </table>
                 </div>
