@@ -55,6 +55,24 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
         };
     }, []);
 
+    const filteredLog = useMemo(() => {
+        return warehouseLog
+            .filter(log => {
+                const typeMatch = filterType === 'all' || log.type === filterType;
+                const searchMatch = searchTerm === '' ||
+                    log.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    log.lotNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (log.barcode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    log.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
+                return typeMatch && searchMatch;
+            })
+            .sort((a, b) => {
+                const dateA = new Date(a.date || a.timestamp).getTime();
+                const dateB = new Date(b.date || b.timestamp).getTime();
+                return dateB - dateA;
+            });
+    }, [warehouseLog, filterType, searchTerm]);
+
     React.useEffect(() => {
         const table = tableRef.current;
         const topScroll = topScrollRef.current;
@@ -142,24 +160,6 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
         printWindow.document.write(htmlContent);
         printWindow.document.close();
     };
-
-    const filteredLog = useMemo(() => {
-        return warehouseLog
-            .filter(log => {
-                const typeMatch = filterType === 'all' || log.type === filterType;
-                const searchMatch = searchTerm === '' ||
-                    log.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    log.lotNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    (log.barcode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    log.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
-                return typeMatch && searchMatch;
-            })
-            .sort((a, b) => {
-                const dateA = new Date(a.date || a.timestamp).getTime();
-                const dateB = new Date(b.date || b.timestamp).getTime();
-                return dateB - dateA;
-            });
-    }, [warehouseLog, searchTerm, filterType]);
 
     // Lógica para o novo Painel de Validade (Shelf-Life)
     const validityAnalysis = useMemo(() => {

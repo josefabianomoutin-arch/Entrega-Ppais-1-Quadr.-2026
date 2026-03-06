@@ -45,6 +45,17 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
       };
   }, []);
 
+  const filteredLogs = useMemo(() => {
+    return logs
+      .filter(l => 
+        l.responsible.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        l.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        l.observations.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (l.maintenanceDetails || '').toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [logs, searchTerm]);
+
   React.useEffect(() => {
       const table = tableRef.current;
       const topScroll = topScrollRef.current;
@@ -62,17 +73,6 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
 
       return () => observer.disconnect();
   }, [filteredLogs]);
-
-  const filteredLogs = useMemo(() => {
-    return logs
-      .filter(l => 
-        l.responsible.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        l.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        l.observations.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (l.maintenanceDetails || '').toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [logs, searchTerm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
