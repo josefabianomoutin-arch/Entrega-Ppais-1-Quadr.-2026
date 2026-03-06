@@ -51,8 +51,9 @@ const EditSupplierModal: React.FC<EditSupplierModalProps> = ({ supplier, supplie
 
     if (saveError) {
       setError(saveError);
+    } else {
+      onClose();
     }
-    // Em caso de sucesso, o componente pai fechará o modal
   };
 
   return (

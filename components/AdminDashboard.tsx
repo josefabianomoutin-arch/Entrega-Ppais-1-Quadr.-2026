@@ -396,7 +396,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         {renderContent()} 
       </main>
 
-      {editingSupplier && (<EditSupplierModal supplier={editingSupplier} suppliers={suppliers} onClose={() => setEditingSupplier(null)} onSave={async (old, name, cpf, weeks) => { const err = await props.onUpdateSupplier(old, name, cpf, weeks); if (!err) setEditingSupplier(null); return err; }} />)}
+      {editingSupplier && (<EditSupplierModal supplier={editingSupplier} suppliers={suppliers} onClose={() => setEditingSupplier(null)} onSave={async (old, name, cpf, weeks) => { const err = await props.onUpdateSupplier(old, name, cpf, weeks); return err; }} />)}
       
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #312e81; border-radius: 10px; }
