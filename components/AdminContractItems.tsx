@@ -230,7 +230,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
             </div>
 
             <div className="bg-white p-6 rounded-3xl shadow-xl">
-                <div className="mb-6">
+                <div className="mb-6 flex justify-between items-center">
                     <input 
                         type="text" 
                         placeholder="Pesquisar produto no contrato..." 
@@ -238,11 +238,113 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full md:w-96 border-2 border-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:border-green-500 font-bold transition-all"
                     />
+                    <button 
+                        onClick={() => {
+                            const printWindow = window.open('', '_blank');
+                            if (!printWindow) {
+                                alert('Por favor, permita popups para imprimir.');
+                                return;
+                            }
+                            const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+                            const htmlContent = `
+                                <html>
+                                <head>
+                                    <title>Relatório - Cálculo Geral</title>
+                                    <style>
+                                        @page { size: A4 landscape; margin: 10mm; }
+                                        body { font-family: Arial, sans-serif; font-size: 10px; }
+                                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                                        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+                                        th { background-color: #f3f4f6; text-transform: uppercase; font-size: 9px; }
+                                        .text-center { text-align: center; }
+                                        .text-right { text-align: right; }
+                                        h2 { text-align: center; text-transform: uppercase; margin-bottom: 5px; }
+                                        .header-info { text-align: center; color: #666; margin-bottom: 20px; font-size: 11px; }
+                                    </style>
+                                </head>
+                                <body>
+                                    <h2>RELATÓRIO - CÁLCULO GERAL</h2>
+                                    <div class="header-info">Data de emissão: ${new Date().toLocaleDateString('pt-BR')}</div>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th class="text-center">#</th>
+                                                <th>Produto do Contrato</th>
+                                                <th class="text-center">Unid.</th>
+                                                <th class="text-right">Meta Total</th>
+                                                <th class="text-right">Entregue</th>
+                                                <th class="text-right">Saldo</th>
+                                                <th class="text-right">Valor Contratado</th>
+                                                <th class="text-right">Valor Entregue</th>
+                                                <th class="text-right">Valor Saldo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${filteredItems.map((item, index) => {
+                                                const balance = Math.max(0, item.totalContracted - item.totalDelivered);
+                                                const balanceValue = Math.max(0, item.totalValueContracted - item.totalValueDelivered);
+                                                return `
+                                                    <tr>
+                                                        <td class="text-center">${index + 1}</td>
+                                                        <td>${item.name}</td>
+                                                        <td class="text-center">${item.unit.split('-')[0]}</td>
+                                                        <td class="text-right">${item.totalContracted.toLocaleString('pt-BR')}</td>
+                                                        <td class="text-right">${item.totalDelivered.toLocaleString('pt-BR')}</td>
+                                                        <td class="text-right">${balance.toLocaleString('pt-BR')}</td>
+                                                        <td class="text-right">${formatCurrency(item.totalValueContracted)}</td>
+                                                        <td class="text-right">${formatCurrency(item.totalValueDelivered)}</td>
+                                                        <td class="text-right">${formatCurrency(balanceValue)}</td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                    <script>
+                                        window.onload = () => {
+                                            window.print();
+                                        };
+                                    </script>
+                                </body>
+                                </html>
+                            `;
+                            printWindow.document.write(htmlContent);
+                            printWindow.document.close();
+                        }}
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-black py-3 px-6 rounded-xl shadow-sm transition-all active:scale-95 uppercase text-xs tracking-widest flex items-center gap-2"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        Imprimir PDF
+                    </button>
                 </div>
 
-                <div className="overflow-x-auto rounded-2xl border-2 border-gray-50">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">
+                <div className="border-2 border-gray-50 rounded-2xl flex flex-col">
+                    <div 
+                        className="overflow-x-auto custom-scrollbar"
+                        onScroll={(e) => {
+                            const bottomScroll = document.getElementById('contract-bottom-scroll');
+                            if (bottomScroll) bottomScroll.scrollLeft = e.currentTarget.scrollLeft;
+                        }}
+                    >
+                        <div id="contract-top-dummy" style={{ height: '1px' }}></div>
+                    </div>
+                    <div 
+                        id="contract-bottom-scroll"
+                        className="overflow-x-auto custom-scrollbar"
+                        onScroll={(e) => {
+                            const topScroll = e.currentTarget.previousElementSibling;
+                            if (topScroll) topScroll.scrollLeft = e.currentTarget.scrollLeft;
+                        }}
+                    >
+                        <table 
+                            className="w-full text-sm"
+                            ref={(el) => {
+                                if (el) {
+                                    const dummy = document.getElementById('contract-top-dummy');
+                                    if (dummy) dummy.style.width = `${el.offsetWidth}px`;
+                                }
+                            }}
+                        >
+                            <thead className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">
                             <tr>
                                 <th className="p-4 text-left">Produto do Contrato</th>
                                 <th className="p-4 text-center">Unid.</th>
@@ -306,6 +408,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                             )}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 

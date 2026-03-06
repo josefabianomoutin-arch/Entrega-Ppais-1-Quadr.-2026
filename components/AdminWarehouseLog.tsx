@@ -28,6 +28,121 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [editingLog, setEditingLog] = useState<WarehouseMovement | null>(null);
 
+    const topScrollRef = React.useRef<HTMLDivElement>(null);
+    const bottomScrollRef = React.useRef<HTMLDivElement>(null);
+    const tableRef = React.useRef<HTMLTableElement>(null);
+
+    React.useEffect(() => {
+        const topScroll = topScrollRef.current;
+        const bottomScroll = bottomScrollRef.current;
+
+        if (!topScroll || !bottomScroll) return;
+
+        const handleTopScroll = () => {
+            bottomScroll.scrollLeft = topScroll.scrollLeft;
+        };
+
+        const handleBottomScroll = () => {
+            topScroll.scrollLeft = bottomScroll.scrollLeft;
+        };
+
+        topScroll.addEventListener('scroll', handleTopScroll);
+        bottomScroll.addEventListener('scroll', handleBottomScroll);
+
+        return () => {
+            topScroll.removeEventListener('scroll', handleTopScroll);
+            bottomScroll.removeEventListener('scroll', handleBottomScroll);
+        };
+    }, []);
+
+    React.useEffect(() => {
+        const table = tableRef.current;
+        const topScroll = topScrollRef.current;
+
+        if (!table || !topScroll) return;
+
+        const observer = new ResizeObserver(() => {
+            const dummyDiv = topScroll.firstChild as HTMLDivElement;
+            if (dummyDiv) {
+                dummyDiv.style.width = `${table.offsetWidth}px`;
+            }
+        });
+
+        observer.observe(table);
+
+        return () => observer.disconnect();
+    }, [filteredLog]);
+
+    const handlePrintPDF = () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        const htmlContent = `
+            <html>
+            <head>
+                <title>Relatório de Movimentações de Estoque</title>
+                <style>
+                    body { font-family: sans-serif; padding: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                    h1 { color: #333; font-size: 18px; }
+                    .text-right { text-align: right; }
+                    .text-center { text-align: center; }
+                    .font-bold { font-weight: bold; }
+                    .text-gray-500 { color: #6b7280; }
+                    .text-xs { font-size: 10px; }
+                    @media print {
+                        @page { size: A4 landscape; margin: 10mm; }
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>Relatório de Movimentações de Estoque</h1>
+                <p>Data de Emissão: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Data Doc.</th>
+                            <th>Produto</th>
+                            <th>Barras</th>
+                            <th>Lote</th>
+                            <th class="text-right">Quantidade</th>
+                            <th>NF/Doc</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredLog.map(log => `
+                            <tr>
+                                <td>${log.type.toUpperCase()}</td>
+                                <td>${(log.date || '').split('-').reverse().join('/')}</td>
+                                <td>
+                                    <div class="font-bold">${log.itemName}</div>
+                                    <div class="text-xs text-gray-500">${log.supplierName}</div>
+                                </td>
+                                <td>${log.barcode || '-'}</td>
+                                <td>${log.lotNumber}</td>
+                                <td class="text-right font-bold">${(log.quantity || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg</td>
+                                <td>${log.inboundInvoice || log.outboundInvoice || '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                <script>
+                    window.onload = () => {
+                        window.print();
+                        window.close();
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    };
+
     const filteredLog = useMemo(() => {
         return warehouseLog
             .filter(log => {
@@ -300,6 +415,13 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
                             Imprimir Etiquetas (Filtradas)
                         </button>
+                        <button 
+                            onClick={handlePrintPDF}
+                            className="bg-gray-800 hover:bg-gray-900 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                            Imprimir PDF
+                        </button>
                     </div>
                 </div>
 
@@ -312,9 +434,17 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     </select>
                 </div>
 
-                <div className="overflow-x-auto max-h-[65vh] custom-scrollbar border rounded-xl shadow-inner">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-100 sticky top-0 z-10 border-b">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div 
+                        ref={topScrollRef} 
+                        className="overflow-x-auto overflow-y-hidden custom-scrollbar border-b border-gray-100" 
+                        style={{ height: '12px' }}
+                    >
+                        <div style={{ height: '1px' }}></div>
+                    </div>
+                    <div ref={bottomScrollRef} className="overflow-x-auto max-h-[65vh] custom-scrollbar">
+                        <table ref={tableRef} className="w-full text-sm">
+                            <thead className="bg-gray-100 sticky top-0 z-10 border-b">
                             <tr>
                                 <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Tipo</th>
                                 <th className="p-3 text-left text-[10px] font-black uppercase text-gray-500 tracking-widest">Data Doc.</th>
@@ -378,6 +508,7 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                             )}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 

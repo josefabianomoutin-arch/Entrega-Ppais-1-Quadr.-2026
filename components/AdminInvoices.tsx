@@ -263,6 +263,105 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+    const topScrollRef = React.useRef<HTMLDivElement>(null);
+    const bottomScrollRef = React.useRef<HTMLDivElement>(null);
+    const tableRef = React.useRef<HTMLTableElement>(null);
+
+    React.useEffect(() => {
+        const topScroll = topScrollRef.current;
+        const bottomScroll = bottomScrollRef.current;
+
+        if (!topScroll || !bottomScroll) return;
+
+        const handleTopScroll = () => {
+            bottomScroll.scrollLeft = topScroll.scrollLeft;
+        };
+
+        const handleBottomScroll = () => {
+            topScroll.scrollLeft = bottomScroll.scrollLeft;
+        };
+
+        topScroll.addEventListener('scroll', handleTopScroll);
+        bottomScroll.addEventListener('scroll', handleBottomScroll);
+
+        return () => {
+            topScroll.removeEventListener('scroll', handleTopScroll);
+            bottomScroll.removeEventListener('scroll', handleBottomScroll);
+        };
+    }, []);
+
+    const handlePrintPDF = () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        const htmlContent = `
+            <html>
+            <head>
+                <title>Relatório de Notas Fiscais</title>
+                <style>
+                    body { font-family: sans-serif; padding: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                    h1 { color: #333; font-size: 18px; }
+                    .text-right { text-align: right; }
+                    .text-center { text-align: center; }
+                    .font-bold { font-weight: bold; }
+                    .text-gray-500 { color: #6b7280; }
+                    .text-xs { font-size: 10px; }
+                    @media print {
+                        @page { size: A4 landscape; margin: 10mm; }
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>Relatório de Notas Fiscais</h1>
+                <p>Data de Emissão: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fornecedor</th>
+                            <th>Data</th>
+                            <th>Nº Nota Fiscal</th>
+                            <th class="text-right">Valor Total</th>
+                            <th>Itens</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredAndSortedInvoices.map(invoice => `
+                            <tr>
+                                <td>
+                                    <div class="font-bold">${invoice.supplierName}</div>
+                                    <div class="text-xs text-gray-500">${invoice.supplierCpf}</div>
+                                </td>
+                                <td>${formatDate(invoice.date)}</td>
+                                <td>${invoice.invoiceNumber}</td>
+                                <td class="text-right font-bold">${formatCurrency(invoice.totalValue)}</td>
+                                <td>
+                                    <ul style="margin:0; padding-left: 15px;">
+                                        ${invoice.items.map((item: any) => `
+                                            <li>${item.name} - ${item.kg.toFixed(2).replace('.',',')} Kg - ${formatCurrency(item.value)}</li>
+                                        `).join('')}
+                                    </ul>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                <script>
+                    window.onload = () => {
+                        window.print();
+                        window.close();
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    };
+
     const allInvoices = useMemo((): InvoiceInfo[] => {
         const invoicesMap = new Map<string, InvoiceInfo>();
         (suppliers || []).forEach(supplier => {
@@ -317,6 +416,24 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
             return sortDirection === 'asc' ? -comp : comp;
         });
     }, [allInvoices, searchTerm, sortKey, sortDirection]);
+
+    React.useEffect(() => {
+        const table = tableRef.current;
+        const topScroll = topScrollRef.current;
+
+        if (!table || !topScroll) return;
+
+        const observer = new ResizeObserver(() => {
+            const dummyDiv = topScroll.firstChild as HTMLDivElement;
+            if (dummyDiv) {
+                dummyDiv.style.width = `${table.offsetWidth}px`;
+            }
+        });
+
+        observer.observe(table);
+
+        return () => observer.disconnect();
+    }, [filteredAndSortedInvoices, expandedInvoiceId]);
 
     const handleSort = (key: 'supplierName' | 'date' | 'totalValue') => {
         if (key === sortKey) setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
@@ -444,13 +561,28 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                             Lançar NF Manualmente
                         </button>
                     )}
+                    <button 
+                        onClick={handlePrintPDF}
+                        className="bg-gray-800 hover:bg-gray-900 text-white font-black py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        Imprimir PDF
+                    </button>
                     <input type="text" placeholder="Pesquisar (Fornecedor, NF, Código de Barras)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-400 transition-all w-full md:w-auto" />
                 </div>
             </div>
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div 
+                    ref={topScrollRef} 
+                    className="overflow-x-auto overflow-y-hidden custom-scrollbar border-b border-gray-100" 
+                    style={{ height: '12px' }}
+                >
+                    <div style={{ height: '1px' }}></div>
+                </div>
+                <div ref={bottomScrollRef} className="overflow-x-auto custom-scrollbar">
+                    <table ref={tableRef} className="w-full text-sm">
+                        <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                         <tr>
                             <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('supplierName')}>Fornecedor</th>
                             <th className="p-3 text-left cursor-pointer" onClick={() => handleSort('date')}>Data</th>
@@ -599,6 +731,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                         }) : (<tr><td colSpan={6} className="p-8 text-center text-gray-400 italic">Nenhuma nota fiscal registrada.</td></tr>)}
                     </tbody>
                 </table>
+                </div>
             </div>
 
             {editingInvoice && (

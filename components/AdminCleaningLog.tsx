@@ -18,6 +18,51 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const topScrollRef = React.useRef<HTMLDivElement>(null);
+  const bottomScrollRef = React.useRef<HTMLDivElement>(null);
+  const tableRef = React.useRef<HTMLTableElement>(null);
+
+  React.useEffect(() => {
+      const topScroll = topScrollRef.current;
+      const bottomScroll = bottomScrollRef.current;
+
+      if (!topScroll || !bottomScroll) return;
+
+      const handleTopScroll = () => {
+          bottomScroll.scrollLeft = topScroll.scrollLeft;
+      };
+
+      const handleBottomScroll = () => {
+          topScroll.scrollLeft = bottomScroll.scrollLeft;
+      };
+
+      topScroll.addEventListener('scroll', handleTopScroll);
+      bottomScroll.addEventListener('scroll', handleBottomScroll);
+
+      return () => {
+          topScroll.removeEventListener('scroll', handleTopScroll);
+          bottomScroll.removeEventListener('scroll', handleBottomScroll);
+      };
+  }, []);
+
+  React.useEffect(() => {
+      const table = tableRef.current;
+      const topScroll = topScrollRef.current;
+
+      if (!table || !topScroll) return;
+
+      const observer = new ResizeObserver(() => {
+          const dummyDiv = topScroll.firstChild as HTMLDivElement;
+          if (dummyDiv) {
+              dummyDiv.style.width = `${table.offsetWidth}px`;
+          }
+      });
+
+      observer.observe(table);
+
+      return () => observer.disconnect();
+  }, [filteredLogs]);
+
   const filteredLogs = useMemo(() => {
     return logs
       .filter(l => 
@@ -248,9 +293,17 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, onRegister, o
           </div>
         </div>
 
-        <div className="overflow-x-auto border rounded-xl shadow-inner">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div 
+                ref={topScrollRef} 
+                className="overflow-x-auto overflow-y-hidden custom-scrollbar border-b border-gray-100" 
+                style={{ height: '12px' }}
+            >
+                <div style={{ height: '1px' }}></div>
+            </div>
+            <div ref={bottomScrollRef} className="overflow-x-auto custom-scrollbar">
+                <table ref={tableRef} className="w-full text-sm">
+                    <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b">
               <tr>
                 <th className="p-4 text-left">Data</th>
                 <th className="p-4 text-left">Tipo de Serviço</th>

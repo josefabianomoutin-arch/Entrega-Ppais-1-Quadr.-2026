@@ -37,6 +37,125 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
          item.becCode?.includes(searchTerm))
     );
 
+    const topScrollRef = React.useRef<HTMLDivElement>(null);
+    const bottomScrollRef = React.useRef<HTMLDivElement>(null);
+    const tableRef = React.useRef<HTMLTableElement>(null);
+    const [tableWidth, setTableWidth] = useState(0);
+
+    React.useEffect(() => {
+        if (!tableRef.current) return;
+        const observer = new ResizeObserver(() => {
+            if (tableRef.current) {
+                setTableWidth(tableRef.current.offsetWidth);
+            }
+        });
+        observer.observe(tableRef.current);
+        return () => observer.disconnect();
+    }, [filteredItems]);
+
+    const handleTopScroll = () => {
+        if (bottomScrollRef.current && topScrollRef.current) {
+            bottomScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+        }
+    };
+
+    const handleBottomScroll = () => {
+        if (bottomScrollRef.current && topScrollRef.current) {
+            topScrollRef.current.scrollLeft = bottomScrollRef.current.scrollLeft;
+        }
+    };
+
+    const handlePrint = () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('Por favor, permita popups para imprimir.');
+            return;
+        }
+
+        const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+
+        const htmlContent = `
+            <html>
+            <head>
+                <title>Relatório - ${category}</title>
+                <style>
+                    @page { size: A4 landscape; margin: 10mm; }
+                    body { font-family: Arial, sans-serif; font-size: 10px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+                    th { background-color: #f3f4f6; text-transform: uppercase; font-size: 9px; }
+                    .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    h2 { text-align: center; text-transform: uppercase; margin-bottom: 5px; }
+                    .header-info { text-align: center; color: #666; margin-bottom: 20px; font-size: 11px; }
+                </style>
+            </head>
+            <body>
+                <h2>RELATÓRIO DE AQUISIÇÃO - ${category}</h2>
+                <div class="header-info">Data de emissão: ${new Date().toLocaleDateString('pt-BR')}</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="text-center">#</th>
+                            <th>Produto para aquisição</th>
+                            <th>Produto do Contrato</th>
+                            <th class="text-center">Cod. Compras / BEC</th>
+                            <th class="text-center">Natureza de Despesa</th>
+                            <th class="text-center">Unid.</th>
+                            <th class="text-right">Qtd. Adquirida</th>
+                            ${category !== 'PPAIS' ? '<th class="text-right">Saldo Estoque</th>' : '<th class="text-right">Peso por Fornecedor</th><th class="text-right">Valor por Fornecedor</th>'}
+                            <th class="text-right">Valor da Mediana</th>
+                            <th class="text-right">Valor Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredItems.map((item, index) => {
+                            const totalValue = item.acquiredQuantity * (item.unitValue || 0);
+                            
+                            let extraCols = '';
+                            if (category !== 'PPAIS') {
+                                extraCols = `<td class="text-right">${item.stockBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>`;
+                            } else {
+                                const suppliersForItem = suppliers.filter(s => (s.contractItems || []).some(ci => ci.name === item.name));
+                                const numSuppliers = suppliersForItem.length || 1;
+                                const weightPerSupplier = item.acquiredQuantity / numSuppliers;
+                                const valuePerSupplier = totalValue / numSuppliers;
+                                extraCols = `
+                                    <td class="text-right">${weightPerSupplier.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                    <td class="text-right">${formatCurrency(valuePerSupplier)}</td>
+                                `;
+                            }
+
+                            return `
+                                <tr>
+                                    <td class="text-center">${index + 1}</td>
+                                    <td>${item.name}</td>
+                                    <td>${item.contractItemName || 'Não vinculado'}</td>
+                                    <td class="text-center">C: ${item.comprasCode || '---'}<br>B: ${item.becCode || '---'}</td>
+                                    <td class="text-center">${item.expenseNature || '---'}</td>
+                                    <td class="text-center">${item.unit}</td>
+                                    <td class="text-right">${item.acquiredQuantity.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                    ${extraCols}
+                                    <td class="text-right">${formatCurrency(item.unitValue || 0)}</td>
+                                    <td class="text-right">${formatCurrency(totalValue)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+                <script>
+                    window.onload = () => {
+                        window.print();
+                    };
+                </script>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    };
+
     const handleSave = async () => {
         if (!name) return;
 
@@ -105,18 +224,42 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                     />
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 </div>
-                <button 
-                    onClick={() => setIsAdding(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-8 rounded-2xl shadow-lg transition-all active:scale-95 uppercase text-xs tracking-widest flex items-center gap-2"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-                    Novo Produto
-                </button>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={handlePrint}
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-black py-4 px-6 rounded-2xl shadow-sm transition-all active:scale-95 uppercase text-xs tracking-widest flex items-center gap-2"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        Imprimir PDF
+                    </button>
+                    <button 
+                        onClick={() => setIsAdding(true)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-8 rounded-2xl shadow-lg transition-all active:scale-95 uppercase text-xs tracking-widest flex items-center gap-2"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                        Novo Produto
+                    </button>
+                </div>
             </div>
 
-            <div className="bg-white rounded-[2rem] shadow-2xl overflow-x-auto border border-gray-100">
-                <table className="w-full border-collapse">
-                    <thead>
+            <div className="bg-white rounded-[2rem] shadow-2xl border border-gray-100 flex flex-col">
+                {/* Top Scrollbar */}
+                <div 
+                    ref={topScrollRef} 
+                    onScroll={handleTopScroll} 
+                    className="overflow-x-auto custom-scrollbar"
+                >
+                    <div style={{ width: tableWidth, height: '1px' }}></div>
+                </div>
+                
+                {/* Table Container */}
+                <div 
+                    ref={bottomScrollRef} 
+                    onScroll={handleBottomScroll} 
+                    className="overflow-x-auto custom-scrollbar"
+                >
+                    <table ref={tableRef} className="w-full border-collapse">
+                        <thead>
                         <tr className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">
                             <th className="p-5 text-center w-12">#</th>
                             <th className="p-5 text-left min-w-[250px]">Produto para aquisição</th>
@@ -220,6 +363,7 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                         )}
                     </tbody>
                 </table>
+                </div>
             </div>
 
             {isAdding && (

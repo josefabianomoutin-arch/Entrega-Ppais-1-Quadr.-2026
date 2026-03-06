@@ -390,59 +390,165 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
 
             {showComparison && (
                 <div className="mt-8 animate-fade-in">
-                    <h3 className="text-2xl font-black text-gray-800 mb-6 text-center uppercase tracking-tighter">
-                        Análise de Frequência de Compra por Prazo de Validade (Média das NFs)
-                    </h3>
-                    <div className="overflow-x-auto border rounded-lg">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-100 text-xs uppercase text-gray-600">
-                                <tr>
-                                    <th className="p-3 text-center">#</th>
-                                    <th className="p-3 text-left">Item (Tabela de Pesos)</th>
-                                    <th className="p-3 text-center">Frequência Consumo</th>
-                                    <th className="p-3 text-center">Média Validade (Dias)</th>
-                                    <th className="p-3 text-center">Recomendação de Compra</th>
-                                    <th className="p-3 text-right">Ação Sugerida</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {resolutionData && Object.entries(resolutionData).sort((a, b) => a[0].localeCompare(b[0])).map(([name, data], index) => {
-                                    const normalizedName = normalizeItemName(name);
-                                    const avgDays = shelfLifeData.get(normalizedName) || 0;
-                                    const recommendation = getPurchaseRecommendation(avgDays);
-                                    
-                                    return (
-                                        <tr key={name} className="hover:bg-gray-50">
-                                            <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
-                                            <td className="p-3 font-semibold text-gray-800">{name}</td>
-                                            <td className="p-3 text-center font-mono text-gray-500">{data.frequency}</td>
-                                            <td className="p-3 text-center font-mono font-bold">
-                                                {avgDays > 0 ? `${Math.round(avgDays)} dias` : <span className="text-gray-300 italic">Sem dados NF</span>}
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                                                    recommendation === 'MENSAL' ? 'bg-red-100 text-red-700' :
-                                                    recommendation === 'QUADRIMESTRAL' ? 'bg-orange-100 text-orange-700' :
-                                                    recommendation === 'SEMESTRAL' ? 'bg-blue-100 text-blue-700' :
-                                                    recommendation === 'ANUAL' ? 'bg-green-100 text-green-700' :
-                                                    'bg-gray-100 text-gray-500'
-                                                }`}>
-                                                    {recommendation}
-                                                </span>
-                                            </td>
-                                            <td className="p-3 text-right text-[10px] font-medium text-gray-500 italic">
-                                                {avgDays > 0 ? (
-                                                    avgDays < 45 ? "Comprar conforme necessidade imediata" :
-                                                    avgDays < 135 ? "Estoque para até 4 meses" :
-                                                    avgDays < 200 ? "Estoque para até 6 meses" :
-                                                    "Possível estoque anual"
-                                                ) : "Aguardando lançamentos de NF"}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-2xl font-black text-gray-800 text-center uppercase tracking-tighter flex-1">
+                            Análise de Frequência de Compra por Prazo de Validade (Média das NFs)
+                        </h3>
+                        <button 
+                            onClick={() => {
+                                const printWindow = window.open('', '_blank');
+                                if (!printWindow) {
+                                    alert('Por favor, permita popups para imprimir.');
+                                    return;
+                                }
+                                const htmlContent = `
+                                    <html>
+                                    <head>
+                                        <title>Análise de Frequência de Compra</title>
+                                        <style>
+                                            @page { size: A4 portrait; margin: 10mm; }
+                                            body { font-family: Arial, sans-serif; font-size: 10px; }
+                                            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                                            th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+                                            th { background-color: #f3f4f6; text-transform: uppercase; font-size: 9px; }
+                                            .text-center { text-align: center; }
+                                            .text-right { text-align: right; }
+                                            h2 { text-align: center; text-transform: uppercase; margin-bottom: 5px; }
+                                            .header-info { text-align: center; color: #666; margin-bottom: 20px; font-size: 11px; }
+                                        </style>
+                                    </head>
+                                    <body>
+                                        <h2>Análise de Frequência de Compra por Prazo de Validade</h2>
+                                        <div class="header-info">Data de emissão: ${new Date().toLocaleDateString('pt-BR')}</div>
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th class="text-center">#</th>
+                                                    <th>Item (Tabela de Pesos)</th>
+                                                    <th class="text-center">Frequência Consumo</th>
+                                                    <th class="text-center">Média Validade (Dias)</th>
+                                                    <th class="text-center">Recomendação de Compra</th>
+                                                    <th class="text-right">Ação Sugerida</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${Object.entries(resolutionData).sort((a, b) => a[0].localeCompare(b[0])).map(([name, data], index) => {
+                                                    const normalizedName = normalizeItemName(name);
+                                                    const avgDays = shelfLifeData.get(normalizedName) || 0;
+                                                    const recommendation = getPurchaseRecommendation(avgDays);
+                                                    const action = avgDays > 0 ? (
+                                                        avgDays < 45 ? "Comprar conforme necessidade imediata" :
+                                                        avgDays < 135 ? "Estoque para até 4 meses" :
+                                                        avgDays < 200 ? "Estoque para até 6 meses" :
+                                                        "Possível estoque anual"
+                                                    ) : "Aguardando lançamentos de NF";
+                                                    
+                                                    return `
+                                                        <tr>
+                                                            <td class="text-center">${index + 1}</td>
+                                                            <td>${name}</td>
+                                                            <td class="text-center">${data.frequency}</td>
+                                                            <td class="text-center">${avgDays > 0 ? Math.round(avgDays) + ' dias' : 'Sem dados NF'}</td>
+                                                            <td class="text-center">${recommendation}</td>
+                                                            <td class="text-right">${action}</td>
+                                                        </tr>
+                                                    `;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                        <script>
+                                            window.onload = () => {
+                                                window.print();
+                                            };
+                                        </script>
+                                    </body>
+                                    </html>
+                                `;
+                                printWindow.document.write(htmlContent);
+                                printWindow.document.close();
+                            }}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-black py-3 px-6 rounded-xl shadow-sm transition-all active:scale-95 uppercase text-xs tracking-widest flex items-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                            Imprimir PDF
+                        </button>
+                    </div>
+                    <div className="border rounded-lg flex flex-col">
+                        <div 
+                            className="overflow-x-auto custom-scrollbar"
+                            onScroll={(e) => {
+                                const bottomScroll = document.getElementById('comparison-bottom-scroll');
+                                if (bottomScroll) bottomScroll.scrollLeft = e.currentTarget.scrollLeft;
+                            }}
+                        >
+                            <div id="comparison-top-dummy" style={{ height: '1px' }}></div>
+                        </div>
+                        <div 
+                            id="comparison-bottom-scroll"
+                            className="overflow-x-auto custom-scrollbar"
+                            onScroll={(e) => {
+                                const topScroll = e.currentTarget.previousElementSibling;
+                                if (topScroll) topScroll.scrollLeft = e.currentTarget.scrollLeft;
+                            }}
+                        >
+                            <table 
+                                className="w-full text-sm"
+                                ref={(el) => {
+                                    if (el) {
+                                        const dummy = document.getElementById('comparison-top-dummy');
+                                        if (dummy) dummy.style.width = `${el.offsetWidth}px`;
+                                    }
+                                }}
+                            >
+                                <thead className="bg-gray-100 text-xs uppercase text-gray-600">
+                                    <tr>
+                                        <th className="p-3 text-center">#</th>
+                                        <th className="p-3 text-left">Item (Tabela de Pesos)</th>
+                                        <th className="p-3 text-center">Frequência Consumo</th>
+                                        <th className="p-3 text-center">Média Validade (Dias)</th>
+                                        <th className="p-3 text-center">Recomendação de Compra</th>
+                                        <th className="p-3 text-right">Ação Sugerida</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {resolutionData && Object.entries(resolutionData).sort((a, b) => a[0].localeCompare(b[0])).map(([name, data], index) => {
+                                        const normalizedName = normalizeItemName(name);
+                                        const avgDays = shelfLifeData.get(normalizedName) || 0;
+                                        const recommendation = getPurchaseRecommendation(avgDays);
+                                        
+                                        return (
+                                            <tr key={name} className="hover:bg-gray-50">
+                                                <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
+                                                <td className="p-3 font-semibold text-gray-800">{name}</td>
+                                                <td className="p-3 text-center font-mono text-gray-500">{data.frequency}</td>
+                                                <td className="p-3 text-center font-mono font-bold">
+                                                    {avgDays > 0 ? `${Math.round(avgDays)} dias` : <span className="text-gray-300 italic">Sem dados NF</span>}
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                                                        recommendation === 'MENSAL' ? 'bg-red-100 text-red-700' :
+                                                        recommendation === 'QUADRIMESTRAL' ? 'bg-orange-100 text-orange-700' :
+                                                        recommendation === 'SEMESTRAL' ? 'bg-blue-100 text-blue-700' :
+                                                        recommendation === 'ANUAL' ? 'bg-green-100 text-green-700' :
+                                                        'bg-gray-100 text-gray-500'
+                                                    }`}>
+                                                        {recommendation}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-right text-[10px] font-medium text-gray-500 italic">
+                                                    {avgDays > 0 ? (
+                                                        avgDays < 45 ? "Comprar conforme necessidade imediata" :
+                                                        avgDays < 135 ? "Estoque para até 4 meses" :
+                                                        avgDays < 200 ? "Estoque para até 6 meses" :
+                                                        "Possível estoque anual"
+                                                    ) : "Aguardando lançamentos de NF"}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}
