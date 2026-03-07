@@ -66,7 +66,7 @@ export interface WarehouseMovement {
   barcode?: string; // NOVO CAMPO
 }
 
-export interface PpaisProducer {
+export interface PerCapitaSupplier {
   id: string;
   name: string;
   cpfCnpj: string;
@@ -83,7 +83,8 @@ export interface PerCapitaConfig {
   seiProcessDefinitions?: Record<string, string>;
   monthlyQuota?: Record<string, number>;
   monthlyResource?: Record<string, number>;
-  ppaisProducers?: PpaisProducer[];
+  ppaisProducers?: PerCapitaSupplier[];
+  pereciveisSuppliers?: PerCapitaSupplier[];
 }
 
 export interface CleaningLog {

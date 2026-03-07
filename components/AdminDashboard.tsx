@@ -153,7 +153,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
   const combinedSuppliers = useMemo(() => {
     const producers = perCapitaConfig.ppaisProducers || [];
-    const mappedProducers: Supplier[] = producers.map(p => {
+    const pereciveis = perCapitaConfig.pereciveisSuppliers || [];
+
+    const mapToSupplier = (p: any) => {
         const weeks: number[] = [];
         const year = 2026;
         const monthNames = [
@@ -184,10 +186,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             allowedWeeks: Array.from(new Set(weeks)),
             initialValue: (p.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * (curr.valuePerKg || 0)), 0)
         } as Supplier;
-    });
+    };
 
-    return [...suppliers, ...mappedProducers];
-  }, [suppliers, perCapitaConfig.ppaisProducers]);
+    const mappedProducers = producers.map(mapToSupplier);
+    const mappedPereciveis = pereciveis.map(mapToSupplier);
+
+    return [...suppliers, ...mappedProducers, ...mappedPereciveis];
+  }, [suppliers, perCapitaConfig.ppaisProducers, perCapitaConfig.pereciveisSuppliers]);
 
   const filteredSuppliers = useMemo(() => {
     return combinedSuppliers.filter(s => (s.name || '').toLowerCase().includes(supplierSearch.toLowerCase()));

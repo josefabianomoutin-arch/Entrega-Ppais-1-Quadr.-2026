@@ -5,8 +5,8 @@ import type { Supplier, PerCapitaConfig, WarehouseMovement, AcquisitionItem } fr
 import { resolutionData } from './resolutionData';
 import AdminContractItems from './AdminContractItems';
 import AdminAcquisitionItems from './AdminAcquisitionItems';
-import AdminPpaisProducers from './AdminPpaisProducers';
-import type { PpaisProducer } from '../types';
+import AdminPerCapitaSuppliers from './AdminPerCapitaSuppliers';
+import type { PerCapitaSupplier } from '../types';
 
 interface AdminPerCapitaProps {
   suppliers: Supplier[];
@@ -102,6 +102,7 @@ const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Jul
 const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog, perCapitaConfig, onUpdatePerCapitaConfig, onUpdateContractForItem, onUpdateAcquisitionItem, onDeleteAcquisitionItem, acquisitionItems }) => {
     const [activeSubTab, setActiveSubTab] = useState<'CALCULO' | 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'PRODUTOS DE LIMPEZA'>('CALCULO');
     const [ppaisSubTab, setPpaisSubTab] = useState<'ITEMS' | 'PRODUCERS'>('ITEMS');
+    const [pereciveisSubTab, setPereciveisSubTab] = useState<'ITEMS' | 'SUPPLIERS'>('ITEMS');
     const [staffCount, setStaffCount] = useState<number>(0);
     const [inmateCount, setInmateCount] = useState<number>(0);
     const [customPerCapita, setCustomPerCapita] = useState<Record<string, string>>({});
@@ -109,7 +110,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
     const [seiProcessDefinitions, setSeiProcessDefinitions] = useState<Record<string, string>>({});
     const [monthlyQuota, setMonthlyQuota] = useState<Record<string, number>>({});
     const [monthlyResource, setMonthlyResource] = useState<Record<string, number>>({});
-    const [ppaisProducers, setPpaisProducers] = useState<PpaisProducer[]>([]);
+    const [ppaisProducers, setPpaisProducers] = useState<PerCapitaSupplier[]>([]);
+    const [pereciveisSuppliers, setPereciveisSuppliers] = useState<PerCapitaSupplier[]>([]);
     const [showComparison, setShowComparison] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -124,6 +126,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
         setMonthlyQuota(perCapitaConfig.monthlyQuota || {});
         setMonthlyResource(perCapitaConfig.monthlyResource || {});
         setPpaisProducers(perCapitaConfig.ppaisProducers || []);
+        setPereciveisSuppliers(perCapitaConfig.pereciveisSuppliers || []);
         setIsDirty(false);
     }, [perCapitaConfig]);
 
@@ -139,6 +142,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
             monthlyQuota,
             monthlyResource,
             ppaisProducers,
+            pereciveisSuppliers,
         };
         try {
             await onUpdatePerCapitaConfig(newConfig);
@@ -182,8 +186,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
         setIsDirty(true);
     };
 
-    const handleUpdateProducers = (newProducers: PpaisProducer[]) => {
+    const handleUpdateProducers = (newProducers: PerCapitaSupplier[]) => {
         setPpaisProducers(newProducers);
+        setIsDirty(true);
+    };
+
+    const handleUpdatePereciveisSuppliers = (newSuppliers: PerCapitaSupplier[]) => {
+        setPereciveisSuppliers(newSuppliers);
         setIsDirty(true);
     };
 
@@ -196,9 +205,18 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
         } as Supplier));
     }, [ppaisProducers]);
 
+    const pereciveisAsSuppliers = useMemo(() => {
+        return pereciveisSuppliers.map(p => ({
+            ...p,
+            deliveries: [],
+            allowedWeeks: [],
+            initialValue: (p.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * (curr.valuePerKg || 0)), 0)
+        } as Supplier));
+    }, [pereciveisSuppliers]);
+
     const handleUpdateContractForPpais = async (itemName: string, assignments: any[]) => {
         const updatedProducers = ppaisProducers.map(producer => {
-            const assignment = assignments.find(a => a.supplierCpf === producer.cpf);
+            const assignment = assignments.find(a => a.supplierCpf === producer.cpfCnpj);
             const newContractItems = (producer.contractItems || []).filter(ci => ci.name !== itemName);
             if (assignment) {
                 newContractItems.push({
@@ -215,6 +233,27 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
         });
         handleUpdateProducers(updatedProducers);
         return { success: true, message: 'Contratos de produtores atualizados' };
+    };
+
+    const handleUpdateContractForPereciveis = async (itemName: string, assignments: any[]) => {
+        const updatedSuppliers = pereciveisSuppliers.map(supplier => {
+            const assignment = assignments.find(a => a.supplierCpf === supplier.cpfCnpj);
+            const newContractItems = (supplier.contractItems || []).filter(ci => ci.name !== itemName);
+            if (assignment) {
+                newContractItems.push({
+                    name: itemName,
+                    totalKg: assignment.totalKg,
+                    valuePerKg: assignment.valuePerKg,
+                    unit: assignment.unit,
+                    category: assignment.category,
+                    comprasCode: assignment.comprasCode,
+                    becCode: assignment.becCode
+                });
+            }
+            return { ...supplier, contractItems: newContractItems };
+        });
+        handleUpdatePereciveisSuppliers(updatedSuppliers);
+        return { success: true, message: 'Contratos de fornecedores atualizados' };
     };
 
     const allContractItemNames = useMemo(() => {
@@ -721,10 +760,36 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                         </div>
                     )}
 
+                    {activeSubTab === 'PERECÍVEIS' && (
+                        <div className="flex gap-2 mb-8 bg-white p-2 rounded-2xl shadow-sm border border-gray-100">
+                            <button 
+                                onClick={() => setPereciveisSubTab('ITEMS')}
+                                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${pereciveisSubTab === 'ITEMS' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}
+                            >
+                                Itens de Aquisição
+                            </button>
+                            <button 
+                                onClick={() => setPereciveisSubTab('SUPPLIERS')}
+                                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${pereciveisSubTab === 'SUPPLIERS' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}
+                            >
+                                Cadastro de Fornecedores
+                            </button>
+                        </div>
+                    )}
+
                     {activeSubTab === 'PPAIS' && ppaisSubTab === 'PRODUCERS' ? (
-                        <AdminPpaisProducers 
-                            producers={ppaisProducers}
+                        <AdminPerCapitaSuppliers 
+                            suppliers={ppaisProducers}
                             onUpdate={handleUpdateProducers}
+                            type="PRODUTOR"
+                            colorScheme="emerald"
+                        />
+                    ) : activeSubTab === 'PERECÍVEIS' && pereciveisSubTab === 'SUPPLIERS' ? (
+                        <AdminPerCapitaSuppliers 
+                            suppliers={pereciveisSuppliers}
+                            onUpdate={handleUpdatePereciveisSuppliers}
+                            type="FORNECEDOR"
+                            colorScheme="indigo"
                         />
                     ) : (
                         <AdminAcquisitionItems 
@@ -733,8 +798,16 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                             onUpdate={onUpdateAcquisitionItem} 
                             onDelete={onDeleteAcquisitionItem} 
                             contractItems={allContractItemNames}
-                            suppliers={activeSubTab === 'PPAIS' ? ppaisAsSuppliers : suppliers}
-                            onUpdateContractForItem={activeSubTab === 'PPAIS' ? handleUpdateContractForPpais : onUpdateContractForItem}
+                            suppliers={
+                                activeSubTab === 'PPAIS' ? ppaisAsSuppliers : 
+                                activeSubTab === 'PERECÍVEIS' ? pereciveisAsSuppliers : 
+                                suppliers
+                            }
+                            onUpdateContractForItem={
+                                activeSubTab === 'PPAIS' ? handleUpdateContractForPpais : 
+                                activeSubTab === 'PERECÍVEIS' ? handleUpdateContractForPereciveis : 
+                                onUpdateContractForItem
+                            }
                         />
                     )}
                 </div>
