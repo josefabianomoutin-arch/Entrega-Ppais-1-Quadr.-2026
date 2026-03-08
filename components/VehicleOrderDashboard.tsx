@@ -89,6 +89,7 @@ const VehicleOrderDashboard: React.FC<VehicleOrderDashboardProps> = ({
           readOnly={false}
           hideAssets={role === 'ordem_saida'}
           hideEdit={role === 'ordem_saida'}
+          showGateTab={true}
         />
       </main>
     </div>

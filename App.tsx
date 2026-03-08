@@ -1179,6 +1179,28 @@ const App: React.FC = () => {
                  return { success: true, message: 'Atualizado' };
              }}
              onDeleteVehicleExitOrder={async (id) => remove(child(vehicleExitOrdersRef, id))}
+             vehicleAssets={vehicleAssets}
+             onRegisterVehicleAsset={async (asset) => {
+                 const r = push(vehicleAssetsRef);
+                 await set(r, { ...asset, id: r.key });
+                 return { success: true, message: 'Veículo registrado' };
+             }}
+             onUpdateVehicleAsset={async (asset) => {
+                 await set(child(vehicleAssetsRef, asset.id), asset);
+                 return { success: true, message: 'Veículo atualizado' };
+             }}
+             onDeleteVehicleAsset={async (id) => remove(child(vehicleAssetsRef, id))}
+             driverAssets={driverAssets}
+             onRegisterDriverAsset={async (asset) => {
+                 const r = push(driverAssetsRef);
+                 await set(r, { ...asset, id: r.key });
+                 return { success: true, message: 'Motorista/Acompanhante registrado' };
+             }}
+             onUpdateDriverAsset={async (asset) => {
+                 await set(child(driverAssetsRef, asset.id), asset);
+                 return { success: true, message: 'Motorista/Acompanhante atualizado' };
+             }}
+             onDeleteDriverAsset={async (id) => remove(child(driverAssetsRef, id))}
            />;
   }
 

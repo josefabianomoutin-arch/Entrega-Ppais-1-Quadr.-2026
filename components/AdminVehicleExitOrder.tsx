@@ -1,6 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { VehicleExitOrder, VehicleAsset, DriverAsset } from '../types';
+import { GoogleGenAI } from "@google/genai";
 
 interface AdminVehicleExitOrderProps {
     orders: VehicleExitOrder[];
@@ -19,6 +20,7 @@ interface AdminVehicleExitOrderProps {
     securityMode?: boolean;
     hideAssets?: boolean;
     hideEdit?: boolean;
+    showGateTab?: boolean;
 }
 
 const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({ 
@@ -28,9 +30,10 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
     readOnly = false,
     securityMode = false,
     hideAssets = false,
-    hideEdit = false
+    hideEdit = false,
+    showGateTab = false
 }) => {
-    const [activeSubTab, setActiveSubTab] = useState<'orders' | 'assets'>('orders');
+    const [activeSubTab, setActiveSubTab] = useState<'orders' | 'assets' | 'gate'>('orders');
     const [activeAssetTab, setActiveAssetTab] = useState<'vehicles' | 'drivers'>('vehicles');
     
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,6 +50,135 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
         companions: [{ name: '', rg: '' }, { name: '', rg: '' }, { name: '', rg: '' }],
         observations: ''
     });
+
+    // Gate Control State
+    const [isCameraActive, setIsCameraActive] = useState(false);
+    const [isProcessingPlate, setIsProcessingPlate] = useState(false);
+    const [cameraError, setCameraError] = useState<string | null>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [gateTab, setGateTab] = useState<'manual' | 'camera'>('manual');
+
+    useEffect(() => {
+        if (securityMode) {
+            setActiveSubTab('gate');
+        }
+    }, [securityMode]);
+
+    const startCamera = async () => {
+        setCameraError(null);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'environment' } 
+            });
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                setIsCameraActive(true);
+            }
+        } catch (err) {
+            console.error("Error accessing camera:", err);
+            setCameraError("Não foi possível acessar a câmera. Verifique as permissões.");
+        }
+    };
+
+    const stopCamera = () => {
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+            videoRef.current.srcObject = null;
+        }
+        setIsCameraActive(false);
+    };
+
+    const captureAndRecognizePlate = async () => {
+        if (!videoRef.current || !canvasRef.current || isProcessingPlate) return;
+
+        setIsProcessingPlate(true);
+        try {
+            const context = canvasRef.current.getContext('2d');
+            if (!context) return;
+
+            canvasRef.current.width = videoRef.current.videoWidth;
+            canvasRef.current.height = videoRef.current.videoHeight;
+            context.drawImage(videoRef.current, 0, 0);
+
+            const base64Image = canvasRef.current.toDataURL('image/jpeg').split(',')[1];
+            
+            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+            
+            const result = await ai.models.generateContent({
+                model: "gemini-3-flash-preview",
+                contents: [{
+                    role: "user",
+                    parts: [
+                        { text: "Extraia apenas a placa do veículo desta imagem. Responda apenas com a placa no formato AAA-0000 ou AAA0A00 (Mercosul). Se não encontrar, responda 'NÃO ENCONTRADA'." },
+                        { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+                    ]
+                }]
+            });
+
+            const plate = (result.text || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            console.log("Plate recognized:", plate);
+
+            if (plate === 'NAOENCONTRADA' || plate.length < 7) {
+                alert("Placa não reconhecida. Tente novamente ou use o registro manual.");
+            } else {
+                // Try to find an order with this plate
+                // We look for orders from today or recent that are either:
+                // 1. Not left yet (Pending)
+                // 2. Left but not returned (Active)
+                
+                const today = new Date().toISOString().split('T')[0];
+                const matchingOrder = orders.find(o => 
+                    o.plate.replace(/[^A-Z0-9]/g, '') === plate && 
+                    (!o.exitTime || !o.returnTime)
+                );
+
+                if (matchingOrder) {
+                    const now = new Date();
+                    const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+                    const currentDate = now.toISOString().split('T')[0];
+
+                    if (!matchingOrder.exitTime) {
+                        if (window.confirm(`Registrar SAÍDA para o veículo ${matchingOrder.vehicle} (${matchingOrder.plate}) às ${currentTime}?`)) {
+                            await onUpdate({
+                                ...matchingOrder,
+                                exitTime: currentTime,
+                                exitDate: currentDate
+                            });
+                        }
+                    } else if (!matchingOrder.returnTime) {
+                        if (window.confirm(`Registrar RETORNO para o veículo ${matchingOrder.vehicle} (${matchingOrder.plate}) às ${currentTime}?`)) {
+                            await onUpdate({
+                                ...matchingOrder,
+                                returnTime: currentTime,
+                                returnDate: currentDate
+                            });
+                        }
+                    }
+                } else {
+                    alert(`Veículo com placa ${plate} identificado, mas nenhuma ordem pendente foi encontrada.`);
+                }
+            }
+        } catch (err) {
+            console.error("Error recognizing plate:", err);
+            alert("Erro ao processar imagem.");
+        } finally {
+            setIsProcessingPlate(false);
+        }
+    };
+
+    const handleQuickRegister = async (order: VehicleExitOrder, type: 'exit' | 'return') => {
+        const now = new Date();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        const currentDate = now.toISOString().split('T')[0];
+
+        if (type === 'exit') {
+            await onUpdate({ ...order, exitTime: currentTime, exitDate: currentDate });
+        } else {
+            await onUpdate({ ...order, returnTime: currentTime, returnDate: currentDate });
+        }
+    };
 
     // Asset Modals State
     const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
@@ -286,6 +418,14 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                         >
                                             Ordens
                                         </button>
+                                        {(securityMode || showGateTab) && (
+                                            <button 
+                                                onClick={() => setActiveSubTab('gate')}
+                                                className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeSubTab === 'gate' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                                            >
+                                                Portaria
+                                            </button>
+                                        )}
                                         {!readOnly && !securityMode && !hideAssets && (
                                             <button 
                                                 onClick={() => setActiveSubTab('assets')}
@@ -396,6 +536,148 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                         </div>
                     </div>
                 </>
+            ) : activeSubTab === 'gate' ? (
+                <div className="space-y-6">
+                    <div className="flex bg-gray-100 p-1 rounded-2xl w-fit">
+                        <button 
+                            onClick={() => { setGateTab('manual'); stopCamera(); }}
+                            className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${gateTab === 'manual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}
+                        >
+                            Registro Manual
+                        </button>
+                        <button 
+                            onClick={() => { setGateTab('camera'); startCamera(); }}
+                            className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${gateTab === 'camera' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}
+                        >
+                            Reconhecimento de Placa
+                        </button>
+                    </div>
+
+                    {gateTab === 'manual' ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden">
+                                <div className="p-6 border-b border-gray-50 bg-indigo-50/30">
+                                    <h3 className="text-sm font-black text-indigo-900 uppercase italic tracking-tighter">Aguardando Saída</h3>
+                                    <p className="text-[9px] text-indigo-400 font-bold uppercase">Veículos com ordem emitida</p>
+                                </div>
+                                <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto custom-scrollbar">
+                                    {orders.filter(o => !o.exitTime).length > 0 ? orders.filter(o => !o.exitTime).map(order => (
+                                        <div key={order.id} className="p-4 hover:bg-gray-50 transition-colors flex justify-between items-center">
+                                            <div>
+                                                <div className="font-black text-gray-800 uppercase text-xs">{order.vehicle}</div>
+                                                <div className="text-[10px] text-indigo-500 font-mono font-bold">{order.plate}</div>
+                                                <div className="text-[9px] text-gray-400 uppercase mt-1">{order.responsibleServer}</div>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleQuickRegister(order, 'exit')}
+                                                className="bg-indigo-600 text-white font-black py-2 px-4 rounded-xl text-[9px] uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95"
+                                            >
+                                                Registrar Saída
+                                            </button>
+                                        </div>
+                                    )) : (
+                                        <div className="p-10 text-center text-gray-300 text-[10px] font-bold uppercase italic">Nenhuma ordem pendente</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden">
+                                <div className="p-6 border-b border-gray-50 bg-emerald-50/30">
+                                    <h3 className="text-sm font-black text-emerald-900 uppercase italic tracking-tighter">Em Trânsito</h3>
+                                    <p className="text-[9px] text-emerald-400 font-bold uppercase">Veículos fora da unidade</p>
+                                </div>
+                                <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto custom-scrollbar">
+                                    {orders.filter(o => o.exitTime && !o.returnTime).length > 0 ? orders.filter(o => o.exitTime && !o.returnTime).map(order => (
+                                        <div key={order.id} className="p-4 hover:bg-gray-50 transition-colors flex justify-between items-center">
+                                            <div>
+                                                <div className="font-black text-gray-800 uppercase text-xs">{order.vehicle}</div>
+                                                <div className="text-[10px] text-emerald-500 font-mono font-bold">{order.plate}</div>
+                                                <div className="text-[9px] text-gray-400 uppercase mt-1">Saída: {order.exitTime}</div>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleQuickRegister(order, 'return')}
+                                                className="bg-emerald-600 text-white font-black py-2 px-4 rounded-xl text-[9px] uppercase tracking-widest shadow-lg shadow-emerald-100 active:scale-95"
+                                            >
+                                                Registrar Retorno
+                                            </button>
+                                        </div>
+                                    )) : (
+                                        <div className="p-10 text-center text-gray-300 text-[10px] font-bold uppercase italic">Nenhum veículo em trânsito</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden p-6">
+                            <div className="max-w-xl mx-auto space-y-6">
+                                <div className="relative aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-100">
+                                    {isCameraActive ? (
+                                        <video 
+                                            ref={videoRef} 
+                                            autoPlay 
+                                            playsInline 
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 gap-4">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                            <button 
+                                                onClick={startCamera}
+                                                className="bg-indigo-600 text-white font-black py-3 px-8 rounded-2xl text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95"
+                                            >
+                                                Ativar Câmera
+                                            </button>
+                                        </div>
+                                    )}
+                                    {isProcessingPlate && (
+                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center text-white gap-4">
+                                            <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            <p className="font-black text-[10px] uppercase tracking-[0.2em]">Processando Placa...</p>
+                                        </div>
+                                    )}
+                                    <canvas ref={canvasRef} className="hidden" />
+                                </div>
+
+                                {cameraError && (
+                                    <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-bold text-center border border-red-100">
+                                        {cameraError}
+                                    </div>
+                                )}
+
+                                <div className="flex justify-center gap-4">
+                                    {isCameraActive && (
+                                        <>
+                                            <button 
+                                                onClick={stopCamera}
+                                                className="bg-gray-100 text-gray-500 font-black py-3 px-8 rounded-2xl text-[10px] uppercase tracking-widest active:scale-95"
+                                            >
+                                                Desativar
+                                            </button>
+                                            <button 
+                                                onClick={captureAndRecognizePlate}
+                                                disabled={isProcessingPlate}
+                                                className="bg-indigo-600 text-white font-black py-4 px-12 rounded-2xl text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 active:scale-95 flex items-center gap-3"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                                Capturar e Identificar
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+
+                                <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100">
+                                    <h4 className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        Como Funciona
+                                    </h4>
+                                    <p className="text-[10px] text-amber-600 leading-relaxed font-medium">
+                                        Posicione a câmera de forma que a placa do veículo esteja bem visível e centralizada. O sistema utilizará inteligência artificial para extrair a placa e registrar automaticamente a saída ou o retorno, baseando-se nas ordens pendentes.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             ) : (
                 <div className="space-y-6">
                     <div className="flex gap-4 border-b border-gray-100 pb-2">

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import JsBarcode from 'jsbarcode';
-import type { Supplier, WarehouseMovement, ContractItem, ThirdPartyEntryLog, VehicleExitOrder } from '../types';
+import type { Supplier, WarehouseMovement, ContractItem, ThirdPartyEntryLog, VehicleExitOrder, VehicleAsset, DriverAsset } from '../types';
 import AdminInvoices from './AdminInvoices';
 import AgendaChegadas from './AgendaChegadas';
 import AdminVehicleExitOrder from './AdminVehicleExitOrder';
@@ -25,6 +25,14 @@ interface AlmoxarifadoDashboardProps {
     onRegisterVehicleExitOrder: (order: Omit<VehicleExitOrder, 'id'>) => Promise<{ success: boolean; message: string }>;
     onUpdateVehicleExitOrder: (order: VehicleExitOrder) => Promise<{ success: boolean; message: string }>;
     onDeleteVehicleExitOrder: (id: string) => Promise<void>;
+    vehicleAssets: VehicleAsset[];
+    onRegisterVehicleAsset: (asset: Omit<VehicleAsset, 'id'>) => Promise<{ success: boolean; message: string }>;
+    onUpdateVehicleAsset: (asset: VehicleAsset) => Promise<{ success: boolean; message: string }>;
+    onDeleteVehicleAsset: (id: string) => Promise<void>;
+    driverAssets: DriverAsset[];
+    onRegisterDriverAsset: (asset: Omit<DriverAsset, 'id'>) => Promise<{ success: boolean; message: string }>;
+    onUpdateDriverAsset: (asset: DriverAsset) => Promise<{ success: boolean; message: string }>;
+    onDeleteDriverAsset: (id: string) => Promise<void>;
 }
 
 const Barcode: React.FC<{ value: string }> = ({ value }) => {
@@ -65,7 +73,15 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
     vehicleExitOrders,
     onRegisterVehicleExitOrder,
     onUpdateVehicleExitOrder,
-    onDeleteVehicleExitOrder
+    onDeleteVehicleExitOrder,
+    vehicleAssets,
+    onRegisterVehicleAsset,
+    onUpdateVehicleAsset,
+    onDeleteVehicleAsset,
+    driverAssets,
+    onRegisterDriverAsset,
+    onUpdateDriverAsset,
+    onDeleteDriverAsset
 }) => {
     const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'receipt' | 'agenda' | 'vehicleExitOrder'>('entry');
     const [selectedAgendaDate, setSelectedAgendaDate] = useState(new Date().toISOString().split('T')[0]);
@@ -582,6 +598,15 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                         onRegister={onRegisterVehicleExitOrder}
                         onUpdate={onUpdateVehicleExitOrder}
                         onDelete={onDeleteVehicleExitOrder}
+                        vehicleAssets={vehicleAssets}
+                        onRegisterVehicleAsset={onRegisterVehicleAsset}
+                        onUpdateVehicleAsset={onUpdateVehicleAsset}
+                        onDeleteVehicleAsset={onDeleteVehicleAsset}
+                        driverAssets={driverAssets}
+                        onRegisterDriverAsset={onRegisterDriverAsset}
+                        onUpdateDriverAsset={onUpdateDriverAsset}
+                        onDeleteDriverAsset={onDeleteDriverAsset}
+                        showGateTab={true}
                     />
                 ) : (
                     <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden animate-fade-in">
