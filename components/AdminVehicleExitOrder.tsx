@@ -67,6 +67,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
     const [actionType, setActionType] = useState<'exit' | 'return' | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isAutoScanEnabled, setIsAutoScanEnabled] = useState(false);
+    const [lastScannedPlate, setLastScannedPlate] = useState<string | null>(null);
     const autoScanIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
@@ -125,7 +126,9 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
     const captureAndRecognizePlate = async () => {
         if (!videoRef.current || !canvasRef.current || isProcessingPlate) return;
 
-        setRecognitionStatus('scanning');
+        if (!isAutoScanEnabled) {
+            setRecognitionStatus('scanning');
+        }
         setIsProcessingPlate(true);
         setErrorMessage(null);
 
@@ -163,6 +166,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                     setRecognitionStatus('idle');
                 }
             } else {
+                setLastScannedPlate(plate);
                 setScannedPlate(plate);
                 
                 const matchingOrder = orders.find(o => 
@@ -183,14 +187,22 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                         }
                     }
                 } else {
-                    setRecognitionStatus('error');
-                    setErrorMessage(`Veículo com placa ${plate} identificado, mas nenhuma ordem pendente foi encontrada.`);
+                    if (!isAutoScanEnabled) {
+                        setRecognitionStatus('error');
+                        setErrorMessage(`Veículo com placa ${plate} identificado, mas nenhuma ordem pendente foi encontrada.`);
+                    } else {
+                        setRecognitionStatus('idle');
+                    }
                 }
             }
         } catch (err) {
             console.error("Error recognizing plate:", err);
-            setRecognitionStatus('error');
-            setErrorMessage("Erro ao processar imagem.");
+            if (!isAutoScanEnabled) {
+                setRecognitionStatus('error');
+                setErrorMessage("Erro ao processar imagem.");
+            } else {
+                setRecognitionStatus('idle');
+            }
         } finally {
             setIsProcessingPlate(false);
         }
@@ -714,10 +726,22 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                             </button>
                                         </div>
                                     )}
-                                    {isProcessingPlate && (
+                                    {isProcessingPlate && !isAutoScanEnabled && (
                                         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center text-white gap-4">
                                             <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
                                             <p className="font-black text-[10px] uppercase tracking-[0.2em]">Processando Placa...</p>
+                                        </div>
+                                    )}
+                                    {isAutoScanEnabled && isProcessingPlate && (
+                                        <div className="absolute top-4 right-4 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
+                                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            <span className="text-[9px] font-black text-white uppercase tracking-widest">Lendo...</span>
+                                        </div>
+                                    )}
+                                    {lastScannedPlate && (
+                                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl border-2 border-indigo-100 shadow-xl animate-bounce">
+                                            <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest text-center mb-0.5">Última Placa</p>
+                                            <p className="text-lg font-black text-indigo-900 font-mono tracking-tighter">{lastScannedPlate}</p>
                                         </div>
                                     )}
                                     <canvas ref={canvasRef} className="hidden" />
