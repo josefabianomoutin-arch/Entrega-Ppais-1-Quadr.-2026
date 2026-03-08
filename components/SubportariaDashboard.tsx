@@ -54,13 +54,25 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({
         setVerificationStatus('idle');
         setVerificationResult(null);
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            } catch (e) {
+                console.log("User camera failed, trying default video");
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            }
+
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
+                try {
+                    await videoRef.current.play();
+                } catch (playErr) {
+                    console.error("Video play failed:", playErr);
+                }
             }
         } catch (err) {
             console.error("Error accessing camera:", err);
-            alert("Não foi possível acessar a câmera.");
+            alert("Não foi possível acessar a câmera. Verifique as permissões do navegador.");
             setIsCameraActive(false);
         }
     };
@@ -428,6 +440,7 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({
                                                 ref={videoRef} 
                                                 autoPlay 
                                                 playsInline 
+                                                muted
                                                 className="w-full h-full object-cover"
                                             />
                                         ) : capturedPhoto ? (

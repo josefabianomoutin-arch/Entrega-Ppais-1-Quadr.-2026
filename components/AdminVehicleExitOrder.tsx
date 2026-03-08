@@ -68,16 +68,33 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
     const startCamera = async () => {
         setCameraError(null);
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'environment' } 
-            });
+            // Try with environment camera first (back camera on mobile)
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+            } catch (e) {
+                console.log("Environment camera failed, trying default video");
+                // Fallback to any available camera
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true 
+                });
+            }
+
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
+                // Ensure video plays
+                try {
+                    await videoRef.current.play();
+                } catch (playErr) {
+                    console.error("Video play failed:", playErr);
+                }
                 setIsCameraActive(true);
             }
         } catch (err) {
             console.error("Error accessing camera:", err);
-            setCameraError("Não foi possível acessar a câmera. Verifique as permissões.");
+            setCameraError("Não foi possível acessar a câmera. Verifique as permissões do navegador.");
         }
     };
 
@@ -423,7 +440,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                                 onClick={() => setActiveSubTab('gate')}
                                                 className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeSubTab === 'gate' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                                             >
-                                                Portaria
+                                                Sub Portaria
                                             </button>
                                         )}
                                         {!readOnly && !securityMode && !hideAssets && (
@@ -616,6 +633,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                             ref={videoRef} 
                                             autoPlay 
                                             playsInline 
+                                            muted
                                             className="w-full h-full object-cover"
                                         />
                                     ) : (
