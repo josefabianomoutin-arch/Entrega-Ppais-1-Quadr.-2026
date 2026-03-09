@@ -320,7 +320,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
     }, [itemData]);
 
     const perCapitaDenominator = useMemo(() => {
-        return inmateCount + (staffCount / 3);
+        return inmateCount + staffCount;
     }, [inmateCount, staffCount]);
 
     const totalPerCapitaKg = useMemo(() => {
@@ -343,7 +343,12 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
     }, [itemData, perCapitaDenominator]);
 
     const totalContractValue = useMemo(() => {
-        return itemData.reduce((sum, item) => sum + item.totalValue, 0);
+        return itemData.reduce((sum, item) => {
+            if (['PPAIS', 'ESTOCÁVEIS', 'PERECÍVEIS'].includes(item.category)) {
+                return sum + item.totalValue;
+            }
+            return sum;
+        }, 0);
     }, [itemData]);
 
     const activeCategories = useMemo(() => {
