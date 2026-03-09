@@ -616,7 +616,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                         <th key={`exec-${cat}`} className="p-4 text-right">{cat}</th>
                                     ))}
                                     <th className="p-4 text-right bg-indigo-700">Adiantamentos</th>
-                                    <th className="p-4 text-right bg-gray-800">Total Gasto</th>
                                     <th className="p-4 text-right bg-indigo-800">Saldo</th>
                                 </tr>
                             </thead>
@@ -654,7 +653,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                             <td className="p-4 text-right font-mono text-indigo-700 bg-indigo-50/20 font-bold">
                                                 {formatCurrency(advance)}
                                             </td>
-                                            <td className="p-4 text-right font-mono font-black text-gray-800 bg-gray-50">{formatCurrency(totalSpent)}</td>
                                             <td className={`p-4 text-right font-mono font-black bg-indigo-50/50 ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 {formatCurrency(balance)}
                                             </td>
@@ -684,18 +682,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                     })}
                                     <th className="p-4 text-right font-mono bg-indigo-700 text-white">
                                         {formatCurrency((Object.values(monthlyAdvances) as number[]).reduce((a: number, b: number) => a + (b || 0), 0))}
-                                    </th>
-                                    <th className="p-4 text-right font-mono bg-gray-900 text-white">
-                                        {formatCurrency(activeCategories.reduce((sum, cat) => {
-                                            let catTotal = 0;
-                                            months.forEach(month => {
-                                                const execVal = monthlyExecution[month]?.[cat] || 0;
-                                                const isActiveMonth = ['Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'].includes(month);
-                                                const futureVal = isActiveMonth ? (categoryMonthlyAverages[cat] || 0) : 0;
-                                                catTotal += execVal > 0 ? execVal : futureVal;
-                                            });
-                                            return sum + catTotal;
-                                        }, 0) + (Object.values(monthlyAdvances) as number[]).reduce((a: number, b: number) => a + (b || 0), 0))}
                                     </th>
                                     <th className="p-4 text-right font-mono bg-indigo-900 text-white">
                                         {formatCurrency(
@@ -731,6 +717,23 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                         </div>
                                     );
                                 })}
+                                <div className="flex justify-between items-center pt-4 border-t-2 border-indigo-100">
+                                    <span className="text-sm font-black text-indigo-900 uppercase">Total Geral Gasto</span>
+                                    <span className="font-mono font-black text-xl text-indigo-700">
+                                        {formatCurrency(
+                                            activeCategories.reduce((sum, cat) => {
+                                                let catTotal = 0;
+                                                months.forEach(month => {
+                                                    const execVal = monthlyExecution[month]?.[cat] || 0;
+                                                    const isActiveMonth = ['Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'].includes(month);
+                                                    const futureVal = isActiveMonth ? (categoryMonthlyAverages[cat] || 0) : 0;
+                                                    catTotal += execVal > 0 ? execVal : futureVal;
+                                                });
+                                                return sum + catTotal;
+                                            }, 0) + (Object.values(monthlyAdvances) as number[]).reduce((a: number, b: number) => a + (b || 0), 0)
+                                        )}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                         <div className="bg-white p-6 rounded-2xl shadow-lg border-l-8 border-emerald-600">
