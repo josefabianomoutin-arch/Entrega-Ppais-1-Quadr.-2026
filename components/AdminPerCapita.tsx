@@ -415,6 +415,19 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
         return execution;
     }, [suppliers, ppaisProducers, pereciveisSuppliers, acquisitionItems]);
 
+    const categoryMonthlyAverages = useMemo(() => {
+        const averages: Record<string, number> = {};
+        activeCategories.forEach(cat => {
+            const items = acquisitionItems.filter(item => item.category === cat);
+            const total = items.reduce((sum, item) => {
+                const quantity = cat === 'PPAIS' ? item.acquiredQuantity : item.stockBalance;
+                return sum + ((item.unitValue || 0) * quantity);
+            }, 0);
+            averages[cat] = total / 8; // Maio-Dez / 8 meses
+        });
+        return averages;
+    }, [activeCategories, acquisitionItems]);
+
     const shelfLifeData = useMemo(() => {
         const shelfLives = new Map<string, number[]>();
         suppliers?.forEach(s => {
@@ -549,6 +562,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                         <th key={cat} className="p-4 text-right">{cat}</th>
                                     ))}
                                     <th className="p-4 text-right bg-gray-800">Total Gasto</th>
+                                    <th className="p-4 text-right bg-orange-800">Gastos Futuros</th>
                                     <th className="p-4 text-right bg-indigo-800">Saldo</th>
                                 </tr>
                             </thead>
@@ -557,7 +571,12 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                     const quota = monthlyQuota[month] || 0;
                                     const exec = monthlyExecution[month];
                                     const totalSpent = activeCategories.reduce((sum, cat) => sum + (exec[cat] || 0), 0);
-                                    const balance = quota - totalSpent;
+                                    
+                                    // Apply future expenses only to May-Dec (8 months)
+                                    const isActiveMonth = ['Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'].includes(month);
+                                    const futureExpenses = isActiveMonth ? activeCategories.reduce((sum, cat) => sum + (categoryMonthlyAverages[cat] || 0), 0) : 0;
+                                    
+                                    const balance = quota - totalSpent - futureExpenses;
 
                                     return (
                                         <tr key={month} className="hover:bg-gray-50 transition-colors">
@@ -567,6 +586,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                                 <td key={cat} className="p-4 text-right font-mono text-indigo-600">{formatCurrency(exec[cat] || 0)}</td>
                                             ))}
                                             <td className="p-4 text-right font-mono font-black text-gray-800 bg-gray-50">{formatCurrency(totalSpent)}</td>
+                                            <td className="p-4 text-right font-mono font-bold text-orange-600 bg-orange-50/30">{formatCurrency(futureExpenses)}</td>
                                             <td className={`p-4 text-right font-mono font-black bg-indigo-50/50 ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 {formatCurrency(balance)}
                                             </td>
@@ -590,12 +610,16 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                             return acc + activeCategories.reduce((sum, cat) => sum + (curr[cat] || 0), 0);
                                         }, 0))}
                                     </th>
+                                    <th className="p-4 text-right font-mono bg-orange-900 text-white">
+                                        {formatCurrency(8 * activeCategories.reduce((sum, cat) => sum + (categoryMonthlyAverages[cat] || 0), 0))}
+                                    </th>
                                     <th className="p-4 text-right font-mono bg-indigo-900 text-white">
                                         {formatCurrency(
                                             (Object.values(monthlyQuota) as number[]).reduce((a: number, b: number) => a + (b || 0), 0) - 
                                             (Object.values(monthlyExecution) as Record<string, number>[]).reduce((acc: number, curr: Record<string, number>) => {
                                                 return acc + activeCategories.reduce((sum, cat) => sum + (curr[cat] || 0), 0);
-                                            }, 0)
+                                            }, 0) -
+                                            (8 * activeCategories.reduce((sum, cat) => sum + (categoryMonthlyAverages[cat] || 0), 0))
                                         )}
                                     </th>
                                 </tr>
