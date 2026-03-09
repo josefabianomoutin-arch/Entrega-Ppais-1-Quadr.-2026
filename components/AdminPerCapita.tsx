@@ -109,7 +109,7 @@ const PTRES_DESCRIPTIONS: Record<string, string> = {
 };
 
 const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog, perCapitaConfig, onUpdatePerCapitaConfig, onUpdateContractForItem, onUpdateAcquisitionItem, onDeleteAcquisitionItem, acquisitionItems }) => {
-    const [activeSubTab, setActiveSubTab] = useState<'CALCULO' | 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'PRODUTOS DE LIMPEZA' | 'CONTROLE'>('CALCULO');
+    const [activeSubTab, setActiveSubTab] = useState<'CALCULO' | 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'PRODUTOS DE LIMPEZA' | 'ADIANTAMENTOS' | 'CONTROLE'>('CALCULO');
     const [ppaisSubTab, setPpaisSubTab] = useState<'ITEMS' | 'PRODUCERS'>('ITEMS');
     const [pereciveisSubTab, setPereciveisSubTab] = useState<'ITEMS' | 'SUPPLIERS'>('ITEMS');
     const [staffCount, setStaffCount] = useState<number>(0);
@@ -122,6 +122,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
     const [ptresResources, setPtresResources] = useState<Record<string, { pieces: number; services: number }>>({});
     const [ppaisProducers, setPpaisProducers] = useState<PerCapitaSupplier[]>([]);
     const [pereciveisSuppliers, setPereciveisSuppliers] = useState<PerCapitaSupplier[]>([]);
+    const [monthlyAdvances, setMonthlyAdvances] = useState<Record<string, number>>({});
     const [showComparison, setShowComparison] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -138,6 +139,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
         setPtresResources(perCapitaConfig.ptresResources || {});
         setPpaisProducers(perCapitaConfig.ppaisProducers || []);
         setPereciveisSuppliers(perCapitaConfig.pereciveisSuppliers || []);
+        setMonthlyAdvances(perCapitaConfig.monthlyAdvances || {});
         setIsDirty(false);
     }, [perCapitaConfig]);
 
@@ -155,6 +157,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
             ptresResources,
             ppaisProducers,
             pereciveisSuppliers,
+            monthlyAdvances,
         };
         try {
             await onUpdatePerCapitaConfig(newConfig);
@@ -195,6 +198,12 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
         } else {
             setMonthlyResource(prev => ({ ...prev, [month]: numValue }));
         }
+        setIsDirty(true);
+    };
+
+    const handleMonthlyAdvanceChange = (month: string, value: string) => {
+        const numValue = parseFloat(value) || 0;
+        setMonthlyAdvances(prev => ({ ...prev, [month]: numValue }));
         setIsDirty(true);
     };
 
@@ -550,6 +559,12 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                     PRODUTOS DE LIMPEZA
                 </button>
                 <button 
+                    onClick={() => setActiveSubTab('ADIANTAMENTOS')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${activeSubTab === 'ADIANTAMENTOS' ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    ADIANTAMENTOS
+                </button>
+                <button 
                     onClick={() => setActiveSubTab('CONTROLE')}
                     className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${activeSubTab === 'CONTROLE' ? 'bg-indigo-900 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                 >
@@ -557,7 +572,34 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                 </button>
             </div>
 
-            {activeSubTab === 'CONTROLE' ? (
+            {activeSubTab === 'ADIANTAMENTOS' ? (
+                <div className="animate-fade-in space-y-8">
+                    <div className="text-center mb-8">
+                        <h2 className="text-2xl font-black text-indigo-900 uppercase tracking-tighter italic">Adiantamentos Mensais</h2>
+                        <p className="text-gray-400 font-medium">Lançamento de valores de adiantamento para cada mês do ano.</p>
+                    </div>
+
+                    <div className="overflow-x-auto bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                            {months.map(month => (
+                                <div key={`advance-${month}`} className="space-y-2">
+                                    <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">{month}</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-indigo-300">R$</span>
+                                        <input 
+                                            type="number"
+                                            value={monthlyAdvances[month] || ''}
+                                            onChange={(e) => handleMonthlyAdvanceChange(month, e.target.value)}
+                                            placeholder="0,00" 
+                                            className="w-full p-3 pl-9 bg-gray-50 border-2 border-gray-100 rounded-xl font-mono text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            ) : activeSubTab === 'CONTROLE' ? (
                 <div className="animate-fade-in space-y-8">
                     <div className="text-center mb-8">
                         <h2 className="text-2xl font-black text-indigo-900 uppercase tracking-tighter">Controle de Execução de Recursos Mensais</h2>
@@ -573,6 +615,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                     {activeCategories.map(cat => (
                                         <th key={`exec-${cat}`} className="p-4 text-right">{cat}</th>
                                     ))}
+                                    <th className="p-4 text-right bg-indigo-700">Adiantamentos</th>
                                     <th className="p-4 text-right bg-gray-800">Total Gasto</th>
                                     <th className="p-4 text-right bg-indigo-800">Saldo</th>
                                 </tr>
@@ -581,13 +624,14 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                 {months.map(month => {
                                     const quota = monthlyQuota[month] || 0;
                                     const exec = monthlyExecution[month];
+                                    const advance = monthlyAdvances[month] || 0;
                                     const isActiveMonth = ['Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'].includes(month);
                                     
                                     const totalSpent = activeCategories.reduce((sum, cat) => {
                                         const value = exec[cat] || 0;
                                         const futureValue = isActiveMonth ? (categoryMonthlyAverages[cat] || 0) : 0;
                                         return sum + (value > 0 ? value : futureValue);
-                                    }, 0);
+                                    }, 0) + advance;
                                     
                                     const balance = quota - totalSpent;
 
@@ -607,6 +651,9 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                                     </td>
                                                 );
                                             })}
+                                            <td className="p-4 text-right font-mono text-indigo-700 bg-indigo-50/20 font-bold">
+                                                {formatCurrency(advance)}
+                                            </td>
                                             <td className="p-4 text-right font-mono font-black text-gray-800 bg-gray-50">{formatCurrency(totalSpent)}</td>
                                             <td className={`p-4 text-right font-mono font-black bg-indigo-50/50 ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 {formatCurrency(balance)}
@@ -635,6 +682,9 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                             </th>
                                         );
                                     })}
+                                    <th className="p-4 text-right font-mono bg-indigo-700 text-white">
+                                        {formatCurrency((Object.values(monthlyAdvances) as number[]).reduce((a: number, b: number) => a + (b || 0), 0))}
+                                    </th>
                                     <th className="p-4 text-right font-mono bg-gray-900 text-white">
                                         {formatCurrency(activeCategories.reduce((sum, cat) => {
                                             let catTotal = 0;
@@ -645,12 +695,12 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                                 catTotal += execVal > 0 ? execVal : futureVal;
                                             });
                                             return sum + catTotal;
-                                        }, 0))}
+                                        }, 0) + (Object.values(monthlyAdvances) as number[]).reduce((a: number, b: number) => a + (b || 0), 0))}
                                     </th>
                                     <th className="p-4 text-right font-mono bg-indigo-900 text-white">
                                         {formatCurrency(
                                             (Object.values(monthlyQuota) as number[]).reduce((a: number, b: number) => a + (b || 0), 0) - 
-                                            activeCategories.reduce((sum, cat) => {
+                                            (activeCategories.reduce((sum, cat) => {
                                                 let catTotal = 0;
                                                 months.forEach(month => {
                                                     const execVal = monthlyExecution[month]?.[cat] || 0;
@@ -659,7 +709,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                                     catTotal += execVal > 0 ? execVal : futureVal;
                                                 });
                                                 return sum + catTotal;
-                                            }, 0)
+                                            }, 0) + (Object.values(monthlyAdvances) as number[]).reduce((a: number, b: number) => a + (b || 0), 0))
                                         )}
                                     </th>
                                 </tr>

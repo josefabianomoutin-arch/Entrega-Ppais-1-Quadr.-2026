@@ -87,6 +87,7 @@ export interface PerCapitaConfig {
   ptresResources?: Record<string, { pieces: number; services: number }>;
   ppaisProducers?: PerCapitaSupplier[];
   pereciveisSuppliers?: PerCapitaSupplier[];
+  monthlyAdvances?: Record<string, number>;
 }
 
 export interface CleaningLog {
