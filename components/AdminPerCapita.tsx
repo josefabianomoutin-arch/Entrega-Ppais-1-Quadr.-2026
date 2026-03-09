@@ -565,7 +565,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                     {activeCategories.map(cat => (
                                         <th key={`prev-${cat}`} className="p-4 text-right bg-orange-800/90">Prev. {cat}</th>
                                     ))}
-                                    <th className="p-4 text-right bg-orange-900">Total Futuro</th>
                                     <th className="p-4 text-right bg-indigo-800">Saldo</th>
                                 </tr>
                             </thead>
@@ -594,7 +593,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                                     {formatCurrency(isActiveMonth ? (categoryMonthlyAverages[cat] || 0) : 0)}
                                                 </td>
                                             ))}
-                                            <td className="p-4 text-right font-mono font-bold text-orange-700 bg-orange-50/30">{formatCurrency(futureExpenses)}</td>
                                             <td className={`p-4 text-right font-mono font-black bg-indigo-50/50 ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 {formatCurrency(balance)}
                                             </td>
@@ -623,9 +621,6 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                             {formatCurrency(8 * (categoryMonthlyAverages[cat] || 0))}
                                         </th>
                                     ))}
-                                    <th className="p-4 text-right font-mono bg-orange-900 text-white">
-                                        {formatCurrency(8 * activeCategories.reduce((sum, cat) => sum + (categoryMonthlyAverages[cat] || 0), 0))}
-                                    </th>
                                     <th className="p-4 text-right font-mono bg-indigo-900 text-white">
                                         {formatCurrency(
                                             (Object.values(monthlyQuota) as number[]).reduce((a: number, b: number) => a + (b || 0), 0) - 
