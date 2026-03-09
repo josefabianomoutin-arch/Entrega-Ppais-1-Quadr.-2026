@@ -346,6 +346,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
         return itemData.reduce((sum, item) => sum + item.totalValue, 0);
     }, [itemData]);
 
+    const activeCategories = useMemo(() => {
+        return ['PPAIS', 'KIT PPL', 'PERECÍVEIS', 'ESTOCÁVEIS', 'AUTOMAÇÃO', 'PRODUTOS DE LIMPEZA'].filter(cat => {
+            return (seiProcessDefinitions[cat] && seiProcessDefinitions[cat].trim() !== '') || 
+                   (seiProcessNumbers[cat] && seiProcessNumbers[cat].trim() !== '');
+        });
+    }, [seiProcessDefinitions, seiProcessNumbers]);
+
     const monthlyExecution = useMemo(() => {
         const execution: Record<string, Record<string, number>> = {};
         months.forEach(m => {
@@ -355,8 +362,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                 'ESTOCÁVEIS': 0,
                 'PERECÍVEIS': 0,
                 'AUTOMAÇÃO': 0,
-                'PRODUTOS DE LIMPEZA': 0,
-                'OUTROS': 0
+                'PRODUTOS DE LIMPEZA': 0
             };
         });
 
@@ -378,19 +384,13 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                 if (acqItem) {
                     if (execution[m][acqItem.category] !== undefined) {
                         execution[m][acqItem.category] += d.value || 0;
-                    } else {
-                        execution[m]['OUTROS'] += d.value || 0;
                     }
                 } else {
                     const contractItem = s.contractItems?.find(ci => normalizeItemName(ci.name) === normalizedDelItem);
                     if (contractItem && contractItem.category && contractItem.category !== 'OUTROS') {
                         if (execution[m][contractItem.category] !== undefined) {
                             execution[m][contractItem.category] += d.value || 0;
-                        } else {
-                            execution[m]['OUTROS'] += d.value || 0;
                         }
-                    } else {
-                        execution[m]['OUTROS'] += d.value || 0;
                     }
                 }
             });
@@ -545,13 +545,9 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                 <tr>
                                     <th className="p-4 text-left">Mês</th>
                                     <th className="p-4 text-right bg-indigo-900">Cota Mensal</th>
-                                    <th className="p-4 text-right">PPAIS</th>
-                                    <th className="p-4 text-right">KIT PPL</th>
-                                    <th className="p-4 text-right">PERECÍVEIS</th>
-                                    <th className="p-4 text-right">ESTOCÁVEIS</th>
-                                    <th className="p-4 text-right">AUTOMAÇÃO</th>
-                                    <th className="p-4 text-right">LIMPEZA</th>
-                                    <th className="p-4 text-right">OUTROS</th>
+                                    {activeCategories.map(cat => (
+                                        <th key={cat} className="p-4 text-right">{cat}</th>
+                                    ))}
                                     <th className="p-4 text-right bg-gray-800">Total Gasto</th>
                                     <th className="p-4 text-right bg-indigo-800">Saldo</th>
                                 </tr>
@@ -560,20 +556,16 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                 {months.map(month => {
                                     const quota = monthlyQuota[month] || 0;
                                     const exec = monthlyExecution[month];
-                                    const totalSpent = exec['PPAIS'] + exec['KIT PPL'] + exec['PERECÍVEIS'] + exec['ESTOCÁVEIS'] + exec['AUTOMAÇÃO'] + exec['PRODUTOS DE LIMPEZA'] + exec['OUTROS'];
+                                    const totalSpent = activeCategories.reduce((sum, cat) => sum + (exec[cat] || 0), 0);
                                     const balance = quota - totalSpent;
 
                                     return (
                                         <tr key={month} className="hover:bg-gray-50 transition-colors">
                                             <td className="p-4 font-black text-gray-700 uppercase">{month}</td>
                                             <td className="p-4 text-right font-mono font-bold text-indigo-600 bg-indigo-50/30">{formatCurrency(quota)}</td>
-                                            <td className="p-4 text-right font-mono text-emerald-600">{formatCurrency(exec['PPAIS'])}</td>
-                                            <td className="p-4 text-right font-mono text-blue-600">{formatCurrency(exec['KIT PPL'])}</td>
-                                            <td className="p-4 text-right font-mono text-amber-600">{formatCurrency(exec['PERECÍVEIS'])}</td>
-                                            <td className="p-4 text-right font-mono text-purple-600">{formatCurrency(exec['ESTOCÁVEIS'])}</td>
-                                            <td className="p-4 text-right font-mono text-cyan-600">{formatCurrency(exec['AUTOMAÇÃO'])}</td>
-                                            <td className="p-4 text-right font-mono text-pink-600">{formatCurrency(exec['PRODUTOS DE LIMPEZA'])}</td>
-                                            <td className="p-4 text-right font-mono text-gray-500">{formatCurrency(exec['OUTROS'])}</td>
+                                            {activeCategories.map(cat => (
+                                                <td key={cat} className="p-4 text-right font-mono text-indigo-600">{formatCurrency(exec[cat] || 0)}</td>
+                                            ))}
                                             <td className="p-4 text-right font-mono font-black text-gray-800 bg-gray-50">{formatCurrency(totalSpent)}</td>
                                             <td className={`p-4 text-right font-mono font-black bg-indigo-50/50 ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 {formatCurrency(balance)}
@@ -586,39 +578,23 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                 <tr>
                                     <td className="p-4 uppercase">Totais Anuais</td>
                                     <td className="p-4 text-right font-mono">
-                                        {formatCurrency(Object.values(monthlyQuota).reduce((a, b) => a + b, 0))}
+                                        {formatCurrency((Object.values(monthlyQuota) as number[]).reduce((a: number, b: number) => a + (b || 0), 0))}
                                     </td>
-                                    <th className="p-4 text-right font-mono">
-                                        {formatCurrency(Object.values(monthlyExecution).reduce((acc: number, curr: Record<string, number>) => acc + (curr['PPAIS'] || 0), 0))}
-                                    </th>
-                                    <th className="p-4 text-right font-mono">
-                                        {formatCurrency(Object.values(monthlyExecution).reduce((acc: number, curr: Record<string, number>) => acc + (curr['KIT PPL'] || 0), 0))}
-                                    </th>
-                                    <th className="p-4 text-right font-mono">
-                                        {formatCurrency(Object.values(monthlyExecution).reduce((acc: number, curr: Record<string, number>) => acc + (curr['PERECÍVEIS'] || 0), 0))}
-                                    </th>
-                                    <th className="p-4 text-right font-mono">
-                                        {formatCurrency(Object.values(monthlyExecution).reduce((acc: number, curr: Record<string, number>) => acc + (curr['ESTOCÁVEIS'] || 0), 0))}
-                                    </th>
-                                    <th className="p-4 text-right font-mono">
-                                        {formatCurrency(Object.values(monthlyExecution).reduce((acc: number, curr: Record<string, number>) => acc + (curr['AUTOMAÇÃO'] || 0), 0))}
-                                    </th>
-                                    <th className="p-4 text-right font-mono">
-                                        {formatCurrency(Object.values(monthlyExecution).reduce((acc: number, curr: Record<string, number>) => acc + (curr['PRODUTOS DE LIMPEZA'] || 0), 0))}
-                                    </th>
-                                    <th className="p-4 text-right font-mono">
-                                        {formatCurrency(Object.values(monthlyExecution).reduce((acc: number, curr: Record<string, number>) => acc + (curr['OUTROS'] || 0), 0))}
-                                    </th>
-                                    <th className="p-4 text-right font-mono bg-gray-900">
-                                        {formatCurrency(Object.values(monthlyExecution).reduce((acc: number, curr: Record<string, number>) => {
-                                            return acc + Object.values(curr).reduce((a: number, b: number) => a + b, 0);
+                                    {activeCategories.map(cat => (
+                                        <th key={cat} className="p-4 text-right font-mono">
+                                            {formatCurrency((Object.values(monthlyExecution) as Record<string, number>[]).reduce((acc: number, curr: Record<string, number>) => acc + (curr[cat] || 0), 0))}
+                                        </th>
+                                    ))}
+                                    <th className="p-4 text-right font-mono bg-gray-900 text-white">
+                                        {formatCurrency((Object.values(monthlyExecution) as Record<string, number>[]).reduce((acc: number, curr: Record<string, number>) => {
+                                            return acc + activeCategories.reduce((sum, cat) => sum + (curr[cat] || 0), 0);
                                         }, 0))}
                                     </th>
-                                    <th className="p-4 text-right font-mono bg-indigo-900">
+                                    <th className="p-4 text-right font-mono bg-indigo-900 text-white">
                                         {formatCurrency(
-                                            Object.values(monthlyQuota).reduce((a: number, b: number) => a + b, 0) - 
-                                            Object.values(monthlyExecution).reduce((acc: number, curr: Record<string, number>) => {
-                                                return acc + Object.values(curr).reduce((a: number, b: number) => a + b, 0);
+                                            (Object.values(monthlyQuota) as number[]).reduce((a: number, b: number) => a + (b || 0), 0) - 
+                                            (Object.values(monthlyExecution) as Record<string, number>[]).reduce((acc: number, curr: Record<string, number>) => {
+                                                return acc + activeCategories.reduce((sum, cat) => sum + (curr[cat] || 0), 0);
                                             }, 0)
                                         )}
                                     </th>
@@ -631,8 +607,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                         <div className="bg-white p-6 rounded-2xl shadow-lg border-l-8 border-indigo-600">
                             <h3 className="text-lg font-black text-gray-800 uppercase mb-4">Resumo de Categorias</h3>
                             <div className="space-y-3">
-                                {['PPAIS', 'KIT PPL', 'PERECÍVEIS', 'ESTOCÁVEIS', 'AUTOMAÇÃO', 'PRODUTOS DE LIMPEZA', 'OUTROS'].map(cat => {
-                                    const total = Object.values(monthlyExecution).reduce((acc: number, curr: Record<string, number>) => acc + (curr[cat] || 0), 0);
+                                {activeCategories.map(cat => {
+                                    const total = (Object.values(monthlyExecution) as Record<string, number>[]).reduce((acc: number, curr: Record<string, number>) => acc + (curr[cat] || 0), 0);
                                     if (total === 0) return null;
                                     return (
                                         <div key={cat} className="flex justify-between items-center border-b pb-2">
@@ -651,7 +627,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                             <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
                                 <p className="text-xs font-bold text-emerald-700 uppercase">Dica de Gestão</p>
                                 <p className="text-[10px] text-emerald-600 mt-1">
-                                    Mantenha os lançamentos de NF atualizados para que o saldo mensal reflita a realidade financeira de cada processo.
+                                    Mantenha os lançamentos de NF atualizados para que o saldo mensal reflita a realidade financeira de cada processo. Apenas categorias com Processo SEI ou Definição preenchidos são contabilizadas.
                                 </p>
                             </div>
                         </div>
