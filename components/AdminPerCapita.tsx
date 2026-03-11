@@ -520,11 +520,19 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
         }).map(supplier => {
             const totalWeight = supplier.contractItems?.reduce((acc, item) => acc + (item.totalKg || 0), 0) || 0;
             const totalValue = supplier.contractItems?.reduce((acc, item) => acc + (item.totalValue || 0), 0) || 0;
+            const items = supplier.contractItems?.map(item => ({
+                name: item.name,
+                contracted: item.totalKg || 0,
+                unit: item.unit || 'KG',
+                value: item.totalValue || 0
+            })) || [];
+
             return {
                 name: supplier.name,
                 document: supplier.cpf,
                 totalWeight,
-                totalValue
+                totalValue,
+                items
             };
         }).filter(s => s.totalWeight > 0 || s.totalValue > 0)
           .sort((a, b) => a.name.localeCompare(b.name));
@@ -1141,12 +1149,28 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                     </thead>
                                     <tbody className="divide-y divide-red-50 bg-white">
                                         {suppliersWithoutEmpenho.map((supplier, index) => (
-                                            <tr key={supplier.document} className="hover:bg-red-50/50 transition-colors">
-                                                <td className="p-3 font-semibold text-gray-800">{supplier.name}</td>
-                                                <td className="p-3 text-center font-mono text-gray-500">{supplier.document}</td>
-                                                <td className="p-3 text-center font-mono text-gray-600">{supplier.totalWeight.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</td>
-                                                <td className="p-3 text-center font-mono font-bold text-red-600">{formatCurrency(supplier.totalValue)}</td>
-                                            </tr>
+                                            <React.Fragment key={supplier.document}>
+                                                <tr className="hover:bg-red-50/50 transition-colors">
+                                                    <td className="p-3 font-semibold text-gray-800">
+                                                        {supplier.name}
+                                                        {supplier.items.length > 0 && (
+                                                            <div className="mt-2 pl-4 border-l-2 border-red-100 space-y-1">
+                                                                {supplier.items.map((item, idx) => (
+                                                                    <div key={idx} className="text-[10px] text-gray-500 flex justify-between items-center max-w-sm">
+                                                                        <span className="truncate pr-2" title={item.name}>• {item.name}</span>
+                                                                        <span className="font-mono text-gray-400 whitespace-nowrap">
+                                                                            {item.contracted.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.unit} - {formatCurrency(item.value)}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-3 text-center font-mono text-gray-500 align-top">{supplier.document}</td>
+                                                    <td className="p-3 text-center font-mono text-gray-600 align-top">{supplier.totalWeight.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</td>
+                                                    <td className="p-3 text-center font-mono font-bold text-red-600 align-top">{formatCurrency(supplier.totalValue)}</td>
+                                                </tr>
+                                            </React.Fragment>
                                         ))}
                                     </tbody>
                                     <tfoot className="bg-red-50 font-bold text-red-900">
