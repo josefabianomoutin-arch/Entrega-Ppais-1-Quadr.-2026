@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Supplier, PerCapitaConfig, WarehouseMovement, AcquisitionItem } from '../types';
-import { resolutionData } from './resolutionData';
 import AdminContractItems from './AdminContractItems';
 import AdminAcquisitionItems from './AdminAcquisitionItems';
 import AdminPerCapitaSuppliers from './AdminPerCapitaSuppliers';
@@ -449,46 +448,40 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
         return total;
     }, [monthlyExecution, categoryMonthlyAverages]);
 
-    const shelfLifeData = useMemo(() => {
-        const shelfLives = new Map<string, number[]>();
-        suppliers?.forEach(s => {
-            s.deliveries?.forEach(d => {
-                const startDate = d.invoiceDate || d.date;
-                if (!startDate) return;
-                const start = new Date(startDate + 'T12:00:00').getTime();
-                
-                const itemName = normalizeItemName(d.item || '');
-                if (!itemName) return;
+    const contractedItemsSummary = useMemo(() => {
+        const summary = new Map<string, { contracted: number; received: number; remaining: number; unit: string; originalName: string }>();
 
-                d.lots?.forEach(l => {
-                    if (!l.expirationDate) return;
-                    const end = new Date(l.expirationDate + 'T12:00:00').getTime();
-                    const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-                    
-                    if (diffDays > 0) {
-                        const existing = shelfLives.get(itemName) || [];
-                        existing.push(diffDays);
-                        shelfLives.set(itemName, existing);
-                    }
-                });
+        suppliers?.forEach(supplier => {
+            supplier.contractItems?.forEach(item => {
+                const normalizedName = normalizeItemName(item.name);
+                if (!summary.has(normalizedName)) {
+                    summary.set(normalizedName, { contracted: 0, received: 0, remaining: 0, unit: item.unit || 'KG', originalName: item.name });
+                }
+                const data = summary.get(normalizedName)!;
+                data.contracted += item.totalKg || 0;
+                summary.set(normalizedName, data);
+            });
+
+            supplier.deliveries?.forEach(delivery => {
+                const normalizedName = normalizeItemName(delivery.item || '');
+                if (normalizedName && summary.has(normalizedName)) {
+                    const data = summary.get(normalizedName)!;
+                    data.received += delivery.kg || 0;
+                    summary.set(normalizedName, data);
+                }
             });
         });
-        
-        const averages = new Map<string, number>();
-        shelfLives.forEach((lives, name) => {
-            const avg = lives.reduce((a, b) => a + b, 0) / lives.length;
-            averages.set(name, avg);
-        });
-        return averages;
-    }, [suppliers]);
 
-    const getPurchaseRecommendation = (avgDays: number) => {
-        if (avgDays === 0) return 'DADOS INSUFICIENTES';
-        if (avgDays < 45) return 'MENSAL';
-        if (avgDays < 135) return 'QUADRIMESTRAL';
-        if (avgDays < 200) return 'SEMESTRAL';
-        return 'ANUAL';
-    };
+        const result = Array.from(summary.entries()).map(([name, data]) => ({
+            name: data.originalName,
+            contracted: data.contracted,
+            received: data.received,
+            remaining: Math.max(0, data.contracted - data.received),
+            unit: data.unit
+        })).sort((a, b) => a.name.localeCompare(b.name));
+
+        return result;
+    }, [suppliers]);
 
     return (
         <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-7xl mx-auto border-t-8 border-green-500 animate-fade-in relative">
@@ -903,7 +896,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                 <div className="mt-8 animate-fade-in">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-2xl font-black text-gray-800 text-center uppercase tracking-tighter flex-1">
-                            Análise de Frequência de Compra por Prazo de Validade (Média das NFs)
+                            Comparativo Resumido dos Itens Adquiridos no Contrato
                         </h3>
                         <button 
                             onClick={() => {
@@ -915,7 +908,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                 const htmlContent = `
                                     <html>
                                     <head>
-                                        <title>Análise de Frequência de Compra</title>
+                                        <title>Comparativo Resumido dos Itens Adquiridos no Contrato</title>
                                         <style>
                                             @page { size: A4 portrait; margin: 10mm; }
                                             body { font-family: Arial, sans-serif; font-size: 10px; }
@@ -929,39 +922,27 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                         </style>
                                     </head>
                                     <body>
-                                        <h2>Análise de Frequência de Compra por Prazo de Validade</h2>
+                                        <h2>Comparativo Resumido dos Itens Adquiridos no Contrato</h2>
                                         <div class="header-info">Data de emissão: ${new Date().toLocaleDateString('pt-BR')}</div>
                                         <table>
                                             <thead>
                                                 <tr>
                                                     <th class="text-center">#</th>
-                                                    <th>Item (Tabela de Pesos)</th>
-                                                    <th class="text-center">Frequência Consumo</th>
-                                                    <th class="text-center">Média Validade (Dias)</th>
-                                                    <th class="text-center">Recomendação de Compra</th>
-                                                    <th class="text-right">Ação Sugerida</th>
+                                                    <th>Item</th>
+                                                    <th class="text-center">Qtd. Contratada</th>
+                                                    <th class="text-center">Qtd. Recebida</th>
+                                                    <th class="text-center">Restam Entregar</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                ${Object.entries(resolutionData).sort((a, b) => a[0].localeCompare(b[0])).map(([name, data], index) => {
-                                                    const normalizedName = normalizeItemName(name);
-                                                    const avgDays = shelfLifeData.get(normalizedName) || 0;
-                                                    const recommendation = getPurchaseRecommendation(avgDays);
-                                                    const action = avgDays > 0 ? (
-                                                        avgDays < 45 ? "Comprar conforme necessidade imediata" :
-                                                        avgDays < 135 ? "Estoque para até 4 meses" :
-                                                        avgDays < 200 ? "Estoque para até 6 meses" :
-                                                        "Possível estoque anual"
-                                                    ) : "Aguardando lançamentos de NF";
-                                                    
+                                                ${contractedItemsSummary.map((item, index) => {
                                                     return `
                                                         <tr>
                                                             <td class="text-center">${index + 1}</td>
-                                                            <td>${name}</td>
-                                                            <td class="text-center">${data.frequency}</td>
-                                                            <td class="text-center">${avgDays > 0 ? Math.round(avgDays) + ' dias' : 'Sem dados NF'}</td>
-                                                            <td class="text-center">${recommendation}</td>
-                                                            <td class="text-right">${action}</td>
+                                                            <td>${item.name}</td>
+                                                            <td class="text-center">${item.contracted.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.unit}</td>
+                                                            <td class="text-center">${item.received.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.unit}</td>
+                                                            <td class="text-center">${item.remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.unit}</td>
                                                         </tr>
                                                     `;
                                                 }).join('')}
@@ -1014,45 +995,22 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                 <thead className="bg-gray-100 text-xs uppercase text-gray-600">
                                     <tr>
                                         <th className="p-3 text-center">#</th>
-                                        <th className="p-3 text-left">Item (Tabela de Pesos)</th>
-                                        <th className="p-3 text-center">Frequência Consumo</th>
-                                        <th className="p-3 text-center">Média Validade (Dias)</th>
-                                        <th className="p-3 text-center">Recomendação de Compra</th>
-                                        <th className="p-3 text-right">Ação Sugerida</th>
+                                        <th className="p-3 text-left">Item</th>
+                                        <th className="p-3 text-center">Qtd. Contratada</th>
+                                        <th className="p-3 text-center">Qtd. Recebida</th>
+                                        <th className="p-3 text-center">Restam Entregar</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {resolutionData && Object.entries(resolutionData).sort((a, b) => a[0].localeCompare(b[0])).map(([name, data], index) => {
-                                        const normalizedName = normalizeItemName(name);
-                                        const avgDays = shelfLifeData.get(normalizedName) || 0;
-                                        const recommendation = getPurchaseRecommendation(avgDays);
-                                        
+                                    {contractedItemsSummary.map((item, index) => {
                                         return (
-                                            <tr key={name} className="hover:bg-gray-50">
+                                            <tr key={item.name} className="hover:bg-gray-50">
                                                 <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
-                                                <td className="p-3 font-semibold text-gray-800">{name}</td>
-                                                <td className="p-3 text-center font-mono text-gray-500">{data.frequency}</td>
-                                                <td className="p-3 text-center font-mono font-bold">
-                                                    {avgDays > 0 ? `${Math.round(avgDays)} dias` : <span className="text-gray-300 italic">Sem dados NF</span>}
-                                                </td>
-                                                <td className="p-3 text-center">
-                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                                                        recommendation === 'MENSAL' ? 'bg-red-100 text-red-700' :
-                                                        recommendation === 'QUADRIMESTRAL' ? 'bg-orange-100 text-orange-700' :
-                                                        recommendation === 'SEMESTRAL' ? 'bg-blue-100 text-blue-700' :
-                                                        recommendation === 'ANUAL' ? 'bg-green-100 text-green-700' :
-                                                        'bg-gray-100 text-gray-500'
-                                                    }`}>
-                                                        {recommendation}
-                                                    </span>
-                                                </td>
-                                                <td className="p-3 text-right text-[10px] font-medium text-gray-500 italic">
-                                                    {avgDays > 0 ? (
-                                                        avgDays < 45 ? "Comprar conforme necessidade imediata" :
-                                                        avgDays < 135 ? "Estoque para até 4 meses" :
-                                                        avgDays < 200 ? "Estoque para até 6 meses" :
-                                                        "Possível estoque anual"
-                                                    ) : "Aguardando lançamentos de NF"}
+                                                <td className="p-3 font-semibold text-gray-800">{item.name}</td>
+                                                <td className="p-3 text-center font-mono text-gray-500">{item.contracted.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.unit}</td>
+                                                <td className="p-3 text-center font-mono text-gray-500">{item.received.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.unit}</td>
+                                                <td className="p-3 text-center font-mono font-bold text-blue-600">
+                                                    {item.remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.unit}
                                                 </td>
                                             </tr>
                                         );
