@@ -126,7 +126,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
     const [isDirty, setIsDirty] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
-    const [comparisonFilter, setComparisonFilter] = useState<'TODOS' | 'SEM_ENTREGA' | 'ATENCAO'>('TODOS');
+    const [comparisonFilter, setComparisonFilter] = useState<'TODOS' | 'SEM_ENTREGA' | 'ATENCAO' | 'AVANCADO' | 'CONCLUIDO'>('TODOS');
 
     useEffect(() => {
         setStaffCount(perCapitaConfig.staffCount || 0);
@@ -477,8 +477,9 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
             const percentage = data.contracted > 0 ? (data.received / data.contracted) * 100 : 0;
             let status = 'NORMAL';
             if (data.received === 0) status = 'SEM_ENTREGA';
-            else if (percentage < 50) status = 'ATENCAO';
             else if (percentage >= 100) status = 'CONCLUIDO';
+            else if (percentage >= 70) status = 'AVANCADO';
+            else if (percentage < 50) status = 'ATENCAO';
 
             return {
                 name: data.originalName,
@@ -498,6 +499,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
         if (comparisonFilter === 'TODOS') return contractedItemsSummary;
         if (comparisonFilter === 'SEM_ENTREGA') return contractedItemsSummary.filter(i => i.status === 'SEM_ENTREGA');
         if (comparisonFilter === 'ATENCAO') return contractedItemsSummary.filter(i => i.status === 'ATENCAO');
+        if (comparisonFilter === 'AVANCADO') return contractedItemsSummary.filter(i => i.status === 'AVANCADO');
+        if (comparisonFilter === 'CONCLUIDO') return contractedItemsSummary.filter(i => i.status === 'CONCLUIDO');
         return contractedItemsSummary;
     }, [contractedItemsSummary, comparisonFilter]);
 
@@ -955,7 +958,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                             </thead>
                                             <tbody>
                                                 ${filteredComparison.map((item, index) => {
-                                                    const statusText = item.status === 'SEM_ENTREGA' ? 'SEM ENTREGA' : item.status === 'ATENCAO' ? 'ATENÇÃO (< 50%)' : item.status === 'CONCLUIDO' ? 'CONCLUÍDO' : 'NORMAL';
+                                                    const statusText = item.status === 'SEM_ENTREGA' ? 'SEM ENTREGA' : item.status === 'ATENCAO' ? 'ATENÇÃO (< 50%)' : item.status === 'AVANCADO' ? 'AVANÇADO (≥ 70%)' : item.status === 'CONCLUIDO' ? 'CONCLUÍDO (100%)' : 'NORMAL';
                                                     return `
                                                         <tr>
                                                             <td class="text-center">${index + 1}</td>
@@ -994,6 +997,12 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                             </button>
                             <button onClick={() => setComparisonFilter('ATENCAO')} className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 transition-colors ${comparisonFilter === 'ATENCAO' ? 'bg-orange-500 text-white shadow-md' : 'bg-white text-orange-600 border border-orange-200 hover:bg-orange-50'}`}>
                                 <span className="w-2 h-2 rounded-full bg-current"></span> Atenção (&lt; 50%)
+                            </button>
+                            <button onClick={() => setComparisonFilter('AVANCADO')} className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 transition-colors ${comparisonFilter === 'AVANCADO' ? 'bg-blue-500 text-white shadow-md' : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'}`}>
+                                <span className="w-2 h-2 rounded-full bg-current"></span> Avançado (≥ 70%)
+                            </button>
+                            <button onClick={() => setComparisonFilter('CONCLUIDO')} className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 transition-colors ${comparisonFilter === 'CONCLUIDO' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-green-600 border border-green-200 hover:bg-green-50'}`}>
+                                <span className="w-2 h-2 rounded-full bg-current"></span> Concluído (100%)
                             </button>
                         </div>
                         <div 
@@ -1041,6 +1050,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                                     {item.name}
                                                     {item.status === 'SEM_ENTREGA' && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">SEM ENTREGA</span>}
                                                     {item.status === 'ATENCAO' && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700">ATENÇÃO</span>}
+                                                    {item.status === 'AVANCADO' && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">AVANÇADO</span>}
+                                                    {item.status === 'CONCLUIDO' && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">CONCLUÍDO</span>}
                                                 </td>
                                                 <td className="p-3 text-center font-mono text-gray-500">{item.contracted.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.unit}</td>
                                                 <td className="p-3 text-center font-mono text-gray-500">{item.received.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.unit}</td>
@@ -1051,7 +1062,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                                     <div className="flex items-center gap-2">
                                                         <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                                                             <div 
-                                                                className={`h-full rounded-full ${item.status === 'SEM_ENTREGA' ? 'bg-red-500' : item.status === 'ATENCAO' ? 'bg-orange-500' : item.status === 'CONCLUIDO' ? 'bg-green-500' : 'bg-blue-500'}`} 
+                                                                className={`h-full rounded-full ${item.status === 'SEM_ENTREGA' ? 'bg-red-500' : item.status === 'ATENCAO' ? 'bg-orange-500' : item.status === 'AVANCADO' ? 'bg-blue-500' : item.status === 'CONCLUIDO' ? 'bg-green-500' : 'bg-blue-400'}`} 
                                                                 style={{ width: `${Math.min(100, item.percentage)}%` }}
                                                             ></div>
                                                         </div>
