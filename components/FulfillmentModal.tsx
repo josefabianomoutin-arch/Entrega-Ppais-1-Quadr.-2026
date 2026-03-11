@@ -1,6 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import type { Delivery, ContractItem } from '../types';
+import { speechService } from '../src/services/speechService';
+import { Volume2, Upload, FileText, Loader2 } from 'lucide-react';
 
 interface FulfillmentModalProps {
   invoiceInfo: { date: string; deliveries: Delivery[] };
@@ -35,6 +37,20 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [items, setItems] = useState<FulfilledItem[]>([{ id: `item-${Date.now()}`, name: '', kg: '' }]);
   const [confirmed, setConfirmed] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePlayGuide = async () => {
+    const text = "Bem-vindo ao envio da nota fiscal. Primeiro, digite o número da nota fiscal no campo indicado. Depois, selecione os produtos que você entregou e informe a quantidade de cada um. Clique no botão azul 'Selecionar Arquivo da Nota' para escolher o PDF da sua nota fiscal. Por fim, marque a caixa de confirmação e clique em 'Salvar e Enviar' para concluir.";
+    await speechService.speak(text);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
 
   const formattedDate = new Date(invoiceInfo.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   
@@ -97,31 +113,55 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
         const kg = parseFloat(item.kg.replace(',', '.'));
         return item.name !== '' && !isNaN(kg) && kg > 0;
     });
-    return hasNf && hasItems && allItemsValid && confirmed;
-  }, [invoiceNumber, items, confirmed]);
+    const hasFile = selectedFile !== null;
+    return hasNf && hasItems && allItemsValid && confirmed && hasFile && !isUploading;
+  }, [invoiceNumber, items, confirmed, selectedFile, isUploading]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isFormValid) return;
+    if (!isFormValid || !selectedFile) return;
 
-    const fulfilledItems = items.map(item => {
-        const contractItem = contractItems.find(ci => ci.name === item.name);
-        const kg = parseFloat(item.kg.replace(',', '.'));
+    setIsUploading(true);
 
-        if (!contractItem || isNaN(kg) || kg <= 0) return null;
-        
-        const [unitType, unitWeightStr] = (contractItem.unit || 'kg-1').split('-');
-        let valuePerKg = contractItem.valuePerKg || 0;
-        if (unitType !== 'kg' && unitType !== 'un') {
-            const unitWeight = parseFloat(unitWeightStr);
-            if (unitWeight > 0) valuePerKg = (contractItem.valuePerKg || 0) / unitWeight;
-        }
+    try {
+      // Upload to Google Drive
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("fileName", `NF_${invoiceNumber}_${invoiceInfo.date}.pdf`);
 
-        return { name: item.name, kg: kg, value: kg * valuePerKg };
-    }).filter((item): item is { name: string; kg: number; value: number } => item !== null);
+      const uploadResponse = await fetch("/api/upload-invoice", {
+        method: "POST",
+        body: formData,
+      });
 
-    onSave({ invoiceNumber, fulfilledItems });
+      if (!uploadResponse.ok) {
+        throw new Error("Falha no upload para o Google Drive");
+      }
+
+      const fulfilledItems = items.map(item => {
+          const contractItem = contractItems.find(ci => ci.name === item.name);
+          const kg = parseFloat(item.kg.replace(',', '.'));
+
+          if (!contractItem || isNaN(kg) || kg <= 0) return null;
+          
+          const [unitType, unitWeightStr] = (contractItem.unit || 'kg-1').split('-');
+          let valuePerKg = contractItem.valuePerKg || 0;
+          if (unitType !== 'kg' && unitType !== 'un') {
+              const unitWeight = parseFloat(unitWeightStr);
+              if (unitWeight > 0) valuePerKg = (contractItem.valuePerKg || 0) / unitWeight;
+          }
+
+          return { name: item.name, kg: kg, value: kg * valuePerKg };
+      }).filter((item): item is { name: string; kg: number; value: number } => item !== null);
+
+      onSave({ invoiceNumber, fulfilledItems });
+    } catch (error) {
+      console.error("Submit error:", error);
+      alert("Erro ao enviar a nota fiscal. Por favor, tente novamente.");
+    } finally {
+      setIsUploading(false);
+    }
   };
   
   const availableContractItems = useMemo(() => {
@@ -137,9 +177,19 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
         
         {/* Header Fixo */}
         <div className="flex justify-between items-center p-6 md:p-8 border-b border-gray-50 flex-shrink-0">
-          <div>
-            <h2 className="text-xl md:text-2xl font-black text-gray-900 uppercase tracking-tighter italic leading-none">Faturamento NF</h2>
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">Obrigatório informar Pesos e Itens</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h2 className="text-xl md:text-2xl font-black text-gray-900 uppercase tracking-tighter italic leading-none">Faturamento NF</h2>
+              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">Obrigatório informar Pesos e Itens</p>
+            </div>
+            <button 
+              type="button" 
+              onClick={handlePlayGuide}
+              className="bg-indigo-100 text-indigo-600 p-2 rounded-full hover:bg-indigo-200 transition-colors"
+              title="Ouvir Guia"
+            >
+              <Volume2 className="h-5 w-5" />
+            </button>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-900 transition-colors p-2 bg-gray-50 rounded-full">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -165,10 +215,37 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
                         <label htmlFor="invoice-number" className="text-[10px] font-black text-gray-400 uppercase ml-1">Nº da Nota Fiscal (NF)</label>
                         <input type="text" id="invoice-number" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} required placeholder="Ex: 001234" className="w-full h-14 px-4 border-2 border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800"/>
                     </div>
-                    <div className="bg-gray-50 rounded-2xl p-3 flex flex-col justify-center border-2 border-dashed border-gray-200">
-                        <p className="text-[9px] text-gray-400 font-black uppercase text-center mb-1">Total Calculado</p>
-                        <p className="text-xl font-black text-indigo-700 text-center leading-none">{formatCurrency(totalValue)}</p>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Arquivo da Nota (PDF)</label>
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`w-full h-14 px-4 border-2 border-dashed rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all ${selectedFile ? 'border-green-200 bg-green-50 text-green-700' : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-indigo-300 hover:bg-indigo-50'}`}
+                        >
+                          {selectedFile ? (
+                            <>
+                              <FileText className="h-5 w-5" />
+                              <span className="text-xs font-bold truncate max-w-[150px]">{selectedFile.name}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-5 w-5" />
+                              <span className="text-xs font-bold">Selecionar PDF</span>
+                            </>
+                          )}
+                        </div>
+                        <input 
+                          type="file" 
+                          ref={fileInputRef} 
+                          onChange={handleFileChange} 
+                          accept="application/pdf" 
+                          className="hidden" 
+                        />
                     </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-center border-2 border-dashed border-gray-200">
+                    <p className="text-[9px] text-gray-400 font-black uppercase text-center mb-1">Total Calculado</p>
+                    <p className="text-xl font-black text-indigo-700 text-center leading-none">{formatCurrency(totalValue)}</p>
                 </div>
 
                 <div className="space-y-4 pt-4 border-t">
@@ -240,13 +317,20 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
 
             {/* Rodapé Fixo - OTIMIZADO PARA MOBILE (Safe Area) */}
             <div className="p-6 md:p-8 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row gap-3 flex-shrink-0 pb-[max(24px,env(safe-area-inset-bottom))]">
-                <button type="button" onClick={onClose} className="flex-1 bg-gray-50 text-gray-400 font-black h-16 rounded-2xl uppercase text-[10px] tracking-widest hover:bg-gray-100 active:scale-95 transition-all">Cancelar</button>
+                <button type="button" onClick={onClose} disabled={isUploading} className="flex-1 bg-gray-50 text-gray-400 font-black h-16 rounded-2xl uppercase text-[10px] tracking-widest hover:bg-gray-100 active:scale-95 transition-all disabled:opacity-50">Cancelar</button>
                 <button 
                     type="submit" 
-                    disabled={!isFormValid}
-                    className={`flex-[2] flex items-center justify-center gap-3 font-black h-16 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-sm text-white ${isFormValid ? 'bg-orange-600 hover:bg-orange-700' : 'bg-gray-200 cursor-not-allowed text-gray-400'}`}
+                    disabled={!isFormValid || isUploading}
+                    className={`flex-[2] flex items-center justify-center gap-3 font-black h-16 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-sm text-white ${isFormValid && !isUploading ? 'bg-orange-600 hover:bg-orange-700' : 'bg-gray-200 cursor-not-allowed text-gray-400'}`}
                 >
-                    Salvar e Enviar NF
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      'Salvar e Enviar NF'
+                    )}
                 </button>
             </div>
         </form>

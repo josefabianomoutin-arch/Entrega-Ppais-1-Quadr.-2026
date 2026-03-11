@@ -8,6 +8,8 @@ import SummaryCard from './SummaryCard';
 import InvoiceUploader from './InvoiceUploader';
 import EmailConfirmationModal from './EmailConfirmationModal';
 import FulfillmentModal from './FulfillmentModal';
+import { speechService } from '../src/services/speechService';
+import { HelpCircle } from 'lucide-react';
 
 const SIMULATED_TODAY = new Date('2026-04-30T00:00:00');
 
@@ -89,6 +91,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   
   const handleCloseFulfillmentModal = () => { setInvoiceToFulfill(null); setIsFulfillmentModalOpen(false); };
   
+  const handlePlayGeneralHelp = async () => {
+    const text = "Olá! Este é o seu painel de entregas. Para agendar uma nova entrega, clique em um dia vazio no calendário. Para enviar uma nota fiscal de uma entrega já realizada, clique no dia da entrega e selecione 'Faturar Entrega'. Se precisar de ajuda em cada passo, procure pelo ícone de som.";
+    await speechService.speak(text);
+  };
+
   const handleSaveFulfillment = (invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }) => {
     if (invoiceToFulfill) {
       const placeholderIds = invoiceToFulfill.deliveries.map(d => d.id);
@@ -126,9 +133,18 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="min-h-screen text-gray-800 bg-gray-50 pb-20">
       <header className="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-50">
-        <div>
-          <h1 className={`text-xl font-black ${headerColor} uppercase tracking-tighter italic`}>Olá, {supplier.name.split(' ')[0]}!</h1>
-          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{panelTitle}</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className={`text-xl font-black ${headerColor} uppercase tracking-tighter italic`}>Olá, {supplier.name.split(' ')[0]}!</h1>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{panelTitle}</p>
+          </div>
+          <button 
+            onClick={handlePlayGeneralHelp}
+            className="bg-indigo-50 text-indigo-600 p-2 rounded-full hover:bg-indigo-100 transition-colors"
+            title="Ajuda por Voz"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </button>
         </div>
         <button onClick={onLogout} className="bg-red-50 text-red-600 font-black py-2 px-4 rounded-xl transition-all border border-red-100 text-[10px] uppercase tracking-widest active:scale-95">Sair</button>
       </header>

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { speechService } from '../src/services/speechService';
+import { Volume2 } from 'lucide-react';
 
 interface MonthlyQuota {
   name: string;
@@ -18,6 +20,11 @@ interface DeliveryModalProps {
 const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, monthlyQuotas }) => {
   const [time, setTime] = useState('08:00');
 
+  const handlePlayGuide = async () => {
+    const text = "Para agendar sua entrega, escolha um horário entre as 8 da manhã e as 4 da tarde no campo indicado. Depois de escolher o horário, clique no botão verde 'Salvar Agendamento' para confirmar.";
+    await speechService.speak(text);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -35,7 +42,17 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({ date, onClose, onSave, mo
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 animate-fade-in-up">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">Agendar Horário</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-gray-800">Agendar Horário</h2>
+            <button 
+              type="button" 
+              onClick={handlePlayGuide}
+              className="bg-green-100 text-green-600 p-2 rounded-full hover:bg-green-200 transition-colors"
+              title="Ouvir Guia"
+            >
+              <Volume2 className="h-5 w-5" />
+            </button>
+          </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
         </div>
         <p className="mb-6 text-gray-600">Data selecionada: <span className="font-semibold text-green-700">{formattedDate}</span></p>
