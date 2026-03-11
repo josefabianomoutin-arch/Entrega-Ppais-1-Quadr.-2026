@@ -41,6 +41,10 @@ async function startServer() {
   };
 
   // API Routes
+  app.get("/api/test", (req, res) => {
+    res.send("Server is working!");
+  });
+
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
@@ -88,6 +92,20 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
+    
+    // Explicitly serve index.html for non-API routes
+    app.use('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      if (url.startsWith('/api')) return next();
+      
+      try {
+        let template = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        next(e);
+      }
+    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
@@ -97,8 +115,9 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server is listening on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`>>> SERVIDOR RODANDO NA PORTA ${PORT}`);
+    console.log(`>>> AMBIENTE: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`>>> URL DO APP: https://ais-dev-4qt2g7pkcbaumjhhst3746-882203782.us-east5.run.app`);
   });
 }
 
