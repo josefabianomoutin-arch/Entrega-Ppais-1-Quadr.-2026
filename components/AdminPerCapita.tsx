@@ -16,6 +16,7 @@ interface AdminPerCapitaProps {
   onUpdateAcquisitionItem: (item: AcquisitionItem) => Promise<{ success: boolean, message: string }>;
   onDeleteAcquisitionItem: (id: string) => Promise<{ success: boolean, message: string }>;
   acquisitionItems: AcquisitionItem[];
+  onUpdateSupplierObservations?: (cpf: string, observations: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 const formatCurrency = (value: number) => {
@@ -107,7 +108,7 @@ const PTRES_DESCRIPTIONS: Record<string, string> = {
     '380328': 'Recurso para Diárias e Outras Despesas'
 };
 
-const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog, perCapitaConfig, onUpdatePerCapitaConfig, onUpdateContractForItem, onUpdateAcquisitionItem, onDeleteAcquisitionItem, acquisitionItems }) => {
+const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog, perCapitaConfig, onUpdatePerCapitaConfig, onUpdateContractForItem, onUpdateAcquisitionItem, onDeleteAcquisitionItem, acquisitionItems, onUpdateSupplierObservations }) => {
     const [activeSubTab, setActiveSubTab] = useState<'CALCULO' | 'KIT PPL' | 'PPAIS' | 'ESTOCÁVEIS' | 'PERECÍVEIS' | 'AUTOMAÇÃO' | 'PRODUTOS DE LIMPEZA' | 'ADIANTAMENTOS' | 'CONTROLE'>('CALCULO');
     const [ppaisSubTab, setPpaisSubTab] = useState<'ITEMS' | 'PRODUCERS'>('ITEMS');
     const [pereciveisSubTab, setPereciveisSubTab] = useState<'ITEMS' | 'SUPPLIERS'>('ITEMS');
@@ -532,7 +533,8 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                 document: supplier.cpf,
                 totalWeight,
                 totalValue,
-                items
+                items,
+                observations: supplier.observations || ''
             };
         }).filter(s => s.totalWeight > 0 || s.totalValue > 0)
           .sort((a, b) => a.name.localeCompare(b.name));
@@ -1145,6 +1147,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                             <th className="p-3 text-center">CNPJ/CPF</th>
                                             <th className="p-3 text-center">Peso a Empenhar</th>
                                             <th className="p-3 text-center">Valor a Empenhar</th>
+                                            <th className="p-3 text-left">Observações</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-red-50 bg-white">
@@ -1169,6 +1172,19 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                                     <td className="p-3 text-center font-mono text-gray-500 align-top">{supplier.document}</td>
                                                     <td className="p-3 text-center font-mono text-gray-600 align-top">{supplier.totalWeight.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</td>
                                                     <td className="p-3 text-center font-mono font-bold text-red-600 align-top">{formatCurrency(supplier.totalValue)}</td>
+                                                    <td className="p-3 align-top">
+                                                        <textarea 
+                                                            className="w-full p-2 text-[10px] border border-gray-200 rounded-md focus:ring-1 focus:ring-red-500 focus:border-red-500 outline-none resize-none"
+                                                            rows={2}
+                                                            placeholder="Adicionar observação..."
+                                                            defaultValue={supplier.observations}
+                                                            onBlur={(e) => {
+                                                                if (onUpdateSupplierObservations && e.target.value !== supplier.observations) {
+                                                                    onUpdateSupplierObservations(supplier.document, e.target.value);
+                                                                }
+                                                            }}
+                                                        />
+                                                    </td>
                                                 </tr>
                                             </React.Fragment>
                                         ))}
@@ -1178,6 +1194,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                                             <td colSpan={2} className="p-3 text-right uppercase text-xs tracking-wider">Total a Empenhar:</td>
                                             <td className="p-3 text-center font-mono">{suppliersWithoutEmpenho.reduce((acc, s) => acc + s.totalWeight, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</td>
                                             <td className="p-3 text-center font-mono">{formatCurrency(suppliersWithoutEmpenho.reduce((acc, s) => acc + s.totalValue, 0))}</td>
+                                            <td className="p-3"></td>
                                         </tr>
                                     </tfoot>
                                 </table>

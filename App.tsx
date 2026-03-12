@@ -304,6 +304,17 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateSupplierObservations = async (cpf: string, observations: string) => {
+    try {
+      const supplierRef = child(suppliersRef, cpf);
+      await update(supplierRef, { observations });
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao atualizar observações do fornecedor:', error);
+      return { success: false, message: String(error) };
+    }
+  };
+
   const handleScheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
     try {
       // Check main suppliers
@@ -1025,6 +1036,7 @@ const App: React.FC = () => {
         suppliers={suppliers} 
         onRegister={handleRegisterSupplier}
         onUpdateSupplier={handleUpdateSupplier}
+        onUpdateSupplierObservations={handleUpdateSupplierObservations}
         onLogout={handleLogout}
         warehouseLog={warehouseLog}
         perCapitaConfig={perCapitaConfig}

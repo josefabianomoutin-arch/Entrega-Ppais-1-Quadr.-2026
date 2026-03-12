@@ -85,6 +85,7 @@ interface AdminDashboardProps {
   onClearAllTemporaryExitInmates: () => Promise<{ success: boolean }>;
   onRegisterTemporaryExitLog: (log: Omit<TemporaryExitLog, 'id'>) => Promise<{ success: boolean }>;
   onBulkUpdateTemporaryExitInmates: (inmates: TemporaryExitInmate[]) => Promise<{ success: boolean }>;
+  onUpdateSupplierObservations?: (cpf: string, observations: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -320,7 +321,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'finance': return <AdminFinancialManager records={financialRecords} onSave={props.onSaveFinancialRecord} onDelete={props.onDeleteFinancialRecord} />;
       case 'invoices': return <AdminInvoices suppliers={combinedSuppliers} warehouseLog={warehouseLog} onReopenInvoice={props.onReopenInvoice} onDeleteInvoice={props.onDeleteInvoice} onUpdateInvoiceItems={props.onUpdateInvoiceItems} onManualInvoiceEntry={props.onManualInvoiceEntry} />;
       case 'schedule': return <AdminScheduleView suppliers={combinedSuppliers} thirdPartyEntries={thirdPartyEntries} onCancelDeliveries={props.onCancelDeliveries} onDeleteThirdPartyEntry={props.onDeleteThirdPartyEntry} />;
-      case 'perCapita': return <AdminPerCapita suppliers={suppliers} warehouseLog={warehouseLog} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={props.onUpdatePerCapitaConfig} onUpdateContractForItem={onUpdateContractForItem} onUpdateAcquisitionItem={props.onUpdateAcquisitionItem} onDeleteAcquisitionItem={props.onDeleteAcquisitionItem} acquisitionItems={acquisitionItems} />;
+      case 'perCapita': return <AdminPerCapita suppliers={suppliers} warehouseLog={warehouseLog} perCapitaConfig={perCapitaConfig} onUpdatePerCapitaConfig={props.onUpdatePerCapitaConfig} onUpdateContractForItem={onUpdateContractForItem} onUpdateAcquisitionItem={props.onUpdateAcquisitionItem} onDeleteAcquisitionItem={props.onDeleteAcquisitionItem} acquisitionItems={acquisitionItems} onUpdateSupplierObservations={props.onUpdateSupplierObservations} />;
       case 'cleaning': return <AdminCleaningLog logs={cleaningLogs} onRegister={props.onRegisterCleaningLog} onDelete={props.onDeleteCleaningLog} />;
       case 'thirdPartyEntry': return <AdminThirdPartyEntry logs={thirdPartyEntries} onRegister={props.onRegisterThirdPartyEntry} onUpdate={props.onUpdateThirdPartyEntry} onDelete={props.onDeleteThirdPartyEntry} />;
       case 'vehicleExitOrder': return <AdminVehicleExitOrder 

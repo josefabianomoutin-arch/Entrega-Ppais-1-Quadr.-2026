@@ -47,6 +47,7 @@ export interface Supplier {
   contractItems: ContractItem[];
   deliveries: Delivery[];
   allowedWeeks: number[];
+  observations?: string;
 }
 
 export interface WarehouseMovement {
