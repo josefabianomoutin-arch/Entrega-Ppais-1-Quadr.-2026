@@ -105,6 +105,7 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({
                 setVerificationStatus('verifying');
                 
                 try {
+                    // Cache bust: 2026-03-12T08:45:10
                     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
                     const refBase64 = verifyingLog.photo.split(',')[1];
                     const capBase64 = photoData.split(',')[1];

@@ -51,6 +51,7 @@ export class SpeechService {
   private ai: GoogleGenAI | null = null;
 
   private getAI(): GoogleGenAI {
+    // Cache bust: 2026-03-12T08:45:10
     if (!this.ai) {
       this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     }

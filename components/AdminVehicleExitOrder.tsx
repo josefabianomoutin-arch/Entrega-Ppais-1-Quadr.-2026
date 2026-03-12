@@ -142,6 +142,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
 
             const base64Image = canvasRef.current.toDataURL('image/jpeg').split(',')[1];
             
+            // Cache bust: 2026-03-12T08:45:10
             const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
             
             const result = await ai.models.generateContent({
