@@ -338,6 +338,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           onDeleteDriverAsset={props.onDeleteDriverAsset}
       />;
       case 'analytics': return <AdminAnalytics suppliers={suppliers} warehouseLog={warehouseLog} />;
+      case 'graphs': return <AdminGraphs suppliers={combinedSuppliers} />;
       case 'menu': return <AdminStandardMenu suppliers={suppliers} template={props.standardMenu} dailyMenus={props.dailyMenus} onUpdateDailyMenus={props.onUpdateDailyMenu} inmateCount={perCapitaConfig.inmateCount || 0} />;
       case 'almoxarifado': return <WarehouseMovementForm suppliers={suppliers} warehouseLog={warehouseLog} onRegisterEntry={props.onRegisterEntry} onRegisterWithdrawal={props.onRegisterWithdrawal} />;
       case 'temporaryExit': return <TemporaryExitTab 
