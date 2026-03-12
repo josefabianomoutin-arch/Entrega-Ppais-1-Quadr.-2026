@@ -52,13 +52,7 @@ export class SpeechService {
 
   private getAI(): GoogleGenAI {
     if (!this.ai) {
-      // Use the platform-provided key via window.aistudio if available
-      const apiKey = (window as any).aistudio?.getApiKey?.() || (window as any).GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY || '';
-      
-      if (!apiKey) {
-        console.error("API Key is missing!");
-      }
-      this.ai = new GoogleGenAI({ apiKey });
+      this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     }
     return this.ai;
   }
