@@ -22,7 +22,6 @@ export class SpeechService {
   async speak(text: string): Promise<void> {
     try {
       console.log("Iniciando TTS para o texto:", text);
-      // Inicializa o contexto de áudio de forma síncrona para evitar bloqueio do navegador
       const ctx = this.initAudioContext();
 
       const response = await this.ai.models.generateContent({
@@ -32,18 +31,19 @@ export class SpeechService {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' }, // 'Kore' is a good female voice
+              prebuiltVoiceConfig: { voiceName: 'Kore' },
             },
           },
         },
       });
 
-      console.log("Resposta TTS recebida.");
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+      const base64Audio = inlineData?.data;
+      const mimeType = inlineData?.mimeType;
+      
+      console.log("Resposta TTS recebida. MimeType:", mimeType);
       
       if (base64Audio) {
-        console.log("Áudio recebido, decodificando...");
-        // Decode base64 to binary string
         const binaryString = window.atob(base64Audio);
         const len = binaryString.length;
         const bytes = new Uint8Array(len);
@@ -51,19 +51,25 @@ export class SpeechService {
           bytes[i] = binaryString.charCodeAt(i);
         }
 
-        console.log("Tamanho do áudio em bytes:", len);
+        let audioBuffer: AudioBuffer;
 
-        // Gemini TTS returns raw PCM data (16-bit, 24kHz, mono)
-        const numSamples = bytes.length / 2;
-        const audioBuffer = ctx.createBuffer(1, numSamples, 24000);
-        const channelData = audioBuffer.getChannelData(0);
-        const dataView = new DataView(bytes.buffer);
+        try {
+          // Tenta decodificar como um arquivo de áudio padrão (WAV, MP3, OGG)
+          console.log("Tentando decodificar com decodeAudioData...");
+          audioBuffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
+          console.log("Decodificado com sucesso como arquivo padrão.");
+        } catch (e) {
+          console.log("Falha ao decodificar como arquivo padrão, assumindo PCM raw (16-bit, 24kHz)...", e);
+          // Fallback para PCM raw
+          const numSamples = bytes.length / 2;
+          audioBuffer = ctx.createBuffer(1, numSamples, 24000);
+          const channelData = audioBuffer.getChannelData(0);
+          const dataView = new DataView(bytes.buffer);
 
-        for (let i = 0; i < numSamples; i++) {
-          // Read 16-bit signed integer (little-endian)
-          const sample = dataView.getInt16(i * 2, true);
-          // Convert to float [-1.0, 1.0]
-          channelData[i] = sample < 0 ? sample / 32768 : sample / 32767;
+          for (let i = 0; i < numSamples; i++) {
+            const sample = dataView.getInt16(i * 2, true);
+            channelData[i] = sample < 0 ? sample / 32768 : sample / 32767;
+          }
         }
 
         const source = ctx.createBufferSource();
