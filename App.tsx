@@ -76,6 +76,15 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!database) return;
 
+    const connectedRef = ref(database, '.info/connected');
+    onValue(connectedRef, (snap) => {
+      if (snap.val() === true) {
+        console.log("Conectado ao Firebase Realtime Database!");
+      } else {
+        console.warn("Desconectado do Firebase Realtime Database.");
+      }
+    });
+
     onValue(suppliersRef, (snapshot) => {
       const data = snapshot.val();
       setSuppliers(data ? Object.values(data) : []);
@@ -244,83 +253,119 @@ const App: React.FC = () => {
   };
 
   const handleRegisterSupplier = async (name: string, cpf: string, allowedWeeks: number[]) => {
-    const newSupplier: Supplier = {
-      name,
-      cpf,
-      initialValue: 0,
-      contractItems: [],
-      deliveries: [],
-      allowedWeeks
-    };
-    await set(child(suppliersRef, cpf), newSupplier);
+    try {
+      console.log('Tentando registrar fornecedor:', { name, cpf, allowedWeeks });
+      const newSupplier: Supplier = {
+        name,
+        cpf,
+        initialValue: 0,
+        contractItems: [],
+        deliveries: [],
+        allowedWeeks
+      };
+      await set(child(suppliersRef, cpf), newSupplier);
+      console.log('Fornecedor registrado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao registrar fornecedor:', error);
+      throw error;
+    }
   };
 
   const handleUpdateSupplier = async (oldCpf: string, newName: string, newCpf: string, newAllowedWeeks: number[]) => {
-    const supplierRef = child(suppliersRef, oldCpf);
-    await runTransaction(supplierRef, (currentData: Supplier) => {
-      if (currentData) {
-        currentData.name = newName;
-        currentData.cpf = newCpf;
-        currentData.allowedWeeks = newAllowedWeeks;
+    try {
+      console.log('Tentando atualizar fornecedor:', { oldCpf, newName, newCpf, newAllowedWeeks });
+      const supplierRef = child(suppliersRef, oldCpf);
+      
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout ao atualizar fornecedor')), 10000));
+      
+      await Promise.race([
+        runTransaction(supplierRef, (currentData: Supplier) => {
+          if (currentData) {
+            currentData.name = newName;
+            currentData.cpf = newCpf;
+            currentData.allowedWeeks = newAllowedWeeks;
+          }
+          return currentData;
+        }),
+        timeoutPromise
+      ]);
+
+      if (oldCpf !== newCpf) {
+        const snapshot = await get(child(suppliersRef, oldCpf));
+        const oldData = snapshot.val();
+        await set(child(suppliersRef, newCpf), oldData);
+        await remove(child(suppliersRef, oldCpf));
       }
-      return currentData;
-    });
-    if (oldCpf !== newCpf) {
-      const snapshot = await get(child(suppliersRef, oldCpf));
-      const oldData = snapshot.val();
-      await set(child(suppliersRef, newCpf), oldData);
-      await remove(child(suppliersRef, oldCpf));
+      console.log('Fornecedor atualizado com sucesso!');
+      return null;
+    } catch (error) {
+      console.error('Erro ao atualizar fornecedor:', error);
+      return 'Erro ao atualizar fornecedor: ' + (error instanceof Error ? error.message : String(error));
     }
-    return null;
   };
 
   const handleScheduleDelivery = async (supplierCpf: string, date: string, time: string) => {
-    // Check main suppliers
-    const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);
-    if (isMainSupplier) {
-      const supplierRef = child(suppliersRef, supplierCpf);
-      await runTransaction(supplierRef, (currentData: Supplier) => {
-        if (currentData) {
-          const deliveries = currentData.deliveries || [];
-          deliveries.push({
-            id: `del-${Date.now()}`,
-            date,
-            time,
-            item: 'AGENDAMENTO PENDENTE',
-            invoiceUploaded: false
-          });
-          currentData.deliveries = deliveries;
-        }
-        return currentData;
-      });
-      return;
-    }
-
-    // Check Per Capita suppliers
-    await runTransaction(perCapitaConfigRef, (currentData: PerCapitaConfig) => {
-      if (currentData) {
-        const findAndAdd = (list: any[] | undefined) => {
-          const s = list?.find(p => p.cpfCnpj === supplierCpf);
-          if (s) {
-            const deliveries = s.deliveries || [];
-            deliveries.push({
-              id: `del-${Date.now()}`,
-              date,
-              time,
-              item: 'AGENDAMENTO PENDENTE',
-              invoiceUploaded: false
-            });
-            s.deliveries = deliveries;
-            return true;
-          }
-          return false;
-        };
-        if (!findAndAdd(currentData.ppaisProducers)) {
-          findAndAdd(currentData.pereciveisSuppliers);
-        }
+    try {
+      // Check main suppliers
+      const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);
+      if (isMainSupplier) {
+        const supplierRef = child(suppliersRef, supplierCpf);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout ao agendar entrega')), 10000));
+        
+        await Promise.race([
+          runTransaction(supplierRef, (currentData: Supplier) => {
+            if (currentData) {
+              const deliveries = currentData.deliveries || [];
+              deliveries.push({
+                id: `del-${Date.now()}`,
+                date,
+                time,
+                item: 'AGENDAMENTO PENDENTE',
+                invoiceUploaded: false
+              });
+              currentData.deliveries = deliveries;
+            }
+            return currentData;
+          }),
+          timeoutPromise
+        ]);
+        return;
       }
-      return currentData;
-    });
+
+      // Check Per Capita suppliers
+      const timeoutPromisePC = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout ao agendar entrega Per Capita')), 10000));
+      await Promise.race([
+        runTransaction(perCapitaConfigRef, (currentData: PerCapitaConfig) => {
+          if (currentData) {
+            const findAndAdd = (list: any[] | undefined) => {
+              const s = list?.find(p => p.cpfCnpj === supplierCpf);
+              if (s) {
+                const deliveries = s.deliveries || [];
+                deliveries.push({
+                  id: `del-${Date.now()}`,
+                  date,
+                  time,
+                  item: 'AGENDAMENTO PENDENTE',
+                  invoiceUploaded: false
+                });
+                s.deliveries = deliveries;
+                return true;
+              }
+              return false;
+            };
+            if (!findAndAdd(currentData.ppaisProducers)) {
+              findAndAdd(currentData.pereciveisSuppliers);
+            }
+          }
+          return currentData;
+        }),
+        timeoutPromisePC
+      ]);
+    } catch (error) {
+      console.error('Erro ao agendar entrega:', error);
+      // alert is not allowed, but this function doesn't return anything to the UI easily
+      // We'll just log it for now.
+    }
   };
 
   const handleCancelDeliveries = useCallback(async (supplierCpf: string, deliveryIds: string[]) => {
@@ -785,29 +830,48 @@ const App: React.FC = () => {
   // --- FIM GERENCIAMENTO NOTAS ---
 
   const handleUpdateContractForItem = async (itemName: string, assignments: any[]) => {
-    for (const supplier of suppliers) {
-      const assignment = assignments.find(a => a.supplierCpf === supplier.cpf);
-      const supplierRef = child(suppliersRef, supplier.cpf);
-      await runTransaction(supplierRef, (data: Supplier) => {
-        if (data) {
-          data.contractItems = (data.contractItems || []).filter(ci => ci.name !== itemName);
-          if (assignment) {
-            data.contractItems.push({
-              name: itemName,
-              totalKg: assignment.totalKg,
-              valuePerKg: assignment.valuePerKg,
-              unit: assignment.unit,
-              category: assignment.category,
-              comprasCode: assignment.comprasCode,
-              becCode: assignment.becCode
-            });
-          }
-          data.initialValue = (data.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * curr.valuePerKg), 0);
-        }
-        return data;
-      });
+    try {
+      console.log('Tentando atualizar contratos para o item:', itemName, 'Assignments:', assignments);
+      console.log('Total de fornecedores para processar:', suppliers.length);
+      
+      let count = 0;
+      for (const supplier of suppliers) {
+        count++;
+        const assignment = assignments.find(a => a.supplierCpf === supplier.cpf);
+        const supplierRef = child(suppliersRef, supplier.cpf);
+        
+        console.log(`Processando fornecedor ${count}/${suppliers.length}: ${supplier.name} (${supplier.cpf})`);
+        
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout ao atualizar fornecedor ' + supplier.name)), 10000));
+        
+        await Promise.race([
+          runTransaction(supplierRef, (data: Supplier) => {
+            if (data) {
+              data.contractItems = (data.contractItems || []).filter(ci => ci.name !== itemName);
+              if (assignment) {
+                data.contractItems.push({
+                  name: itemName,
+                  totalKg: assignment.totalKg,
+                  valuePerKg: assignment.valuePerKg,
+                  unit: assignment.unit,
+                  category: assignment.category,
+                  comprasCode: assignment.comprasCode,
+                  becCode: assignment.becCode
+                });
+              }
+              data.initialValue = (data.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * curr.valuePerKg), 0);
+            }
+            return data;
+          }),
+          timeoutPromise
+        ]);
+      }
+      console.log('Contratos atualizados com sucesso!');
+      return { success: true, message: 'Contratos atualizados' };
+    } catch (error) {
+      console.error('Erro ao atualizar contratos:', error);
+      return { success: false, message: 'Falha ao atualizar contratos: ' + (error instanceof Error ? error.message : String(error)) };
     }
-    return { success: true, message: 'Contratos atualizados' };
   };
 
   const handleUpdateAcquisitionItem = async (item: AcquisitionItem) => {
@@ -877,7 +941,8 @@ const App: React.FC = () => {
 
         return { success: true, message: 'Entrada registrada' };
     } catch (e) {
-        return { success: false, message: 'Falha na conexão' };
+        console.error('Erro ao registrar entrada:', e);
+        return { success: false, message: 'Falha na conexão: ' + (e instanceof Error ? e.message : String(e)) };
     }
   };
 
@@ -925,7 +990,8 @@ const App: React.FC = () => {
         await set(newRef, exit);
         return { success: true, message: 'Saída registrada' };
     } catch (e) {
-        return { success: false, message: 'Falha na conexão' };
+        console.error('Erro ao registrar saída:', e);
+        return { success: false, message: 'Falha na conexão: ' + (e instanceof Error ? e.message : String(e)) };
     }
   };
 

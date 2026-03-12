@@ -471,6 +471,7 @@ export const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModal
     const [itemBecCode, setItemBecCode] = useState(becCode || '');
     const [newSupplierCpf, setNewSupplierCpf] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     
     // PPAIS specific: Total Meta
     const [totalMeta, setTotalMeta] = useState(() => {
@@ -548,6 +549,7 @@ export const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModal
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
+        setSaveError(null);
         const finalAssignments = assignments.map(a => ({
             supplierCpf: a.supplierCpf,
             totalKg: parseFloat(a.totalKg.replace(',', '.')),
@@ -558,7 +560,12 @@ export const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModal
             becCode: itemBecCode
         })).filter(a => !isNaN(a.totalKg));
 
-        await onSave(finalAssignments);
+        const result = await onSave(finalAssignments);
+        if (result && !result.success) {
+            setSaveError(result.message);
+        } else {
+            onClose();
+        }
         setIsSaving(false);
     };
 
@@ -574,6 +581,11 @@ export const ManageContractSuppliersModal: React.FC<ManageContractSuppliersModal
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-5 space-y-4">
+                    {saveError && (
+                        <div className="bg-red-50 border-2 border-red-100 p-4 rounded-2xl text-red-600 font-black text-[10px] uppercase tracking-widest animate-pulse">
+                            Erro ao salvar: {saveError}
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
                             <label className="text-[9px] font-black text-gray-400 uppercase block mb-1 ml-1">Categoria do Item</label>
