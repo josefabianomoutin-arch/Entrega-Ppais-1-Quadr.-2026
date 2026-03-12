@@ -37,9 +37,19 @@ export class SpeechService {
         },
       });
 
-      const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-      const base64Audio = inlineData?.data;
-      const mimeType = inlineData?.mimeType;
+      let base64Audio: string | undefined;
+      let mimeType: string | undefined;
+
+      // A inteligência artificial pode retornar o áudio em qualquer uma das "partes" da resposta.
+      // Precisamos procurar em todas elas, e não apenas na primeira.
+      const parts = response.candidates?.[0]?.content?.parts || [];
+      for (const part of parts) {
+        if (part.inlineData) {
+          base64Audio = part.inlineData.data;
+          mimeType = part.inlineData.mimeType;
+          break;
+        }
+      }
       
       console.log("Resposta TTS recebida. MimeType:", mimeType);
       
