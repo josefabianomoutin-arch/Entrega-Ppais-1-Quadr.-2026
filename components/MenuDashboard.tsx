@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import type { StandardMenu, DailyMenus, MenuRow, Supplier } from '../types';
-import { Calendar, Printer, Clock, Utensils, ChevronRight, ChevronLeft, CheckSquare, Square } from 'lucide-react';
+import { Calendar, Printer, Clock, Utensils, ChevronRight, ChevronLeft, CheckSquare, Square, Tag } from 'lucide-react';
 
 interface MenuDashboardProps {
   standardMenu: StandardMenu;
@@ -229,6 +229,149 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
     printWindow.document.close();
   };
 
+  const handlePrintLargeLabel = () => {
+    const selectedItems = currentMenu.filter(r => selectedRows.has(r.id));
+    
+    // Se não houver seleção, tenta pegar todos do almoço e janta
+    const lunchItems = selectedItems.length > 0 
+      ? selectedItems.filter(r => r.period === 'ALMOÇO')
+      : currentMenu.filter(r => r.period === 'ALMOÇO');
+      
+    const dinnerItems = selectedItems.length > 0
+      ? selectedItems.filter(r => r.period === 'JANTA')
+      : currentMenu.filter(r => r.period === 'JANTA');
+    
+    if (lunchItems.length === 0 && dinnerItems.length === 0) {
+      alert('Selecione os itens do Almoço e Janta para gerar a etiqueta.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=900,height=600');
+    if (!printWindow) return;
+
+    const dateFormatted = new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR');
+    const dayOfWeek = WEEK_DAYS_BR[new Date(selectedDate + 'T12:00:00').getDay()];
+
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Etiqueta de Cardápio 18x10</title>
+          <style>
+            @page { size: landscape; margin: 0; }
+            body { 
+              margin: 0; 
+              padding: 0; 
+              display: flex; 
+              justify-content: center; 
+              align-items: center; 
+              height: 100vh;
+              background: white;
+            }
+            .label-card {
+              width: 180mm;
+              height: 100mm;
+              border: 3px solid #000;
+              padding: 8mm;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              font-family: 'Arial', sans-serif;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #000;
+              padding-bottom: 4mm;
+              margin-bottom: 4mm;
+            }
+            .header h1 { margin: 0; font-size: 24pt; text-transform: uppercase; font-weight: 900; }
+            .header .date-info { font-size: 16pt; font-weight: bold; margin-top: 2mm; }
+            
+            .content {
+              flex: 1;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8mm;
+              overflow: hidden;
+            }
+            .meal-section {
+              display: flex;
+              flex-direction: column;
+            }
+            .meal-title {
+              font-size: 16pt;
+              font-weight: 900;
+              text-transform: uppercase;
+              background: #000;
+              color: #fff;
+              padding: 2mm;
+              text-align: center;
+              margin-bottom: 3mm;
+            }
+            .item-list {
+              font-size: 12pt;
+              line-height: 1.4;
+              margin: 0;
+              padding-left: 5mm;
+            }
+            .item-list li {
+              margin-bottom: 1.5mm;
+              font-weight: bold;
+            }
+            .footer {
+              margin-top: 4mm;
+              border-top: 2px solid #000;
+              padding-top: 3mm;
+              display: flex;
+              justify-content: space-between;
+              font-size: 11pt;
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="label-card">
+            <div class="header">
+              <h1>Cardápio Institucional</h1>
+              <div class="date-info">${dayOfWeek} - ${dateFormatted}</div>
+            </div>
+            <div class="content">
+              <div class="meal-section">
+                <div class="meal-title">Almoço</div>
+                <ul class="item-list">
+                  ${lunchItems.length > 0 
+                    ? lunchItems.map(item => `<li>${item.foodItem || item.contractedItem}</li>`).join('')
+                    : '<li>-</li>'}
+                </ul>
+              </div>
+              <div class="meal-section">
+                <div class="meal-title">Jantar</div>
+                <ul class="item-list">
+                  ${dinnerItems.length > 0 
+                    ? dinnerItems.map(item => `<li>${item.foodItem || item.contractedItem}</li>`).join('')
+                    : '<li>-</li>'}
+                </ul>
+              </div>
+            </div>
+            <div class="footer">
+              <span>Penitenciária de Taiúva</span>
+              <span>Gestão de Alimentação</span>
+            </div>
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   const handleGenerateDailyPdf = () => {
     const printWindow = window.open('', '_blank', 'width=900,height=1000');
     if (!printWindow) return;
@@ -402,22 +545,40 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
               )}
               
               {showPdfOnly ? (
-                <button 
-                  onClick={handleGenerateDailyPdf}
-                  className="flex items-center justify-center gap-3 px-10 py-4 bg-slate-800 hover:bg-slate-900 text-white font-black rounded-2xl shadow-lg shadow-slate-200 transition-all active:scale-95 uppercase text-xs tracking-widest"
-                >
-                  <Printer className="h-5 w-5" />
-                  Gerar PDF do Dia
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={handlePrintLargeLabel}
+                    className="flex items-center justify-center gap-3 px-8 py-4 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-2xl shadow-lg shadow-amber-200 transition-all active:scale-95 uppercase text-xs tracking-widest"
+                  >
+                    <Tag className="h-5 w-5" />
+                    Etiqueta 18x10
+                  </button>
+                  <button 
+                    onClick={handleGenerateDailyPdf}
+                    className="flex items-center justify-center gap-3 px-10 py-4 bg-slate-800 hover:bg-slate-900 text-white font-black rounded-2xl shadow-lg shadow-slate-200 transition-all active:scale-95 uppercase text-xs tracking-widest"
+                  >
+                    <Printer className="h-5 w-5" />
+                    Gerar PDF do Dia
+                  </button>
+                </div>
               ) : (
-                <button 
-                  onClick={handlePrintSelected}
-                  disabled={selectedRows.size === 0}
-                  className="flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-lg shadow-indigo-200 transition-all active:scale-95 uppercase text-xs tracking-widest disabled:bg-slate-300 disabled:shadow-none"
-                >
-                  <Printer className="h-5 w-5" />
-                  Imprimir Selecionadas ({selectedRows.size})
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={handlePrintLargeLabel}
+                    className="flex items-center justify-center gap-3 px-8 py-4 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-2xl shadow-lg shadow-amber-200 transition-all active:scale-95 uppercase text-xs tracking-widest"
+                  >
+                    <Tag className="h-5 w-5" />
+                    Etiqueta 18x10
+                  </button>
+                  <button 
+                    onClick={handlePrintSelected}
+                    disabled={selectedRows.size === 0}
+                    className="flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-lg shadow-indigo-200 transition-all active:scale-95 uppercase text-xs tracking-widest disabled:bg-slate-300 disabled:shadow-none"
+                  >
+                    <Printer className="h-5 w-5" />
+                    Imprimir Selecionadas ({selectedRows.size})
+                  </button>
+                </div>
               )}
             </div>
           </div>
