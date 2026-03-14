@@ -2,8 +2,6 @@ import React, { useState, useRef } from 'react';
 import type { Delivery } from '../types';
 import { speechService } from '../src/services/speechService';
 import { Volume2, Upload, FileText, Loader2, ExternalLink } from 'lucide-react';
-import { storage } from '../firebaseConfig';
-import { ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 interface SendInvoiceModalProps {
   invoiceInfo: { date: string; deliveries: Delivery[] };
@@ -84,23 +82,30 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
     setUploadError(null);
 
     try {
-      console.log("Starting upload...", { storage });
-      const fileName = `NF_${invoiceNumber}_${invoiceInfo.date}_${Date.now()}.pdf`;
-      const fileRef = storageRef(storage, `notas_fiscais/${fileName}`);
+      console.log("Starting upload to API...");
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('fileName', `NF_${invoiceNumber}_${invoiceInfo.date}_${Date.now()}.pdf`);
       
-      // Usar uploadBytes simples para garantir a conclusão
-      console.log("Uploading file...");
-      const snapshot = await uploadBytes(fileRef, selectedFile);
-      console.log("Upload complete, getting download URL...");
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      console.log("Download URL obtained:", downloadURL);
+      const response = await fetch('/api/upload-invoice', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload file');
+      }
+
+      const data = await response.json();
+      console.log("Upload complete, download URL:", data.webViewLink);
       
       if (method === 'whatsapp') {
-        handleSendWhatsApp(downloadURL);
+        handleSendWhatsApp(data.webViewLink);
       } else {
-        handleSendEmail(downloadURL);
+        handleSendEmail(data.webViewLink);
       }
-      setIsUploading(false); // Ensure uploading state is reset
+      setIsUploading(false);
     } catch (error: any) {
       console.error("Submit error:", error);
       setUploadError(`Erro ao enviar o arquivo PDF: ${error.message || 'Erro desconhecido'}. Verifique sua conexão ou tente novamente.`);
