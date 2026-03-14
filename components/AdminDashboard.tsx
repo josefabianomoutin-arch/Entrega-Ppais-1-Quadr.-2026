@@ -171,7 +171,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
         return {
             ...p,
-            deliveries: [], // Deliveries for producers might need to be fetched/merged if they exist
+            cpf: p.cpfCnpj, // Ensure cpf is set for Supplier type compatibility
+            deliveries: p.deliveries || [],
             allowedWeeks: Array.from(new Set(weeks)),
             initialValue: (p.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * (curr.valuePerKg || 0)), 0)
         } as Supplier;
@@ -383,67 +384,124 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row h-screen overflow-hidden">
-      {/* Sidebar Desktop */}
-      <aside className="hidden md:flex w-72 bg-indigo-950 min-h-screen flex-col border-r shadow-2xl z-50 sticky top-0 h-screen">
-        <div className="p-6 border-b border-indigo-900 bg-indigo-950 text-white">
-            <h1 className="text-lg font-black uppercase italic tracking-tighter leading-none">Admin Painel</h1>
-            <p className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest mt-1">Gestão Institucional 2026</p>
+    <div className="flex h-screen bg-zinc-50 overflow-hidden font-sans">
+      {/* Professional Sidebar Desktop */}
+      <aside className="hidden md:flex w-72 bg-zinc-900 text-white flex-col shadow-2xl z-20">
+        <div className="p-8 border-b border-white/5">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-8 w-8 bg-indigo-500 rounded-lg flex items-center justify-center">
+              <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            </div>
+            <h1 className="text-xl font-black tracking-tighter italic">GESTAO 2026</h1>
+          </div>
+          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Painel Administrativo</p>
         </div>
-        <nav className="p-4 flex-1 overflow-y-auto custom-scrollbar">
-          <ul className="space-y-1">
-            {visibleTabs.map(tab => (
-              <li key={tab.id}>
-                <button onClick={() => setActiveTab(tab.id)} className={`w-full flex items-center gap-3 p-4 rounded-2xl text-[10px] font-black uppercase tracking-tighter transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-indigo-300 hover:bg-indigo-900'}`}>
-                    {tab.icon} {tab.name}
-                </button>
-              </li>
-            ))}
-          </ul>
+
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
+          {visibleTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                activeTab === tab.id 
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
+                  : 'text-zinc-400 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <span className={`transition-colors ${activeTab === tab.id ? 'text-white' : 'text-zinc-600 group-hover:text-zinc-300'}`}>
+                {React.cloneElement(tab.icon as React.ReactElement, { className: "h-5 w-5" })}
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-widest">{tab.name}</span>
+            </button>
+          ))}
         </nav>
-        <div className="p-4 border-t border-indigo-900">
-            <button onClick={onLogout} className="w-full p-4 bg-red-600/20 text-red-400 font-black rounded-2xl uppercase text-[9px] tracking-widest hover:bg-red-600 hover:text-white transition-colors border border-red-900">Sair da Gestão</button>
+
+        <div className="p-6 border-t border-white/5">
+          <button 
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800 hover:bg-rose-600 text-zinc-400 hover:text-white rounded-xl transition-all font-black text-[10px] uppercase tracking-widest"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            Sair do Sistema
+          </button>
         </div>
       </aside>
 
       {/* Mobile Header */}
-      <header className="md:hidden bg-indigo-950 text-white p-4 sticky top-0 z-[100] shadow-lg flex justify-between items-center border-b border-indigo-800 flex-shrink-0">
-          <div>
-            <h1 className="text-sm font-black uppercase italic tracking-tighter">Finanças 2026</h1>
-            <p className="text-[8px] text-indigo-400 font-bold uppercase">ADMINISTRADOR</p>
-          </div>
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-indigo-900 rounded-xl active:bg-indigo-800">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16m-7 6h7"} /></svg>
-          </button>
+      <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-zinc-900 text-white flex items-center justify-between px-6 z-[100] border-b border-white/5">
+        <h1 className="text-sm font-black uppercase italic tracking-tighter">GESTAO 2026</h1>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-zinc-800 rounded-lg">
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16m-7 6h7"} /></svg>
+        </button>
       </header>
 
-      {/* Overlay Menu Mobile */}
+      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-[90] bg-indigo-950 p-4 pt-20 animate-fade-in overflow-y-auto">
-              <div className="grid grid-cols-2 gap-3 pb-20">
-                  {visibleTabs.map(tab => (
-                      <button key={tab.id} onClick={() => { setActiveTab(tab.id); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center justify-center p-6 rounded-3xl text-[9px] font-black uppercase gap-3 border-2 transition-all active:scale-95 ${activeTab === tab.id ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-indigo-900/50 border-indigo-900 text-indigo-300'}`}>
-                          {React.cloneElement(tab.icon as React.ReactElement, { className: "h-6 w-6" })}
-                          {tab.name}
-                      </button>
-                  ))}
-                  <button onClick={onLogout} className="col-span-2 mt-4 p-5 bg-red-600 text-white rounded-3xl font-black uppercase text-[10px] tracking-widest active:bg-red-700">Encerrar Sessão</button>
-              </div>
+        <div className="md:hidden fixed inset-0 z-[90] bg-zinc-900 p-6 pt-24 overflow-y-auto animate-fade-in">
+          <div className="grid grid-cols-2 gap-4">
+            {visibleTabs.map(tab => (
+              <button 
+                key={tab.id} 
+                onClick={() => { setActiveTab(tab.id); setIsMobileMenuOpen(false); }} 
+                className={`flex flex-col items-center justify-center p-6 rounded-3xl text-[9px] font-black uppercase gap-3 border-2 transition-all active:scale-95 ${activeTab === tab.id ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}
+              >
+                {React.cloneElement(tab.icon as React.ReactElement, { className: "h-6 w-6" })}
+                {tab.name}
+              </button>
+            ))}
+            <button onClick={onLogout} className="col-span-2 mt-4 p-5 bg-rose-600 text-white rounded-3xl font-black uppercase text-[10px] tracking-widest">Encerrar Sessão</button>
           </div>
+        </div>
       )}
 
-      {/* Main Content */}
-      <main className="flex-1 p-2 md:p-10 overflow-y-auto bg-gray-100 custom-scrollbar-main"> 
-        {renderContent()} 
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col min-w-0 bg-zinc-50 relative pt-16 md:pt-0">
+        {/* Top Header Bar Desktop */}
+        <header className="hidden md:flex h-20 bg-white border-b border-zinc-200 items-center justify-between px-10 sticky top-0 z-10">
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-black text-zinc-800 uppercase tracking-tighter italic">
+              {visibleTabs.find(t => t.id === activeTab)?.name || 'Painel'}
+            </h2>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Usuário Ativo</span>
+              <span className="text-xs font-bold text-zinc-800">Administrador Master</span>
+            </div>
+            <div className="h-10 w-10 bg-zinc-100 rounded-full border-2 border-white shadow-sm flex items-center justify-center">
+              <svg className="h-6 w-6 text-zinc-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </div>
+          </div>
+        </header>
+
+        {/* Dynamic Content Container */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar-main">
+          <div className="max-w-7xl mx-auto">
+            {renderContent()}
+          </div>
+        </div>
       </main>
 
-      {editingSupplier && (<EditSupplierModal supplier={editingSupplier} suppliers={suppliers} onClose={() => setEditingSupplier(null)} onSave={async (old, name, cpf, weeks) => { const err = await props.onUpdateSupplier(old, name, cpf, weeks); return err; }} />)}
+      {editingSupplier && (
+        <EditSupplierModal 
+          supplier={editingSupplier} 
+          suppliers={suppliers} 
+          onClose={() => setEditingSupplier(null)} 
+          onSave={async (old, name, cpf, weeks) => { 
+            const err = await props.onUpdateSupplier(old, name, cpf, weeks); 
+            return err; 
+          }} 
+        />
+      )}
       
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #312e81; border-radius: 10px; }
-        .custom-scrollbar-main::-webkit-scrollbar { width: 6px; } .custom-scrollbar-main::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 10px; }
-        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .custom-scrollbar-main::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar-main::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 10px; }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
     </div>
   );

@@ -31,7 +31,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
   acquisitionItems = []
 }) => {
 
-  const inmateCount = perCapitaConfig?.inmateCount || 1;
+  const perCapitaDenominator = (perCapitaConfig?.inmateCount || 0) + (perCapitaConfig?.staffCount || 0) || 1;
 
   // 1. Resumo Financeiro
   const financialSummary = useMemo(() => {
@@ -65,6 +65,18 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
     ];
   }, [suppliers]);
 
+  // 2.1 Fornecedores Sem Entregas (Lista)
+  const suppliersWithoutDeliveries = useMemo(() => {
+    return suppliers
+      .filter(s => (s.deliveries || []).length === 0)
+      .map(s => ({
+        name: s.name,
+        value: (s.contractItems || []).reduce((acc, item) => acc + ((item.totalKg || 0) * (item.valuePerKg || 0)), 0)
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [suppliers]);
+
   // 3. Materiais em Falta (Itens com 0% de entrega)
   const missingMaterials = useMemo(() => {
     const itemsMap = new Map<string, { contracted: number; delivered: number }>();
@@ -94,21 +106,21 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
       .slice(0, 5);
   }, [suppliers]);
 
-  // 4. Per Capita - Custo por Preso
+  // 4. Per Capita - Custo por Pessoa
   const perCapitaStats = useMemo(() => {
     const totalContractValue = suppliers.reduce((acc, s) => {
       return acc + (s.contractItems || []).reduce((sum, item) => sum + ((item.totalKg || 0) * (item.valuePerKg || 0)), 0);
     }, 0);
 
     const dailyCost = totalContractValue / 365; 
-    const perPersonDaily = dailyCost / inmateCount;
+    const perPersonDaily = dailyCost / perCapitaDenominator;
 
     return {
-      totalMonthly: totalContractValue / 12,
+      totalMonthly: totalContractValue / 8,
       dailyTotal: dailyCost,
       perPersonDaily: perPersonDaily
     };
-  }, [suppliers, inmateCount]);
+  }, [suppliers, perCapitaDenominator]);
 
   // 5. Movimentação de Almoxarifado
   const warehouseData = useMemo(() => {
@@ -199,190 +211,232 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   return (
-    <div className="space-y-6 animate-fade-in pb-20">
-      {/* Dashboard Header Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100 flex flex-col justify-between">
-          <div>
-            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Custo Diário / Preso</p>
-            <p className="text-3xl font-black text-indigo-600">{formatCurrency(perCapitaStats.perPersonDaily)}</p>
-          </div>
-          <p className="text-[9px] text-zinc-400 mt-2 font-bold uppercase">População: {inmateCount}</p>
+    <div className="space-y-8 animate-fade-in pb-24">
+      {/* Header Section - Global Stats */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-200 pb-6">
+        <div>
+          <h2 className="text-3xl font-black text-zinc-900 uppercase tracking-tighter italic">Painel de Controle</h2>
+          <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Monitoramento em Tempo Real • Gestão 2026</p>
         </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100 flex flex-col justify-between">
-          <div>
-            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Fornecedores Sem Entrega</p>
-            <p className="text-3xl font-black text-rose-500">{deliveryPerformance.find(d => d.name === 'Sem Entregas')?.value || 0}</p>
+        <div className="flex gap-2">
+          <div className="px-4 py-2 bg-zinc-900 text-white rounded-xl flex flex-col items-end">
+            <span className="text-[8px] font-black uppercase opacity-50">Status do Sistema</span>
+            <span className="text-xs font-bold flex items-center gap-2">
+              <span className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></span>
+              OPERACIONAL
+            </span>
           </div>
-          <p className="text-[9px] text-zinc-400 mt-2 font-bold uppercase">Total: {suppliers.length}</p>
-        </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100 flex flex-col justify-between">
-          <div>
-            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Materiais em Falta (0%)</p>
-            <p className="text-3xl font-black text-amber-500">{missingMaterials.length}</p>
-          </div>
-          <p className="text-[9px] text-zinc-400 mt-2 font-bold uppercase">Itens Críticos</p>
-        </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100 flex flex-col justify-between">
-          <div>
-            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Valor Total Contratos</p>
-            <p className="text-2xl font-black text-emerald-600">{formatCurrency(perCapitaStats.totalMonthly * 12)}</p>
-          </div>
-          <p className="text-[9px] text-zinc-400 mt-2 font-bold uppercase">Previsão Anual</p>
         </div>
       </div>
 
+      {/* Main KPI Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Per Capita Card - The Hero */}
+        <div className="md:col-span-2 bg-indigo-600 p-8 rounded-[2.5rem] shadow-2xl shadow-indigo-200 text-white relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+             <svg className="h-32 w-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+          </div>
+          <div className="relative z-10">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70 mb-2">Custo Diário / Pessoa</p>
+            <h4 className="text-6xl font-black italic tracking-tighter mb-4">{formatCurrency(perCapitaStats.perPersonDaily)}</h4>
+            <div className="flex items-center gap-4">
+              <div className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-black uppercase">População: {perCapitaDenominator}</div>
+              <div className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-black uppercase">Meta: R$ 12,00</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Secondary Stats */}
+        <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-zinc-100 flex flex-col justify-between group hover:border-indigo-200 transition-colors">
+          <div>
+            <div className="h-10 w-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 mb-4">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Saldo Projetado</p>
+            <h4 className="text-2xl font-black text-zinc-900 font-mono">{formatCurrency(perCapitaStats.totalMonthly)}</h4>
+          </div>
+          <p className="text-[9px] text-emerald-600 font-black uppercase bg-emerald-50 px-2 py-1 rounded-lg self-start mt-4">Dentro da Cota</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-zinc-100 flex flex-col justify-between group hover:border-rose-200 transition-colors">
+          <div>
+            <div className="h-10 w-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 mb-4">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            </div>
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Alertas Críticos</p>
+            <h4 className="text-2xl font-black text-rose-600 font-mono">{missingMaterials.length + (deliveryPerformance.find(d => d.name === 'Sem Entregas')?.value || 0)}</h4>
+          </div>
+          <p className="text-[9px] text-rose-600 font-black uppercase bg-rose-50 px-2 py-1 rounded-lg self-start mt-4">Ação Necessária</p>
+        </div>
+      </div>
+
+      {/* Grid Layout for Charts and Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Delivery Performance Pie */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 lg:col-span-1">
-          <h3 className="text-lg font-black text-zinc-800 uppercase tracking-tighter mb-6">Status de Entregas</h3>
+        {/* Left Column - Operational Lists */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Missing Materials List */}
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-sm font-black text-zinc-800 uppercase tracking-tighter">Materiais em Falta</h3>
+              <span className="text-[10px] font-black bg-rose-100 text-rose-600 px-2 py-1 rounded-lg">CRÍTICO</span>
+            </div>
+            <div className="space-y-3">
+              {missingMaterials.length > 0 ? missingMaterials.map(item => (
+                <div key={item.name} className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 hover:bg-zinc-100 transition-colors">
+                  <p className="font-black text-zinc-800 uppercase text-[10px] mb-1">{item.name}</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] text-zinc-400 font-bold uppercase">Contratado: {item.contracted.toLocaleString()} kg</span>
+                    <span className="text-[9px] font-black text-rose-500">0% ENTREGUE</span>
+                  </div>
+                </div>
+              )) : (
+                <div className="text-center py-8">
+                  <p className="text-zinc-300 text-[10px] font-black uppercase">Tudo em conformidade</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Suppliers Without Deliveries */}
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100">
+            <h3 className="text-sm font-black text-zinc-800 uppercase tracking-tighter mb-6">Atraso de Início</h3>
+            <div className="space-y-3">
+              {suppliersWithoutDeliveries.length > 0 ? suppliersWithoutDeliveries.map(s => (
+                <div key={s.name} className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                  <p className="font-black text-zinc-800 uppercase text-[9px] max-w-[140px] truncate">{s.name}</p>
+                  <span className="text-zinc-900 text-[9px] font-mono font-bold">{formatCurrency(s.value)}</span>
+                </div>
+              )) : (
+                <p className="text-zinc-300 text-[10px] font-black uppercase text-center py-4">Sem pendências</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Center/Right Column - Visual Data */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Warehouse Flow */}
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-lg font-black text-zinc-800 uppercase tracking-tighter">Fluxo de Almoxarifado</h3>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase">Volume de Movimentação • Últimos 30 Dias</p>
+              </div>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 bg-indigo-500 rounded-full"></span>
+                  <span className="text-[9px] font-black text-zinc-400 uppercase">Entradas</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 bg-amber-500 rounded-full"></span>
+                  <span className="text-[9px] font-black text-zinc-400 uppercase">Saídas</span>
+                </div>
+              </div>
+            </div>
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={warehouseData}>
+                  <defs>
+                    <linearGradient id="colorEntries" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorWithdrawals" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 800, fill: '#94a3b8'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 800, fill: '#94a3b8'}} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '10px', fontWeight: 'bold' }}
+                  />
+                  <Area type="monotone" dataKey="entries" name="Entradas" stroke="#6366f1" fillOpacity={1} fill="url(#colorEntries)" strokeWidth={4} />
+                  <Area type="monotone" dataKey="withdrawals" name="Saídas" stroke="#f59e0b" fillOpacity={1} fill="url(#colorWithdrawals)" strokeWidth={4} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Delivery Status Pie */}
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100">
+              <h3 className="text-sm font-black text-zinc-800 uppercase tracking-tighter mb-8">Status de Entregas</h3>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={deliveryPerformance} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={8} dataKey="value">
+                      {deliveryPerformance.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />)}
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Financial Balance Pie */}
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100">
+              <h3 className="text-sm font-black text-zinc-800 uppercase tracking-tighter mb-8">Balanço Financeiro</h3>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={financialSummary} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={8} dataKey="value">
+                      {financialSummary.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />)}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Row - Secondary Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100">
+          <h3 className="text-xs font-black text-zinc-800 uppercase tracking-widest mb-6">Top Fornecedores (Kg)</h3>
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={deliveryPerformance} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                  {deliveryPerformance.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                </Pie>
-                <Tooltip />
-                <Legend verticalAlign="bottom" height={36}/>
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Missing Materials Bar Chart */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 lg:col-span-2">
-          <h3 className="text-lg font-black text-zinc-800 uppercase tracking-tighter mb-6">Materiais Críticos (0% Entregue)</h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={missingMaterials} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} width={150} />
-                <Tooltip formatter={(value: number) => `${value.toFixed(2)} Kg`} />
-                <Bar dataKey="contracted" name="Qtd. Contratada (Kg)" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={15} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Warehouse Movement Area Chart */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 lg:col-span-2">
-          <h3 className="text-lg font-black text-zinc-800 uppercase tracking-tighter mb-6">Fluxo de Almoxarifado (30 Dias)</h3>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={warehouseData}>
-                <defs>
-                  <linearGradient id="colorEntries" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorWithdrawals" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} />
-                <Tooltip />
-                <Area type="monotone" dataKey="entries" name="Entradas" stroke="#6366f1" fillOpacity={1} fill="url(#colorEntries)" strokeWidth={3} />
-                <Area type="monotone" dataKey="withdrawals" name="Saídas" stroke="#f59e0b" fillOpacity={1} fill="url(#colorWithdrawals)" strokeWidth={3} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Financial Pie Chart */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 lg:col-span-1">
-          <h3 className="text-lg font-black text-zinc-800 uppercase tracking-tighter mb-6">Balanço Financeiro</h3>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={financialSummary} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
-                  {financialSummary.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                </Pie>
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Legend verticalAlign="bottom" height={36}/>
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Supplier Progress Horizontal Bar */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 lg:col-span-1">
-          <h3 className="text-lg font-black text-zinc-800 uppercase tracking-tighter mb-6">Top 5 Fornecedores (Kg)</h3>
-          <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={supplierProgress} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
                 <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 8, fontWeight: 700, fill: '#94a3b8'}} width={100} />
+                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 8, fontWeight: 800, fill: '#94a3b8'}} width={100} />
                 <Tooltip />
-                <Bar dataKey="delivered" name="Entregue (Kg)" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={12} />
+                <Bar dataKey="delivered" name="Entregue" fill="#6366f1" radius={[0, 10, 10, 0]} barSize={12} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Cleaning Logs Bar Chart */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 lg:col-span-1">
-          <h3 className="text-lg font-black text-zinc-800 uppercase tracking-tighter mb-6">Tipos de Limpeza</h3>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={cleaningData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 8, fontWeight: 700, fill: '#94a3b8'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} />
-                <Tooltip />
-                <Bar dataKey="value" name="Quantidade" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Vehicle Trips Bar Chart */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 lg:col-span-1">
-          <h3 className="text-lg font-black text-zinc-800 uppercase tracking-tighter mb-6">Top 5 Veículos (Viagens)</h3>
-          <div className="h-72 w-full">
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100">
+          <h3 className="text-xs font-black text-zinc-800 uppercase tracking-widest mb-6">Logística de Veículos</h3>
+          <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={vehicleData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 8, fontWeight: 700, fill: '#94a3b8'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 7, fontWeight: 800, fill: '#94a3b8'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 800, fill: '#94a3b8'}} />
                 <Tooltip />
-                <Bar dataKey="value" name="Viagens" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={20} />
+                <Bar dataKey="value" name="Viagens" fill="#8b5cf6" radius={[10, 10, 0, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Third Party Entries Pie Chart */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 lg:col-span-1">
-          <h3 className="text-lg font-black text-zinc-800 uppercase tracking-tighter mb-6">Entradas Terceiros / Local</h3>
-          <div className="h-72 w-full">
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100">
+          <h3 className="text-xs font-black text-zinc-800 uppercase tracking-widest mb-6">Tipos de Limpeza</h3>
+          <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={thirdPartyData} cx="50%" cy="50%" innerRadius={40} outerRadius={80} paddingAngle={5} dataKey="value">
-                  {thirdPartyData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                </Pie>
+              <BarChart data={cleaningData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 8, fontWeight: 800, fill: '#94a3b8'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 800, fill: '#94a3b8'}} />
                 <Tooltip />
-                <Legend verticalAlign="bottom" height={36}/>
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Director Withdrawals Bar Chart */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 lg:col-span-2">
-          <h3 className="text-lg font-black text-zinc-800 uppercase tracking-tighter mb-6">Top 5 Itens Retirados (Diretoria)</h3>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={directorData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} width={150} />
-                <Tooltip />
-                <Bar dataKey="value" name="Quantidade" fill="#ec4899" radius={[0, 4, 4, 0]} barSize={15} />
+                <Bar dataKey="value" name="Qtd" fill="#10b981" radius={[10, 10, 0, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -390,8 +444,15 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
       </div>
 
       <style>{`
-        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@700&display=swap');
+        
+        .animate-fade-in { 
+          animation: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+        }
+        @keyframes fade-in { 
+          from { opacity: 0; transform: translateY(20px); } 
+          to { opacity: 1; transform: translateY(0); } 
+        }
       `}</style>
     </div>
   );

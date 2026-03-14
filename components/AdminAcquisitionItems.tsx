@@ -218,322 +218,484 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
     };
 
     return (
-        <div className="animate-fade-in space-y-6">
+        <div className="animate-fade-in space-y-8 relative">
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+                @keyframes scale-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+                .animate-scale-in { animation: scale-in 0.3s ease-out forwards; }
+                .grid-bg { 
+                    background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+                    background-size: 20px 20px;
+                }
             `}</style>
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[2rem] shadow-xl border-b-4 border-indigo-600">
-                <div className="flex flex-col flex-1 w-full gap-2">
-                    <div className="relative w-full">
+
+            {/* Status Board Header */}
+            <div className="flex items-center justify-between px-6 py-3 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-lg overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent pointer-events-none"></div>
+                <div className="flex items-center gap-6 relative z-10">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">System Live</span>
+                    </div>
+                    <div className="h-4 w-px bg-zinc-800"></div>
+                    <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Módulo de Aquisição</span>
+                        <span className="text-[11px] font-black text-white uppercase tracking-wider">{category}</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4 relative z-10">
+                    <div className="text-right">
+                        <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest block">Última Atualização</span>
+                        <span className="text-[10px] font-mono font-bold text-zinc-300">{new Date().toLocaleTimeString('pt-BR')}</span>
+                    </div>
+                    <div className="bg-zinc-800 px-3 py-1.5 rounded-lg border border-zinc-700">
+                        <span className="text-[10px] font-mono font-black text-indigo-400">v2.4.0-CC</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Painel de Controle Superior */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Busca e Filtros */}
+                <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm flex flex-col justify-center relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <svg className="w-12 h-12 text-zinc-900" fill="currentColor" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                    </div>
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 ml-1">Terminal de Pesquisa</label>
+                    <div className="relative">
                         <input 
                             type="text" 
-                            placeholder="Pesquisar produto..." 
+                            placeholder="FILTRAR POR NOME OU CÓDIGO..." 
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl outline-none font-bold transition-all shadow-inner"
+                            className="w-full pl-4 pr-4 py-3.5 bg-zinc-50 border-2 border-zinc-100 rounded-2xl outline-none font-black text-xs uppercase tracking-wider focus:border-indigo-500 focus:bg-white transition-all placeholder:text-zinc-300"
                         />
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-2">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Valor Total da Categoria:</span>
-                            <span className="text-sm font-black text-indigo-900">
+                </div>
+
+                {/* KPIs de Alta Densidade */}
+                <div className="lg:col-span-5 grid grid-cols-2 gap-4">
+                    <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full -mr-12 -mt-12"></div>
+                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em] relative z-10">Valor Total Categoria</span>
+                        <div className="mt-2 relative z-10">
+                            <span className="text-2xl font-black text-zinc-900 font-mono tracking-tighter">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalCategoryValue)}
                             </span>
                         </div>
-                        {(category === 'PPAIS' || category === 'PERECÍVEIS') && (
-                            <div className="flex items-center gap-2 border-l-2 border-indigo-100 pl-6">
-                                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Média Mensal (Maio-Dez / 8 meses):</span>
-                                <span className="text-sm font-black text-emerald-700">
+                        <div className="mt-4 flex items-center gap-2 relative z-10">
+                            <div className="h-1 flex-1 bg-zinc-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-indigo-500 w-2/3"></div>
+                            </div>
+                            <span className="text-[8px] font-black text-zinc-400 uppercase">67% do Orçamento</span>
+                        </div>
+                    </div>
+                    {(category === 'PPAIS' || category === 'PERECÍVEIS') ? (
+                        <div className="bg-emerald-900 p-6 rounded-3xl border border-emerald-800 shadow-lg flex flex-col justify-between relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-12 -mt-12"></div>
+                            <span className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.2em] relative z-10">Média Mensal (8m)</span>
+                            <div className="mt-2 text-white relative z-10">
+                                <span className="text-2xl font-black font-mono tracking-tighter">
                                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalCategoryValue / 8)}
                                 </span>
                             </div>
-                        )}
-                    </div>
+                            <div className="mt-4 flex items-center gap-2 relative z-10">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                                <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Projeção Estável</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-indigo-900 p-6 rounded-3xl border border-indigo-800 shadow-lg flex flex-col justify-between relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-12 -mt-12"></div>
+                            <span className="text-[9px] font-black text-indigo-300 uppercase tracking-[0.2em] relative z-10">Itens Ativos</span>
+                            <div className="mt-2 text-white relative z-10">
+                                <span className="text-3xl font-black font-mono tracking-tighter">{filteredItems.length}</span>
+                                <span className="text-[10px] font-bold ml-2 opacity-60 uppercase tracking-widest">SKUs</span>
+                            </div>
+                            <div className="mt-4 flex items-center gap-2 relative z-10">
+                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div>
+                                <span className="text-[8px] font-black text-indigo-300 uppercase tracking-widest">Inventário Monitorado</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
-                <div className="flex gap-2">
-                    <button 
-                        onClick={handlePrint}
-                        className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-black py-4 px-6 rounded-2xl shadow-sm transition-all active:scale-95 uppercase text-xs tracking-widest flex items-center gap-2"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                        Imprimir PDF
-                    </button>
+
+                {/* Ações Rápidas */}
+                <div className="lg:col-span-3 flex flex-col gap-3">
                     <button 
                         onClick={() => setIsAdding(true)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-8 rounded-2xl shadow-lg transition-all active:scale-95 uppercase text-xs tracking-widest flex items-center gap-2"
+                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3 group relative overflow-hidden"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-                        Novo Produto
+                        <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="bg-white/20 p-2 rounded-xl group-hover:scale-110 transition-transform">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                        </div>
+                        <span className="text-[10px] uppercase tracking-[0.2em]">Adicionar Item</span>
+                    </button>
+                    <button 
+                        onClick={handlePrint}
+                        className="flex-1 bg-white hover:bg-zinc-50 text-zinc-600 border-2 border-zinc-100 font-black rounded-2xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-3 group"
+                    >
+                        <svg className="h-4 w-4 text-zinc-400 group-hover:text-indigo-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        <span className="text-[10px] uppercase tracking-[0.2em]">Gerar Relatório</span>
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white rounded-[2rem] shadow-2xl border border-gray-100 flex flex-col">
-                {/* Top Scrollbar */}
-                <div 
-                    ref={topScrollRef} 
-                    onScroll={handleTopScroll} 
-                    className="overflow-x-auto custom-scrollbar"
-                >
-                    <div style={{ width: tableWidth, height: '1px' }}></div>
+            {/* Tabela de Inventário */}
+            <div className="bg-white rounded-[2.5rem] border border-zinc-200 shadow-xl overflow-hidden flex flex-col relative">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500"></div>
+                
+                {/* Top Scrollbar Sync */}
+                <div ref={topScrollRef} onScroll={handleTopScroll} className="overflow-x-auto custom-scrollbar bg-zinc-50/50 border-b border-zinc-100">
+                    <div style={{ width: tableWidth, height: '4px' }}></div>
                 </div>
                 
-                {/* Table Container */}
-                <div 
-                    ref={bottomScrollRef} 
-                    onScroll={handleBottomScroll} 
-                    className="overflow-x-auto custom-scrollbar"
-                >
+                {/* Main Table Container */}
+                <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="overflow-x-auto custom-scrollbar">
                     <table ref={tableRef} className="w-full border-collapse">
                         <thead>
-                        <tr className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">
-                            <th className="p-5 text-center w-12">#</th>
-                            <th className="p-5 text-left min-w-[250px]">Produto para aquisição</th>
-                            <th className="p-5 text-left min-w-[150px]">Produto do Contrato</th>
-                            <th className="p-5 text-center whitespace-nowrap">Cod. Compras / BEC</th>
-                            <th className="p-5 text-center whitespace-nowrap">Natureza de Despesa</th>
-                            <th className="p-5 text-center">Unid.</th>
-                            <th className="p-5 text-right whitespace-nowrap">Qtd. Adquirida</th>
-                            {category !== 'PPAIS' && category !== 'PERECÍVEIS' ? (
-                                <th className="p-5 text-right whitespace-nowrap">Saldo Estoque</th>
-                            ) : (
-                                <>
-                                    <th className="p-5 text-right whitespace-nowrap">Peso por Fornecedor</th>
-                                    <th className="p-5 text-right whitespace-nowrap">Valor por Fornecedor</th>
-                                </>
-                            )}
-                            <th className="p-5 text-right whitespace-nowrap">Valor da Mediana</th>
-                            <th className="p-5 text-right whitespace-nowrap">Valor Total</th>
-                            <th className="p-5 text-center sticky right-0 bg-gray-900 z-10">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {filteredItems.map((item, index) => (
-                            <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
-                                <td className="p-5 text-center font-bold text-gray-400">{index + 1}</td>
-                                <td className="p-5">
-                                    <div className="font-black text-indigo-950 uppercase text-xs">{item.name}</div>
-                                    {(category === 'PPAIS' || category === 'PERECÍVEIS') && (
-                                        <div className="mt-2 flex flex-wrap gap-1.5">
-                                            {suppliers.filter(s => (s.contractItems || []).some(ci => ci.name === item.name)).map(s => (
-                                                <div key={s.cpf} className="flex flex-col bg-indigo-50/50 px-2 py-1 rounded-lg border border-indigo-100/50">
-                                                    <span className="text-[8px] font-black text-indigo-700 uppercase leading-tight">{s.name.split(' ')[0]}</span>
-                                                    <div className="flex gap-0.5 mt-0.5">
-                                                        {(s.allowedWeeks || []).map(w => (
-                                                            <span key={w} className="text-[7px] font-bold text-indigo-400">S{w}</span>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </td>
-                                <td className="p-5 font-bold text-gray-500 uppercase text-[10px] italic">
-                                    {item.contractItemName || <span className="text-red-300">Não vinculado</span>}
-                                </td>
-                                <td className="p-5 text-center">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-bold text-gray-400">C: {item.comprasCode || '---'}</span>
-                                        <span className="text-[10px] font-bold text-gray-400">B: {item.becCode || '---'}</span>
-                                    </div>
-                                </td>
-                                <td className="p-5 text-center font-mono font-bold text-gray-500 text-[10px]">
-                                    {item.expenseNature || '---'}
-                                </td>
-                                <td className="p-5 text-center">
-                                    <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-[10px] font-black uppercase">{item.unit}</span>
-                                </td>
-                                <td className="p-5 text-right font-mono font-bold text-indigo-600">
-                                    {item.acquiredQuantity.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </td>
+                            <tr className="bg-zinc-50/80 backdrop-blur-sm text-zinc-500 text-[10px] uppercase tracking-[0.15em] border-b border-zinc-200">
+                                <th className="p-6 text-center w-16 border-r border-zinc-100 font-serif italic normal-case opacity-60">#</th>
+                                <th className="p-6 text-left min-w-[320px] border-r border-zinc-100 font-serif italic normal-case">Identificação do Produto</th>
+                                <th className="p-6 text-left min-w-[200px] border-r border-zinc-100 font-serif italic normal-case">Vínculo Contratual</th>
+                                <th className="p-6 text-center whitespace-nowrap border-r border-zinc-100 font-serif italic normal-case">Classificação</th>
+                                <th className="p-6 text-center border-r border-zinc-100 font-serif italic normal-case">Unid.</th>
+                                <th className="p-6 text-right whitespace-nowrap border-r border-zinc-100 font-serif italic normal-case">Logística</th>
                                 {category !== 'PPAIS' && category !== 'PERECÍVEIS' ? (
-                                    <td className="p-5 text-right font-mono font-bold text-green-600">
-                                        {item.stockBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    <th className="p-6 text-right whitespace-nowrap border-r border-zinc-100 font-serif italic normal-case">Estoque</th>
+                                ) : (
+                                    <>
+                                        <th className="p-6 text-right whitespace-nowrap border-r border-zinc-100 font-serif italic normal-case">Peso/Forn.</th>
+                                        <th className="p-6 text-right whitespace-nowrap border-r border-zinc-100 font-serif italic normal-case">Vlr/Forn.</th>
+                                    </>
+                                )}
+                                <th className="p-6 text-right whitespace-nowrap border-r border-zinc-100 font-serif italic normal-case">Financeiro</th>
+                                <th className="p-6 text-center sticky right-0 bg-zinc-50/90 backdrop-blur-sm z-10 border-l border-zinc-200 font-serif italic normal-case">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100">
+                            {filteredItems.map((item, index) => (
+                                <tr key={item.id} className="hover:bg-indigo-50/30 transition-all group">
+                                    <td className="p-6 text-center font-mono text-[11px] font-bold text-zinc-400 border-r border-zinc-50">{String(index + 1).padStart(2, '0')}</td>
+                                    <td className="p-6 border-r border-zinc-50">
+                                        <div className="flex flex-col gap-1">
+                                            <div className="font-black text-zinc-900 uppercase text-sm tracking-tight leading-tight group-hover:text-indigo-600 transition-colors">{item.name}</div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[8px] font-black px-1.5 py-0.5 bg-zinc-100 text-zinc-500 rounded uppercase tracking-widest border border-zinc-200">ID: {item.id.split('-')[1] || '---'}</span>
+                                                <span className="text-[8px] font-black px-1.5 py-0.5 bg-indigo-50 text-indigo-500 rounded uppercase tracking-widest border border-indigo-100">{category}</span>
+                                            </div>
+                                        </div>
+                                        {(category === 'PPAIS' || category === 'PERECÍVEIS') && (
+                                            <div className="mt-4 grid grid-cols-2 gap-2">
+                                                {suppliers.filter(s => (s.contractItems || []).some(ci => ci.name === item.name)).map(s => (
+                                                    <div key={s.cpf} className="flex items-center bg-white/50 px-2.5 py-1.5 rounded-xl border border-zinc-100 shadow-sm hover:border-indigo-200 transition-all">
+                                                        <div className="w-2 h-2 rounded-full bg-indigo-500 mr-2 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[9px] font-black text-zinc-700 uppercase leading-none">{s.name.split(' ')[0]}</span>
+                                                            <div className="mt-1 flex gap-1">
+                                                                {(s.allowedWeeks || []).map(w => (
+                                                                    <span key={w} className="text-[7px] font-bold text-zinc-400 bg-zinc-50 px-1 rounded">W{w}</span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </td>
-                                ) : (() => {
-                                    const supplierCount = suppliers.filter(s => 
-                                        (s.contractItems || []).some(ci => ci.name === item.name)
-                                    ).length || 1;
-                                    const weightPerSupplier = item.acquiredQuantity / supplierCount;
-                                    const valuePerSupplier = (item.unitValue || 0) * weightPerSupplier;
-                                    return (
-                                        <>
-                                            <td className="p-5 text-right font-mono font-bold text-indigo-600">
-                                                {weightPerSupplier.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                            </td>
-                                            <td className="p-5 text-right font-mono font-bold text-indigo-900">
-                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valuePerSupplier)}
-                                            </td>
-                                        </>
-                                    );
-                                })()}
-                                <td className="p-5 text-right font-mono font-bold text-gray-600">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitValue || 0)}
-                                </td>
-                                <td className="p-5 text-right font-mono font-bold text-indigo-900 whitespace-nowrap">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((item.unitValue || 0) * ((category === 'PPAIS' || category === 'PERECÍVEIS') ? item.acquiredQuantity : item.stockBalance))}
-                                </td>
-                                <td className="p-5 text-center sticky right-0 bg-white group-hover:bg-indigo-50 transition-colors z-10 border-l border-gray-100 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                                    <div className="flex justify-center gap-2">
-                                        <button 
-                                            onClick={() => setManageItem(item)}
-                                            className="bg-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all shadow-sm"
-                                            title="Vincular Fornecedores"
-                                        >
-                                            Vincular
-                                        </button>
-                                        <button 
-                                            onClick={() => startEdit(item)}
-                                            className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-all"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.707.707-2.828-2.828.707-.707zM11.36 6.336l-2.828 2.828 2.828 2.828 2.828-2.828-2.828-2.828zM7.36 10.336l-5.086 5.086a1 1 0 00-.293.707V19a1 1 0 001 1h2.879a1 1 0 00.707-.293l5.086-5.086-5.086-5.086z" /></svg>
-                                        </button>
-                                        <button 
-                                            onClick={() => { if(window.confirm('Excluir este item?')) onDelete(item.id); }}
-                                            className="p-2 text-red-600 hover:bg-red-100 rounded-xl transition-all"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                        {filteredItems.length === 0 && (
-                            <tr>
-                                <td colSpan={10} className="p-10 text-center text-gray-400 font-medium italic">Nenhum produto cadastrado nesta categoria.</td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                                    <td className="p-6 border-r border-zinc-50">
+                                        <div className="flex flex-col gap-1.5">
+                                            <div className="text-[10px] font-bold text-zinc-500 uppercase italic leading-tight">
+                                                {item.contractItemName || <span className="text-red-500 not-italic font-black bg-red-50 px-2 py-0.5 rounded border border-red-100">Pendente de Vínculo</span>}
+                                            </div>
+                                            {item.contractItemName && (
+                                                <div className="flex items-center gap-1 opacity-40">
+                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                                                    <span className="text-[8px] font-black uppercase tracking-widest">Linked to Contract</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="p-6 text-center border-r border-zinc-50">
+                                        <div className="flex flex-col gap-2 items-center">
+                                            <div className="inline-flex flex-col gap-0.5 bg-zinc-900 px-3 py-1.5 rounded-xl shadow-md">
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <span className="text-[8px] font-black text-zinc-500 uppercase tracking-tighter">Compras</span>
+                                                    <span className="text-[10px] font-mono font-bold text-indigo-400">{item.comprasCode || '---'}</span>
+                                                </div>
+                                                <div className="h-px bg-zinc-800 my-0.5"></div>
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <span className="text-[8px] font-black text-zinc-500 uppercase tracking-tighter">BEC</span>
+                                                    <span className="text-[10px] font-mono font-bold text-emerald-400">{item.becCode || '---'}</span>
+                                                </div>
+                                            </div>
+                                            <span className="text-[9px] font-mono font-black text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200">
+                                                ND: {item.expenseNature || '---'}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="p-6 text-center border-r border-zinc-50">
+                                        <span className="bg-zinc-900 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm">{item.unit}</span>
+                                    </td>
+                                    <td className="p-6 text-right border-r border-zinc-50 bg-indigo-50/20">
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Qtd. Adquirida</span>
+                                            <span className="font-mono text-sm font-black text-indigo-600">
+                                                {item.acquiredQuantity.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    {category !== 'PPAIS' && category !== 'PERECÍVEIS' ? (
+                                        <td className="p-6 text-right border-r border-zinc-50 bg-emerald-50/20">
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest mb-1">Saldo em Estoque</span>
+                                                <span className="font-mono text-sm font-black text-emerald-600">
+                                                    {item.stockBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                        </td>
+                                    ) : (() => {
+                                        const supplierCount = suppliers.filter(s => 
+                                            (s.contractItems || []).some(ci => ci.name === item.name)
+                                        ).length || 1;
+                                        const weightPerSupplier = item.acquiredQuantity / supplierCount;
+                                        const valuePerSupplier = (item.unitValue || 0) * weightPerSupplier;
+                                        return (
+                                            <>
+                                                <td className="p-6 text-right border-r border-zinc-50">
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1">Peso/Forn.</span>
+                                                        <span className="font-mono text-sm font-bold text-zinc-600">
+                                                            {weightPerSupplier.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-6 text-right border-r border-zinc-50">
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1">Vlr/Forn.</span>
+                                                        <span className="font-mono text-sm font-bold text-zinc-900">
+                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valuePerSupplier)}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </>
+                                        );
+                                    })()}
+                                    <td className="p-6 text-right border-r border-zinc-50">
+                                        <div className="flex flex-col gap-2 items-end">
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">Vlr. Unitário</span>
+                                                <span className="font-mono text-xs font-bold text-zinc-500">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitValue || 0)}
+                                                </span>
+                                            </div>
+                                            <div className="h-px w-12 bg-zinc-100"></div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mb-0.5">Total Item</span>
+                                                <span className="font-mono text-sm font-black text-zinc-900 whitespace-nowrap">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((item.unitValue || 0) * ((category === 'PPAIS' || category === 'PERECÍVEIS') ? item.acquiredQuantity : item.stockBalance))}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="p-6 text-center sticky right-0 bg-white/90 backdrop-blur-sm group-hover:bg-indigo-50/90 transition-all z-10 border-l border-zinc-200 shadow-[-12px_0_20px_-8px_rgba(0,0,0,0.1)]">
+                                        <div className="flex flex-col gap-2">
+                                            <button 
+                                                onClick={() => setManageItem(item)}
+                                                className="w-full bg-zinc-900 text-white hover:bg-indigo-600 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95"
+                                            >
+                                                Vincular
+                                            </button>
+                                            <div className="flex gap-2">
+                                                <button 
+                                                    onClick={() => startEdit(item)}
+                                                    className="flex-1 p-2.5 text-zinc-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all border border-transparent hover:border-indigo-100 shadow-sm"
+                                                >
+                                                    <svg className="h-4 w-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                </button>
+                                                <button 
+                                                    onClick={() => { if(window.confirm('Excluir este item?')) onDelete(item.id); }}
+                                                    className="flex-1 p-2.5 text-zinc-400 hover:text-red-600 hover:bg-white rounded-xl transition-all border border-transparent hover:border-red-100 shadow-sm"
+                                                >
+                                                    <svg className="h-4 w-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                            {filteredItems.length === 0 && (
+                                <tr>
+                                    <td colSpan={12} className="p-20 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <div className="bg-zinc-50 p-4 rounded-full">
+                                                <svg className="h-8 w-8 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+                                            </div>
+                                            <p className="text-zinc-400 font-bold uppercase text-[10px] tracking-widest">Nenhum produto encontrado</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
+            {/* Modal de Cadastro / Edição */}
             {isAdding && (
-                <div className="fixed inset-0 bg-indigo-950/40 backdrop-blur-sm flex justify-center items-center z-[200] p-2 md:p-4">
-                    <div className="bg-white w-full max-w-lg rounded-[1.5rem] shadow-2xl overflow-hidden animate-scale-in flex flex-col max-h-[85vh]">
-                        <div className="bg-indigo-900 p-4 md:p-5 text-white flex-shrink-0">
-                            <h3 className="text-lg md:text-xl font-black uppercase tracking-tighter">{editingId ? 'Editar Produto' : 'Novo Produto para Aquisição'}</h3>
-                            <p className="text-indigo-200 text-[9px] font-bold uppercase tracking-widest mt-0.5">{category}</p>
-                        </div>
-                        <div className="p-4 md:p-5 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
-                            <div>
-                                <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Nome do Produto para Aquisição</label>
-                                <textarea 
-                                    rows={2}
-                                    value={name} 
-                                    onChange={e => setName(e.target.value)} 
-                                    className="w-full p-2.5 border-2 border-gray-100 rounded-lg focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all text-xs resize-none"
-                                    placeholder="Ex: ARROZ AGULHINHA"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Vincular ao Produto do Contrato</label>
-                                <select 
-                                    value={contractItemName} 
-                                    onChange={e => setContractItemName(e.target.value)}
-                                    className="w-full p-2.5 border-2 border-gray-100 rounded-lg focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all appearance-none bg-white text-xs"
-                                >
-                                    <option value="">-- SELECIONE O ITEM DO CONTRATO --</option>
-                                    {contractItems.map(ci => <option key={ci} value={ci}>{ci}</option>)}
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
+                <div className="fixed inset-0 bg-zinc-950/60 backdrop-blur-md flex justify-center items-center z-[200] p-4">
+                    <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-scale-in flex flex-col max-h-[90vh] border border-zinc-200">
+                        <div className="bg-zinc-900 p-8 text-white flex-shrink-0 relative overflow-hidden">
+                            {/* Background Decoration */}
+                            <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
+                            
+                            <div className="relative z-10 flex justify-between items-start">
                                 <div>
-                                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Cód. Compras</label>
+                                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] block mb-2">Editor de Inventário</span>
+                                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">
+                                        {editingId ? 'Editar Produto' : 'Novo Registro'}
+                                    </h3>
+                                    <div className="mt-4 inline-flex items-center bg-white/10 px-3 py-1 rounded-full border border-white/10">
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-300">{category}</span>
+                                    </div>
+                                </div>
+                                <button onClick={resetForm} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-8 space-y-8 overflow-y-auto flex-1 custom-scrollbar">
+                            {/* Seção Principal */}
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Nome do Produto para Aquisição</label>
+                                    <textarea 
+                                        rows={2}
+                                        value={name} 
+                                        onChange={e => setName(e.target.value)} 
+                                        className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all resize-none"
+                                        placeholder="Ex: ARROZ AGULHINHA TIPO 1"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Vínculo com Item do Contrato</label>
+                                    <div className="relative">
+                                        <select 
+                                            value={contractItemName} 
+                                            onChange={e => setContractItemName(e.target.value)}
+                                            className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all appearance-none"
+                                        >
+                                            <option value="">-- SELECIONE O ITEM DO CONTRATO --</option>
+                                            {contractItems.map(ci => <option key={ci} value={ci}>{ci}</option>)}
+                                        </select>
+                                        <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-zinc-400">
+                                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Grid de Códigos e Natureza */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Cód. Compras</label>
                                     <input 
                                         type="text" 
                                         value={comprasCode} 
                                         onChange={e => setComprasCode(e.target.value)} 
-                                        className="w-full p-2.5 border-2 border-gray-100 rounded-lg focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all text-xs"
-                                        placeholder="Código Compras"
+                                        className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 font-mono font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                                        placeholder="00.000.000"
                                     />
                                 </div>
-                                <div>
-                                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Cód. BEC</label>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Cód. BEC</label>
                                     <input 
                                         type="text" 
                                         value={becCode} 
                                         onChange={e => setBecCode(e.target.value)} 
-                                        className="w-full p-2.5 border-2 border-gray-100 rounded-lg focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all text-xs"
-                                        placeholder="Código BEC"
+                                        className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 font-mono font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                                        placeholder="0000000"
                                     />
                                 </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Natureza de Despesa</label>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Nat. Despesa</label>
                                     <input 
                                         type="text" 
                                         value={expenseNature} 
                                         onChange={e => setExpenseNature(e.target.value)} 
-                                        className="w-full p-2.5 border-2 border-gray-100 rounded-lg focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all text-xs"
-                                        placeholder="Ex: 339030"
+                                        className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 font-mono font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                                        placeholder="339030"
                                     />
                                 </div>
-                                <div>
-                                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Unidade</label>
+                            </div>
+
+                            {/* Grid de Valores e Unidade */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Unidade</label>
                                     <select 
                                         value={unit} 
                                         onChange={e => setUnit(e.target.value)}
-                                        className="w-full p-2.5 border-2 border-gray-100 rounded-lg focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all appearance-none bg-white text-xs"
+                                        className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all appearance-none"
                                     >
-                                        <option value="un">Unidade (un)</option>
-                                        <option value="kg">Quilograma (kg)</option>
-                                        <option value="litro">Litro (L)</option>
-                                        <option value="caixa">Caixa (cx)</option>
-                                        <option value="embalagem">Embalagem (emb)</option>
-                                        <option value="dz">Dúzia (dz)</option>
+                                        <option value="un">un</option>
+                                        <option value="kg">kg</option>
+                                        <option value="litro">L</option>
+                                        <option value="caixa">cx</option>
+                                        <option value="embalagem">emb</option>
+                                        <option value="dz">dz</option>
                                     </select>
                                 </div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-3">
-                                <div>
-                                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Qtd. Adq.</label>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Qtd. Adq.</label>
                                     <input 
                                         type="text" 
                                         value={acquiredQuantity} 
                                         onChange={e => setAcquiredQuantity(e.target.value)} 
-                                        className="w-full p-2.5 border-2 border-gray-100 rounded-lg focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all text-right font-mono text-xs"
+                                        className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 font-mono font-bold text-sm text-right focus:border-indigo-500 focus:bg-white outline-none transition-all"
                                     />
                                 </div>
-                                <div>
-                                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Saldo Est.</label>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Saldo Est.</label>
                                     <input 
                                         type="text" 
                                         value={stockBalance} 
                                         onChange={e => setStockBalance(e.target.value)} 
-                                        className="w-full p-2.5 border-2 border-gray-100 rounded-lg focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all text-right font-mono text-xs"
+                                        className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 font-mono font-bold text-sm text-right focus:border-indigo-500 focus:bg-white outline-none transition-all"
                                     />
                                 </div>
-                                <div>
-                                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Vlr. Mediana</label>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Vlr. Mediana</label>
                                     <input 
                                         type="text" 
                                         value={unitValue} 
                                         onChange={e => setUnitValue(e.target.value)} 
-                                        className="w-full p-2.5 border-2 border-gray-100 rounded-lg focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-bold transition-all text-right font-mono text-xs"
+                                        className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 font-mono font-bold text-sm text-right focus:border-indigo-500 focus:bg-white outline-none transition-all"
                                     />
                                 </div>
                             </div>
                         </div>
-                        <div className="p-4 md:p-5 bg-gray-50 border-t border-gray-100 flex gap-3 flex-shrink-0">
+
+                        <div className="p-8 bg-zinc-50 border-t border-zinc-100 flex gap-4 flex-shrink-0">
                             <button 
                                 onClick={resetForm}
                                 disabled={isSaving}
-                                className="flex-1 bg-white border-2 border-gray-200 hover:bg-gray-100 text-gray-500 font-black py-2.5 rounded-lg transition-all uppercase text-[9px] tracking-widest disabled:opacity-50"
+                                className="flex-1 bg-white border-2 border-zinc-200 hover:bg-zinc-100 text-zinc-500 font-black py-4 rounded-2xl transition-all uppercase text-[10px] tracking-[0.2em] disabled:opacity-50"
                             >
                                 Cancelar
                             </button>
                             <button 
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2.5 rounded-lg shadow-lg transition-all active:scale-95 uppercase text-[9px] tracking-widest disabled:bg-gray-400"
+                                className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-white font-black py-4 rounded-2xl shadow-xl transition-all active:scale-95 uppercase text-[10px] tracking-[0.2em] disabled:bg-zinc-400"
                             >
-                                {isSaving ? 'Salvando...' : 'Salvar Produto'}
+                                {isSaving ? 'Processando...' : (editingId ? 'Atualizar Registro' : 'Confirmar Cadastro')}
                             </button>
                         </div>
                     </div>
