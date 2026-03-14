@@ -69,6 +69,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json({ id: file.data.id, webViewLink: file.data.webViewLink });
   } catch (error: any) {
     console.error('Error uploading to Google Drive:', error);
+    // Log the full error object to help diagnose
+    if (error.errors) {
+      console.error("Google Drive API errors:", JSON.stringify(error.errors, null, 2));
+    }
     res.status(500).json({ error: 'Failed to upload file', details: error.message });
   }
 }
