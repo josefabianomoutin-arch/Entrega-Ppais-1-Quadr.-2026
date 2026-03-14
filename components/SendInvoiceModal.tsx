@@ -100,7 +100,7 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload file');
+        throw new Error(JSON.stringify(errorData));
       }
 
       const data = await response.json();
@@ -120,6 +120,7 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
       try {
         const errorData = JSON.parse(error.message);
         if (errorData.details) errorMessage = errorData.details;
+        else if (errorData.error) errorMessage = errorData.error;
       } catch (e) {
         // Not JSON, keep original message
       }
