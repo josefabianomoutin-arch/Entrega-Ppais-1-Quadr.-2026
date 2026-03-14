@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, FinancialRecord, Delivery, ThirdPartyEntryLog, AcquisitionItem, VehicleExitOrder, VehicleAsset, DriverAsset, TemporaryExitInmate, TemporaryExitLog, UserRole } from '../types';
+import type { Supplier, ContractItem, WarehouseMovement, PerCapitaConfig, CleaningLog, DirectorPerCapitaLog, StandardMenu, DailyMenus, FinancialRecord, Delivery, ThirdPartyEntryLog, AcquisitionItem, VehicleExitOrder, VehicleAsset, DriverAsset, UserRole } from '../types';
 import AdminAnalytics from './AdminAnalytics';
 import AdminContractItems from './AdminContractItems';
 import WeekSelector from './WeekSelector';
@@ -15,11 +15,10 @@ import AdminStandardMenu from './AdminStandardMenu';
 import AdminFinancialManager from './AdminFinancialManager';
 import AdminThirdPartyEntry from './AdminThirdPartyEntry';
 import AdminVehicleExitOrder from './AdminVehicleExitOrder';
-import TemporaryExitTab from './TemporaryExitTab';
 
 import WarehouseMovementForm from './WarehouseMovementForm';
 
-type AdminTab = 'info' | 'register' | 'contracts' | 'finance' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'cleaning' | 'vehicleExitOrder' | 'thirdPartyEntry' | 'directorPerCapita' | 'menu' | 'almoxarifado' | 'temporaryExit';
+type AdminTab = 'info' | 'register' | 'contracts' | 'finance' | 'analytics' | 'graphs' | 'schedule' | 'invoices' | 'perCapita' | 'cleaning' | 'vehicleExitOrder' | 'thirdPartyEntry' | 'directorPerCapita' | 'menu' | 'almoxarifado';
 
 interface AdminDashboardProps {
   user: { name: string; cpf: string; role: UserRole };
@@ -78,13 +77,6 @@ interface AdminDashboardProps {
   onRegisterDriverAsset: (asset: Omit<DriverAsset, 'id'>) => Promise<{ success: boolean; message: string }>;
   onUpdateDriverAsset: (asset: DriverAsset) => Promise<{ success: boolean; message: string }>;
   onDeleteDriverAsset: (id: string) => Promise<void>;
-  temporaryExitInmates: TemporaryExitInmate[];
-  temporaryExitLogs: TemporaryExitLog[];
-  onSaveTemporaryExitInmate: (inmate: TemporaryExitInmate) => Promise<{ success: boolean }>;
-  onDeleteTemporaryExitInmate: (id: string) => Promise<void>;
-  onClearAllTemporaryExitInmates: () => Promise<{ success: boolean }>;
-  onRegisterTemporaryExitLog: (log: Omit<TemporaryExitLog, 'id'>) => Promise<{ success: boolean }>;
-  onBulkUpdateTemporaryExitInmates: (inmates: TemporaryExitInmate[]) => Promise<{ success: boolean }>;
   onUpdateSupplierObservations?: (cpf: string, observations: string) => Promise<{ success: boolean; message?: string }>;
 }
 
@@ -118,7 +110,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     acquisitionItems = [],
     onUpdateContractForItem
   } = props;
-  const [activeTab, setActiveTab] = useState<AdminTab>(props.user.role === 'admin' ? 'register' : 'temporaryExit');
+  const [activeTab, setActiveTab] = useState<AdminTab>('register');
   const [supplierSubTab, setSupplierSubTab] = useState<'list' | 'new'>('list'); 
   const [supplierSearch, setSupplierSearch] = useState('');
   const [regName, setRegName] = useState('');
@@ -144,13 +136,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     { id: 'graphs', name: 'Gráficos', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" /><path d="M12 2.252A8.001 8.001 0 0117.748 8H12V2.252z" /></svg> },
     { id: 'info', name: 'Sistema', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm14 1a1 1 0 11-2 0 1 1 0 012 0zM2 13a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2zm14 1a1 1 0 11-2 0 1 1 0 012 0z" clipRule="evenodd" /></svg> },
     { id: 'almoxarifado', name: 'Almoxarifado', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 8a1 1 0 011-1h1V6a1 1 0 012 0v1h2V6a1 1 0 112 0v1h1a1 1 0 110 2H6a1 1 0 01-1-1zm1 4a1 1 0 100 2h8a1 1 0 100-2H6z" /></svg> },
-    { id: 'temporaryExit', name: 'Saída Temporária', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" /></svg> },
   ];
 
-  const visibleTabs = useMemo(() => {
-    if (props.user.role === 'admin') return tabs;
-    return tabs.filter(t => t.id === 'temporaryExit');
-  }, [props.user.role, tabs]);
+  const visibleTabs = useMemo(() => tabs, [tabs]);
 
   const combinedSuppliers = useMemo(() => {
     const producers = perCapitaConfig.ppaisProducers || [];
@@ -342,16 +330,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'graphs': return <AdminGraphs suppliers={combinedSuppliers} />;
       case 'menu': return <AdminStandardMenu suppliers={suppliers} template={props.standardMenu} dailyMenus={props.dailyMenus} onUpdateDailyMenus={props.onUpdateDailyMenu} inmateCount={perCapitaConfig.inmateCount || 0} />;
       case 'almoxarifado': return <WarehouseMovementForm suppliers={suppliers} warehouseLog={warehouseLog} onRegisterEntry={props.onRegisterEntry} onRegisterWithdrawal={props.onRegisterWithdrawal} />;
-      case 'temporaryExit': return <TemporaryExitTab 
-        user={props.user}
-        inmates={props.temporaryExitInmates}
-        logs={props.temporaryExitLogs}
-        onSaveInmate={props.onSaveTemporaryExitInmate}
-        onDeleteInmate={props.onDeleteTemporaryExitInmate}
-        onClearAllInmates={props.onClearAllTemporaryExitInmates}
-        onRegisterLog={props.onRegisterTemporaryExitLog}
-        onBulkUpdateInmates={props.onBulkUpdateTemporaryExitInmates}
-      />;
       case 'info': 
         return (
             <div className="max-w-4xl mx-auto space-y-6 animate-fade-in p-4 md:p-0 pb-16">
