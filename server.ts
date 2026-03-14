@@ -43,9 +43,7 @@ async function startServer() {
         client_x509_cert_url: process.env.GOOGLE_CLIENT_X509_CERT_URL,
       };
 
-      console.log("Checking credentials...");
-      console.log("Client Email exists:", !!credentials.client_email);
-      console.log("Private Key exists:", !!credentials.private_key);
+      console.log("Full credentials object:", JSON.stringify(credentials, (key, value) => key === 'private_key' ? '***' : value));
 
       if (!credentials.client_email || !credentials.private_key) {
         throw new Error("Missing Google Service Account credentials in environment variables.");
