@@ -17,12 +17,16 @@ async function startServer() {
   });
 
   app.post("/api/upload-invoice", upload.single("file"), async (req, res) => {
+    console.log("Received upload request");
     try {
       if (!req.file) {
+        console.log("No file in request");
         return res.status(400).json({ error: "No file uploaded" });
       }
+      console.log("File received:", req.file.originalname);
 
       const { fileName } = req.body;
+      console.log("File name:", fileName);
 
       const auth = new google.auth.GoogleAuth({
         credentials: {

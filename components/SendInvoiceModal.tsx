@@ -87,10 +87,15 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
       formData.append('file', selectedFile);
       formData.append('fileName', `NF_${invoiceNumber}_${invoiceInfo.date}_${Date.now()}.pdf`);
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+      
       const response = await fetch('/api/upload-invoice', {
         method: 'POST',
         body: formData,
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -108,7 +113,7 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
       setIsUploading(false);
     } catch (error: any) {
       console.error("Submit error:", error);
-      setUploadError(`Erro ao enviar o arquivo PDF: ${error.message || 'Erro desconhecido'}. Verifique sua conexão ou tente novamente.`);
+      setUploadError(`Erro ao enviar o arquivo PDF: ${error.name === 'AbortError' ? 'Tempo limite excedido' : (error.message || 'Erro desconhecido')}. Verifique sua conexão ou tente novamente.`);
       setIsUploading(false);
     }
   };
