@@ -10,9 +10,8 @@ import FinanceDashboard from './components/FinanceDashboard';
 import SubportariaDashboard from './components/SubportariaDashboard';
 import MenuDashboard from './components/MenuDashboard';
 import VehicleOrderDashboard from './components/VehicleOrderDashboard';
-import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, onValue, set, runTransaction, push, child, update, remove, get } from 'firebase/database';
-import { firebaseConfig } from './firebaseConfig';
+import { app } from './firebaseConfig';
 
 let database: any;
 let rootRef: any;
@@ -31,7 +30,6 @@ let vehicleAssetsRef: any;
 let driverAssetsRef: any;
 
 try {
-  const app = initializeApp(firebaseConfig);
   database = getDatabase(app);
   rootRef = ref(database);
   suppliersRef = ref(database, 'suppliers');
@@ -398,7 +396,8 @@ const App: React.FC = () => {
               kg: item.kg,
               value: item.value,
               invoiceUploaded: true,
-              invoiceNumber: String(invoiceData.invoiceNumber || '').trim()
+              invoiceNumber: String(invoiceData.invoiceNumber || '').trim(),
+              invoiceUrl: invoiceData.fileUrl || ''
             });
           });
         }
@@ -425,7 +424,8 @@ const App: React.FC = () => {
                 kg: item.kg,
                 value: item.value,
                 invoiceUploaded: true,
-                invoiceNumber: String(invoiceData.invoiceNumber || '').trim()
+                invoiceNumber: String(invoiceData.invoiceNumber || '').trim(),
+                invoiceUrl: invoiceData.fileUrl || ''
               });
             });
             return true;

@@ -3,12 +3,14 @@ import React, { useState, useMemo, useRef } from 'react';
 import type { Delivery, ContractItem } from '../types';
 import { speechService } from '../src/services/speechService';
 import { Volume2, Upload, FileText, Loader2 } from 'lucide-react';
+import { storage } from '../firebaseConfig';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface FulfillmentModalProps {
   invoiceInfo: { date: string; deliveries: Delivery[] };
   contractItems: ContractItem[];
   onClose: () => void;
-  onSave: (invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }) => void;
+  onSave: (invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[]; fileUrl?: string }) => void;
 }
 
 interface FulfilledItem {
@@ -125,19 +127,12 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
     setIsUploading(true);
 
     try {
-      // Upload to Google Drive
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("fileName", `NF_${invoiceNumber}_${invoiceInfo.date}.pdf`);
-
-      const uploadResponse = await fetch("/api/upload-invoice", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error("Falha no upload para o Google Drive");
-      }
+      // Upload to Firebase Storage
+      const fileName = `NF_${invoiceNumber}_${invoiceInfo.date}_${Date.now()}.pdf`;
+      const fileRef = storageRef(storage, `notas_fiscais/${fileName}`);
+      
+      await uploadBytes(fileRef, selectedFile);
+      const downloadURL = await getDownloadURL(fileRef);
 
       const fulfilledItems = items.map(item => {
           const contractItem = contractItems.find(ci => ci.name === item.name);
@@ -155,7 +150,7 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
           return { name: item.name, kg: kg, value: kg * valuePerKg };
       }).filter((item): item is { name: string; kg: number; value: number } => item !== null);
 
-      onSave({ invoiceNumber, fulfilledItems });
+      onSave({ invoiceNumber, fulfilledItems, fileUrl: downloadURL });
     } catch (error) {
       console.error("Submit error:", error);
       alert("Erro ao enviar a nota fiscal. Por favor, tente novamente.");

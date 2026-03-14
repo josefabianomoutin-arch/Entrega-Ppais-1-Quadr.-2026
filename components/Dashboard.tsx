@@ -103,7 +103,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const handleSaveFulfillment = (invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[] }) => {
+  const handleSaveFulfillment = (invoiceData: { invoiceNumber: string; fulfilledItems: { name: string; kg: number; value: number }[]; fileUrl?: string }) => {
     if (invoiceToFulfill) {
       const placeholderIds = invoiceToFulfill.deliveries.map(d => d.id);
       onFulfillAndInvoice(supplier.cpf, placeholderIds, invoiceData);
