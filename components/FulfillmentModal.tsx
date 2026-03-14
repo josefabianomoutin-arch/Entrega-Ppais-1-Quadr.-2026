@@ -4,7 +4,7 @@ import type { Delivery, ContractItem } from '../types';
 import { speechService } from '../src/services/speechService';
 import { Volume2, Upload, FileText, Loader2 } from 'lucide-react';
 import { storage } from '../firebaseConfig';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 interface FulfillmentModalProps {
   invoiceInfo: { date: string; deliveries: Delivery[] };
@@ -41,6 +41,8 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
   const [confirmed, setConfirmed] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handlePlayGuide = async () => {
@@ -115,46 +117,94 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
         const kg = parseFloat(item.kg.replace(',', '.'));
         return item.name !== '' && !isNaN(kg) && kg > 0;
     });
-    const hasFile = selectedFile !== null;
-    return hasNf && hasItems && allItemsValid && confirmed && hasFile && !isUploading;
-  }, [invoiceNumber, items, confirmed, selectedFile, isUploading]);
+    return hasNf && hasItems && allItemsValid && confirmed && !isUploading;
+  }, [invoiceNumber, items, confirmed, isUploading]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const generateWhatsAppLink = (fulfilledItems: any[], total: number) => {
+    let message = `*Faturamento de Nota Fiscal*\n`;
+    message += `*Data:* ${new Date(invoiceInfo.date + 'T00:00:00').toLocaleDateString('pt-BR')}\n`;
+    message += `*NF:* ${invoiceNumber}\n\n`;
+    message += `*Itens Entregues:*\n`;
+    
+    fulfilledItems.forEach(item => {
+      message += `- ${item.name}: ${item.kg} kg\n`;
+    });
+    
+    message += `\n*Total Calculado:* ${formatCurrency(total)}`;
+    
+    const encodedMessage = encodeURIComponent(message);
+    return `https://wa.me/?text=${encodedMessage}`;
+  };
+
+  const handleSaveData = (downloadURL?: string, sendWhatsApp: boolean = false) => {
+    const fulfilledItems = items.map(item => {
+        const contractItem = contractItems.find(ci => ci.name === item.name);
+        const kg = parseFloat(item.kg.replace(',', '.'));
+
+        if (!contractItem || isNaN(kg) || kg <= 0) return null;
+        
+        const [unitType, unitWeightStr] = (contractItem.unit || 'kg-1').split('-');
+        let valuePerKg = contractItem.valuePerKg || 0;
+        if (unitType !== 'kg' && unitType !== 'un') {
+            const unitWeight = parseFloat(unitWeightStr);
+            if (unitWeight > 0) valuePerKg = (contractItem.valuePerKg || 0) / unitWeight;
+        }
+
+        return { name: item.name, kg: kg, value: kg * valuePerKg };
+    }).filter((item): item is { name: string; kg: number; value: number } => item !== null);
+
+    if (sendWhatsApp) {
+      window.open(generateWhatsAppLink(fulfilledItems, totalValue), '_blank');
+    }
+
+    onSave({ invoiceNumber, fulfilledItems, fileUrl: downloadURL });
+  };
+
+  const handleSubmit = async (e: React.FormEvent, sendWhatsApp: boolean = false) => {
     e.preventDefault();
 
-    if (!isFormValid || !selectedFile) return;
+    if (!isFormValid) return;
+
+    if (!selectedFile) {
+      handleSaveData(undefined, sendWhatsApp);
+      return;
+    }
 
     setIsUploading(true);
+    setUploadProgress(0);
+    setUploadError(null);
 
     try {
-      // Upload to Firebase Storage
       const fileName = `NF_${invoiceNumber}_${invoiceInfo.date}_${Date.now()}.pdf`;
       const fileRef = storageRef(storage, `notas_fiscais/${fileName}`);
       
-      await uploadBytes(fileRef, selectedFile);
-      const downloadURL = await getDownloadURL(fileRef);
+      const uploadTask = uploadBytesResumable(fileRef, selectedFile);
 
-      const fulfilledItems = items.map(item => {
-          const contractItem = contractItems.find(ci => ci.name === item.name);
-          const kg = parseFloat(item.kg.replace(',', '.'));
-
-          if (!contractItem || isNaN(kg) || kg <= 0) return null;
-          
-          const [unitType, unitWeightStr] = (contractItem.unit || 'kg-1').split('-');
-          let valuePerKg = contractItem.valuePerKg || 0;
-          if (unitType !== 'kg' && unitType !== 'un') {
-              const unitWeight = parseFloat(unitWeightStr);
-              if (unitWeight > 0) valuePerKg = (contractItem.valuePerKg || 0) / unitWeight;
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(Math.round(progress));
+        }, 
+        (error) => {
+          console.error("Upload error:", error);
+          setUploadError(error.message || "Erro ao enviar a nota fiscal. Verifique se o Firebase Storage está ativado no seu projeto.");
+          setIsUploading(false);
+        }, 
+        async () => {
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            handleSaveData(downloadURL, sendWhatsApp);
+          } catch (err: any) {
+            console.error("Error getting download URL:", err);
+            setUploadError(err.message || "Erro ao obter o link do arquivo.");
+          } finally {
+            setIsUploading(false);
           }
-
-          return { name: item.name, kg: kg, value: kg * valuePerKg };
-      }).filter((item): item is { name: string; kg: number; value: number } => item !== null);
-
-      onSave({ invoiceNumber, fulfilledItems, fileUrl: downloadURL });
-    } catch (error) {
+        }
+      );
+    } catch (error: any) {
       console.error("Submit error:", error);
-      alert("Erro ao enviar a nota fiscal. Por favor, tente novamente.");
-    } finally {
+      setUploadError(error.message || "Erro ao iniciar o envio da nota fiscal.");
       setIsUploading(false);
     }
   };
@@ -195,6 +245,13 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
             
             <div className="flex-1 overflow-y-auto p-5 md:p-8 space-y-6 custom-scrollbar pb-20">
+                {uploadError && (
+                  <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-start gap-3">
+                    <div className="text-red-700 font-medium text-sm">
+                      {uploadError}
+                    </div>
+                  </div>
+                )}
                 <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex items-start gap-3">
                     <div className="bg-orange-500 text-white p-2 rounded-xl flex-shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -314,17 +371,32 @@ const FulfillmentModal: React.FC<FulfillmentModalProps> = ({ invoiceInfo, contra
             <div className="p-6 md:p-8 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row gap-3 flex-shrink-0 pb-[max(24px,env(safe-area-inset-bottom))]">
                 <button type="button" onClick={onClose} disabled={isUploading} className="flex-1 bg-gray-50 text-gray-400 font-black h-16 rounded-2xl uppercase text-[10px] tracking-widest hover:bg-gray-100 active:scale-95 transition-all disabled:opacity-50">Cancelar</button>
                 <button 
-                    type="submit" 
+                    type="button" 
+                    onClick={(e) => handleSubmit(e as any, true)}
                     disabled={!isFormValid || isUploading}
-                    className={`flex-[2] flex items-center justify-center gap-3 font-black h-16 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-sm text-white ${isFormValid && !isUploading ? 'bg-orange-600 hover:bg-orange-700' : 'bg-gray-200 cursor-not-allowed text-gray-400'}`}
+                    className={`flex-[1.5] flex items-center justify-center gap-2 font-black h-16 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-xs text-white ${isFormValid && !isUploading ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-200 cursor-not-allowed text-gray-400'}`}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    Enviar WhatsApp
+                </button>
+                <button 
+                    type="button" 
+                    onClick={(e) => handleSubmit(e as any, false)}
+                    disabled={!isFormValid || isUploading}
+                    className={`flex-[1.5] flex items-center justify-center gap-2 font-black h-16 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-xs text-white ${isFormValid && !isUploading ? 'bg-orange-600 hover:bg-orange-700' : 'bg-gray-200 cursor-not-allowed text-gray-400'}`}
                 >
                     {isUploading ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        Enviando...
-                      </>
+                      <div className="flex flex-col items-center justify-center w-full">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <span>Enviando... {uploadProgress}%</span>
+                        </div>
+                        <div className="w-1/2 h-1 bg-gray-300 rounded-full mt-2 overflow-hidden">
+                          <div className="h-full bg-orange-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                        </div>
+                      </div>
                     ) : (
-                      'Salvar e Enviar NF'
+                      'Apenas Salvar'
                     )}
                 </button>
             </div>
