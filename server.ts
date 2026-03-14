@@ -27,6 +27,8 @@ async function startServer() {
 
       const { fileName } = req.body;
       console.log("File name:", fileName);
+      console.log("Folder ID:", process.env.GOOGLE_DRIVE_FOLDER_ID);
+      console.log("Service Account Email:", process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
 
       const auth = new google.auth.GoogleAuth({
         credentials: {
@@ -36,23 +38,27 @@ async function startServer() {
         scopes: ["https://www.googleapis.com/auth/drive.file"],
       });
 
+      console.log("Auth initialized");
       const drive = google.drive({ version: "v3", auth });
 
       const fileMetadata = {
         name: fileName || req.file.originalname,
         parents: process.env.GOOGLE_DRIVE_FOLDER_ID ? [process.env.GOOGLE_DRIVE_FOLDER_ID] : undefined,
       };
+      console.log("File metadata:", fileMetadata);
 
       const media = {
         mimeType: req.file.mimetype,
         body: Readable.from(req.file.buffer),
       };
 
+      console.log("Starting drive.files.create...");
       const file = await drive.files.create({
         requestBody: fileMetadata,
         media: media,
         fields: "id, webViewLink",
       });
+      console.log("File created successfully:", file.data.id);
 
       res.json({ id: file.data.id, webViewLink: file.data.webViewLink });
     } catch (error: any) {
