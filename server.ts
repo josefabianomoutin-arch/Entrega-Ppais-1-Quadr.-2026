@@ -63,7 +63,8 @@ async function startServer() {
       res.json({ id: file.data.id, webViewLink: file.data.webViewLink });
     } catch (error: any) {
       console.error("Error uploading to Google Drive:", error);
-      const errorMessage = error.errors ? JSON.stringify(error.errors) : error.message;
+      // Ensure we get the full error details
+      const errorMessage = error.errors ? JSON.stringify(error.errors) : (error.message || String(error));
       res.status(500).json({ error: "Erro no Google Drive", details: errorMessage });
     }
   });
