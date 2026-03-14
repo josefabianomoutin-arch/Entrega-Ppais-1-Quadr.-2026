@@ -30,23 +30,37 @@ async function startServer() {
       console.log("Folder ID:", process.env.GOOGLE_DRIVE_FOLDER_ID);
       console.log("Service Account Email:", process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
 
-      const credentials = {
-        type: "service_account",
-        project_id: process.env.GOOGLE_PROJECT_ID,
-        private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-        private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        auth_uri: "https://accounts.google.com/o/oauth2/auth",
-        token_uri: "https://oauth2.googleapis.com/token",
-        auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-        client_x509_cert_url: process.env.GOOGLE_CLIENT_X509_CERT_URL,
-      };
+      let credentials;
+      if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+        try {
+          credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+          console.log("Loaded credentials from GOOGLE_APPLICATION_CREDENTIALS_JSON");
+        } catch (e) {
+          console.error("Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON", e);
+        }
+      }
 
-      console.log("Full credentials object:", JSON.stringify(credentials, (key, value) => key === 'private_key' ? '***' : value));
+      if (!credentials) {
+        credentials = {
+          type: "service_account",
+          project_id: process.env.GOOGLE_PROJECT_ID,
+          private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
+          private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+          client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          auth_uri: "https://accounts.google.com/o/oauth2/auth",
+          token_uri: "https://oauth2.googleapis.com/token",
+          auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+          client_x509_cert_url: process.env.GOOGLE_CLIENT_X509_CERT_URL,
+        };
+        console.log("Constructed credentials manually");
+      }
+
+      console.log("Credentials keys:", Object.keys(credentials));
+      console.log("Client Email:", credentials.client_email);
 
       if (!credentials.client_email || !credentials.private_key) {
-        throw new Error("Missing Google Service Account credentials in environment variables.");
+        throw new Error(`Missing Google Service Account credentials. Email: ${!!credentials.client_email}, Key: ${!!credentials.private_key}`);
       }
 
       const auth = google.auth.fromJSON(credentials);
