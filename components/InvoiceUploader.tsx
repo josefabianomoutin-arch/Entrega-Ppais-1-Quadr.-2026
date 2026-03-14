@@ -4,11 +4,11 @@ import type { Delivery } from '../types';
 
 interface InvoiceUploaderProps {
   pendingInvoices: { date: string; deliveries: Delivery[] }[];
-  onFulfill: (invoiceInfo: { date: string; deliveries: Delivery[] }) => void;
+  onSendInvoice: (invoiceInfo: { date: string; deliveries: Delivery[] }) => void;
   onCancel: (deliveryIds: string[]) => void;
 }
 
-const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ pendingInvoices, onFulfill, onCancel }) => {
+const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ pendingInvoices, onSendInvoice, onCancel }) => {
   
   const formatDate = (dateString: string) => {
     return new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR', {
@@ -29,7 +29,7 @@ const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ pendingInvoices, onFu
     <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
       <h2 className="text-xl font-semibold mb-4 text-orange-600">Entregas a Faturar</h2>
       <p className="text-xs text-gray-500 mb-4">
-        As entregas agendadas que já passaram da data aparecerão aqui para você preencher os dados e enviar a nota fiscal ou excluir caso a entrega não tenha ocorrido.
+        As entregas agendadas que já passaram da data aparecerão aqui para você enviar a nota fiscal ou excluir caso a entrega não tenha ocorrido.
       </p>
       
       <div className="space-y-3 max-h-80 overflow-y-auto border-t border-b py-2 pr-2 custom-scrollbar">
@@ -45,10 +45,10 @@ const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ pendingInvoices, onFu
                   </div>
                   <div className="flex gap-2">
                       <button
-                          onClick={() => onFulfill(invoiceInfo)}
-                          className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-3 rounded-lg transition-colors text-xs shadow-sm active:scale-95"
+                          onClick={() => onSendInvoice(invoiceInfo)}
+                          className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg transition-colors text-xs shadow-sm active:scale-95"
                       >
-                          Faturar Agora
+                          Enviar Nota Fiscal
                       </button>
                       <button
                           onClick={() => handleCancelClick(invoiceInfo.date, invoiceInfo.deliveries.map(d => d.id))}

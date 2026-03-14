@@ -66,7 +66,7 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
                                         {isPast && (
                                             <button 
                                                 onClick={() => onFulfill({ date: dateString, deliveries: [delivery] })}
-                                                className="bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-black uppercase px-4 py-2 rounded-xl shadow-lg active:scale-95 transition-all"
+                                                className="bg-green-500 hover:bg-green-600 text-white text-[10px] font-black uppercase px-4 py-2 rounded-xl shadow-lg active:scale-95 transition-all"
                                             >
                                                 Faturar
                                             </button>
@@ -114,7 +114,7 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
                     <button 
                         type="button" 
                         onClick={() => onFulfill({ date: dateString, deliveries: placeholderDeliveries })}
-                        className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-4 rounded-2xl transition-all shadow-xl uppercase tracking-widest text-sm active:scale-95"
+                        className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl transition-all shadow-xl uppercase tracking-widest text-sm active:scale-95"
                     >
                         Faturar Todo o Dia
                     </button>

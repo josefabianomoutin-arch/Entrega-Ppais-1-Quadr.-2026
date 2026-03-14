@@ -8,6 +8,7 @@ import SummaryCard from './SummaryCard';
 import InvoiceUploader from './InvoiceUploader';
 import EmailConfirmationModal from './EmailConfirmationModal';
 import FulfillmentModal from './FulfillmentModal';
+import SendInvoiceModal from './SendInvoiceModal';
 import { speechService } from '../src/services/speechService';
 import { HelpCircle, Volume2, Loader2 } from 'lucide-react';
 
@@ -49,7 +50,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isFulfillmentModalOpen, setIsFulfillmentModalOpen] = useState(false);
+  const [isSendInvoiceModalOpen, setIsSendInvoiceModalOpen] = useState(false);
   const [invoiceToFulfill, setInvoiceToFulfill] = useState<{ date: string; deliveries: Delivery[] } | null>(null);
+  const [invoiceToSend, setInvoiceToSend] = useState<{ date: string; deliveries: Delivery[] } | null>(null);
   const [deliveriesToShow, setDeliveriesToShow] = useState<Delivery[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -91,12 +94,20 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
   
   const handleCloseFulfillmentModal = () => { setInvoiceToFulfill(null); setIsFulfillmentModalOpen(false); };
+
+  const handleOpenSendInvoiceModal = (invoiceInfo: { date: string; deliveries: Delivery[] }) => {
+    setInvoiceToSend(invoiceInfo);
+    setIsSendInvoiceModalOpen(true);
+    setIsViewModalOpen(false);
+  };
+
+  const handleCloseSendInvoiceModal = () => { setInvoiceToSend(null); setIsSendInvoiceModalOpen(false); };
   
   const handlePlayGeneralHelp = async () => {
     if (isSpeaking) return;
     setIsSpeaking(true);
     try {
-      const text = "Olá! Este é o seu painel de entregas. Para agendar uma nova entrega, clique em um dia vazio no calendário. Para enviar uma nota fiscal de uma entrega já realizada, clique no dia da entrega e selecione 'Faturar Entrega'. Se precisar de ajuda em cada passo, procure pelo ícone de som.";
+      const text = "Olá! Este é o seu painel de entregas. Para agendar uma nova entrega, clique em um dia vazio no calendário. Para enviar uma nota fiscal de uma entrega já realizada, clique no dia da entrega e selecione 'Enviar Nota Fiscal'. Se precisar de ajuda em cada passo, procure pelo ícone de som.";
       await speechService.speak(text);
     } finally {
       setIsSpeaking(false);
@@ -217,7 +228,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             {pendingDailyInvoices.length > 0 && (
                 <InvoiceUploader 
                     pendingInvoices={pendingDailyInvoices} 
-                    onFulfill={handleOpenFulfillmentModal}
+                    onSendInvoice={handleOpenSendInvoiceModal}
                     onCancel={(ids) => onCancelDeliveries(supplier.cpf, ids)}
                 />
             )}
@@ -235,6 +246,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       
       {isFulfillmentModalOpen && invoiceToFulfill && (
         <FulfillmentModal invoiceInfo={invoiceToFulfill} contractItems={supplier.contractItems} onClose={handleCloseFulfillmentModal} onSave={handleSaveFulfillment} />
+      )}
+
+      {isSendInvoiceModalOpen && invoiceToSend && (
+        <SendInvoiceModal invoiceInfo={invoiceToSend} onClose={handleCloseSendInvoiceModal} />
       )}
 
       {emailModalData && <EmailConfirmationModal data={emailModalData} onClose={onCloseEmailModal} />}
