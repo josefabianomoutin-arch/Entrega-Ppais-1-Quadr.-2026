@@ -85,23 +85,32 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
     setIsUploading(true);
     setUploadError(null);
 
+    // Open window immediately to bypass popup blocker
+    const newWindow = window.open('', '_blank');
+
     try {
       const fileName = `NF_${invoiceNumber}_${invoiceInfo.date}_${Date.now()}.pdf`;
       const fileRef = storageRef(storage, `notas_fiscais/${fileName}`);
       
-      // Usar uploadBytes em vez de uploadBytesResumable para maior confiabilidade
       const snapshot = await uploadBytes(fileRef, selectedFile);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
-      if (method === 'whatsapp') {
-        handleSendWhatsApp(downloadURL);
+      const link = method === 'whatsapp' ? generateWhatsAppLink(downloadURL) : generateEmailLink(downloadURL);
+      
+      if (newWindow) {
+        newWindow.location.href = link;
+        onClose(); // Close modal immediately
       } else {
-        handleSendEmail(downloadURL);
+        // Fallback to "Tudo Pronto" screen if window was blocked
+        if (method === 'whatsapp') setWhatsappLink(link);
+        else setEmailLink(link);
+        setIsUploading(false);
       }
     } catch (error: any) {
       console.error("Submit error:", error);
       setUploadError("Erro ao enviar o arquivo PDF. Verifique sua conexão ou tente novamente.");
       setIsUploading(false);
+      if (newWindow) newWindow.close();
     }
   };
 
