@@ -44,9 +44,22 @@ const ViewDeliveryModal: React.FC<ViewDeliveryModalProps> = ({ date, deliveries,
                 Data: <span className="text-green-700">{formattedDate}</span>
             </p>
             {invoiceNumber && (
-                <p className="text-[10px] font-black text-indigo-400 uppercase mt-2">
-                    Nota Fiscal vinculada: <span className="text-indigo-700 font-mono">{invoiceNumber}</span>
-                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <p className="text-[10px] font-black text-indigo-400 uppercase">
+                      Nota Fiscal vinculada: <span className="text-indigo-700 font-mono">{invoiceNumber}</span>
+                  </p>
+                  {deliveries.find(d => d.invoiceUrl)?.invoiceUrl && (
+                    <a 
+                      href={deliveries.find(d => d.invoiceUrl)?.invoiceUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md font-bold hover:bg-indigo-100 transition-colors flex items-center gap-1"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                      Ver PDF
+                    </a>
+                  )}
+                </div>
             )}
         </div>
         

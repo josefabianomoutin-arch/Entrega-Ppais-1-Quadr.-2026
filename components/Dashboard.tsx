@@ -20,6 +20,7 @@ interface DashboardProps {
   onLogout: () => void;
   onScheduleDelivery: (supplierCpf: string, date: string, time: string) => void;
   onCancelDeliveries: (supplierCpf: string, deliveryIds: string[]) => void;
+  onSaveInvoice: (supplierCpf: string, deliveryIds: string[], invoiceNumber: string, invoiceUrl: string) => Promise<void>;
   emailModalData: {
     recipient: string;
     cc: string;
@@ -37,6 +38,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onLogout, 
   onScheduleDelivery, 
   onCancelDeliveries,
+  onSaveInvoice,
   emailModalData,
   onCloseEmailModal
 }) => {
@@ -220,7 +222,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       )}
       
       {isSendInvoiceModalOpen && invoiceToSend && (
-        <SendInvoiceModal invoiceInfo={invoiceToSend} onClose={handleCloseSendInvoiceModal} />
+        <SendInvoiceModal 
+          invoiceInfo={invoiceToSend} 
+          onClose={handleCloseSendInvoiceModal} 
+          onSave={(invoiceNumber, invoiceUrl) => onSaveInvoice(supplier.cpf, invoiceToSend.deliveries.map(d => d.id), invoiceNumber, invoiceUrl)}
+        />
       )}
 
       {emailModalData && <EmailConfirmationModal data={emailModalData} onClose={onCloseEmailModal} />}

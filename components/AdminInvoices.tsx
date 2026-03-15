@@ -7,6 +7,7 @@ interface InvoiceInfo {
     supplierName: string;
     supplierCpf: string;
     invoiceNumber: string;
+    invoiceUrl?: string;
     invoiceDate?: string; // NOVO
     receiptTermNumber?: string;
     barcode?: string;
@@ -398,7 +399,8 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                 const barcode = deliveries.find(d => d.barcode)?.barcode;
                 const receiptTermNumber = deliveries.find(d => d.receiptTermNumber)?.receiptTermNumber;
                 const invoiceDate = deliveries.find(d => d.invoiceDate)?.invoiceDate;
-                invoicesMap.set(invoiceId, { id: invoiceId, supplierName: supplier.name, supplierCpf: supplier.cpf, invoiceNumber, barcode, receiptTermNumber, invoiceDate, date: earliestDate, totalValue, items });
+                const invoiceUrl = deliveries.find(d => d.invoiceUrl)?.invoiceUrl;
+                invoicesMap.set(invoiceId, { id: invoiceId, supplierName: supplier.name, supplierCpf: supplier.cpf, invoiceNumber, invoiceUrl, barcode, receiptTermNumber, invoiceDate, date: earliestDate, totalValue, items });
             });
         });
         return Array.from(invoicesMap.values());
@@ -627,7 +629,21 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                             )}
                                         </td>
                                         <td className="p-3 font-mono">
-                                            {invoice.invoiceNumber}
+                                            <div className="flex items-center gap-2">
+                                                {invoice.invoiceNumber}
+                                                {invoice.invoiceUrl && (
+                                                    <a 
+                                                        href={invoice.invoiceUrl} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer"
+                                                        className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md font-bold hover:bg-indigo-100 transition-colors flex items-center gap-1"
+                                                        title="Ver PDF"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                        PDF
+                                                    </a>
+                                                )}
+                                            </div>
                                             {invoice.receiptTermNumber && (
                                                 <div className="text-[9px] text-teal-600 mt-1 font-bold uppercase">
                                                     NOTA DE EMPENHO: {invoice.receiptTermNumber}

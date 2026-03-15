@@ -1,21 +1,27 @@
 import React, { useState, useRef } from 'react';
 import type { Delivery } from '../types';
 import { speechService } from '../src/services/speechService';
-import { Volume2, Upload, FileText, Download, CheckCircle2 } from 'lucide-react';
+import { Volume2, Upload, FileText, Download, CheckCircle2, Loader2 } from 'lucide-react';
+import { storage } from '../firebaseConfig';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 interface SendInvoiceModalProps {
   invoiceInfo: { date: string; deliveries: Delivery[] };
   onClose: () => void;
+  onSave: (invoiceNumber: string, invoiceUrl: string) => Promise<void>;
 }
 
-const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClose }) => {
+const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClose, onSave }) => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handlePlayGuide = async () => {
-    const text = "Bem-vindo ao salvamento da nota fiscal. Digite o número da nota fiscal, selecione o arquivo PDF e clique em Salvar PDF.";
+    const text = "Bem-vindo ao envio da nota fiscal. Digite o número da nota fiscal, selecione o arquivo PDF e clique em Enviar PDF.";
     await speechService.speak(text);
   };
 
@@ -29,26 +35,43 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
 
   const isFormValid = invoiceNumber.trim().length > 0 && selectedFile !== null;
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!isFormValid || !selectedFile) return;
 
-    // Create a new filename
-    const sanitizedDate = invoiceInfo.date.replace(/-/g, '');
-    const newFileName = `NF_${invoiceNumber}_${sanitizedDate}.pdf`;
+    setIsUploading(true);
+    setUploadError(null);
 
-    // Create a blob URL and trigger download
-    const url = URL.createObjectURL(selectedFile);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = newFileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const sanitizedDate = invoiceInfo.date.replace(/-/g, '');
+      const newFileName = `NF_${invoiceNumber}_${sanitizedDate}_${Date.now()}.pdf`;
+      const storageRef = ref(storage, `invoices/${newFileName}`);
 
-    setIsSaved(true);
+      const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        }, 
+        (error) => {
+          console.error("Upload error:", error);
+          setUploadError("Erro ao enviar o arquivo. Tente novamente.");
+          setIsUploading(false);
+        }, 
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          await onSave(invoiceNumber, downloadURL);
+          setIsUploading(false);
+          setIsSaved(true);
+        }
+      );
+    } catch (error) {
+      console.error("Error starting upload:", error);
+      setUploadError("Erro ao iniciar o envio.");
+      setIsUploading(false);
+    }
   };
 
   if (isSaved) {
@@ -59,9 +82,9 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
             <CheckCircle2 className="h-10 w-10" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic">Salvo com Sucesso!</h2>
+            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic">Enviado com Sucesso!</h2>
             <p className="text-sm text-gray-500 mt-2">
-              O arquivo PDF foi baixado para a sua pasta de Downloads com o nome padronizado.
+              A nota fiscal foi enviada e salva no sistema para o administrador.
             </p>
           </div>
           <button 
@@ -82,8 +105,8 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
         <div className="flex justify-between items-center p-4 md:p-6 border-b border-gray-50 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div>
-              <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter italic leading-none">Salvar NF</h2>
-              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">Almoxarifado</p>
+              <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter italic leading-none">Enviar NF</h2>
+              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">Fornecedor</p>
             </div>
             <button 
               type="button" 
@@ -94,7 +117,7 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
               <Volume2 className="h-4 w-4" />
             </button>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-900 transition-colors p-1.5 bg-gray-50 rounded-full">
+          <button onClick={onClose} disabled={isUploading} className="text-gray-400 hover:text-gray-900 transition-colors p-1.5 bg-gray-50 rounded-full disabled:opacity-50">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -114,13 +137,13 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
                 <div className="space-y-4">
                     <div className="space-y-1">
                         <label htmlFor="invoice-number" className="text-[10px] font-black text-gray-400 uppercase ml-1">Nº da Nota Fiscal (NF)</label>
-                        <input type="text" id="invoice-number" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} required placeholder="Ex: 001234" className="w-full h-14 px-4 border-2 border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800"/>
+                        <input type="text" id="invoice-number" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} required placeholder="Ex: 001234" disabled={isUploading} className="w-full h-14 px-4 border-2 border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800 disabled:opacity-50"/>
                     </div>
                     <div className="space-y-1">
                         <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Arquivo da Nota (PDF) - OBRIGATÓRIO</label>
                         <div 
-                          onClick={() => fileInputRef.current?.click()}
-                          className={`w-full h-14 px-4 border-2 border-dashed rounded-2xl flex items-center justify-between gap-2 cursor-pointer transition-all ${selectedFile ? 'border-green-200 bg-green-50 text-green-700' : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-indigo-300 hover:bg-indigo-50'}`}
+                          onClick={() => !isUploading && fileInputRef.current?.click()}
+                          className={`w-full h-14 px-4 border-2 border-dashed rounded-2xl flex items-center justify-between gap-2 transition-all ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${selectedFile ? 'border-green-200 bg-green-50 text-green-700' : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-indigo-300 hover:bg-indigo-50'}`}
                         >
                           <div className="flex items-center gap-2 overflow-hidden">
                             {selectedFile ? (
@@ -135,7 +158,7 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
                               </>
                             )}
                           </div>
-                          {selectedFile && (
+                          {selectedFile && !isUploading && (
                             <button 
                               type="button" 
                               onClick={(e) => {
@@ -155,21 +178,49 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
                           onChange={handleFileChange} 
                           accept="application/pdf" 
                           className="hidden" 
+                          disabled={isUploading}
                           required
                         />
                     </div>
                 </div>
+                
+                {uploadError && (
+                  <div className="p-3 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100 font-medium">
+                    {uploadError}
+                  </div>
+                )}
+                
+                {isUploading && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                      <span>Enviando...</span>
+                      <span>{Math.round(uploadProgress)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                      <div className="bg-indigo-500 h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                    </div>
+                  </div>
+                )}
             </div>
 
             <div className="p-6 md:p-8 border-t border-gray-100 bg-white flex flex-col sm:flex-row gap-3 flex-shrink-0 pb-[max(24px,env(safe-area-inset-bottom))]">
-                <button type="button" onClick={onClose} className="flex-1 bg-gray-50 text-gray-400 font-black h-16 rounded-2xl uppercase text-[10px] tracking-widest hover:bg-gray-100 active:scale-95 transition-all">Cancelar</button>
+                <button type="button" onClick={onClose} disabled={isUploading} className="flex-1 bg-gray-50 text-gray-400 font-black h-16 rounded-2xl uppercase text-[10px] tracking-widest hover:bg-gray-100 active:scale-95 transition-all disabled:opacity-50">Cancelar</button>
                 <button 
                     type="submit" 
-                    disabled={!isFormValid}
-                    className={`flex-[2] flex items-center justify-center gap-2 font-black h-16 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-xs text-white ${isFormValid ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-200 cursor-not-allowed text-gray-400'}`}
+                    disabled={!isFormValid || isUploading}
+                    className={`flex-[2] flex items-center justify-center gap-2 font-black h-16 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-xs text-white ${isFormValid && !isUploading ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-200 cursor-not-allowed text-gray-400'}`}
                 >
-                    <Download className="h-5 w-5" />
-                    Salvar PDF
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-5 w-5" />
+                        Enviar PDF
+                      </>
+                    )}
                 </button>
             </div>
         </form>

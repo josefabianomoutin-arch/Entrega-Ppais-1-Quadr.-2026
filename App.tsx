@@ -377,6 +377,58 @@ const App: React.FC = () => {
     });
   }, [suppliers]);
 
+  const handleSaveInvoice = useCallback(async (supplierCpf: string, deliveryIds: string[], invoiceNumber: string, invoiceUrl: string) => {
+    try {
+      const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);
+      if (isMainSupplier) {
+        const supplierRef = child(suppliersRef, supplierCpf);
+        await runTransaction(supplierRef, (currentData: Supplier) => {
+          if (currentData) {
+            const deliveries = currentData.deliveries || [];
+            deliveries.forEach(d => {
+              if (deliveryIds.includes(d.id)) {
+                d.invoiceUploaded = true;
+                d.invoiceNumber = invoiceNumber;
+                d.invoiceUrl = invoiceUrl;
+              }
+            });
+            currentData.deliveries = deliveries;
+          }
+          return currentData;
+        });
+        return;
+      }
+
+      await runTransaction(perCapitaConfigRef, (currentData: PerCapitaConfig) => {
+        if (currentData) {
+          const findAndUpdate = (list: any[] | undefined) => {
+            const s = list?.find(p => p.cpfCnpj === supplierCpf);
+            if (s) {
+              const deliveries = s.deliveries || [];
+              deliveries.forEach((d: any) => {
+                if (deliveryIds.includes(d.id)) {
+                  d.invoiceUploaded = true;
+                  d.invoiceNumber = invoiceNumber;
+                  d.invoiceUrl = invoiceUrl;
+                }
+              });
+              s.deliveries = deliveries;
+              return true;
+            }
+            return false;
+          };
+          if (!findAndUpdate(currentData.ppaisProducers)) {
+            findAndUpdate(currentData.pereciveisSuppliers);
+          }
+        }
+        return currentData;
+      });
+    } catch (error) {
+      console.error('Erro ao salvar nota fiscal:', error);
+      throw error;
+    }
+  }, [suppliers]);
+
   const handleMarkArrival = async (supplierCpf: string, deliveryId: string) => {
     const now = new Date();
     const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
@@ -438,6 +490,7 @@ const App: React.FC = () => {
             const finalInvoiceNumber = newInvoiceNumber || invoiceNumber;
             const finalReceiptTerm = receiptTermNumber !== undefined ? receiptTermNumber : existingForNf[0].receiptTermNumber;
             const finalInvoiceDate = invoiceDate !== undefined ? invoiceDate : existingForNf[0].invoiceDate;
+            const existingInvoiceUrl = existingForNf.find(d => d.invoiceUrl)?.invoiceUrl;
 
             // Remove itens antigos daquela nota
             currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
@@ -453,6 +506,7 @@ const App: React.FC = () => {
                 value: item.value,
                 invoiceUploaded: true,
                 invoiceNumber: String(finalInvoiceNumber || '').trim(),
+                invoiceUrl: existingInvoiceUrl,
                 invoiceDate: finalInvoiceDate,
                 barcode: barcode,
                 receiptTermNumber: finalReceiptTerm,
@@ -489,6 +543,7 @@ const App: React.FC = () => {
               const finalInvoiceNumber = newInvoiceNumber || invoiceNumber;
               const finalReceiptTerm = receiptTermNumber !== undefined ? receiptTermNumber : existingForNf[0].receiptTermNumber;
               const finalInvoiceDate = invoiceDate !== undefined ? invoiceDate : existingForNf[0].invoiceDate;
+              const existingInvoiceUrl = existingForNf.find((d: any) => d.invoiceUrl)?.invoiceUrl;
 
               s.deliveries = s.deliveries.filter((d: any) => d.invoiceNumber !== invoiceNumber);
 
@@ -502,6 +557,7 @@ const App: React.FC = () => {
                   value: item.value,
                   invoiceUploaded: true,
                   invoiceNumber: String(finalInvoiceNumber || '').trim(),
+                  invoiceUrl: existingInvoiceUrl,
                   invoiceDate: finalInvoiceDate,
                   barcode: barcode,
                   receiptTermNumber: finalReceiptTerm,
@@ -1238,6 +1294,7 @@ const App: React.FC = () => {
           onLogout={handleLogout} 
           onScheduleDelivery={handleScheduleDelivery}
           onCancelDeliveries={handleCancelDeliveries}
+          onSaveInvoice={handleSaveInvoice}
           emailModalData={null}
           onCloseEmailModal={() => {}}
         />
@@ -1265,6 +1322,7 @@ const App: React.FC = () => {
           onLogout={handleLogout} 
           onScheduleDelivery={handleScheduleDelivery}
           onCancelDeliveries={handleCancelDeliveries}
+          onSaveInvoice={handleSaveInvoice}
           emailModalData={null}
           onCloseEmailModal={() => {}}
         />
