@@ -57,6 +57,10 @@ async function startServer() {
       }
 
       // Validate credentials
+      console.log("Credentials object before GoogleAuth:", JSON.stringify({
+        ...credentials,
+        private_key: credentials.private_key ? '***' : 'MISSING'
+      }));
       if (!credentials.client_email || !credentials.private_key) {
         throw new Error(`Missing required Google Cloud credentials. 
           Email: ${credentials.client_email ? 'Present' : 'MISSING'},
