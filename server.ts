@@ -69,10 +69,10 @@ async function startServer() {
       // Write credentials to a temporary file
       const credsPath = '/tmp/google_credentials.json';
       fs.writeFileSync(credsPath, JSON.stringify(credentials));
-      process.env.GOOGLE_APPLICATION_CREDENTIALS = credsPath;
 
-      // Use GoogleAuth to load credentials from the file
+      // Use GoogleAuth to load credentials from the file explicitly
       const auth = new GoogleAuth({
+        keyFilename: credsPath,
         scopes: ["https://www.googleapis.com/auth/drive.file"],
       });
 
