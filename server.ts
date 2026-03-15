@@ -19,7 +19,9 @@ async function startServer() {
   });
 
   app.post("/api/upload-invoice", upload.single("file"), async (req, res) => {
-    console.log("Received upload request");
+    console.log("--- UPLOAD ROUTE REACHED ---");
+    console.log("Request body:", req.body);
+    console.log("Request file:", req.file ? req.file.originalname : "No file");
     delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
     try {
       if (!req.file) {
