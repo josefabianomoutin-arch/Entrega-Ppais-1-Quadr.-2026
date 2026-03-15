@@ -379,6 +379,14 @@ const App: React.FC = () => {
 
   const handleSaveInvoice = useCallback(async (supplierCpf: string, deliveryIds: string[], invoiceNumber: string, invoiceUrl: string) => {
     try {
+      let finalInvoiceUrl = invoiceUrl;
+      if (invoiceUrl.startsWith('data:')) {
+        const invoiceId = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const invoiceRef = child(ref(database), `invoices/${invoiceId}`);
+        await set(invoiceRef, invoiceUrl);
+        finalInvoiceUrl = `rtdb://invoices/${invoiceId}`;
+      }
+
       const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);
       if (isMainSupplier) {
         const supplierRef = child(suppliersRef, supplierCpf);
@@ -389,7 +397,7 @@ const App: React.FC = () => {
               if (deliveryIds.includes(d.id)) {
                 d.invoiceUploaded = true;
                 d.invoiceNumber = invoiceNumber;
-                d.invoiceUrl = invoiceUrl;
+                d.invoiceUrl = finalInvoiceUrl;
               }
             });
             currentData.deliveries = deliveries;
@@ -409,7 +417,7 @@ const App: React.FC = () => {
                 if (deliveryIds.includes(d.id)) {
                   d.invoiceUploaded = true;
                   d.invoiceNumber = invoiceNumber;
-                  d.invoiceUrl = invoiceUrl;
+                  d.invoiceUrl = finalInvoiceUrl;
                 }
               });
               s.deliveries = deliveries;

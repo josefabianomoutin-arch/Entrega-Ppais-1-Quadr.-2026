@@ -1,6 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Supplier, Delivery, ContractItem, WarehouseMovement } from '../types';
+import { getDatabase, ref, get } from 'firebase/database';
+import { app } from '../firebaseConfig';
 
 interface InvoiceInfo {
     id: string;
@@ -541,6 +543,50 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
         else alert(res.message || 'Erro ao salvar lançamento manual.');
     };
 
+    const handleOpenPdf = async (url: string) => {
+        let finalUrl = url;
+        if (url.startsWith('rtdb://')) {
+            const path = url.substring(7); // remove 'rtdb://'
+            const db = getDatabase(app);
+            const refPath = ref(db, path);
+            try {
+                const snapshot = await get(refPath);
+                if (snapshot.exists()) {
+                    finalUrl = snapshot.val();
+                } else {
+                    alert("PDF não encontrado no banco de dados.");
+                    return;
+                }
+            } catch (e) {
+                console.error("Error fetching PDF from RTDB:", e);
+                alert("Erro ao buscar o PDF.");
+                return;
+            }
+        }
+
+        if (finalUrl.startsWith('data:')) {
+            try {
+                const arr = finalUrl.split(',');
+                const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+                const bstr = atob(arr[1]);
+                let n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                while (n--) {
+                    u8arr[n] = bstr.charCodeAt(n);
+                }
+                const blob = new Blob([u8arr], { type: mime });
+                const blobUrl = URL.createObjectURL(blob);
+                window.open(blobUrl, '_blank');
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+            } catch (e) {
+                console.error("Error opening PDF:", e);
+                alert("Erro ao abrir o PDF.");
+            }
+        } else {
+            window.open(finalUrl, '_blank');
+        }
+    };
+
     return (
         <div className="bg-white p-6 rounded-2xl shadow-xl max-w-7xl mx-auto border-t-8 border-teal-500 animate-fade-in relative z-10">
             <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
@@ -632,16 +678,14 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                             <div className="flex items-center gap-2">
                                                 {invoice.invoiceNumber}
                                                 {invoice.invoiceUrl && (
-                                                    <a 
-                                                        href={invoice.invoiceUrl} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer"
+                                                    <button 
+                                                        onClick={() => handleOpenPdf(invoice.invoiceUrl!)}
                                                         className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md font-bold hover:bg-indigo-100 transition-colors flex items-center gap-1"
                                                         title="Ver PDF"
                                                     >
                                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                                         PDF
-                                                    </a>
+                                                    </button>
                                                 )}
                                             </div>
                                             {invoice.receiptTermNumber && (

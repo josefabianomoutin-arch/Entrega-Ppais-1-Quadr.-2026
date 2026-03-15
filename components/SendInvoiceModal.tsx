@@ -2,8 +2,6 @@ import React, { useState, useRef } from 'react';
 import type { Delivery } from '../types';
 import { speechService } from '../src/services/speechService';
 import { Volume2, Upload, FileText, Download, CheckCircle2, Loader2 } from 'lucide-react';
-import { storage } from '../firebaseConfig';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 interface SendInvoiceModalProps {
   invoiceInfo: { date: string; deliveries: Delivery[] };
@@ -16,7 +14,6 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -27,7 +24,14 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        setUploadError("O arquivo é muito grande. O tamanho máximo permitido é 2MB.");
+        setSelectedFile(null);
+        return;
+      }
+      setUploadError(null);
+      setSelectedFile(file);
     }
   };
 
@@ -44,29 +48,24 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
     setUploadError(null);
 
     try {
-      const sanitizedDate = invoiceInfo.date.replace(/-/g, '');
-      const newFileName = `NF_${invoiceNumber}_${sanitizedDate}_${Date.now()}.pdf`;
-      const storageRef = ref(storage, `invoices/${newFileName}`);
-
-      const uploadTask = uploadBytesResumable(storageRef, selectedFile);
-
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-        }, 
-        (error) => {
-          console.error("Upload error:", error);
-          setUploadError("Erro ao enviar o arquivo. Tente novamente.");
-          setIsUploading(false);
-        }, 
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          await onSave(invoiceNumber, downloadURL);
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        try {
+          await onSave(invoiceNumber, base64String);
           setIsUploading(false);
           setIsSaved(true);
+        } catch (error) {
+          console.error("Error saving invoice:", error);
+          setUploadError("Erro ao salvar a nota fiscal. Tente novamente.");
+          setIsUploading(false);
         }
-      );
+      };
+      reader.onerror = () => {
+        setUploadError("Erro ao ler o arquivo. Tente novamente.");
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(selectedFile);
     } catch (error) {
       console.error("Error starting upload:", error);
       setUploadError("Erro ao iniciar o envio.");
@@ -194,10 +193,9 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
                   <div className="space-y-2">
                     <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase tracking-widest">
                       <span>Enviando...</span>
-                      <span>{Math.round(uploadProgress)}%</span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                      <div className="bg-indigo-500 h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                      <div className="bg-indigo-500 h-2 rounded-full transition-all duration-300 w-full animate-pulse"></div>
                     </div>
                   </div>
                 )}

@@ -323,7 +323,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                         </div>
                     </div>
 
-                    <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-3 custom-scrollbar">
+                    <div className="space-y-4">
                         {/* Seção de Terceiros */}
                         {sortedThirdParties.length > 0 && (
                             <div className="space-y-4 mb-8">
