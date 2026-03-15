@@ -60,12 +60,6 @@ async function startServer() {
       }
 
       // Validate credentials
-      fs.writeFileSync('/tmp/debug_env.json', JSON.stringify(process.env));
-      fs.writeFileSync('/tmp/debug_credentials.json', JSON.stringify({
-        ...credentials,
-        private_key: credentials.private_key ? '***' : 'MISSING'
-      }));
-      
       if (!credentials.client_email || !credentials.private_key) {
         throw new Error(`Missing required Google Cloud credentials. 
           Email: ${credentials.client_email ? 'Present' : 'MISSING'},
@@ -73,9 +67,13 @@ async function startServer() {
           Please check your app settings.`);
       }
 
-      // Use GoogleAuth to load credentials explicitly
+      // Write credentials to a temporary file
+      const credsPath = '/tmp/google_credentials.json';
+      fs.writeFileSync(credsPath, JSON.stringify(credentials));
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = credsPath;
+
+      // Use GoogleAuth to load credentials from the file
       const auth = new GoogleAuth({
-        credentials,
         scopes: ["https://www.googleapis.com/auth/drive.file"],
       });
 
