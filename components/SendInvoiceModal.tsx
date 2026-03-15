@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import type { Delivery } from '../types';
 import { speechService } from '../src/services/speechService';
-import { Volume2, Upload, FileText, Loader2, ExternalLink } from 'lucide-react';
+import { Volume2, Upload, FileText, Download, CheckCircle2 } from 'lucide-react';
 
 interface SendInvoiceModalProps {
   invoiceInfo: { date: string; deliveries: Delivery[] };
@@ -11,14 +11,11 @@ interface SendInvoiceModalProps {
 const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClose }) => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [whatsappLink, setWhatsappLink] = useState<string | null>(null);
-  const [emailLink, setEmailLink] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handlePlayGuide = async () => {
-    const text = "Bem-vindo ao envio da nota fiscal. Digite o número da nota fiscal e selecione o arquivo PDF. Depois clique em Enviar WhatsApp ou Enviar por E-mail.";
+    const text = "Bem-vindo ao salvamento da nota fiscal. Digite o número da nota fiscal, selecione o arquivo PDF e clique em Salvar PDF.";
     await speechService.speak(text);
   };
 
@@ -30,135 +27,48 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
 
   const formattedDate = new Date(invoiceInfo.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  const isFormValid = invoiceNumber.trim().length > 0 && !isUploading;
+  const isFormValid = invoiceNumber.trim().length > 0 && selectedFile !== null;
 
-  const generateWhatsAppLink = (fileUrl?: string) => {
-    const message = `Olá! Segue a Nota Fiscal referente à entrega do dia ${formattedDate}.\n\n*Nº da NF:* ${invoiceNumber}${fileUrl ? `\n*Link do PDF:* ${fileUrl}` : ''}`;
-    return `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
-  };
-
-  const generateEmailLink = (fileUrl?: string) => {
-    const subject = `Nota Fiscal - Entrega ${formattedDate} - NF ${invoiceNumber}`;
-    const body = `Olá,\n\nSegue a Nota Fiscal referente à entrega do dia ${formattedDate}.\n\nNº da NF: ${invoiceNumber}${fileUrl ? `\n\nLink do PDF: ${fileUrl}` : ''}\n\nAtenciosamente.`;
-    return `mailto:rsscaramal@sap.sp.gov.br,jfmoutin@sap.sp.gov.br?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
-
-  const handleSendWhatsApp = (fileUrl?: string) => {
-    const link = generateWhatsAppLink(fileUrl);
-    setWhatsappLink(link);
-    setIsUploading(false);
-    
-    // Try to open automatically
-    const newWindow = window.open(link, '_blank', 'noopener,noreferrer');
-    
-    // If it didn't open (blocked), the user will see the "Tudo Pronto" screen
-    // and can click the "Abrir WhatsApp" button.
-  };
-
-  const handleSendEmail = (fileUrl?: string) => {
-    const link = generateEmailLink(fileUrl);
-    setEmailLink(link);
-    setIsUploading(false);
-    
-    // Try to open automatically
-    const newWindow = window.open(link, '_blank', 'noopener,noreferrer');
-    
-    // If it didn't open (blocked), the user will see the "Tudo Pronto" screen
-    // and can click the "Abrir E-mail" button.
-  };
-
-  const handleSubmit = async (e: React.FormEvent, method: 'whatsapp' | 'email') => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isFormValid) return;
+    if (!isFormValid || !selectedFile) return;
 
-    // If no file, just perform the action
-    if (!selectedFile) {
-      if (method === 'whatsapp') handleSendWhatsApp();
-      else handleSendEmail();
-      return;
-    }
+    // Create a new filename
+    const sanitizedDate = invoiceInfo.date.replace(/-/g, '');
+    const newFileName = `NF_${invoiceNumber}_${sanitizedDate}.pdf`;
 
-    setIsUploading(true);
-    setUploadError(null);
+    // Create a blob URL and trigger download
+    const url = URL.createObjectURL(selectedFile);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = newFileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-    try {
-      console.log("Starting upload to API...");
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('fileName', `NF_${invoiceNumber}_${invoiceInfo.date}_${Date.now()}.pdf`);
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
-      
-      const response = await fetch('/api/upload-invoice', {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(JSON.stringify(errorData));
-      }
-
-      const data = await response.json();
-      console.log("Upload complete, download URL:", data.webViewLink);
-      
-      // Perform the action based on the method passed to handleSubmit
-      if (method === 'whatsapp') {
-        handleSendWhatsApp(data.webViewLink);
-      } else {
-        handleSendEmail(data.webViewLink);
-      }
-      // Note: setIsUploading(false) is called inside handleSendWhatsApp/Email
-    } catch (error: any) {
-      console.error("Submit error:", error);
-      // Try to parse the error response from the backend
-      let errorMessage = error.message;
-      try {
-        const errorData = JSON.parse(error.message);
-        if (errorData.details) errorMessage = errorData.details;
-        else if (errorData.error) errorMessage = errorData.error;
-      } catch (e) {
-        // Not JSON, keep original message
-      }
-      setUploadError(`Erro ao enviar o arquivo PDF: ${errorMessage}. Verifique as configurações do Google Drive.`);
-      setIsUploading(false);
-    }
+    setIsSaved(true);
   };
 
-  if (whatsappLink || emailLink) {
-    const isWhatsApp = !!whatsappLink;
-    const link = whatsappLink || emailLink;
-    
+  if (isSaved) {
     return (
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-[100] p-2 md:p-4">
         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md flex flex-col animate-fade-in-up border border-gray-100 overflow-hidden p-8 text-center space-y-6">
-          <div className={`w-20 h-20 ${isWhatsApp ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'} rounded-full flex items-center justify-center mx-auto`}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
+            <CheckCircle2 className="h-10 w-10" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic">Tudo Pronto!</h2>
+            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic">Salvo com Sucesso!</h2>
             <p className="text-sm text-gray-500 mt-2">
-              {isWhatsApp 
-                ? "Se o WhatsApp não abriu automaticamente, clique no botão abaixo para enviar a mensagem."
-                : "Se o seu aplicativo de e-mail não abriu automaticamente, clique no botão abaixo para enviar."}
+              O arquivo PDF foi baixado para a sua pasta de Downloads com o nome padronizado.
             </p>
           </div>
-          <a 
-            href={link as string}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setTimeout(onClose, 1000)}
-            className={`w-full ${isWhatsApp ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'} text-white font-black py-4 rounded-2xl transition-all shadow-xl uppercase tracking-widest text-sm active:scale-95 flex items-center justify-center gap-2`}
+          <button 
+            onClick={onClose}
+            className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl transition-all shadow-xl uppercase tracking-widest text-sm active:scale-95 flex items-center justify-center gap-2"
           >
-            <ExternalLink className="h-5 w-5" />
-            {isWhatsApp ? "Abrir WhatsApp" : "Abrir E-mail"}
-          </a>
-          <button onClick={onClose} className="text-gray-400 font-bold text-xs uppercase tracking-widest hover:text-gray-600">
-            Fechar
+            Concluir
           </button>
         </div>
       </div>
@@ -172,7 +82,7 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
         <div className="flex justify-between items-center p-4 md:p-6 border-b border-gray-50 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div>
-              <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter italic leading-none">Enviar NF</h2>
+              <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter italic leading-none">Salvar NF</h2>
               <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">Almoxarifado</p>
             </div>
             <button 
@@ -189,15 +99,8 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
           </button>
         </div>
 
-        <form className="flex flex-col overflow-hidden">
+        <form className="flex flex-col overflow-hidden" onSubmit={handleSave}>
             <div className="p-4 md:p-6 space-y-4">
-                {uploadError && (
-                  <div className="bg-red-50 p-3 rounded-xl border border-red-100 flex items-start gap-2">
-                    <div className="text-red-700 font-medium text-xs">
-                      {uploadError}
-                    </div>
-                  </div>
-                )}
                 <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 flex items-start gap-2">
                     <div className="bg-orange-500 text-white p-1.5 rounded-lg flex-shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -238,7 +141,6 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedFile(null);
-                                setUploadError(null);
                                 if (fileInputRef.current) fileInputRef.current.value = '';
                               }}
                               className="p-2 hover:bg-green-100 rounded-full transition-colors text-green-600"
@@ -260,50 +162,16 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
             </div>
 
             <div className="p-6 md:p-8 border-t border-gray-100 bg-white flex flex-col sm:flex-row gap-3 flex-shrink-0 pb-[max(24px,env(safe-area-inset-bottom))]">
-                <button type="button" onClick={onClose} disabled={isUploading} className="flex-1 bg-gray-50 text-gray-400 font-black h-16 rounded-2xl uppercase text-[10px] tracking-widest hover:bg-gray-100 active:scale-95 transition-all disabled:opacity-50">Cancelar</button>
-                <div className="flex-[2] flex gap-2">
-                  <button 
-                      type="button" 
-                      onClick={(e) => handleSubmit(e, 'email')}
-                      disabled={!isFormValid || !selectedFile || isUploading}
-                      className={`flex-1 flex items-center justify-center gap-2 font-black h-16 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-xs text-white ${isFormValid && selectedFile && !isUploading ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-200 cursor-not-allowed text-gray-400'}`}
-                  >
-                      {isUploading ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                          E-mail
-                        </>
-                      )}
-                  </button>
-                  <button 
-                      type="button" 
-                      onClick={(e) => handleSubmit(e, 'whatsapp')}
-                      disabled={!isFormValid || !selectedFile || isUploading}
-                      className={`flex-1 flex items-center justify-center gap-2 font-black h-16 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-xs text-white ${isFormValid && selectedFile && !isUploading ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-200 cursor-not-allowed text-gray-400'}`}
-                  >
-                      {isUploading ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                          WhatsApp
-                        </>
-                      )}
-                  </button>
-                </div>
+                <button type="button" onClick={onClose} className="flex-1 bg-gray-50 text-gray-400 font-black h-16 rounded-2xl uppercase text-[10px] tracking-widest hover:bg-gray-100 active:scale-95 transition-all">Cancelar</button>
+                <button 
+                    type="submit" 
+                    disabled={!isFormValid}
+                    className={`flex-[2] flex items-center justify-center gap-2 font-black h-16 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-xs text-white ${isFormValid ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-200 cursor-not-allowed text-gray-400'}`}
+                >
+                    <Download className="h-5 w-5" />
+                    Salvar PDF
+                </button>
             </div>
-            {isUploading && (
-              <div className="px-8 pb-6">
-                <div className="flex items-center justify-between text-xs font-bold text-gray-500 mb-2">
-                  <span>Enviando arquivo...</span>
-                </div>
-                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden relative">
-                  <div className="h-full bg-indigo-500 absolute top-0 left-0 animate-[pulse_1.5s_ease-in-out_infinite] w-full"></div>
-                </div>
-              </div>
-            )}
         </form>
       </div>
        <style>{`
