@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Supplier, Delivery, ContractItem, WarehouseMovement } from '../types';
 import { getDatabase, ref, get } from 'firebase/database';
 import { app } from '../firebaseConfig';
+import ConfirmModal from './ConfirmModal';
 
 interface InvoiceInfo {
     id: string;
@@ -265,6 +266,21 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
     const [exitingInvoice, setExitingInvoice] = useState<InvoiceInfo | null>(null);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
+    const [activeSubTab, setActiveSubTab] = useState<'all' | 'uploaded'>('all');
+
+    // Confirmation Modal State
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     const topScrollRef = React.useRef<HTMLDivElement>(null);
     const bottomScrollRef = React.useRef<HTMLDivElement>(null);
@@ -409,11 +425,16 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
     }, [suppliers, warehouseLog]);
     
     const filteredAndSortedInvoices = useMemo(() => {
-        const filtered = allInvoices.filter(invoice => 
+        let filtered = allInvoices.filter(invoice => 
             invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || 
             invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (invoice.barcode && invoice.barcode.toLowerCase().includes(searchTerm.toLowerCase()))
         );
+
+        if (activeSubTab === 'uploaded') {
+            filtered = filtered.filter(inv => !!inv.invoiceUrl);
+        }
+
         return filtered.sort((a, b) => {
             let comp = 0;
             if (sortKey === 'supplierName') comp = a.supplierName.localeCompare(b.supplierName);
@@ -589,6 +610,21 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
 
     return (
         <div className="bg-white p-6 rounded-2xl shadow-xl max-w-7xl mx-auto border-t-8 border-teal-500 animate-fade-in relative z-10">
+            <div className="flex bg-gray-100 p-1 rounded-2xl mb-6 max-w-md">
+                <button 
+                    onClick={() => setActiveSubTab('all')} 
+                    className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeSubTab === 'all' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    Todas as Notas
+                </button>
+                <button 
+                    onClick={() => setActiveSubTab('uploaded')} 
+                    className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeSubTab === 'uploaded' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    Notas com PDF
+                </button>
+            </div>
+
             <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
                  <div>
                     <h2 className="text-3xl font-black text-teal-900 uppercase tracking-tighter">Consulta de Notas Fiscais</h2>
@@ -733,8 +769,42 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                             </svg>
                                                         </button>
                                                         <button onClick={() => setEditingInvoice(invoice)} className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Editar">Editar</button>
-                                                        <button onClick={() => { if(window.confirm('Reabrir nota?')) onReopenInvoice(invoice.supplierCpf, invoice.invoiceNumber); }} className="bg-orange-100 text-orange-700 hover:bg-orange-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Reabrir">Reabrir</button>
-                                                        <button onClick={() => { if(window.confirm('Excluir nota?')) onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber); }} className="bg-red-100 text-red-700 hover:bg-red-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" title="Excluir">Excluir</button>
+                                                        <button 
+                                                            onClick={() => { 
+                                                                setConfirmConfig({
+                                                                    isOpen: true,
+                                                                    title: 'Reabrir Nota',
+                                                                    message: 'Deseja realmente reabrir esta nota fiscal?',
+                                                                    onConfirm: () => {
+                                                                        onReopenInvoice(invoice.supplierCpf, invoice.invoiceNumber);
+                                                                        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                                    },
+                                                                    variant: 'warning'
+                                                                });
+                                                            }} 
+                                                            className="bg-orange-100 text-orange-700 hover:bg-orange-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" 
+                                                            title="Reabrir"
+                                                        >
+                                                            Reabrir
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => { 
+                                                                setConfirmConfig({
+                                                                    isOpen: true,
+                                                                    title: 'Excluir Nota',
+                                                                    message: 'Deseja realmente excluir esta nota fiscal? Esta ação não pode ser desfeita.',
+                                                                    onConfirm: () => {
+                                                                        onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber);
+                                                                        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                                    },
+                                                                    variant: 'danger'
+                                                                });
+                                                            }} 
+                                                            className="bg-red-100 text-red-700 hover:bg-red-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" 
+                                                            title="Excluir"
+                                                        >
+                                                            Excluir
+                                                        </button>
                                                     </>
                                                 )}
                                             </div>
@@ -809,6 +879,15 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
             {isManualModalOpen && (
                 <ManualInvoiceModal suppliers={suppliers} onClose={() => setIsManualModalOpen(false)} onSave={handleManualEntrySave} isSaving={isSavingEdit} />
             )}
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                variant={confirmConfig.variant}
+            />
         </div>
     )
 };

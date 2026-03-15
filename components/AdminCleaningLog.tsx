@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import type { CleaningLog, FinancialRecord } from '../types';
+import ConfirmModal from './ConfirmModal';
 
 interface AdminCleaningLogProps {
   logs: CleaningLog[];
@@ -20,6 +21,20 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, financialReco
   const [partsProcessId, setPartsProcessId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Confirmation Modal State
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   const topScrollRef = React.useRef<HTMLDivElement>(null);
   const bottomScrollRef = React.useRef<HTMLDivElement>(null);
@@ -441,7 +456,22 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, financialReco
                     </div>
                   </td>
                   <td className="p-4 text-center">
-                    <button onClick={() => { if(window.confirm('Deseja excluir este registro permanentemente?')) onDelete(log.id); }} className="text-red-400 hover:text-red-600 p-2 rounded-full transition-colors" title="Excluir Registro">
+                    <button 
+                      onClick={() => {
+                        setConfirmConfig({
+                          isOpen: true,
+                          title: 'Excluir Registro',
+                          message: 'Deseja excluir este registro permanentemente?',
+                          variant: 'danger',
+                          onConfirm: () => {
+                            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                            onDelete(log.id);
+                          }
+                        });
+                      }} 
+                      className="text-red-400 hover:text-red-600 p-2 rounded-full transition-colors" 
+                      title="Excluir Registro"
+                    >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
                   </td>
@@ -454,6 +484,14 @@ const AdminCleaningLog: React.FC<AdminCleaningLogProps> = ({ logs, financialReco
           </div>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        variant={confirmConfig.variant}
+      />
       <style>{`
         @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }

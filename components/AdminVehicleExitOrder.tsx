@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { VehicleExitOrder, VehicleAsset, DriverAsset } from '../types';
 import { GoogleGenAI } from "@google/genai";
+import ConfirmModal from './ConfirmModal';
 
 interface AdminVehicleExitOrderProps {
     orders: VehicleExitOrder[];
@@ -69,6 +70,20 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
     const [isAutoScanEnabled, setIsAutoScanEnabled] = useState(false);
     const [lastScannedPlate, setLastScannedPlate] = useState<string | null>(null);
     const autoScanIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Confirmation Modal State
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     useEffect(() => {
         if (securityMode) {
@@ -616,7 +631,22 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                                                 </button>
                                                             )}
                                                             {!readOnly && (
-                                                                <button onClick={() => { if(window.confirm('Excluir esta ordem?')) onDelete(order.id); }} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors" title="Excluir">
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        setConfirmConfig({
+                                                                            isOpen: true,
+                                                                            title: 'Excluir Ordem de Saída',
+                                                                            message: 'Tem certeza que deseja excluir esta ordem?',
+                                                                            variant: 'danger',
+                                                                            onConfirm: () => {
+                                                                                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                                                onDelete(order.id);
+                                                                            }
+                                                                        });
+                                                                    }} 
+                                                                    className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors" 
+                                                                    title="Excluir"
+                                                                >
                                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                                 </button>
                                                             )}
@@ -933,7 +963,23 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                                 <td className="p-3">
                                                     <div className="flex justify-center gap-2">
                                                         <button onClick={() => { setEditingVehicle(v); setVehicleFormData({ model: v.model, plate: v.plate, assetNumber: v.assetNumber }); setIsVehicleModalOpen(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                                                        <button onClick={() => { if(window.confirm('Excluir veículo?')) onDeleteVehicleAsset(v.id); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                setConfirmConfig({
+                                                                    isOpen: true,
+                                                                    title: 'Excluir Veículo',
+                                                                    message: 'Tem certeza que deseja excluir este veículo?',
+                                                                    variant: 'danger',
+                                                                    onConfirm: () => {
+                                                                        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                                        onDeleteVehicleAsset(v.id);
+                                                                    }
+                                                                });
+                                                            }} 
+                                                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -978,7 +1024,23 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                                 <td className="p-3">
                                                     <div className="flex justify-center gap-2">
                                                         <button onClick={() => { setEditingDriver(d); setDriverFormData({ name: d.name, role: d.role, cnhCategory: d.cnhCategory, isFitToDrive: d.isFitToDrive }); setIsDriverModalOpen(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                                                        <button onClick={() => { if(window.confirm('Excluir motorista?')) onDeleteDriverAsset(d.id); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                setConfirmConfig({
+                                                                    isOpen: true,
+                                                                    title: 'Excluir Motorista',
+                                                                    message: 'Tem certeza que deseja excluir este motorista?',
+                                                                    variant: 'danger',
+                                                                    onConfirm: () => {
+                                                                        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                                        onDeleteDriverAsset(d.id);
+                                                                    }
+                                                                });
+                                                            }} 
+                                                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>

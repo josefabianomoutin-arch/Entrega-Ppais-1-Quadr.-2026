@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Supplier, Delivery, ThirdPartyEntryLog } from '../types';
 import WeeklyScheduleControl from './WeeklyScheduleControl';
+import ConfirmModal from './ConfirmModal';
 
 interface AdminScheduleViewProps {
   suppliers: Supplier[];
@@ -26,6 +27,20 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
     const [reportSelectedMonth, setReportSelectedMonth] = useState('');
     const [reportSeiNumber, setReportSeiNumber] = useState('');
     const [reportSupplierAddress, setReportSupplierAddress] = useState('');
+
+    // Confirmation Modal State
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 
@@ -239,15 +254,29 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
 
     const handleCancel = (supplierCpf: string, deliveryIds: string[], date: string, isInvoice: boolean) => {
         const type = isInvoice ? 'FATURAMENTO' : 'AGENDAMENTO';
-        if (window.confirm(`ATENÇÃO: Deseja realmente EXCLUIR o ${type} do dia ${formatDate(date)}?\n\nEsta ação removerá o registro permanentemente.`)) {
-            onCancelDeliveries(supplierCpf, deliveryIds);
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: `Excluir ${type}`,
+            message: `ATENÇÃO: Deseja realmente EXCLUIR o ${type} do dia ${formatDate(date)}?\n\nEsta ação removerá o registro permanentemente.`,
+            onConfirm: () => {
+                onCancelDeliveries(supplierCpf, deliveryIds);
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            },
+            variant: 'danger'
+        });
     };
 
     const handleDeleteThirdParty = async (id: string, company: string, date: string) => {
-        if (window.confirm(`ATENÇÃO: Deseja realmente EXCLUIR o agendamento de ${company} do dia ${formatDate(date)}?`)) {
-            await onDeleteThirdPartyEntry(id);
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Excluir Agendamento',
+            message: `ATENÇÃO: Deseja realmente EXCLUIR o agendamento de ${company} do dia ${formatDate(date)}?`,
+            onConfirm: async () => {
+                await onDeleteThirdPartyEntry(id);
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            },
+            variant: 'danger'
+        });
     };
 
     const handleClearDayForSupplier = (supplierCpf: string, supplierName: string, date: string) => {
@@ -256,9 +285,16 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
         const deliveriesOnDate = (p.deliveries || []).filter(d => d.date === date);
         if (deliveriesOnDate.length === 0) return;
 
-        if (window.confirm(`ATENÇÃO: Deseja excluir TODOS os registros (${deliveriesOnDate.length}) do fornecedor ${supplierName} no dia ${formatDate(date)}?`)) {
-            onCancelDeliveries(supplierCpf, deliveriesOnDate.map(d => d.id));
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Limpar Dia',
+            message: `ATENÇÃO: Deseja excluir TODOS os registros (${deliveriesOnDate.length}) do fornecedor ${supplierName} no dia ${formatDate(date)}?`,
+            onConfirm: () => {
+                onCancelDeliveries(supplierCpf, deliveriesOnDate.map(d => d.id));
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            },
+            variant: 'danger'
+        });
     }
 
     return (
@@ -557,6 +593,14 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                 <WeeklyScheduleControl suppliers={suppliers} thirdPartyEntries={thirdPartyEntries} />
             )}
              <style>{`.custom-scrollbar::-webkit-scrollbar { width: 8px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }`}</style>
+             <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                variant={confirmConfig.variant}
+             />
         </div>
     );
 };

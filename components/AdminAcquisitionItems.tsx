@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import type { AcquisitionItem, Supplier } from '../types';
 import { ManageContractSuppliersModal } from './AdminContractItems';
+import ConfirmModal from './ConfirmModal';
 
 interface AdminAcquisitionItemsProps {
     items: AcquisitionItem[];
@@ -30,6 +31,20 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
     const [stockBalance, setStockBalance] = useState('0');
     const [unitValue, setUnitValue] = useState('0');
     const [isSaving, setIsSaving] = useState(false);
+
+    // Confirmation Modal State
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     const filteredItems = items.filter(item => 
         item.category === category &&
@@ -518,7 +533,18 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                                                     <svg className="h-4 w-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                                 </button>
                                                 <button 
-                                                    onClick={() => { if(window.confirm('Excluir este item?')) onDelete(item.id); }}
+                                                    onClick={() => {
+                                                        setConfirmConfig({
+                                                            isOpen: true,
+                                                            title: 'Excluir Item',
+                                                            message: 'Tem certeza que deseja excluir este item?',
+                                                            variant: 'danger',
+                                                            onConfirm: () => {
+                                                                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                                onDelete(item.id);
+                                                            }
+                                                        });
+                                                    }}
                                                     className="flex-1 p-2.5 text-zinc-400 hover:text-red-600 hover:bg-white rounded-xl transition-all border border-transparent hover:border-red-100 shadow-sm"
                                                 >
                                                     <svg className="h-4 w-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -729,6 +755,15 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                     }}
                 />
             )}
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                variant={confirmConfig.variant}
+            />
         </div>
     );
 };

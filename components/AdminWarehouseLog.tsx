@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import type { WarehouseMovement, Supplier, ContractItem } from '../types';
+import ConfirmModal from './ConfirmModal';
 
 interface AdminWarehouseLogProps {
     warehouseLog: WarehouseMovement[];
@@ -27,6 +28,20 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [editingLog, setEditingLog] = useState<WarehouseMovement | null>(null);
+
+    // Confirmation Modal State
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     const topScrollRef = React.useRef<HTMLDivElement>(null);
     const bottomScrollRef = React.useRef<HTMLDivElement>(null);
@@ -603,6 +618,15 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
                     }}
                 />
             )}
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                variant={confirmConfig.variant}
+            />
 
             <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }`}</style>
         </div>

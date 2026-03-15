@@ -1,6 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import type { Supplier, WarehouseMovement } from '../types';
+import ConfirmModal from './ConfirmModal';
 
 interface AdminContractItemsProps {
   suppliers: Supplier[];
@@ -24,6 +25,20 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
     const [isAddingItem, setIsAddingItem] = useState(false);
     const [newItemName, setNewItemName] = useState('');
     const [newItemUnit, setNewItemUnit] = useState('kg-1');
+
+    // Confirmation Modal State
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     const itemAggregation = useMemo(() => {
         const map = new Map<string, any>();
@@ -130,10 +145,17 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
     };
 
     const handleDeleteItem = async (itemName: string) => {
-        if (window.confirm(`Tem certeza que deseja excluir o item "${itemName}" de TODOS os contratos? Esta ação não pode ser desfeita.`)) {
-            const res = await onUpdateContractForItem(itemName, []);
-            if (!res.success) alert(res.message);
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Excluir Item do Contrato',
+            message: `Tem certeza que deseja excluir o item "${itemName}" de TODOS os contratos? Esta ação não pode ser desfeita.`,
+            variant: 'danger',
+            onConfirm: async () => {
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                const res = await onUpdateContractForItem(itemName, []);
+                if (!res.success) alert(res.message);
+            }
+        });
     };
 
     return (
@@ -431,6 +453,15 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
                     }}
                 />
             )}
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                variant={confirmConfig.variant}
+            />
 
             <style>{`
                 @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
