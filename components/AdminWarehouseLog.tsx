@@ -394,14 +394,21 @@ const AdminWarehouseLog: React.FC<AdminWarehouseLogProps> = ({ warehouseLog, sup
             ? 'Excluir esta entrada? O lote será removido e o saldo voltará ao contrato.' 
             : 'Excluir esta saída? A quantidade voltará ao saldo do lote atual.';
             
-        if (window.confirm(msg)) {
-            setIsDeleting(log.id);
-            const result = await onDeleteEntry(log);
-            setIsDeleting(null);
-            if (!result.success) {
-                alert(`Erro ao excluir: ${result.message}`);
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Confirmar Exclusão',
+            message: msg,
+            variant: 'danger',
+            onConfirm: async () => {
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                setIsDeleting(log.id);
+                const result = await onDeleteEntry(log);
+                setIsDeleting(null);
+                if (!result.success) {
+                    alert(`Erro ao excluir: ${result.message}`);
+                }
             }
-        }
+        });
     };
 
     return (

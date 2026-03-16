@@ -17,6 +17,7 @@ interface AdminVehicleExitOrderProps {
     onRegisterDriverAsset: (asset: Omit<DriverAsset, 'id'>) => Promise<{ success: boolean; message: string }>;
     onUpdateDriverAsset: (asset: DriverAsset) => Promise<{ success: boolean; message: string }>;
     onDeleteDriverAsset: (id: string) => Promise<void>;
+    onUpdateVehicleExitOrder?: (order: VehicleExitOrder) => Promise<{ success: boolean; message: string }>;
     readOnly?: boolean;
     securityMode?: boolean;
     hideAssets?: boolean;
@@ -28,6 +29,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
     orders, onRegister, onUpdate, onDelete,
     vehicleAssets, onRegisterVehicleAsset, onUpdateVehicleAsset, onDeleteVehicleAsset,
     driverAssets, onRegisterDriverAsset, onUpdateDriverAsset, onDeleteDriverAsset,
+    onUpdateVehicleExitOrder,
     readOnly = false,
     securityMode = false,
     hideAssets = false,
@@ -38,6 +40,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
     const [activeAssetTab, setActiveAssetTab] = useState<'vehicles' | 'drivers'>('vehicles');
     
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isUploadingPdf, setIsUploadingPdf] = useState<string | null>(null);
     const [editingOrder, setEditingOrder] = useState<VehicleExitOrder | null>(null);
     const [formData, setFormData] = useState<Omit<VehicleExitOrder, 'id'>>({
         date: new Date().toISOString().split('T')[0],
@@ -450,6 +453,171 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
         printWindow.document.close();
     };
 
+    const handleAttachPdf = async (order: VehicleExitOrder) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/pdf';
+        input.onchange = async (e: any) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            
+            if (file.size > 2 * 1024 * 1024) {
+                alert("O arquivo é muito grande. O tamanho máximo permitido é 2MB.");
+                return;
+            }
+
+            setIsUploadingPdf(order.id);
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const base64 = event.target?.result as string;
+                if (onUpdateVehicleExitOrder) {
+                    const res = await onUpdateVehicleExitOrder({ ...order, pdfUrl: base64 });
+                    if (!res.success) alert(res.message);
+                } else if (onUpdate) {
+                    const res = await onUpdate({ ...order, pdfUrl: base64 });
+                    if (!res.success) alert(res.message);
+                }
+                setIsUploadingPdf(null);
+            };
+            reader.readAsDataURL(file);
+        };
+        input.click();
+    };
+
+    const handleOpenPdf = (url: string) => {
+        if (url.startsWith('data:application/pdf;base64,')) {
+            try {
+                const base64Content = url.split(',')[1];
+                const binaryString = window.atob(base64Content);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'application/pdf' });
+                const blobUrl = URL.createObjectURL(blob);
+                window.open(blobUrl, '_blank');
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+            } catch (error) {
+                console.error("Erro ao processar PDF:", error);
+                alert("Erro ao abrir o PDF.");
+            }
+        } else {
+            window.open(url, '_blank');
+        }
+    };
+
+    const groupedOrders = useMemo(() => {
+        return {
+            withPdf: orders.filter(o => o.pdfUrl),
+            withoutPdf: orders.filter(o => !o.pdfUrl)
+        };
+    }, [orders]);
+
+    const renderOrderRow = (order: VehicleExitOrder) => (
+        <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+            <td className="p-4 font-bold text-gray-600">{order.date.split('-').reverse().join('/')}</td>
+            <td className="p-4">
+                <div className="font-black text-gray-800 uppercase">{order.vehicle}</div>
+                <div className="text-[10px] text-indigo-500 font-mono flex items-center gap-2">
+                    {order.plate}
+                    {order.pdfUrl && (
+                        <button 
+                            onClick={() => handleOpenPdf(order.pdfUrl!)}
+                            className="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-black uppercase flex items-center gap-1 hover:bg-indigo-100"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            PDF
+                        </button>
+                    )}
+                </div>
+            </td>
+            <td className="p-4">
+                <div className="font-bold text-gray-700 uppercase">{order.responsibleServer}</div>
+                <div className="text-[10px] text-gray-400 uppercase">{order.serverRole}</div>
+            </td>
+            <td className="p-4 font-bold text-gray-600 uppercase">{order.destination}</td>
+            <td className="p-4 font-mono text-gray-500">{order.fctNumber}</td>
+            {(securityMode || orders.some(o => o.exitTime || o.returnTime)) && (
+                <>
+                    <td className="p-4 text-center">
+                        {order.exitTime ? (
+                            <div className="flex flex-col items-center">
+                                <span className="text-indigo-600 font-black text-xs">{order.exitTime}</span>
+                                <span className="text-[9px] text-gray-400 font-bold">{order.exitDate?.split('-').reverse().join('/')}</span>
+                            </div>
+                        ) : <span className="text-gray-300">--:--</span>}
+                    </td>
+                    <td className="p-4 text-center">
+                        {order.returnTime ? (
+                            <div className="flex flex-col items-center">
+                                <span className="text-emerald-600 font-black text-xs">{order.returnTime}</span>
+                                <span className="text-[9px] text-gray-400 font-bold">{order.returnDate?.split('-').reverse().join('/')}</span>
+                            </div>
+                        ) : <span className="text-gray-300">--:--</span>}
+                    </td>
+                </>
+            )}
+            <td className="p-4">
+                <div className="flex items-center justify-center gap-2">
+                    {securityMode ? (
+                        <button 
+                            onClick={() => handleEdit(order)}
+                            className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                            title="Registrar Horários"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </button>
+                    ) : (
+                        <>
+                            <button onClick={() => handlePrint(order)} className="p-2 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors" title="Imprimir">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                            </button>
+                            {!readOnly && !hideEdit && (
+                                <button onClick={() => handleEdit(order)} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors" title="Editar">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                </button>
+                            )}
+                            {!readOnly && (
+                                <button 
+                                    onClick={() => handleAttachPdf(order)}
+                                    disabled={isUploadingPdf === order.id}
+                                    className={`p-2 rounded-xl transition-all ${order.pdfUrl ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                                    title={order.pdfUrl ? "Substituir PDF" : "Anexar PDF"}
+                                >
+                                    {isUploadingPdf === order.id ? (
+                                        <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                    ) : (
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                    )}
+                                </button>
+                            )}
+                            {!readOnly && (
+                                <button 
+                                    onClick={() => {
+                                        setConfirmConfig({
+                                            isOpen: true,
+                                            title: 'Excluir Ordem de Saída',
+                                            message: 'Tem certeza que deseja excluir esta ordem?',
+                                            variant: 'danger',
+                                            onConfirm: () => {
+                                                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                onDelete(order.id);
+                                            }
+                                        });
+                                    }} 
+                                    className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors" 
+                                    title="Excluir"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                            )}
+                        </>
+                    )}
+                </div>
+            </td>
+        </tr>
+    );
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingOrder) {
@@ -583,80 +751,33 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {orders.length > 0 ? orders.sort((a,b) => b.date.localeCompare(a.date)).map(order => (
-                                        <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="p-4 font-bold text-gray-600">{order.date.split('-').reverse().join('/')}</td>
-                                            <td className="p-4">
-                                                <div className="font-black text-gray-800 uppercase">{order.vehicle}</div>
-                                                <div className="text-[10px] text-indigo-500 font-mono">{order.plate}</div>
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="font-bold text-gray-700 uppercase">{order.responsibleServer}</div>
-                                                <div className="text-[10px] text-gray-400 uppercase">{order.serverRole}</div>
-                                            </td>
-                                            <td className="p-4 font-bold text-gray-600 uppercase">{order.destination}</td>
-                                            <td className="p-4 font-mono text-gray-500">{order.fctNumber}</td>
-                                            {(securityMode || orders.some(o => o.exitTime || o.returnTime)) && (
+                                    {orders.length > 0 ? (
+                                        <>
+                                            {/* Ordens com Anexo */}
+                                            {groupedOrders.withPdf.length > 0 && (
                                                 <>
-                                                    <td className="p-4 text-center">
-                                                        <span className={`font-black text-xs ${order.exitTime ? 'text-indigo-600' : 'text-gray-300 italic'}`}>
-                                                            {order.exitTime || '--:--'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-4 text-center">
-                                                        <span className={`font-black text-xs ${order.returnTime ? 'text-emerald-600' : 'text-gray-300 italic'}`}>
-                                                            {order.returnTime || '--:--'}
-                                                        </span>
-                                                    </td>
+                                                    <tr className="bg-indigo-50/30">
+                                                        <td colSpan={8} className="p-2 text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center border-y border-indigo-100">
+                                                            Ordens com Anexo (PDF)
+                                                        </td>
+                                                    </tr>
+                                                    {groupedOrders.withPdf.sort((a,b) => b.date.localeCompare(a.date)).map(order => renderOrderRow(order))}
                                                 </>
                                             )}
-                                            <td className="p-4">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    {securityMode ? (
-                                                        <button 
-                                                            onClick={() => handleEdit(order)}
-                                                            className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
-                                                            title="Registrar Horários"
-                                                        >
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                                        </button>
-                                                    ) : (
-                                                        <>
-                                                            <button onClick={() => handlePrint(order)} className="p-2 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors" title="Imprimir">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                                                            </button>
-                                                            {!readOnly && !hideEdit && (
-                                                                <button onClick={() => handleEdit(order)} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors" title="Editar">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                                </button>
-                                                            )}
-                                                            {!readOnly && (
-                                                                <button 
-                                                                    onClick={() => {
-                                                                        setConfirmConfig({
-                                                                            isOpen: true,
-                                                                            title: 'Excluir Ordem de Saída',
-                                                                            message: 'Tem certeza que deseja excluir esta ordem?',
-                                                                            variant: 'danger',
-                                                                            onConfirm: () => {
-                                                                                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
-                                                                                onDelete(order.id);
-                                                                            }
-                                                                        });
-                                                                    }} 
-                                                                    className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors" 
-                                                                    title="Excluir"
-                                                                >
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                                </button>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )) : (
-                                        <tr><td colSpan={6} className="p-20 text-center text-gray-400 italic font-bold uppercase tracking-widest">Nenhuma ordem registrada</td></tr>
+                                            {/* Ordens sem Anexo */}
+                                            {groupedOrders.withoutPdf.length > 0 && (
+                                                <>
+                                                    <tr className="bg-amber-50/30">
+                                                        <td colSpan={8} className="p-2 text-[10px] font-black text-amber-600 uppercase tracking-widest text-center border-y border-amber-100">
+                                                            Ordens sem Anexo
+                                                        </td>
+                                                    </tr>
+                                                    {groupedOrders.withoutPdf.sort((a,b) => b.date.localeCompare(a.date)).map(order => renderOrderRow(order))}
+                                                </>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <tr><td colSpan={8} className="p-20 text-center text-gray-400 italic font-bold uppercase tracking-widest">Nenhuma ordem registrada</td></tr>
                                     )}
                                 </tbody>
                             </table>

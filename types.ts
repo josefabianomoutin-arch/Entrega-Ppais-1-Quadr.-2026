@@ -230,6 +230,7 @@ export interface VehicleExitOrder {
   returnDate?: string;
   returnTime?: string;
   observations?: string;
+  pdfUrl?: string;
 }
 
 export type UserRole = 'admin' | 'supplier' | 'producer' | 'pereciveis_supplier' | 'almoxarifado' | 'itesp' | 'financeiro' | 'subportaria' | 'cardapio' | 'infraestrutura' | 'ordem_saida' | 'readonly';

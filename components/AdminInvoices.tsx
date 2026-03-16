@@ -449,7 +449,16 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
             else if (sortKey === 'totalValue') comp = b.totalValue - a.totalValue;
             return sortDirection === 'asc' ? -comp : comp;
         });
-    }, [allInvoices, searchTerm, sortKey, sortDirection]);
+    }, [allInvoices, searchTerm, sortKey, sortDirection, activeSubTab, pdfFilter]);
+
+    const groupedInvoices = useMemo(() => {
+        if (mode !== 'warehouse_exit') return { all: filteredAndSortedInvoices };
+        
+        return {
+            withPdf: filteredAndSortedInvoices.filter(inv => !!inv.invoiceUrl),
+            withoutPdf: filteredAndSortedInvoices.filter(inv => !inv.invoiceUrl)
+        };
+    }, [filteredAndSortedInvoices, mode]);
 
     React.useEffect(() => {
         const table = tableRef.current;
@@ -536,16 +545,23 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
             }).filter(it => it.remaining > 0.001);
 
             if (itemsWithBalance.length > 0) {
-                if (window.confirm('Deseja imprimir as etiquetas com o SALDO RESTANTE dos itens desta nota?')) {
-                    const invToPrint = {
-                        ...exitingInvoice,
-                        items: itemsWithBalance.map(it => ({
-                            ...it,
-                            kg: it.remaining // Use the new remaining quantity for the label
-                        }))
-                    };
-                    handlePrintLabels([invToPrint]);
-                }
+                setConfirmConfig({
+                    isOpen: true,
+                    title: 'Imprimir Etiquetas',
+                    message: 'Deseja imprimir as etiquetas com o SALDO RESTANTE dos itens desta nota?',
+                    onConfirm: () => {
+                        const invToPrint = {
+                            ...exitingInvoice,
+                            items: itemsWithBalance.map(it => ({
+                                ...it,
+                                kg: it.remaining // Use the new remaining quantity for the label
+                            }))
+                        };
+                        handlePrintLabels([invToPrint]);
+                        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                    },
+                    variant: 'info'
+                });
             }
 
             setExitingInvoice(null);
@@ -751,7 +767,277 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredAndSortedInvoices.length > 0 ? filteredAndSortedInvoices.map((invoice, index) => {
+                        {mode === 'warehouse_exit' ? (
+                            <>
+                                {groupedInvoices.withPdf && groupedInvoices.withPdf.length > 0 && (
+                                    <>
+                                        <tr className="bg-indigo-50/50">
+                                            <td colSpan={7} className="p-2 text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center border-y border-indigo-100">
+                                                Notas com Anexo (PDF)
+                                            </td>
+                                        </tr>
+                                        {groupedInvoices.withPdf.map((invoice, index) => {
+                                            const isExpanded = expandedInvoiceId === invoice.id;
+                                            return (
+                                                <React.Fragment key={invoice.id}>
+                                                    <tr className="border-b hover:bg-gray-50 transition-colors">
+                                                        <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
+                                                        <td className="p-3">
+                                                            <div className="flex items-center gap-4">
+                                                                <div>
+                                                                    <p className="font-bold text-gray-800 uppercase leading-none">{invoice.supplierName}</p>
+                                                                    <p className="text-[10px] font-mono text-gray-400 mt-1">{invoice.supplierCpf}</p>
+                                                                </div>
+                                                                {invoice.items.some((it: any) => (it.exitedQuantity || 0) > 0) && (
+                                                                    <div className="bg-amber-50 border-2 border-amber-200 px-4 py-2 rounded-xl shadow-sm">
+                                                                        <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest leading-none mb-1">Saldo Restante</p>
+                                                                        <p className="text-sm font-black text-amber-700 leading-none uppercase">
+                                                                            {invoice.items.reduce((acc: number, it: any) => acc + Math.max(0, (it.kg || 0) - (it.exitedQuantity || 0)), 0).toFixed(2).replace('.', ',')} KG
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-3 font-mono">
+                                                            <div>{formatDate(invoice.date)}</div>
+                                                            {invoice.invoiceDate && invoice.invoiceDate !== invoice.date && (
+                                                                <div className="text-[9px] text-amber-600 font-bold uppercase mt-1">
+                                                                    NF: {formatDate(invoice.invoiceDate)}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3 font-mono">
+                                                            <div className="flex items-center gap-2">
+                                                                {invoice.invoiceNumber}
+                                                                {invoice.invoiceUrl && (
+                                                                    <button 
+                                                                        onClick={() => handleOpenPdf(invoice.invoiceUrl!)}
+                                                                        className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md font-bold hover:bg-indigo-100 transition-colors flex items-center gap-1"
+                                                                        title="Ver PDF"
+                                                                    >
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                                        PDF
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            {invoice.receiptTermNumber && (
+                                                                <div className="text-[9px] text-teal-600 mt-1 font-bold uppercase">
+                                                                    NOTA DE EMPENHO: {invoice.receiptTermNumber}
+                                                                </div>
+                                                            )}
+                                                            {invoice.barcode && (
+                                                                <div className="text-[9px] text-gray-400 mt-1 font-mono truncate max-w-[150px]" title={invoice.barcode}>
+                                                                    CHAVE: {invoice.barcode}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3 text-right font-mono font-bold text-green-700">{formatCurrency(invoice.totalValue)}</td>
+                                                        <td className="p-3 text-center">
+                                                            <button onClick={() => setExpandedInvoiceId(isExpanded ? null : invoice.id)} className="p-2 rounded-full hover:bg-gray-200" title="Ver itens">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                                            </button>
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                {invoice.items.every((item: any) => item.exitedQuantity >= item.kg) ? (
+                                                                    <span className="bg-gray-100 text-gray-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg shadow-sm">
+                                                                        Saída Concluída
+                                                                    </span>
+                                                                ) : (
+                                                                    <button 
+                                                                        onClick={() => handleRegisterExitClick(invoice)}
+                                                                        className="bg-red-600 text-white hover:bg-red-700 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors shadow-md"
+                                                                        title="Registrar Saída"
+                                                                    >
+                                                                        Registrar Saída
+                                                                    </button>
+                                                                )}
+                                                                <button 
+                                                                    onClick={() => { 
+                                                                        setConfirmConfig({
+                                                                            isOpen: true,
+                                                                            title: 'Excluir Nota',
+                                                                            message: 'Deseja realmente excluir esta nota fiscal? Esta ação não pode ser desfeita.',
+                                                                            onConfirm: () => {
+                                                                                onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber);
+                                                                                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                                            },
+                                                                            variant: 'danger'
+                                                                        });
+                                                                    }} 
+                                                                    className="bg-red-100 text-red-700 hover:bg-red-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" 
+                                                                    title="Excluir"
+                                                                >
+                                                                    Excluir
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {isExpanded && (
+                                                        <tr className="bg-gray-100">
+                                                            <td colSpan={7} className="p-4">
+                                                                <div className="bg-white p-4 rounded-lg shadow-inner">
+                                                                    <h4 className="text-xs font-bold uppercase text-gray-600 mb-2">Detalhamento da NF {invoice.invoiceNumber}</h4>
+                                                                    <ul className="space-y-1 text-xs">
+                                                                        {invoice.items.length > 0 ? invoice.items.map((item: any, index) => {
+                                                                            const remaining = Math.max(0, item.kg - (item.exitedQuantity || 0));
+                                                                            return (
+                                                                                <li key={index} className="flex justify-between items-center p-2 border-b last:border-b-0">
+                                                                                    <span className="font-semibold text-gray-700 uppercase flex items-center gap-3">
+                                                                                        {item.name} 
+                                                                                        <span className="text-gray-400 font-normal">({(item.kg || 0).toFixed(2).replace('.',',')} Kg)</span>
+                                                                                        {item.exitedQuantity > 0 && (
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                                                                                    SALDO: {remaining.toFixed(2).replace('.',',')} Kg
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </span>
+                                                                                </li>
+                                                                            );
+                                                                        }) : <li className="text-gray-400 italic">Nenhum item cadastrado</li>}
+                                                                    </ul>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                    </>
+                                )}
+                                {groupedInvoices.withoutPdf && groupedInvoices.withoutPdf.length > 0 && (
+                                    <>
+                                        <tr className="bg-amber-50/50">
+                                            <td colSpan={7} className="p-2 text-[10px] font-black text-amber-600 uppercase tracking-widest text-center border-y border-amber-100">
+                                                Notas sem Anexo
+                                            </td>
+                                        </tr>
+                                        {groupedInvoices.withoutPdf.map((invoice, index) => {
+                                            const isExpanded = expandedInvoiceId === invoice.id;
+                                            return (
+                                                <React.Fragment key={invoice.id}>
+                                                    <tr className="border-b hover:bg-gray-50 transition-colors">
+                                                        <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
+                                                        <td className="p-3">
+                                                            <div className="flex items-center gap-4">
+                                                                <div>
+                                                                    <p className="font-bold text-gray-800 uppercase leading-none">{invoice.supplierName}</p>
+                                                                    <p className="text-[10px] font-mono text-gray-400 mt-1">{invoice.supplierCpf}</p>
+                                                                </div>
+                                                                {invoice.items.some((it: any) => (it.exitedQuantity || 0) > 0) && (
+                                                                    <div className="bg-amber-50 border-2 border-amber-200 px-4 py-2 rounded-xl shadow-sm">
+                                                                        <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest leading-none mb-1">Saldo Restante</p>
+                                                                        <p className="text-sm font-black text-amber-700 leading-none uppercase">
+                                                                            {invoice.items.reduce((acc: number, it: any) => acc + Math.max(0, (it.kg || 0) - (it.exitedQuantity || 0)), 0).toFixed(2).replace('.', ',')} KG
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-3 font-mono">
+                                                            <div>{formatDate(invoice.date)}</div>
+                                                            {invoice.invoiceDate && invoice.invoiceDate !== invoice.date && (
+                                                                <div className="text-[9px] text-amber-600 font-bold uppercase mt-1">
+                                                                    NF: {formatDate(invoice.invoiceDate)}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3 font-mono">
+                                                            <div className="flex items-center gap-2">
+                                                                {invoice.invoiceNumber}
+                                                            </div>
+                                                            {invoice.receiptTermNumber && (
+                                                                <div className="text-[9px] text-teal-600 mt-1 font-bold uppercase">
+                                                                    NOTA DE EMPENHO: {invoice.receiptTermNumber}
+                                                                </div>
+                                                            )}
+                                                            {invoice.barcode && (
+                                                                <div className="text-[9px] text-gray-400 mt-1 font-mono truncate max-w-[150px]" title={invoice.barcode}>
+                                                                    CHAVE: {invoice.barcode}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3 text-right font-mono font-bold text-green-700">{formatCurrency(invoice.totalValue)}</td>
+                                                        <td className="p-3 text-center">
+                                                            <button onClick={() => setExpandedInvoiceId(isExpanded ? null : invoice.id)} className="p-2 rounded-full hover:bg-gray-200" title="Ver itens">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                                            </button>
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                {invoice.items.every((item: any) => item.exitedQuantity >= item.kg) ? (
+                                                                    <span className="bg-gray-100 text-gray-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg shadow-sm">
+                                                                        Saída Concluída
+                                                                    </span>
+                                                                ) : (
+                                                                    <button 
+                                                                        onClick={() => handleRegisterExitClick(invoice)}
+                                                                        className="bg-red-600 text-white hover:bg-red-700 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors shadow-md"
+                                                                        title="Registrar Saída"
+                                                                    >
+                                                                        Registrar Saída
+                                                                    </button>
+                                                                )}
+                                                                <button 
+                                                                    onClick={() => { 
+                                                                        setConfirmConfig({
+                                                                            isOpen: true,
+                                                                            title: 'Excluir Nota',
+                                                                            message: 'Deseja realmente excluir esta nota fiscal? Esta ação não pode ser desfeita.',
+                                                                            onConfirm: () => {
+                                                                                onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber);
+                                                                                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                                            },
+                                                                            variant: 'danger'
+                                                                        });
+                                                                    }} 
+                                                                    className="bg-red-100 text-red-700 hover:bg-red-200 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors" 
+                                                                    title="Excluir"
+                                                                >
+                                                                    Excluir
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {isExpanded && (
+                                                        <tr className="bg-gray-100">
+                                                            <td colSpan={7} className="p-4">
+                                                                <div className="bg-white p-4 rounded-lg shadow-inner">
+                                                                    <h4 className="text-xs font-bold uppercase text-gray-600 mb-2">Detalhamento da NF {invoice.invoiceNumber}</h4>
+                                                                    <ul className="space-y-1 text-xs">
+                                                                        {invoice.items.length > 0 ? invoice.items.map((item: any, index) => {
+                                                                            const remaining = Math.max(0, item.kg - (item.exitedQuantity || 0));
+                                                                            return (
+                                                                                <li key={index} className="flex justify-between items-center p-2 border-b last:border-b-0">
+                                                                                    <span className="font-semibold text-gray-700 uppercase flex items-center gap-3">
+                                                                                        {item.name} 
+                                                                                        <span className="text-gray-400 font-normal">({(item.kg || 0).toFixed(2).replace('.',',')} Kg)</span>
+                                                                                        {item.exitedQuantity > 0 && (
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                                                                                    SALDO: {remaining.toFixed(2).replace('.',',')} Kg
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </span>
+                                                                                </li>
+                                                                            );
+                                                                        }) : <li className="text-gray-400 italic">Nenhum item cadastrado</li>}
+                                                                    </ul>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            filteredAndSortedInvoices.length > 0 ? filteredAndSortedInvoices.map((invoice, index) => {
                             if (activeSubTab === 'uploaded') {
                                 return (
                                     <tr key={invoice.id} className="border-b hover:bg-gray-50 transition-colors">
@@ -982,7 +1268,14 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
             )}
 
             {exitingInvoice && (
-                <ExitInvoiceModal invoice={exitingInvoice} supplier={suppliers.find(s => s.cpf === exitingInvoice.supplierCpf)!} onClose={() => setExitingInvoice(null)} onSave={handleExitSave} isSaving={isSavingEdit} />
+                <ExitInvoiceModal 
+                    invoice={exitingInvoice} 
+                    supplier={suppliers.find(s => s.cpf === exitingInvoice.supplierCpf)!} 
+                    onClose={() => setExitingInvoice(null)} 
+                    onSave={handleExitSave} 
+                    isSaving={isSavingEdit} 
+                    onConfirmRequest={(config) => setConfirmConfig({ ...config, isOpen: true, onConfirm: () => { config.onConfirm(); setConfirmConfig(prev => ({ ...prev, isOpen: false })); } })}
+                />
             )}
 
             {isManualModalOpen && (
@@ -1267,7 +1560,24 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
                                             <label className="text-[8px] font-black text-gray-400 uppercase ml-1 text-center block">Qtd ({unit})</label>
                                             <input type="text" value={item.kg} onChange={e => handleItemChange(item.id, 'kg', e.target.value)} placeholder="0,00" className="w-full h-9 px-3 border border-gray-200 rounded-lg text-xs text-center font-mono focus:ring-2 focus:ring-teal-400 outline-none bg-white" required />
                                         </div>
-                                        <button type="button" onClick={() => setItems(prev => prev.filter(it => it.id !== item.id))} className="text-red-400 hover:text-red-600 p-1 mt-3 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                setConfirmConfig({
+                                                    isOpen: true,
+                                                    title: 'Excluir Item',
+                                                    message: `Deseja realmente remover o item "${item.name}" desta nota?`,
+                                                    onConfirm: () => {
+                                                        setItems(prev => prev.filter(it => it.id !== item.id));
+                                                        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                    },
+                                                    variant: 'danger'
+                                                });
+                                            }} 
+                                            className="text-red-400 hover:text-red-600 p-1 mt-3 transition-colors"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        </button>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
@@ -1305,9 +1615,10 @@ interface ExitInvoiceModalProps {
     onClose: () => void;
     onSave: (outboundNf: string, exitDate: string, itemsToExit: { name: string; kg: number; lotNumber?: string; expirationDate?: string }[]) => void;
     isSaving: boolean;
+    onConfirmRequest: (config: { title: string; message: string; onConfirm: () => void; variant?: 'danger' | 'warning' | 'info' }) => void;
 }
 
-const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, onClose, onSave, isSaving }) => {
+const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, onClose, onSave, isSaving, onConfirmRequest }) => {
     const [items, setItems] = useState(invoice.items.filter(it => (it.kg - (it.exitedQuantity || 0)) > 0.001).map((it, idx) => ({ 
         id: `exit-${idx}`, 
         name: it.name, 
@@ -1405,9 +1716,14 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
                                 <button 
                                     type="button"
                                     onClick={() => {
-                                        if (window.confirm('Deseja preencher a quantidade total para TODOS os itens desta nota?')) {
-                                            setItems(prev => prev.map(it => ({ ...it, kg: it.maxKg.toFixed(2).replace('.', ',') })));
-                                        }
+                                        onConfirmRequest({
+                                            title: 'Preencher Tudo',
+                                            message: 'Deseja preencher a quantidade total para TODOS os itens desta nota?',
+                                            onConfirm: () => {
+                                                setItems(prev => prev.map(it => ({ ...it, kg: it.maxKg.toFixed(2).replace('.', ',') })));
+                                            },
+                                            variant: 'info'
+                                        });
                                     }}
                                     className="w-full sm:w-auto text-[8px] font-black text-red-600 hover:bg-red-600 hover:text-white uppercase bg-white px-3 py-1 rounded-lg border-2 border-red-100 transition-all active:scale-95 shadow-sm"
                                 >
