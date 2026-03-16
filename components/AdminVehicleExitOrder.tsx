@@ -695,12 +695,34 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                                 <div className="text-[10px] text-indigo-500 font-mono font-bold">{order.plate}</div>
                                                 <div className="text-[9px] text-gray-400 uppercase mt-1">{order.responsibleServer}</div>
                                             </div>
-                                            <button 
-                                                onClick={() => handleQuickRegister(order, 'exit')}
-                                                className="bg-indigo-600 text-white font-black py-2 px-4 rounded-xl text-[9px] uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95"
-                                            >
-                                                Registrar Saída
-                                            </button>
+                                            <div className="flex gap-2">
+                                                {!readOnly && (
+                                                    <button 
+                                                        onClick={() => {
+                                                            setConfirmConfig({
+                                                                isOpen: true,
+                                                                title: 'Excluir Ordem',
+                                                                message: 'Tem certeza que deseja excluir esta ordem pendente?',
+                                                                variant: 'danger',
+                                                                onConfirm: () => {
+                                                                    setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                                    onDelete(order.id);
+                                                                }
+                                                            });
+                                                        }}
+                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                                                        title="Excluir"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    </button>
+                                                )}
+                                                <button 
+                                                    onClick={() => handleQuickRegister(order, 'exit')}
+                                                    className="bg-indigo-600 text-white font-black py-2 px-4 rounded-xl text-[9px] uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95"
+                                                >
+                                                    Registrar Saída
+                                                </button>
+                                            </div>
                                         </div>
                                     )) : (
                                         <div className="p-10 text-center text-gray-300 text-[10px] font-bold uppercase italic">Nenhuma ordem pendente</div>
@@ -721,12 +743,34 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                                 <div className="text-[10px] text-emerald-500 font-mono font-bold">{order.plate}</div>
                                                 <div className="text-[9px] text-gray-400 uppercase mt-1">Saída: {order.exitTime}</div>
                                             </div>
-                                            <button 
-                                                onClick={() => handleQuickRegister(order, 'return')}
-                                                className="bg-emerald-600 text-white font-black py-2 px-4 rounded-xl text-[9px] uppercase tracking-widest shadow-lg shadow-emerald-100 active:scale-95"
-                                            >
-                                                Registrar Retorno
-                                            </button>
+                                            <div className="flex gap-2">
+                                                {!readOnly && (
+                                                    <button 
+                                                        onClick={() => {
+                                                            setConfirmConfig({
+                                                                isOpen: true,
+                                                                title: 'Excluir Ordem',
+                                                                message: 'Tem certeza que deseja excluir esta ordem em trânsito?',
+                                                                variant: 'danger',
+                                                                onConfirm: () => {
+                                                                    setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                                    onDelete(order.id);
+                                                                }
+                                                            });
+                                                        }}
+                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                                                        title="Excluir"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    </button>
+                                                )}
+                                                <button 
+                                                    onClick={() => handleQuickRegister(order, 'return')}
+                                                    className="bg-emerald-600 text-white font-black py-2 px-4 rounded-xl text-[9px] uppercase tracking-widest shadow-lg shadow-emerald-100 active:scale-95"
+                                                >
+                                                    Registrar Retorno
+                                                </button>
+                                            </div>
                                         </div>
                                     )) : (
                                         <div className="p-10 text-center text-gray-300 text-[10px] font-bold uppercase italic">Nenhum veículo em trânsito</div>
@@ -1211,13 +1255,32 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-3">
-                                    <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                                        Acompanhantes
-                                    </label>
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                            Acompanhantes
+                                        </label>
+                                        <button 
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, companions: [...formData.companions, { name: '', rg: '' }] })}
+                                            className="text-[8px] font-black text-indigo-600 uppercase hover:underline"
+                                        >
+                                            + Adicionar
+                                        </button>
+                                    </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         {formData.companions.map((c, i) => (
-                                            <div key={i} className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm space-y-1.5">
+                                            <div key={i} className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm space-y-1.5 relative group">
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newCompanions = formData.companions.filter((_, idx) => idx !== i);
+                                                        setFormData({ ...formData, companions: newCompanions });
+                                                    }}
+                                                    className="absolute -top-1 -right-1 bg-red-100 text-red-600 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-2 w-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                </button>
                                                 <div className="space-y-0.5">
                                                     <label className="text-[7px] font-black text-gray-400 uppercase">Nome ({i + 1})</label>
                                                     <input 
