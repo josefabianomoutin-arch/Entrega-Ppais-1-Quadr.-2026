@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { FinancialRecord } from '../types';
+import ConfirmModal from './ConfirmModal';
 
 interface AdminFinancialManagerProps {
   records: FinancialRecord[];
@@ -26,6 +27,19 @@ const PtresTable: React.FC<{ ptres: string, ptresRecords: FinancialRecord[], for
     const topScrollRef = useRef<HTMLDivElement>(null);
     const bottomScrollRef = useRef<HTMLDivElement>(null);
     const tableRef = useRef<HTMLTableElement>(null);
+    
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     useEffect(() => {
         const topScroll = topScrollRef.current;
@@ -153,7 +167,18 @@ const PtresTable: React.FC<{ ptres: string, ptresRecords: FinancialRecord[], for
                                                 <button onClick={() => handleEdit(r)} className={`p-2 rounded-lg transition-all ${formData.id === r.id ? 'bg-orange-500 text-white' : (isFinalizado ? 'bg-green-100 text-green-700 hover:bg-green-600 hover:text-white' : isEmAndamentoEmpenhado ? 'bg-orange-100 text-orange-700 hover:bg-orange-600 hover:text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white')}`} title="Editar">
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                                 </button>
-                                                <button onClick={() => { if(window.confirm('Excluir este registro?')) onDelete(r.id); }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all" title="Excluir">
+                                                <button onClick={() => { 
+                                                    setConfirmConfig({
+                                                        isOpen: true,
+                                                        title: 'Excluir Registro',
+                                                        message: 'Deseja realmente excluir este registro? Esta ação não pode ser desfeita.',
+                                                        onConfirm: () => {
+                                                            onDelete(r.id);
+                                                            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                        },
+                                                        variant: 'danger'
+                                                    });
+                                                }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all" title="Excluir">
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                 </button>
                                             </div>
@@ -165,6 +190,14 @@ const PtresTable: React.FC<{ ptres: string, ptresRecords: FinancialRecord[], for
                     </table>
                 </div>
             </div>
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                variant={confirmConfig.variant}
+            />
         </div>
     );
 };

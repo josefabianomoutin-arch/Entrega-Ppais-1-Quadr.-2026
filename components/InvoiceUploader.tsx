@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { Delivery } from '../types';
+import ConfirmModal from './ConfirmModal';
 
 interface InvoiceUploaderProps {
   pendingInvoices: { date: string; deliveries: Delivery[] }[];
@@ -9,6 +10,18 @@ interface InvoiceUploaderProps {
 }
 
 const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ pendingInvoices, onSendInvoice, onCancel }) => {
+  const [confirmConfig, setConfirmConfig] = useState<{
+      isOpen: boolean;
+      title: string;
+      message: string;
+      onConfirm: () => void;
+      variant?: 'danger' | 'warning' | 'info';
+  }>({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: () => {},
+  });
   
   const formatDate = (dateString: string) => {
     return new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR', {
@@ -20,9 +33,16 @@ const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ pendingInvoices, onSe
 
   const handleCancelClick = (date: string, deliveryIds: string[]) => {
     const formatted = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR');
-    if (window.confirm(`Deseja realmente EXCLUIR o agendamento do dia ${formatted}? Esta ação não pode ser desfeita.`)) {
-      onCancel(deliveryIds);
-    }
+    setConfirmConfig({
+        isOpen: true,
+        title: 'Excluir Agendamento',
+        message: `Deseja realmente EXCLUIR o agendamento do dia ${formatted}? Esta ação não pode ser desfeita.`,
+        onConfirm: () => {
+            onCancel(deliveryIds);
+            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        },
+        variant: 'danger'
+    });
   };
 
   return (
@@ -71,6 +91,14 @@ const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ pendingInvoices, onSe
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
       `}</style>
+      <ConfirmModal 
+          isOpen={confirmConfig.isOpen}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+          variant={confirmConfig.variant}
+      />
     </div>
   );
 };

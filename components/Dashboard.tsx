@@ -8,6 +8,7 @@ import SummaryCard from './SummaryCard';
 import InvoiceUploader from './InvoiceUploader';
 import EmailConfirmationModal from './EmailConfirmationModal';
 import SendInvoiceModal from './SendInvoiceModal';
+import ConfirmModal from './ConfirmModal';
 import { speechService } from '../src/services/speechService';
 import { HelpCircle, Volume2, Loader2 } from 'lucide-react';
 
@@ -49,6 +50,19 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [deliveriesToShow, setDeliveriesToShow] = useState<Delivery[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  
+  const [confirmConfig, setConfirmConfig] = useState<{
+      isOpen: boolean;
+      title: string;
+      message: string;
+      onConfirm: () => void;
+      variant?: 'danger' | 'warning' | 'info';
+  }>({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: () => {},
+  });
 
   const panelTitle = type === 'PRODUTOR' ? 'Painel do Produtor 2026' : 'Painel do Fornecedor 2026';
   const headerColor = type === 'PRODUTOR' ? 'text-green-800' : 'text-indigo-800';
@@ -218,7 +232,27 @@ const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {isViewModalOpen && selectedDate && (
-        <ViewDeliveryModal date={selectedDate} deliveries={deliveriesToShow} onClose={handleCloseViewModal} onAddNew={handleAddNewFromView} onCancel={(ids) => { if(window.confirm('Excluir?')) { onCancelDeliveries(supplier.cpf, ids); handleCloseViewModal(); } }} onFulfill={handleOpenSendInvoiceModal} simulatedToday={SIMULATED_TODAY} />
+        <ViewDeliveryModal 
+            date={selectedDate} 
+            deliveries={deliveriesToShow} 
+            onClose={handleCloseViewModal} 
+            onAddNew={handleAddNewFromView} 
+            onCancel={(ids) => { 
+                setConfirmConfig({
+                    isOpen: true,
+                    title: 'Excluir',
+                    message: 'Excluir?',
+                    onConfirm: () => {
+                        onCancelDeliveries(supplier.cpf, ids); 
+                        handleCloseViewModal();
+                        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                    },
+                    variant: 'danger'
+                });
+            }} 
+            onFulfill={handleOpenSendInvoiceModal} 
+            simulatedToday={SIMULATED_TODAY} 
+        />
       )}
       
       {isSendInvoiceModalOpen && invoiceToSend && (
@@ -230,6 +264,15 @@ const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {emailModalData && <EmailConfirmationModal data={emailModalData} onClose={onCloseEmailModal} />}
+      
+      <ConfirmModal 
+          isOpen={confirmConfig.isOpen}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+          variant={confirmConfig.variant}
+      />
     </div>
   );
 };

@@ -399,21 +399,30 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
             deliveriesByInvoice.forEach((deliveries, invoiceNumber) => {
                 const invoiceId = `${supplier.cpf}-${invoiceNumber}`;
                 const totalValue = deliveries.reduce((sum, d) => sum + (d.value || 0), 0);
-                const items = deliveries
+                const itemsMap = new Map<string, any>();
+                deliveries
                     .filter(d => d.item && d.item !== 'AGENDAMENTO PENDENTE')
-                    .map(d => {
-                        const exitedQuantity = (warehouseLog || [])
-                            .filter(log => log.type === 'saída' && log.inboundInvoice === invoiceNumber && log.itemName === d.item && log.supplierName === supplier.name)
-                            .reduce((sum, log) => sum + (Number(log.quantity) || 0), 0);
-                        return { 
-                            name: d.item || 'Item não especificado', 
-                            kg: d.kg || 0, 
-                            value: d.value || 0,
-                            lotNumber: d.lots?.[0]?.lotNumber,
-                            expirationDate: d.lots?.[0]?.expirationDate,
-                            exitedQuantity
-                        };
+                    .forEach(d => {
+                        const itemName = d.item || 'Item não especificado';
+                        if (itemsMap.has(itemName)) {
+                            const existing = itemsMap.get(itemName);
+                            existing.kg += (d.kg || 0);
+                            existing.value += (d.value || 0);
+                        } else {
+                            const exitedQuantity = (warehouseLog || [])
+                                .filter(log => log.type === 'saída' && log.inboundInvoice === invoiceNumber && log.itemName === itemName && log.supplierName === supplier.name)
+                                .reduce((sum, log) => sum + (Number(log.quantity) || 0), 0);
+                            itemsMap.set(itemName, {
+                                name: itemName,
+                                kg: d.kg || 0,
+                                value: d.value || 0,
+                                lotNumber: d.lots?.[0]?.lotNumber,
+                                expirationDate: d.lots?.[0]?.expirationDate,
+                                exitedQuantity
+                            });
+                        }
                     });
+                const items = Array.from(itemsMap.values());
                 if(items.length === 0 && totalValue === 0) return;
                 const validDates = deliveries.map(d => d.date).filter(d => d && d !== "Invalid Date");
                 const earliestDate = validDates.length > 0 ? validDates.sort()[0] : new Date().toISOString().split('T')[0];
@@ -1257,7 +1266,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                     )}
                                 </React.Fragment>
                             )
-                        }) : (<tr><td colSpan={activeSubTab === 'all' ? 7 : 4} className="p-8 text-center text-gray-400 italic">Nenhuma nota fiscal registrada.</td></tr>)}
+                        }) : (<tr><td colSpan={activeSubTab === 'all' ? 7 : 4} className="p-8 text-center text-gray-400 italic">Nenhuma nota fiscal registrada.</td></tr>))}
                     </tbody>
                 </table>
                 </div>

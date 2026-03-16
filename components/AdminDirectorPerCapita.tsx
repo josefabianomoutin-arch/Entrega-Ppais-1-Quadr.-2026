@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Supplier, DirectorPerCapitaLog, DirectorItem } from '../types';
+import ConfirmModal from './ConfirmModal';
 
 interface AdminDirectorPerCapitaProps {
   suppliers: Supplier[];
@@ -31,6 +32,19 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
   const [recipient, setRecipient] = useState<'Chefe de Departamento' | 'Diretor de Disciplina'>('Chefe de Departamento');
   const [formItems, setFormItems] = useState<{ name: string; quantity: string; expirationDate: string }[]>([{ name: '', quantity: '', expirationDate: '' }]);
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [confirmConfig, setConfirmConfig] = useState<{
+      isOpen: boolean;
+      title: string;
+      message: string;
+      onConfirm: () => void;
+      variant?: 'danger' | 'warning' | 'info';
+  }>({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: () => {},
+  });
 
   const availableItems = useMemo(() => {
     const itemMap = new Map<string, { price: number; unit: string }>();
@@ -372,7 +386,18 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
                   <td className="p-4 text-right font-black text-indigo-700">{formatCurrency(log.totalValue)}</td>
                   <td className="p-4 text-center">
                     <button 
-                      onClick={() => { if(window.confirm('Deseja excluir este registro permanentemente? Atenção: O estoque NÃO será devolvido automaticamente ao excluir o log.')) onDelete(log.id); }} 
+                      onClick={() => { 
+                          setConfirmConfig({
+                              isOpen: true,
+                              title: 'Excluir Registro',
+                              message: 'Deseja excluir este registro permanentemente? Atenção: O estoque NÃO será devolvido automaticamente ao excluir o log.',
+                              onConfirm: () => {
+                                  onDelete(log.id);
+                                  setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                              },
+                              variant: 'danger'
+                          });
+                      }} 
                       className="text-red-400 hover:text-red-600 p-2 rounded-full transition-colors"
                       title="Excluir Registro"
                     >
@@ -388,6 +413,14 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
           </div>
         </div>
       </div>
+      <ConfirmModal 
+          isOpen={confirmConfig.isOpen}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+          variant={confirmConfig.variant}
+      />
     </div>
   );
 };

@@ -15,6 +15,7 @@ import AdminStandardMenu from './AdminStandardMenu';
 import AdminFinancialManager from './AdminFinancialManager';
 import AdminThirdPartyEntry from './AdminThirdPartyEntry';
 import AdminVehicleExitOrder from './AdminVehicleExitOrder';
+import ConfirmModal from './ConfirmModal';
 
 import WarehouseMovementForm from './WarehouseMovementForm';
 
@@ -121,6 +122,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   const [isRestoring, setIsRestoring] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const backupInputRef = useRef<HTMLInputElement>(null);
+  
+  const [confirmConfig, setConfirmConfig] = useState<{
+      isOpen: boolean;
+      title: string;
+      message: string;
+      onConfirm: () => void;
+      variant?: 'danger' | 'warning' | 'info';
+  }>({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: () => {},
+  });
 
   const tabs: { id: AdminTab; name: string; icon: React.ReactElement }[] = [
     { id: 'register', name: 'Fornecedores', icon: <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 11a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1z" /></svg> },
@@ -366,12 +380,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                                 if (!file) return;
                                 const reader = new FileReader();
                                 reader.onload = async (ev) => {
-                                    if(window.confirm('Substituir todos os dados do sistema agora?')) {
-                                        setIsRestoring(true);
-                                        const success = await props.onRestoreFullBackup(JSON.parse(ev.target?.result as string));
-                                        if (success) alert('Sistema Restaurado!');
-                                        setIsRestoring(false);
-                                    }
+                                    setConfirmConfig({
+                                        isOpen: true,
+                                        title: 'Restaurar Sistema',
+                                        message: 'Substituir todos os dados do sistema agora? Esta ação não pode ser desfeita.',
+                                        onConfirm: async () => {
+                                            setIsRestoring(true);
+                                            const success = await props.onRestoreFullBackup(JSON.parse(ev.target?.result as string));
+                                            if (success) alert('Sistema Restaurado!');
+                                            setIsRestoring(false);
+                                            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                        },
+                                        variant: 'danger'
+                                    });
                                 };
                                 reader.readAsText(file);
                             }} accept=".json" className="hidden" />
@@ -496,6 +517,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         />
       )}
       
+      <ConfirmModal 
+          isOpen={confirmConfig.isOpen}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+          variant={confirmConfig.variant}
+      />
+
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }

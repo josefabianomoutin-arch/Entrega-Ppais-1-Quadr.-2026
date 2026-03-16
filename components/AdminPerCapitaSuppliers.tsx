@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import type { PerCapitaSupplier } from '../types';
+import ConfirmModal from './ConfirmModal';
 
 interface AdminPerCapitaSuppliersProps {
     suppliers: PerCapitaSupplier[];
@@ -21,6 +22,19 @@ const AdminPerCapitaSuppliers: React.FC<AdminPerCapitaSuppliersProps> = ({ suppl
     const [cpfCnpj, setCpfCnpj] = useState('');
     const [processNumber, setProcessNumber] = useState('');
     const [monthlySchedule, setMonthlySchedule] = useState<Record<string, number[]>>({});
+    
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant?: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     const filteredSuppliers = suppliers.filter(p => 
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -73,9 +87,16 @@ const AdminPerCapitaSuppliers: React.FC<AdminPerCapitaSuppliersProps> = ({ suppl
     };
 
     const handleDelete = (id: string) => {
-        if (window.confirm(`Tem certeza que deseja excluir este ${type.toLowerCase()}?`)) {
-            onUpdate(suppliers.filter(p => p.id !== id));
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: `Excluir ${type}`,
+            message: `Tem certeza que deseja excluir este ${type.toLowerCase()}?`,
+            onConfirm: () => {
+                onUpdate(suppliers.filter(p => p.id !== id));
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            },
+            variant: 'danger'
+        });
     };
 
     const toggleWeek = (month: string, week: number) => {
@@ -308,6 +329,14 @@ const AdminPerCapitaSuppliers: React.FC<AdminPerCapitaSuppliersProps> = ({ suppl
                     </table>
                 </div>
             </div>
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                variant={confirmConfig.variant}
+            />
         </div>
     );
 };
