@@ -595,6 +595,19 @@ const App: React.FC = () => {
   };
 
   const handleUpdateInvoiceUrl = useCallback(async (supplierCpf: string, invoiceNumber: string, invoiceUrl: string) => {
+    let finalInvoiceUrl = invoiceUrl;
+    if (invoiceUrl.startsWith('data:')) {
+      try {
+        const invoiceId = `inv_upd_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const invoiceRef = child(ref(database), `invoices/${invoiceId}`);
+        await set(invoiceRef, invoiceUrl);
+        finalInvoiceUrl = `rtdb://invoices/${invoiceId}`;
+      } catch (e) {
+        console.error("Error saving invoice PDF to RTDB:", e);
+        return { success: false, message: 'Erro ao salvar o arquivo PDF.' };
+      }
+    }
+
     const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);
     if (isMainSupplier) {
       const supplierRef = child(suppliersRef, supplierCpf);
@@ -603,7 +616,7 @@ const App: React.FC = () => {
           if (currentData && currentData.deliveries) {
             currentData.deliveries = currentData.deliveries.map(d => {
                 if (d.invoiceNumber === invoiceNumber) {
-                    return { ...d, invoiceUrl };
+                    return { ...d, invoiceUrl: finalInvoiceUrl };
                 }
                 return d;
             });
@@ -624,7 +637,7 @@ const App: React.FC = () => {
             if (s && s.deliveries) {
               s.deliveries = s.deliveries.map((d: any) => {
                   if (d.invoiceNumber === invoiceNumber) {
-                      return { ...d, invoiceUrl };
+                      return { ...d, invoiceUrl: finalInvoiceUrl };
                   }
                   return d;
               });
@@ -643,51 +656,6 @@ const App: React.FC = () => {
       return { success: false, message: 'Erro ao gravar no banco de dados.' };
     }
   }, [suppliers, suppliersRef, perCapitaConfigRef]);
-              const finalInvoiceNumber = newInvoiceNumber || invoiceNumber;
-              const finalReceiptTerm = receiptTermNumber !== undefined ? receiptTermNumber : existingForNf[0].receiptTermNumber;
-              const finalInvoiceDate = invoiceDate !== undefined ? invoiceDate : existingForNf[0].invoiceDate;
-              const existingInvoiceUrl = existingForNf.find((d: any) => d.invoiceUrl)?.invoiceUrl;
-
-              s.deliveries = s.deliveries.filter((d: any) => d.invoiceNumber !== invoiceNumber);
-
-              items.forEach((item, idx) => {
-                s.deliveries.push({
-                  id: `inv-edit-${Date.now()}-${idx}`,
-                  date: baseDate,
-                  time: baseTime,
-                  item: item.name,
-                  kg: item.kg,
-                  value: item.value,
-                  invoiceUploaded: true,
-                  invoiceNumber: String(finalInvoiceNumber || '').trim(),
-                  invoiceUrl: existingInvoiceUrl,
-                  invoiceDate: finalInvoiceDate,
-                  barcode: barcode,
-                  receiptTermNumber: finalReceiptTerm,
-                  lots: [{
-                    id: `lot-edit-${Date.now()}-${idx}`,
-                    lotNumber: item.lotNumber || 'EDITADO',
-                    initialQuantity: item.kg,
-                    remainingQuantity: item.kg,
-                    expirationDate: item.expirationDate
-                  }]
-                });
-              });
-              return true;
-            }
-            return false;
-          };
-          if (!findAndUpdate(currentData.ppaisProducers)) {
-            findAndUpdate(currentData.pereciveisSuppliers);
-          }
-        }
-        return currentData;
-      });
-      return { success: true };
-    } catch (e) {
-      return { success: false, message: 'Erro ao gravar no banco de dados.' };
-    }
-  };
 
   const handleReopenInvoice = async (supplierCpf: string, invoiceNumber: string) => {
     const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);

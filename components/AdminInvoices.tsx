@@ -268,6 +268,8 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
     const [activeSubTab, setActiveSubTab] = useState<'all' | 'uploaded'>('all');
+    const [pdfFilter, setPdfFilter] = useState<'all' | 'pending' | 'with_pdf'>('all');
+    const [isUploadingPdf, setIsUploadingPdf] = useState<string | null>(null); // Store invoice ID being uploaded
 
     // Confirmation Modal State
     const [confirmConfig, setConfirmConfig] = useState<{
@@ -433,7 +435,11 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
         );
 
         if (activeSubTab === 'uploaded') {
-            // Do not filter by invoiceUrl, we want to show all to allow attaching PDFs
+            if (pdfFilter === 'pending') {
+                filtered = filtered.filter(inv => !inv.invoiceUrl);
+            } else if (pdfFilter === 'with_pdf') {
+                filtered = filtered.filter(inv => !!inv.invoiceUrl);
+            }
         }
 
         return filtered.sort((a, b) => {
@@ -573,11 +579,22 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
             const file = e.target.files?.[0];
             if (!file) return;
             
+            if (file.size > 2 * 1024 * 1024) {
+                alert("O arquivo é muito grande. O tamanho máximo permitido é 2MB.");
+                return;
+            }
+
+            setIsUploadingPdf(invoice.id);
             const reader = new FileReader();
             reader.onload = async (event) => {
                 const base64 = event.target?.result as string;
                 const res = await onUpdateInvoiceUrl(invoice.supplierCpf, invoice.invoiceNumber, base64);
+                setIsUploadingPdf(null);
                 if (!res.success) alert(res.message || 'Erro ao anexar PDF.');
+            };
+            reader.onerror = () => {
+                setIsUploadingPdf(null);
+                alert('Erro ao ler o arquivo.');
             };
             reader.readAsDataURL(file);
         };
@@ -644,6 +661,29 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                     Notas com PDF
                 </button>
             </div>
+
+            {activeSubTab === 'uploaded' && (
+                <div className="flex gap-2 mb-4">
+                    <button 
+                        onClick={() => setPdfFilter('all')}
+                        className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase transition-all ${pdfFilter === 'all' ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                    >
+                        Todas
+                    </button>
+                    <button 
+                        onClick={() => setPdfFilter('pending')}
+                        className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase transition-all ${pdfFilter === 'pending' ? 'bg-amber-500 text-white shadow-md' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                    >
+                        Pendentes de PDF
+                    </button>
+                    <button 
+                        onClick={() => setPdfFilter('with_pdf')}
+                        className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase transition-all ${pdfFilter === 'with_pdf' ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                    >
+                        Com PDF
+                    </button>
+                </div>
+            )}
 
             <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4 border-b pb-6">
                  <div>
@@ -722,16 +762,28 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                             {invoice.invoiceUrl ? (
                                                 <button 
                                                     onClick={() => handleOpenPdf(invoice.invoiceUrl!)}
-                                                    className="text-indigo-600 hover:text-indigo-800 font-bold underline text-xs"
+                                                    className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all"
                                                 >
-                                                    Abrir PDF
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                    Visualizar
                                                 </button>
                                             ) : (
                                                 <button 
                                                     onClick={() => handleAttachPdf(invoice)}
-                                                    className="text-teal-600 hover:text-teal-800 font-bold underline text-xs"
+                                                    disabled={isUploadingPdf !== null}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all ${isUploadingPdf === invoice.id ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-teal-50 text-teal-600 hover:bg-teal-100'}`}
                                                 >
-                                                    Anexar PDF
+                                                    {isUploadingPdf === invoice.id ? (
+                                                        <>
+                                                            <div className="h-3 w-3 border-2 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
+                                                            Salvando...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4-4m4 4v12" /></svg>
+                                                            Anexar PDF
+                                                        </>
+                                                    )}
                                                 </button>
                                             )}
                                         </td>
