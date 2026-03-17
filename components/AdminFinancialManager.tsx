@@ -77,119 +77,164 @@ const PtresTable: React.FC<{ ptres: string, ptresRecords: FinancialRecord[], for
         return () => resizeObserver.disconnect();
     }, [ptresRecords]);
 
-    const ptresTotals = ptresRecords.reduce((acc, r) => ({
-        rec: acc.rec + (r.tipo === 'RECURSO' ? (Number(r.valorRecebido) || 0) : 0),
-        gast: acc.gast + (r.tipo === 'DESPESA' ? Number(r.valorUtilizado) : 0)
-    }), { rec: 0, gast: 0 });
+    const ptresTotalsByNatureza = ptresRecords.reduce((acc, r) => {
+        const nat = r.natureza || 'OUTROS';
+        if (!acc[nat]) {
+            acc[nat] = { rec: 0, gast: 0 };
+        }
+        if (r.tipo === 'RECURSO') {
+            acc[nat].rec += (Number(r.valorRecebido) || 0);
+        } else if (r.tipo === 'DESPESA') {
+            acc[nat].gast += (Number(r.valorUtilizado) || 0);
+        }
+        return acc;
+    }, {} as Record<string, { rec: number, gast: number }>);
+
+    const totalGeralRec = (Object.values(ptresTotalsByNatureza) as { rec: number, gast: number }[]).reduce((sum, item) => sum + item.rec, 0);
+    const totalGeralGast = (Object.values(ptresTotalsByNatureza) as { rec: number, gast: number }[]).reduce((sum, item) => sum + item.gast, 0);
+    const saldoGeral = totalGeralRec - totalGeralGast;
 
     return (
         <div className="animate-fade-in-up">
-            <div className="flex items-center justify-between mb-4 border-b-2 border-gray-200 pb-2 px-2">
+            <div className="flex items-center justify-between mb-6 border-b-2 border-gray-200 pb-4 px-2">
                 <div className="flex flex-col">
                     <div className="flex items-baseline gap-3">
-                        <h3 className="text-2xl font-black text-gray-800 tracking-tighter italic">Histórico PTRES {ptres}</h3>
-                        <span className="text-[10px] font-black bg-gray-200 text-gray-600 px-3 py-1 rounded-full uppercase tracking-widest">
+                        <h3 className="text-3xl font-black text-gray-800 tracking-tighter italic">Histórico PTRES {ptres}</h3>
+                        <span className="text-xs font-black bg-gray-200 text-gray-600 px-3 py-1 rounded-full uppercase tracking-widest">
                             {ptresRecords.length} Movimentos
                         </span>
                     </div>
                 </div>
-                <div className="text-right">
-                    <p className="text-[10px] font-black text-gray-400 uppercase">Saldo do Grupo</p>
-                    <p className={`font-black ${ptresTotals.rec - ptresTotals.gast >= 0 ? 'text-indigo-600' : 'text-red-700'}`}>
-                        {formatCurrency(ptresTotals.rec - ptresTotals.gast)}
-                    </p>
+                <div className="flex gap-6 text-right">
+                    <div className="flex flex-col items-end border-l-2 border-gray-200 pl-6">
+                        <p className="text-xs font-black text-gray-400 uppercase">Saldo Total do Grupo</p>
+                        <p className={`text-2xl font-black ${saldoGeral >= 0 ? 'text-indigo-600' : 'text-red-700'}`}>
+                            {formatCurrency(saldoGeral)}
+                        </p>
+                    </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div 
-                    ref={topScrollRef} 
-                    className="overflow-x-auto overflow-y-hidden custom-scrollbar border-b border-gray-100" 
-                    style={{ height: '12px' }}
-                >
-                    <div style={{ height: '1px' }}></div>
-                </div>
-                <div ref={bottomScrollRef} className="overflow-x-auto custom-scrollbar">
-                    <table ref={tableRef} className="w-full text-sm">
-                        <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                            <tr>
-                                <th className="p-3 text-center w-12">#</th>
-                                <th className="p-3 text-left">Tipo</th>
-                                <th className="p-3 text-left">Natureza / Modalidade</th>
-                                <th className="p-3 text-left">Descrição</th>
-                                <th className="p-3 text-left">Processo / Empenho</th>
-                                <th className="p-3 text-left">Data</th>
-                                <th className="p-3 text-left">Status</th>
-                                <th className="p-3 text-right">Valor</th>
-                                <th className="p-3 text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {ptresRecords.sort((a, b) => new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime()).map((r, index) => {
-                                const statusUpper = (r.status || '').toUpperCase().trim();
-                                const isFinalizado = ['FINALIZADO', 'CONCLUIDO', 'CONCLUÍDO'].includes(statusUpper);
-                                const isEmAndamentoEmpenhado = statusUpper === 'EM ANDAMENTO' && !!r.numeroEmpenho;
-                                
-                                return (
-                                    <tr key={r.id || `admin-rec-${index}`} className={`border-b hover:bg-gray-50 transition-colors ${formData.id === r.id ? 'bg-orange-50' : ''}`}>
-                                        <td className="p-3 text-center font-mono text-gray-500">{index + 1}</td>
-                                        <td className="p-3">
-                                            <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase border shadow-sm ${isFinalizado ? 'bg-green-100 text-green-700 border-green-200' : isEmAndamentoEmpenhado ? 'bg-orange-100 text-orange-700 border-orange-200' : (r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100')}`}>
-                                                {r.tipo}
-                                            </span>
-                                        </td>
-                                        <td className="p-3">
-                                            <div className="text-[10px] font-bold text-gray-600">NAT: {r.natureza}</div>
-                                            {r.tipo === 'DESPESA' && <div className={`text-[10px] font-black uppercase mt-1 ${isFinalizado ? 'text-green-600' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-indigo-500'}`}>{r.modalidade || 'DISPENSA'}</div>}
-                                        </td>
-                                        <td className="p-3 max-w-xs">
-                                            <div className="text-sm font-bold text-gray-800 uppercase truncate" title={r.descricao}>{r.descricao || 'N/A'}</div>
-                                            <div className="text-[8px] font-mono text-gray-300 uppercase mt-1">ID: ...{r.id?.slice(-4)}</div>
-                                        </td>
-                                        <td className="p-3 text-[9px] font-bold uppercase text-gray-500">
-                                            {r.numeroProcesso && <div className="mb-1">PROC: <span className={isFinalizado ? "text-green-700 font-black" : isEmAndamentoEmpenhado ? "text-orange-700 font-black" : "text-gray-800"}>{r.numeroProcesso}</span></div>}
-                                            {r.numeroEmpenho && <div className="mb-1">EMP: <span className={isEmAndamentoEmpenhado ? "text-orange-700 font-black" : "text-gray-800"}>{r.numeroEmpenho}</span></div>}
-                                            {r.notaCredito && <div>CRÉD: <span className="text-gray-800">{r.notaCredito}</span></div>}
-                                        </td>
-                                        <td className="p-3 font-mono text-[10px] text-gray-600">
-                                            {(r.dataRecebimento || r.dataPagamento || '-').split('-').reverse().join('/')}
-                                            {(!isFinalizado && r.dataFinalizacaoProcesso) && <div className="text-[8px] mt-1 text-gray-400">PREV: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</div>}
-                                            {(isFinalizado && r.dataFinalizacaoProcesso) && <div className="text-[8px] mt-1 text-green-600 font-bold">CONCL: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</div>}
-                                        </td>
-                                        <td className="p-3">
-                                            <span className={`text-[10px] font-black ${isFinalizado ? 'text-green-700' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-indigo-600'}`}>{r.status || 'PENDENTE'}</span>
-                                        </td>
-                                        <td className={`p-3 text-right font-black ${isFinalizado ? 'text-green-700' : isEmAndamentoEmpenhado ? 'text-orange-700' : (r.tipo === 'RECURSO' ? 'text-indigo-700' : 'text-red-700')}`}>
-                                            {r.tipo === 'RECURSO' ? formatCurrency(r.valorRecebido) : formatCurrency(r.valorUtilizado)}
-                                        </td>
-                                        <td className="p-3 text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button onClick={() => handleEdit(r)} className={`p-2 rounded-lg transition-all ${formData.id === r.id ? 'bg-orange-500 text-white' : (isFinalizado ? 'bg-green-100 text-green-700 hover:bg-green-600 hover:text-white' : isEmAndamentoEmpenhado ? 'bg-orange-100 text-orange-700 hover:bg-orange-600 hover:text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white')}`} title="Editar">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                </button>
-                                                <button onClick={() => { 
-                                                    setConfirmConfig({
-                                                        isOpen: true,
-                                                        title: 'Excluir Registro',
-                                                        message: 'Deseja realmente excluir este registro? Esta ação não pode ser desfeita.',
-                                                        onConfirm: () => {
-                                                            onDelete(r.id);
-                                                            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
-                                                        },
-                                                        variant: 'danger'
-                                                    });
-                                                }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all" title="Excluir">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+            <div className="space-y-8">
+                {(Object.entries(ptresTotalsByNatureza) as [string, { rec: number, gast: number }][]).sort(([a], [b]) => a.localeCompare(b)).map(([nat, totals]) => {
+                    const natRecords = ptresRecords.filter(r => (r.natureza || 'OUTROS') === nat);
+                    const saldo = totals.rec - totals.gast;
+                    
+                    return (
+                        <div key={nat} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-3 h-3 rounded-full ${nat === '339030' ? 'bg-blue-500' : nat === '339039' ? 'bg-purple-500' : 'bg-gray-500'}`}></div>
+                                    <h4 className="text-lg font-black text-gray-800 uppercase tracking-widest italic">NATUREZA {nat}</h4>
+                                    <span className="text-[10px] font-black bg-white border border-gray-200 text-gray-500 px-2 py-0.5 rounded-full uppercase">
+                                        {natRecords.length} Registros
+                                    </span>
+                                </div>
+                                <div className="flex gap-6 text-right">
+                                    <div className="flex flex-col items-end">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase">Entrada</p>
+                                        <p className="text-sm font-black text-indigo-600">{formatCurrency(totals.rec)}</p>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase">Saída</p>
+                                        <p className="text-sm font-black text-red-600">{formatCurrency(totals.gast)}</p>
+                                    </div>
+                                    <div className="flex flex-col items-end border-l border-gray-300 pl-4">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase">Saldo NAT {nat}</p>
+                                        <p className={`text-lg font-black ${saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {formatCurrency(saldo)}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto custom-scrollbar">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-white text-[10px] uppercase text-gray-400 border-b border-gray-100">
+                                        <tr>
+                                            <th className="p-3 text-center w-12">#</th>
+                                            <th className="p-3 text-left">Tipo</th>
+                                            <th className="p-3 text-left">Modalidade</th>
+                                            <th className="p-3 text-left">Descrição</th>
+                                            <th className="p-3 text-left">Processo / Empenho</th>
+                                            <th className="p-3 text-left">Data</th>
+                                            <th className="p-3 text-left">Status</th>
+                                            <th className="p-3 text-right">Valor</th>
+                                            <th className="p-3 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {natRecords.sort((a, b) => new Date(b.dataRecebimento || b.dataPagamento || 0).getTime() - new Date(a.dataRecebimento || a.dataPagamento || 0).getTime()).map((r, index) => {
+                                            const statusUpper = (r.status || '').toUpperCase().trim();
+                                            const isFinalizado = ['FINALIZADO', 'CONCLUIDO', 'CONCLUÍDO'].includes(statusUpper);
+                                            const isEmAndamentoEmpenhado = statusUpper === 'EM ANDAMENTO' && !!r.numeroEmpenho;
+                                            
+                                            return (
+                                                <tr key={r.id || `admin-rec-${nat}-${index}`} className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${formData.id === r.id ? 'bg-orange-50' : ''}`}>
+                                                    <td className="p-3 text-center font-mono text-gray-400 text-xs">{index + 1}</td>
+                                                    <td className="p-3">
+                                                        <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase border shadow-sm ${isFinalizado ? 'bg-green-100 text-green-700 border-green-200' : isEmAndamentoEmpenhado ? 'bg-orange-100 text-orange-700 border-orange-200' : (r.tipo === 'RECURSO' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-red-50 text-red-700 border-red-100')}`}>
+                                                            {r.tipo}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3">
+                                                        {r.tipo === 'DESPESA' ? (
+                                                            <div className={`text-[10px] font-black uppercase ${isFinalizado ? 'text-green-600' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-indigo-500'}`}>{r.modalidade || 'DISPENSA'}</div>
+                                                        ) : (
+                                                            <div className="text-[10px] font-bold text-gray-400">-</div>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-3 max-w-xs">
+                                                        <div className="text-xs font-bold text-gray-800 uppercase truncate" title={r.descricao}>{r.descricao || 'N/A'}</div>
+                                                        <div className="text-[8px] font-mono text-gray-300 uppercase mt-1">ID: ...{r.id?.slice(-4)}</div>
+                                                    </td>
+                                                    <td className="p-3 text-[9px] font-bold uppercase text-gray-500">
+                                                        {r.numeroProcesso && <div className="mb-1">PROC: <span className={isFinalizado ? "text-green-700 font-black" : isEmAndamentoEmpenhado ? "text-orange-700 font-black" : "text-gray-800"}>{r.numeroProcesso}</span></div>}
+                                                        {r.numeroEmpenho && <div className="mb-1">EMP: <span className={isEmAndamentoEmpenhado ? "text-orange-700 font-black" : "text-gray-800"}>{r.numeroEmpenho}</span></div>}
+                                                        {r.notaCredito && <div>CRÉD: <span className="text-gray-800">{r.notaCredito}</span></div>}
+                                                    </td>
+                                                    <td className="p-3 font-mono text-[10px] text-gray-600">
+                                                        {(r.dataRecebimento || r.dataPagamento || '-').split('-').reverse().join('/')}
+                                                        {(!isFinalizado && r.dataFinalizacaoProcesso) && <div className="text-[8px] mt-1 text-gray-400">PREV: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</div>}
+                                                        {(isFinalizado && r.dataFinalizacaoProcesso) && <div className="text-[8px] mt-1 text-green-600 font-bold">CONCL: {r.dataFinalizacaoProcesso.split('-').reverse().join('/')}</div>}
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <span className={`text-[10px] font-black ${isFinalizado ? 'text-green-700' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-indigo-600'}`}>{r.status || 'PENDENTE'}</span>
+                                                    </td>
+                                                    <td className={`p-3 text-right font-black text-xs ${isFinalizado ? 'text-green-700' : isEmAndamentoEmpenhado ? 'text-orange-700' : (r.tipo === 'RECURSO' ? 'text-indigo-700' : 'text-red-700')}`}>
+                                                        {r.tipo === 'RECURSO' ? formatCurrency(r.valorRecebido) : formatCurrency(r.valorUtilizado)}
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <button onClick={() => handleEdit(r)} className={`p-2 rounded-lg transition-all ${formData.id === r.id ? 'bg-orange-500 text-white' : (isFinalizado ? 'bg-green-100 text-green-700 hover:bg-green-600 hover:text-white' : isEmAndamentoEmpenhado ? 'bg-orange-100 text-orange-700 hover:bg-orange-600 hover:text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white')}`} title="Editar">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                            </button>
+                                                            <button onClick={() => { 
+                                                                setConfirmConfig({
+                                                                    isOpen: true,
+                                                                    title: 'Excluir Registro',
+                                                                    message: 'Deseja realmente excluir este registro? Esta ação não pode ser desfeita.',
+                                                                    onConfirm: () => {
+                                                                        onDelete(r.id);
+                                                                        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                                                                    },
+                                                                    variant: 'danger'
+                                                                });
+                                                            }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all" title="Excluir">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
+
             <ConfirmModal 
                 isOpen={confirmConfig.isOpen}
                 title={confirmConfig.title}
