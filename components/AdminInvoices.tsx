@@ -363,7 +363,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                 <td class="text-right font-bold">${formatCurrency(invoice.totalValue)}</td>
                                 <td>
                                     <ul style="margin:0; padding-left: 15px;">
-                                        ${invoice.items.map((item: any) => `
+                                        ${(invoice.items || []).map((item: any) => `
                                             <li>${item.name} - ${item.kg.toFixed(2).replace('.',',')} Kg - ${formatCurrency(item.value)}</li>
                                         `).join('')}
                                     </ul>
@@ -797,11 +797,11 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                                     <p className="font-bold text-gray-800 uppercase leading-none">{invoice.supplierName}</p>
                                                                     <p className="text-[10px] font-mono text-gray-400 mt-1">{invoice.supplierCpf}</p>
                                                                 </div>
-                                                                {invoice.items.some((it: any) => (it.exitedQuantity || 0) > 0) && (
+                                                                {invoice.items && invoice.items.some((it: any) => (it.exitedQuantity || 0) > 0) && (
                                                                     <div className="bg-amber-50 border-2 border-amber-200 px-4 py-2 rounded-xl shadow-sm">
                                                                         <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest leading-none mb-1">Saldo Restante</p>
                                                                         <p className="text-sm font-black text-amber-700 leading-none uppercase">
-                                                                            {invoice.items.reduce((acc: number, it: any) => acc + Math.max(0, (it.kg || 0) - (it.exitedQuantity || 0)), 0).toFixed(2).replace('.', ',')} KG
+                                                                            {(invoice.items || []).reduce((acc: number, it: any) => acc + Math.max(0, (it.kg || 0) - (it.exitedQuantity || 0)), 0).toFixed(2).replace('.', ',')} KG
                                                                         </p>
                                                                     </div>
                                                                 )}
@@ -848,7 +848,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                         </td>
                                                         <td className="p-3 text-center">
                                                             <div className="flex items-center justify-center gap-2">
-                                                                {invoice.items.every((item: any) => item.exitedQuantity >= item.kg) ? (
+                                                                {(invoice.items || []).every((item: any) => item.exitedQuantity >= item.kg) ? (
                                                                     <span className="bg-gray-100 text-gray-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg shadow-sm">
                                                                         Saída Concluída
                                                                     </span>
@@ -888,7 +888,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                                 <div className="bg-white p-4 rounded-lg shadow-inner">
                                                                     <h4 className="text-xs font-bold uppercase text-gray-600 mb-2">Detalhamento da NF {invoice.invoiceNumber}</h4>
                                                                     <ul className="space-y-1 text-xs">
-                                                                        {invoice.items.length > 0 ? invoice.items.map((item: any, index) => {
+                                                                        {(invoice.items || []).length > 0 ? (invoice.items || []).map((item: any, index) => {
                                                                             const remaining = Math.max(0, item.kg - (item.exitedQuantity || 0));
                                                                             return (
                                                                                 <li key={index} className="flex justify-between items-center p-2 border-b last:border-b-0">
@@ -935,11 +935,11 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                                     <p className="font-bold text-gray-800 uppercase leading-none">{invoice.supplierName}</p>
                                                                     <p className="text-[10px] font-mono text-gray-400 mt-1">{invoice.supplierCpf}</p>
                                                                 </div>
-                                                                {invoice.items.some((it: any) => (it.exitedQuantity || 0) > 0) && (
+                                                                {invoice.items && invoice.items.some((it: any) => (it.exitedQuantity || 0) > 0) && (
                                                                     <div className="bg-amber-50 border-2 border-amber-200 px-4 py-2 rounded-xl shadow-sm">
                                                                         <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest leading-none mb-1">Saldo Restante</p>
                                                                         <p className="text-sm font-black text-amber-700 leading-none uppercase">
-                                                                            {invoice.items.reduce((acc: number, it: any) => acc + Math.max(0, (it.kg || 0) - (it.exitedQuantity || 0)), 0).toFixed(2).replace('.', ',')} KG
+                                                                            {(invoice.items || []).reduce((acc: number, it: any) => acc + Math.max(0, (it.kg || 0) - (it.exitedQuantity || 0)), 0).toFixed(2).replace('.', ',')} KG
                                                                         </p>
                                                                     </div>
                                                                 )}
@@ -976,7 +976,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                         </td>
                                                         <td className="p-3 text-center">
                                                             <div className="flex items-center justify-center gap-2">
-                                                                {invoice.items.every((item: any) => item.exitedQuantity >= item.kg) ? (
+                                                                {(invoice.items || []).every((item: any) => item.exitedQuantity >= item.kg) ? (
                                                                     <span className="bg-gray-100 text-gray-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg shadow-sm">
                                                                         Saída Concluída
                                                                     </span>
@@ -1016,7 +1016,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                                 <div className="bg-white p-4 rounded-lg shadow-inner">
                                                                     <h4 className="text-xs font-bold uppercase text-gray-600 mb-2">Detalhamento da NF {invoice.invoiceNumber}</h4>
                                                                     <ul className="space-y-1 text-xs">
-                                                                        {invoice.items.length > 0 ? invoice.items.map((item: any, index) => {
+                                                                        {(invoice.items || []).length > 0 ? (invoice.items || []).map((item: any, index) => {
                                                                             const remaining = Math.max(0, item.kg - (item.exitedQuantity || 0));
                                                                             return (
                                                                                 <li key={index} className="flex justify-between items-center p-2 border-b last:border-b-0">
@@ -1096,11 +1096,11 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                     <p className="font-bold text-gray-800 uppercase leading-none">{invoice.supplierName}</p>
                                                     <p className="text-[10px] font-mono text-gray-400 mt-1">{invoice.supplierCpf}</p>
                                                 </div>
-                                                {invoice.items.some((it: any) => (it.exitedQuantity || 0) > 0) && (
+                                                {invoice.items && invoice.items.some((it: any) => (it.exitedQuantity || 0) > 0) && (
                                                     <div className="bg-amber-50 border-2 border-amber-200 px-4 py-2 rounded-xl shadow-sm">
                                                         <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest leading-none mb-1">Saldo Restante</p>
                                                         <p className="text-sm font-black text-amber-700 leading-none uppercase">
-                                                            {invoice.items.reduce((acc: number, it: any) => acc + Math.max(0, (it.kg || 0) - (it.exitedQuantity || 0)), 0).toFixed(2).replace('.', ',')} KG
+                                                            {(invoice.items || []).reduce((acc: number, it: any) => acc + Math.max(0, (it.kg || 0) - (it.exitedQuantity || 0)), 0).toFixed(2).replace('.', ',')} KG
                                                         </p>
                                                     </div>
                                                 )}
@@ -1148,7 +1148,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                         <td className="p-3 text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 {mode === 'warehouse_exit' ? (
-                                                    invoice.items.every((item: any) => item.exitedQuantity >= item.kg) ? (
+                                                    (invoice.items || []).every((item: any) => item.exitedQuantity >= item.kg) ? (
                                                         <span className="bg-gray-100 text-gray-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg shadow-sm">
                                                             Saída Concluída
                                                         </span>
@@ -1220,7 +1220,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                 <div className="bg-white p-4 rounded-lg shadow-inner">
                                                     <h4 className="text-xs font-bold uppercase text-gray-600 mb-2">Detalhamento da NF {invoice.invoiceNumber}</h4>
                                                     <ul className="space-y-1 text-xs">
-                                                        {invoice.items.length > 0 ? invoice.items.map((item: any, index) => {
+                                                        {(invoice.items || []).length > 0 ? (invoice.items || []).map((item: any, index) => {
                                                             const remaining = Math.max(0, item.kg - (item.exitedQuantity || 0));
                                                             return (
                                                                 <li key={index} className="flex justify-between items-center p-2 border-b last:border-b-0">
@@ -1457,8 +1457,8 @@ interface EditInvoiceModalProps {
 }
 
 const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, onClose, onSave, isSaving }) => {
-    const initialItems = invoice.items.length > 0 
-        ? invoice.items.map((it, idx) => ({ id: `edit-${idx}`, name: it.name, kg: String(it.kg).replace('.', ','), lot: it.lotNumber || '', exp: it.expirationDate || '' }))
+    const initialItems = (invoice.items || []).length > 0 
+        ? (invoice.items || []).map((it, idx) => ({ id: `edit-${idx}`, name: it.name, kg: String(it.kg).replace('.', ','), lot: it.lotNumber || '', exp: it.expirationDate || '' }))
         : [{ id: `new-0`, name: '', kg: '', lot: '', exp: '' }];
     const [items, setItems] = useState(initialItems);
     const [barcode, setBarcode] = useState(invoice.barcode || '');
@@ -1467,6 +1467,7 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
     const [date, setDate] = useState(invoice.date);
     const [invoiceDate, setInvoiceDate] = useState(invoice.invoiceDate || invoice.date); // NOVO
     const [itemSearch, setItemSearch] = useState('');
+    const [confirmConfig, setConfirmConfig] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void, variant?: 'danger'|'warning'|'info'}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
     const filteredItems = useMemo(() => {
         return items.filter(it => it.name.toLowerCase().includes(itemSearch.toLowerCase()));
@@ -1614,6 +1615,14 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
                     </div>
                 </form>
             </div>
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                onConfirm={confirmConfig.onConfirm}
+                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                variant={confirmConfig.variant}
+            />
         </div>
     );
 };
@@ -1628,7 +1637,7 @@ interface ExitInvoiceModalProps {
 }
 
 const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, onClose, onSave, isSaving, onConfirmRequest }) => {
-    const [items, setItems] = useState(invoice.items.filter(it => (it.kg - (it.exitedQuantity || 0)) > 0.001).map((it, idx) => ({ 
+    const [items, setItems] = useState((invoice.items || []).filter(it => (it.kg - (it.exitedQuantity || 0)) > 0.001).map((it, idx) => ({ 
         id: `exit-${idx}`, 
         name: it.name, 
         kg: '0,00', 

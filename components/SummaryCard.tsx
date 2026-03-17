@@ -37,26 +37,29 @@ const formatCurrency = (value: number): string => {
 };
 
 const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
-    const totalDeliveredValue = supplier.deliveries.reduce((sum, delivery) => sum + (delivery.value || 0), 0);
+    const deliveries = supplier.deliveries || [];
+    const contractItems = supplier.contractItems || [];
+
+    const totalDeliveredValue = deliveries.reduce((sum, delivery) => sum + (delivery.value || 0), 0);
     const valueProgress = supplier.initialValue > 0 ? (totalDeliveredValue / supplier.initialValue) * 100 : 0;
 
     const aggregatedTotals = useMemo(() => {
         const contracted = new Map<string, number>();
         const delivered = new Map<string, number>();
-        supplier.contractItems.forEach(item => {
+        contractItems.forEach(item => {
             const { quantity, unit } = getContractItemDisplayInfo(item);
             contracted.set(unit, (contracted.get(unit) || 0) + quantity);
         });
-        supplier.deliveries.forEach(delivery => {
+        deliveries.forEach(delivery => {
             if (!delivery.item || (delivery.kg || 0) === 0) return;
-            const contractItem = supplier.contractItems.find(ci => ci.name === delivery.item);
+            const contractItem = contractItems.find(ci => ci.name === delivery.item);
             if (contractItem) {
                 const { unit } = getContractItemDisplayInfo(contractItem);
                 delivered.set(unit, (delivered.get(unit) || 0) + (delivery.kg || 0));
             }
         });
         return { contracted, delivered };
-    }, [supplier]);
+    }, [contractItems, deliveries]);
 
     const totalContractedKgForProgress = aggregatedTotals.contracted.get('Kg') || 0;
     const totalDeliveredKgForProgress = aggregatedTotals.delivered.get('Kg') || 0;
@@ -64,7 +67,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
 
     const monthlyDataByItem = useMemo(() => {
         const data = new Map<string, any[]>();
-        supplier.contractItems.forEach(item => {
+        contractItems.forEach(item => {
             const itemMonthlyData = [];
             const { quantity: itemTotalQuantity, unit: itemUnit } = getContractItemDisplayInfo(item);
             const itemTotalValue = (item.totalKg || 0) * (item.valuePerKg || 0);
@@ -82,7 +85,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
                     monthlyQuantityQuota += accumulatedQuantityRemainder;
                 }
 
-                const deliveredInMonth = supplier.deliveries.filter(d => {
+                const deliveredInMonth = deliveries.filter(d => {
                     if (d.item !== item.name) return false;
                     const parts = d.date.split('-');
                     if (parts.length < 2) return false;
