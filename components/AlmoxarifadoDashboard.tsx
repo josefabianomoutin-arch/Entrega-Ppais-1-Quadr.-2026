@@ -349,7 +349,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
 
         const totalInvoiceValue = items.reduce((sum, it) => sum + it.totalValue, 0);
         const invoiceDate = deliveries.find(d => d.invoiceDate)?.invoiceDate || deliveries[0]?.date || ''; 
-        const receiptDate = invoiceDate; // Data do documento igual a data de recebimento (que é a data da NF)
+        const receiptDate = deliveries[0]?.date || ''; // Data de chegada
         const barcode = deliveries.find(d => d.barcode)?.barcode || '';
         const receiptTermNumber = deliveries.find(d => d.receiptTermNumber)?.receiptTermNumber || '';
 
@@ -459,7 +459,9 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
                         <div class="info-row"><span class="info-label">PROCESSO SEI:</span> <span class="info-value">${receiptData.processoSei || 'N/A'}</span></div>
                         <div class="info-row"><span class="info-label">NOTA FISCAL Nº:</span> <span class="info-value">${receiptData.invoiceNumber}</span></div>
                         <div class="info-row"><span class="info-label">NOTA DE EMPENHO:</span> <span class="info-value">${receiptData.receiptTermNumber || 'N/A'}</span></div>
-                        <div class="info-row"><span class="info-label">VALOR TOTAL NOTA FISCAL:</span> <span class="info-value">${formatCurrency(receiptData.totalInvoiceValue)}</span></div>
+                        <div class="info-row"><span class="info-label">DATA NOTA FISCAL:</span> <span class="info-value">${formatDate(receiptData.invoiceDate)}</span></div>
+                        <div class="info-row"><span class="info-label">DATA RECEBIMENTO:</span> <span class="info-value">${formatDate(receiptData.receiptDate)}</span></div>
+                        <div class="info-row"><span class="info-label">VALOR TOTAL NF:</span> <span class="info-value">${formatCurrency(receiptData.totalInvoiceValue)}</span></div>
                         
                         ${receiptData.barcode ? `
                         <div class="barcode-row">
@@ -505,6 +507,10 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
 
                     <div class="footer-text">
                         Recebemos em ordem e na quantidade devida os materiais/serviços acima discriminados, os quais foram inspecionados pela comissão de recepção materiais, foi considerado de acordo com solicitado, satisfazendo as especificações e demais exigências do empenho conforme determina o inciso II do artigo 140 da lei nº 14.133/21.
+                    </div>
+
+                    <div class="location-date">
+                        TAIÚVA, ${receiptData.receiptDate ? new Date(receiptData.receiptDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase() : 'DATA NÃO INFORMADA'}
                     </div>
 
                     <div class="signature-section">
