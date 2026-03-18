@@ -164,7 +164,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                 shortfallKg,
                 financialLoss: shortfallKg * data.unitPrice
             };
-        }).filter(item => item.contractedKgMonthly > 0)
+        }).filter(item => item.contractedKgMonthly > 0 || item.receivedKg > 0)
           .sort((a, b) => months.indexOf(a.month) - months.indexOf(b.month));
 
     }, [itespSuppliers, perCapitaConfig]);

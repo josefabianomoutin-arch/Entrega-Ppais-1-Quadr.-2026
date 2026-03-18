@@ -60,11 +60,23 @@ const getMonthNameFromDateString = (dateStr?: string): string => {
     return "Mês Indefinido";
 };
 
+const ITESP_SUPPLIERS_NAMES = [
+    'BENEDITO OSMAR RAVAZZI', 'ADAO MAXIMO DA FONSECA', 'ANTONIO JOAQUIM DE OLIVEIRA',
+    'CLAUDEMIR LUIZ TURRA', 'CONSUELO ALCANTARA FERREIRA GUIMARARE', 'DANILO ANTONIO MAXIMO',
+    'DOMINGOS APARECIDO ANTONINO', 'LEONARDO FELIPE VELHO MARSOLA', 'LIDIA BERNARDES MONTEIRO BARBOSA',
+    'LUCIMARA MARQUES PEREIRA', 'MARCELO GIBERTONI', 'MARCOS DONADON AGOSTINHO',
+    'MICHEL JOSE RAVAZZI', 'MOISES PINHEIRO DE SA', 'PAULO HENRIQUE PUGLIERI',
+    'PEDRO TEODORO RODRIGUES', 'ROSA MARIA GARBIN VELLONE', 'SAULO ANTONINO',
+    'SONIA REGINA COLOMBO CELESTINO', 'TANIA MARA BALDAO DE BARROS'
+];
+
 const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehouseLog = [], perCapitaConfig }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedSupplierName, setSelectedSupplierName] = useState<string>('all');
     const [selectedProductName, setSelectedProductName] = useState<string>('all');
     const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all');
+
+    const itespSet = useMemo(() => new Set<string>(ITESP_SUPPLIERS_NAMES.map(superNormalize)), []);
 
     const supplierOptions = useMemo(() => {
         const uniqueNames = [...new Set(suppliers.map(s => s.name))];
@@ -87,11 +99,17 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
             const pereciveisSupplier = perCapitaConfig?.pereciveisSuppliers?.find(p => superNormalize(p.name) === sNorm || p.cpfCnpj === s.cpf);
             const producerData = ppaisProducer || pereciveisSupplier;
             
+            const isItesp = [...itespSet].some(allowed => sNorm.includes(allowed) || allowed.includes(sNorm));
+
             // Se houver cronograma, usamos apenas os meses com semanas agendadas
+            // Se for ITESP e não tiver cronograma, padrão de 4 meses (Jan-Abr)
             // Caso contrário, assumimos o ano todo (12 meses)
-            const activeMonths = producerData?.monthlySchedule 
-                ? months.filter(m => (producerData.monthlySchedule[m] || []).length > 0)
-                : months;
+            let activeMonths = months;
+            if (producerData?.monthlySchedule) {
+                activeMonths = months.filter(m => (producerData.monthlySchedule[m] || []).length > 0);
+            } else if (isItesp) {
+                activeMonths = months.slice(0, 4);
+            }
             
             const monthsCount = activeMonths.length || 12;
 
@@ -150,7 +168,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
                 shortfallKg,
                 financialLoss: shortfallKg * data.price
             };
-        }).filter(i => i.contractedKgMonthly > 0)
+        }).filter(i => i.contractedKgMonthly > 0 || i.receivedKg > 0)
           .sort((a, b) => months.indexOf(a.month) - months.indexOf(b.month));
 
     }, [suppliers, warehouseLog, perCapitaConfig]);
