@@ -193,7 +193,8 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
     const totals = useMemo(() => {
         return filteredData.reduce((acc, item) => {
             acc.contracted += item.contractedKgMonthly;
-            acc.received += item.receivedKg;
+            // Cap received by contracted so over-deliveries don't mask shortfalls in totals
+            acc.received += Math.min(item.receivedKg, item.contractedKgMonthly);
             acc.loss += item.financialLoss;
             acc.shortfall += item.shortfallKg;
             return acc;

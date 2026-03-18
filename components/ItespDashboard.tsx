@@ -189,7 +189,8 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
     const totals = useMemo(() => {
         return filteredData.reduce((acc, item) => {
             acc.contracted += item.contractedKgMonthly;
-            acc.received += item.receivedKg;
+            // Cap received by contracted so over-deliveries don't mask shortfalls in totals
+            acc.received += Math.min(item.receivedKg, item.contractedKgMonthly);
             acc.shortfall += item.shortfallKg;
             acc.loss += item.financialLoss;
             return acc;
