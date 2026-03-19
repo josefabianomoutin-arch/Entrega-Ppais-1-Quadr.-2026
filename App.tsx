@@ -414,7 +414,7 @@ const App: React.FC = () => {
           await uploadString(fileRef, invoiceUrl, 'data_url');
           finalInvoiceUrl = await getDownloadURL(fileRef);
         } catch (storageError) {
-          console.warn("Storage failed, falling back to RTDB", storageError);
+          console.error("Storage failed, falling back to RTDB", storageError);
           const invoiceId = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
           const invoiceRef = child(ref(database), `invoices/${invoiceId}`);
           await set(invoiceRef, invoiceUrl);
@@ -468,7 +468,7 @@ const App: React.FC = () => {
       });
     } catch (error) {
       console.error('Erro ao salvar nota fiscal:', error);
-      throw error;
+      throw new Error('Falha ao salvar nota fiscal: ' + (error instanceof Error ? error.message : String(error)));
     }
   }, [suppliers]);
 

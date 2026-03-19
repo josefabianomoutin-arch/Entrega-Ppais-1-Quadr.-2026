@@ -55,9 +55,9 @@ const SendInvoiceModal: React.FC<SendInvoiceModalProps> = ({ invoiceInfo, onClos
           await onSave(invoiceNumber, base64String);
           setIsUploading(false);
           setIsSaved(true);
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error saving invoice:", error);
-          setUploadError("Erro ao salvar a nota fiscal. Tente novamente.");
+          setUploadError(error.message || "Erro ao salvar a nota fiscal. Tente novamente.");
           setIsUploading(false);
         }
       };
