@@ -762,34 +762,40 @@ const App: React.FC = () => {
   };
 
   const handleDeleteInvoice = async (supplierCpf: string, invoiceNumber: string) => {
-    const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);
-    if (isMainSupplier) {
-      const supplierRef = child(suppliersRef, supplierCpf);
-      await runTransaction(supplierRef, (currentData: Supplier) => {
-        if (currentData && currentData.deliveries) {
-          currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+    try {
+      const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);
+      if (isMainSupplier) {
+        const supplierRef = child(suppliersRef, supplierCpf);
+        await runTransaction(supplierRef, (currentData: Supplier) => {
+          if (currentData && currentData.deliveries) {
+            currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+          }
+          return currentData;
+        });
+        return { success: true };
+      }
+
+      await runTransaction(perCapitaConfigRef, (currentData: PerCapitaConfig) => {
+        if (currentData) {
+          const findAndDelete = (list: any[] | undefined) => {
+            const s = list?.find(p => p.cpfCnpj === supplierCpf);
+            if (s && s.deliveries) {
+              s.deliveries = s.deliveries.filter((d: any) => d.invoiceNumber !== invoiceNumber);
+              return true;
+            }
+            return false;
+          };
+          if (!findAndDelete(currentData.ppaisProducers)) {
+            findAndDelete(currentData.pereciveisSuppliers);
+          }
         }
         return currentData;
       });
-      return;
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao excluir nota fiscal:', error);
+      return { success: false, message: 'Erro ao excluir nota fiscal: ' + (error instanceof Error ? error.message : String(error)) };
     }
-
-    await runTransaction(perCapitaConfigRef, (currentData: PerCapitaConfig) => {
-      if (currentData) {
-        const findAndDelete = (list: any[] | undefined) => {
-          const s = list?.find(p => p.cpfCnpj === supplierCpf);
-          if (s && s.deliveries) {
-            s.deliveries = s.deliveries.filter((d: any) => d.invoiceNumber !== invoiceNumber);
-            return true;
-          }
-          return false;
-        };
-        if (!findAndDelete(currentData.ppaisProducers)) {
-          findAndDelete(currentData.pereciveisSuppliers);
-        }
-      }
-      return currentData;
-    });
   };
 
   const handleManualInvoiceEntry = async (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, receiptTermNumber?: string, invoiceDate?: string) => {

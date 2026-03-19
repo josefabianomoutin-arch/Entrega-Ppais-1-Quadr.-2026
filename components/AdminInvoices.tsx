@@ -23,7 +23,7 @@ interface AdminInvoicesProps {
     suppliers: Supplier[];
     warehouseLog?: WarehouseMovement[];
     onReopenInvoice: (supplierCpf: string, invoiceNumber: string) => void;
-    onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => void;
+    onDeleteInvoice: (supplierCpf: string, invoiceNumber: string) => Promise<{ success: boolean; message?: string }>;
     onUpdateInvoiceItems: (supplierCpf: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, newInvoiceNumber?: string, newDate?: string, receiptTermNumber?: string, invoiceDate?: string) => Promise<{ success: boolean; message?: string }>;
     onUpdateInvoiceUrl: (supplierCpf: string, invoiceNumber: string, invoiceUrl: string) => Promise<{ success: boolean; message?: string }>;
     onManualInvoiceEntry: (supplierCpf: string, date: string, invoiceNumber: string, items: { name: string; kg: number; value: number; lotNumber?: string; expirationDate?: string }[], barcode?: string, receiptTermNumber?: string, invoiceDate?: string) => Promise<{ success: boolean; message?: string }>;
@@ -867,8 +867,9 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                                             isOpen: true,
                                                                             title: 'Excluir Nota',
                                                                             message: 'Deseja realmente excluir esta nota fiscal? Esta ação não pode ser desfeita.',
-                                                                            onConfirm: () => {
-                                                                                onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber);
+                                                                            onConfirm: async () => {
+                                                                                const res = await onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber);
+                                                                                if (!res?.success) alert(res?.message || 'Erro ao excluir nota fiscal.');
                                                                                 setConfirmConfig(prev => ({ ...prev, isOpen: false }));
                                                                             },
                                                                             variant: 'danger'
@@ -995,8 +996,9 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                                             isOpen: true,
                                                                             title: 'Excluir Nota',
                                                                             message: 'Deseja realmente excluir esta nota fiscal? Esta ação não pode ser desfeita.',
-                                                                            onConfirm: () => {
-                                                                                onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber);
+                                                                            onConfirm: async () => {
+                                                                                const res = await onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber);
+                                                                                if (!res?.success) alert(res?.message || 'Erro ao excluir nota fiscal.');
                                                                                 setConfirmConfig(prev => ({ ...prev, isOpen: false }));
                                                                             },
                                                                             variant: 'danger'
@@ -1197,8 +1199,9 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
                                                                     isOpen: true,
                                                                     title: 'Excluir Nota',
                                                                     message: 'Deseja realmente excluir esta nota fiscal? Esta ação não pode ser desfeita.',
-                                                                    onConfirm: () => {
-                                                                        onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber);
+                                                                    onConfirm: async () => {
+                                                                        const res = await onDeleteInvoice(invoice.supplierCpf, invoice.invoiceNumber);
+                                                                        if (!res?.success) alert(res?.message || 'Erro ao excluir nota fiscal.');
                                                                         setConfirmConfig(prev => ({ ...prev, isOpen: false }));
                                                                     },
                                                                     variant: 'danger'
