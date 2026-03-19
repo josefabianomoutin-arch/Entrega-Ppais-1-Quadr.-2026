@@ -68,6 +68,10 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
         fctNumber: '',
         companions: [{ name: '', rg: '' }, { name: '', rg: '' }, { name: '', rg: '' }],
         observations: '',
+        exitTime: '',
+        exitDate: '',
+        returnTime: '',
+        returnDate: '',
         validationRole: '',
         validatedBy: ''
     });
@@ -662,10 +666,23 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
             return;
         }
 
-        if (editingOrder) {
-            await onUpdate({ ...formData, id: editingOrder.id });
+        const finalData = { ...formData };
+        if (finalData.exitTime) {
+            if (!finalData.exitDate) finalData.exitDate = finalData.date;
         } else {
-            await onRegister(formData);
+            finalData.exitDate = '';
+        }
+        
+        if (finalData.returnTime) {
+            if (!finalData.returnDate) finalData.returnDate = finalData.date;
+        } else {
+            finalData.returnDate = '';
+        }
+
+        if (editingOrder) {
+            await onUpdate({ ...finalData, id: editingOrder.id });
+        } else {
+            await onRegister(finalData);
         }
         setIsModalOpen(false);
         setEditingOrder(null);
@@ -680,6 +697,10 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
             fctNumber: '',
             companions: [{ name: '', rg: '' }, { name: '', rg: '' }, { name: '', rg: '' }],
             observations: '',
+            exitTime: '',
+            exitDate: '',
+            returnTime: '',
+            returnDate: '',
             validationRole: '',
             validatedBy: ''
         });
@@ -699,7 +720,9 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
             companions: order.companions && order.companions.length > 0 ? order.companions : [{ name: '', rg: '' }, { name: '', rg: '' }, { name: '', rg: '' }],
             observations: order.observations || '',
             exitTime: order.exitTime || '',
+            exitDate: order.exitDate || '',
             returnTime: order.returnTime || '',
+            returnDate: order.returnDate || '',
             validationRole: order.validationRole || '',
             validatedBy: order.validatedBy || ''
         });
@@ -1694,6 +1717,27 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                             placeholder="Opcional"
                                             value={formData.observations}
                                             onChange={e => setFormData({ ...formData, observations: e.target.value.toUpperCase() })}
+                                            className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Horário de Saída</label>
+                                        <input 
+                                            type="time" 
+                                            value={formData.exitTime || ''} 
+                                            onChange={e => setFormData({ ...formData, exitTime: e.target.value })}
+                                            className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Horário de Retorno</label>
+                                        <input 
+                                            type="time" 
+                                            value={formData.returnTime || ''} 
+                                            onChange={e => setFormData({ ...formData, returnTime: e.target.value })}
                                             className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
                                         />
                                     </div>
