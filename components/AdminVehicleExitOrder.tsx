@@ -655,6 +655,13 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Validation
+        if (!formData.fctNumber || !formData.destination || !formData.responsibleServer || !formData.vehicle) {
+            alert('Por favor, preencha todos os campos obrigatórios (FCT, Destino, Responsável e Veículo).');
+            return;
+        }
+
         if (editingOrder) {
             await onUpdate({ ...formData, id: editingOrder.id });
         } else {
@@ -1671,6 +1678,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                         <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Número da FCT (Anexar)</label>
                                         <input 
                                             type="text" 
+                                            required
                                             placeholder="Ex: 1630/2025"
                                             value={formData.fctNumber}
                                             onChange={e => setFormData({ ...formData, fctNumber: e.target.value.toUpperCase() })}
