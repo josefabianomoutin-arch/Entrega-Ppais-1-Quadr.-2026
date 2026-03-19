@@ -763,27 +763,35 @@ const App: React.FC = () => {
     });
   };
 
-  const handleDeleteInvoice = async (supplierCpf: string, invoiceNumber: string, retries = 3) => {
+  const handleDeleteInvoice = async (supplierCpf: string, invoiceNumber: string, retries = 5) => {
+    console.log('handleDeleteInvoice chamado:', supplierCpf, invoiceNumber);
     for (let i = 0; i < retries; i++) {
       try {
         const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);
         if (isMainSupplier) {
           const supplierRef = child(suppliersRef, supplierCpf);
+          console.log(`Iniciando transação MainSupplier (tentativa ${i + 1}):`, supplierCpf);
           await runTransaction(supplierRef, (currentData: Supplier) => {
             if (currentData && currentData.deliveries) {
+              console.log('MainSupplier - deliveries antes:', currentData.deliveries.length);
               currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+              console.log('MainSupplier - deliveries depois:', currentData.deliveries.length);
             }
             return currentData;
           });
+          console.log('Transação de exclusão concluída para MainSupplier');
           return { success: true };
         }
 
+        console.log(`Iniciando transação PerCapita (tentativa ${i + 1})`);
         await runTransaction(perCapitaConfigRef, (currentData: PerCapitaConfig) => {
           if (currentData) {
             const findAndDelete = (list: any[] | undefined) => {
               const s = list?.find(p => p.cpfCnpj === supplierCpf);
               if (s && s.deliveries) {
+                console.log('PerCapita - deliveries antes:', s.deliveries.length);
                 s.deliveries = s.deliveries.filter((d: any) => d.invoiceNumber !== invoiceNumber);
+                console.log('PerCapita - deliveries depois:', s.deliveries.length);
                 return true;
               }
               return false;
@@ -794,6 +802,7 @@ const App: React.FC = () => {
           }
           return currentData;
         });
+        console.log('Transação de exclusão concluída para PerCapita');
         return { success: true };
       } catch (error) {
         console.warn(`Tentativa ${i + 1} de exclusão falhou:`, error);
@@ -802,7 +811,7 @@ const App: React.FC = () => {
           return { success: false, message: 'Erro ao excluir nota fiscal após várias tentativas: ' + (error instanceof Error ? error.message : String(error)) };
         }
         // Espera um pouco antes de tentar novamente (backoff simples)
-        await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
       }
     }
   };
