@@ -763,44 +763,47 @@ const App: React.FC = () => {
     });
   };
 
-  const handleDeleteInvoice = async (supplierCpf: string, invoiceNumber: string) => {
-    try {
-      const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);
-      if (isMainSupplier) {
-        const supplierRef = child(suppliersRef, supplierCpf);
-        console.log('Iniciando transação de exclusão para MainSupplier:', supplierCpf);
-        await runTransaction(supplierRef, (currentData: Supplier) => {
-          if (currentData && currentData.deliveries) {
-            currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+  const handleDeleteInvoice = async (supplierCpf: string, invoiceNumber: string, retries = 3) => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);
+        if (isMainSupplier) {
+          const supplierRef = child(suppliersRef, supplierCpf);
+          await runTransaction(supplierRef, (currentData: Supplier) => {
+            if (currentData && currentData.deliveries) {
+              currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
+            }
+            return currentData;
+          });
+          return { success: true };
+        }
+
+        await runTransaction(perCapitaConfigRef, (currentData: PerCapitaConfig) => {
+          if (currentData) {
+            const findAndDelete = (list: any[] | undefined) => {
+              const s = list?.find(p => p.cpfCnpj === supplierCpf);
+              if (s && s.deliveries) {
+                s.deliveries = s.deliveries.filter((d: any) => d.invoiceNumber !== invoiceNumber);
+                return true;
+              }
+              return false;
+            };
+            if (!findAndDelete(currentData.ppaisProducers)) {
+              findAndDelete(currentData.pereciveisSuppliers);
+            }
           }
           return currentData;
         });
-        console.log('Transação de exclusão concluída para MainSupplier');
         return { success: true };
-      }
-
-      console.log('Iniciando transação de exclusão para PerCapita');
-      await runTransaction(perCapitaConfigRef, (currentData: PerCapitaConfig) => {
-        if (currentData) {
-          const findAndDelete = (list: any[] | undefined) => {
-            const s = list?.find(p => p.cpfCnpj === supplierCpf);
-            if (s && s.deliveries) {
-              s.deliveries = s.deliveries.filter((d: any) => d.invoiceNumber !== invoiceNumber);
-              return true;
-            }
-            return false;
-          };
-          if (!findAndDelete(currentData.ppaisProducers)) {
-            findAndDelete(currentData.pereciveisSuppliers);
-          }
+      } catch (error) {
+        console.warn(`Tentativa ${i + 1} de exclusão falhou:`, error);
+        if (i === retries - 1) {
+          console.error('Erro final ao excluir nota fiscal:', error);
+          return { success: false, message: 'Erro ao excluir nota fiscal após várias tentativas: ' + (error instanceof Error ? error.message : String(error)) };
         }
-        return currentData;
-      });
-      console.log('Transação de exclusão concluída para PerCapita');
-      return { success: true };
-    } catch (error) {
-      console.error('Erro detalhado ao excluir nota fiscal:', error);
-      return { success: false, message: 'Erro ao excluir nota fiscal: ' + (error instanceof Error ? error.message : String(error)) };
+        // Espera um pouco antes de tentar novamente (backoff simples)
+        await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
+      }
     }
   };
 
