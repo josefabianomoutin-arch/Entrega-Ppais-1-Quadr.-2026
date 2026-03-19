@@ -80,7 +80,7 @@ const JulioDashboard: React.FC<JulioDashboardProps> = ({
           onUpdateValidationRole={onUpdateValidationRole}
           onDeleteValidationRole={onDeleteValidationRole}
           hideAssets={false}
-          securityMode={true}
+          securityMode={false}
           showGateTab={true}
         />
       </main>

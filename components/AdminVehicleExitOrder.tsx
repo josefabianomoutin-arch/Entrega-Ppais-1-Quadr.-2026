@@ -1172,7 +1172,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                     )}
                 </div>
             )}
-            {activeSubTab === 'orders' && !readOnly && !securityMode && !hideAssets && (
+            {activeSubTab === 'orders' && !readOnly && !hideAssets && (
                 <div className="space-y-6 mt-12">
                     <div className="flex gap-4 border-b border-gray-100 pb-2">
                         <button 
