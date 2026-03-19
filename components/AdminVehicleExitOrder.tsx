@@ -657,8 +657,8 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
         e.preventDefault();
 
         // Validation
-        if (!formData.fctNumber || !formData.destination || !formData.responsibleServer || !formData.vehicle) {
-            alert('Por favor, preencha todos os campos obrigatórios (FCT, Destino, Responsável e Veículo).');
+        if (!formData.fctNumber || !formData.destination || !formData.responsibleServer || !formData.vehicle || !formData.serverRole) {
+            alert('Por favor, preencha todos os campos obrigatórios (FCT, Destino, Responsável, Cargo e Veículo).');
             return;
         }
 
@@ -803,18 +803,10 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                                 Sub Portaria
                                             </button>
                                         )}
-                                        {!readOnly && !securityMode && !hideAssets && (
-                                            <button 
-                                                onClick={() => setActiveSubTab('assets')}
-                                                className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeSubTab === 'assets' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                                            >
-                                                Cadastros
-                                            </button>
-                                        )}
                                     </div>
             </div>
 
-            {activeSubTab === 'orders' ? (
+            {activeSubTab === 'orders' && (
                 <>
                     {!readOnly && !securityMode && (
                         <div className="flex justify-end">
@@ -881,7 +873,8 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                         </div>
                     </div>
                 </>
-            ) : activeSubTab === 'gate' ? (
+            )}
+            {activeSubTab === 'gate' && (
                 <div className="space-y-6">
                     <div className="flex bg-gray-100 p-1 rounded-2xl w-fit">
                         <button 
@@ -1178,8 +1171,9 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                         </div>
                     )}
                 </div>
-            ) : (
-                <div className="space-y-6">
+            )}
+            {activeSubTab === 'orders' && !readOnly && !securityMode && !hideAssets && (
+                <div className="space-y-6 mt-12">
                     <div className="flex gap-4 border-b border-gray-100 pb-2">
                         <button 
                             onClick={() => setActiveAssetTab('vehicles')}
@@ -1685,7 +1679,6 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                             className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs font-mono"
                                         />
                                     </div>
-                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Observações</label>
                                         <input 
@@ -1696,31 +1689,6 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                             className="w-full h-9 px-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
                                         />
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-1">Validação de Saída (Cargo/Responsável)</label>
-                                        <select 
-                                            value={formData.validationRole}
-                                            onChange={e => {
-                                                const roleName = e.target.value;
-                                                const role = validationRoles.find(r => r.roleName === roleName);
-                                                setFormData({ 
-                                                    ...formData, 
-                                                    validationRole: roleName,
-                                                    validatedBy: role ? role.responsibleName : '',
-                                                    validationTimestamp: role ? new Date().toISOString() : undefined
-                                                });
-                                            }}
-                                            className="w-full h-9 px-3 border-2 border-indigo-100 rounded-xl bg-indigo-50 font-bold focus:bg-white focus:border-indigo-500 transition-all outline-none text-xs"
-                                        >
-                                            <option value="">SELECIONE O RESPONSÁVEL PELA VALIDAÇÃO</option>
-                                            {validationRoles.map(role => (
-                                                <option key={role.id} value={role.roleName}>
-                                                    {role.roleName} - {role.responsibleName}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
                                 </div>
                             </>
                         )}
