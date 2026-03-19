@@ -567,7 +567,8 @@ const App: React.FC = () => {
         });
         return { success: true };
       } catch (e) {
-        return { success: false, message: 'Erro ao gravar no banco de dados.' };
+        console.error('Erro detalhado ao gravar no banco de dados (MainSupplier):', e);
+        return { success: false, message: 'Erro ao gravar no banco de dados: ' + (e instanceof Error ? e.message : String(e)) };
       }
       return;
     }
@@ -625,7 +626,8 @@ const App: React.FC = () => {
       });
       return { success: true };
     } catch (e) {
-      return { success: false, message: 'Erro ao gravar no banco de dados.' };
+      console.error('Erro detalhado ao gravar no banco de dados (PerCapita):', e);
+      return { success: false, message: 'Erro ao gravar no banco de dados: ' + (e instanceof Error ? e.message : String(e)) };
     }
   };
 
@@ -766,15 +768,18 @@ const App: React.FC = () => {
       const isMainSupplier = suppliers.some(s => s.cpf === supplierCpf);
       if (isMainSupplier) {
         const supplierRef = child(suppliersRef, supplierCpf);
+        console.log('Iniciando transação de exclusão para MainSupplier:', supplierCpf);
         await runTransaction(supplierRef, (currentData: Supplier) => {
           if (currentData && currentData.deliveries) {
             currentData.deliveries = currentData.deliveries.filter(d => d.invoiceNumber !== invoiceNumber);
           }
           return currentData;
         });
+        console.log('Transação de exclusão concluída para MainSupplier');
         return { success: true };
       }
 
+      console.log('Iniciando transação de exclusão para PerCapita');
       await runTransaction(perCapitaConfigRef, (currentData: PerCapitaConfig) => {
         if (currentData) {
           const findAndDelete = (list: any[] | undefined) => {
@@ -791,9 +796,10 @@ const App: React.FC = () => {
         }
         return currentData;
       });
+      console.log('Transação de exclusão concluída para PerCapita');
       return { success: true };
     } catch (error) {
-      console.error('Erro ao excluir nota fiscal:', error);
+      console.error('Erro detalhado ao excluir nota fiscal:', error);
       return { success: false, message: 'Erro ao excluir nota fiscal: ' + (error instanceof Error ? error.message : String(error)) };
     }
   };
