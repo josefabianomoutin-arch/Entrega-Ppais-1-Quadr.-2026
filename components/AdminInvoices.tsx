@@ -390,7 +390,7 @@ const AdminInvoices: React.FC<AdminInvoicesProps> = ({ suppliers, warehouseLog, 
         const invoicesMap = new Map<string, InvoiceInfo>();
         (suppliers || []).forEach(supplier => {
             const deliveriesByInvoice = new Map<string, Delivery[]>();
-            Object.values(supplier.deliveries || {}).forEach(delivery => {
+            (Object.values(supplier.deliveries || {}) as Delivery[]).forEach(delivery => {
                 if (delivery.invoiceNumber && delivery.invoiceNumber.trim() !== "") {
                     const existing = deliveriesByInvoice.get(delivery.invoiceNumber) || [];
                     deliveriesByInvoice.set(delivery.invoiceNumber, [...existing, delivery]);

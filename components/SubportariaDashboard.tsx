@@ -167,7 +167,7 @@ const SubportariaDashboard: React.FC<SubportariaDashboardProps> = ({
         }[] = [];
         
         suppliers.forEach(s => {
-            (s.deliveries || []).forEach(d => {
+            (Object.values(s.deliveries || {}) as Delivery[]).forEach(d => {
                 if (d.date === selectedDate) {
                     const isFaturado = d.item !== 'AGENDAMENTO PENDENTE';
                     const existing = list.find(l => l.type === 'FORNECEDOR' && l.name === s.name && l.time === d.time && l.originalStatus === (isFaturado ? 'FATURADO' : 'AGENDADO'));

@@ -47,13 +47,13 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
     const filteredSuppliers = useMemo(() => {
         return suppliers.filter(p => {
             const nameMatch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-            const dateMatch = !dateFilter || Object.values(p.deliveries || {}).some(d => d.date === dateFilter);
+            const dateMatch = !dateFilter || Object.values((p.deliveries as any) || {}).some((d: any) => d.date === dateFilter);
             return nameMatch && dateMatch;
         });
     }, [suppliers, searchTerm, dateFilter]);
 
     const reportSuppliers = useMemo(() => {
-        return suppliers.filter(s => Object.values(s.deliveries || {}).some(d => d.invoiceNumber)).sort((a, b) => a.name.localeCompare(b.name));
+        return suppliers.filter(s => Object.values((s.deliveries as any) || {}).some((d: any) => d.invoiceNumber)).sort((a, b) => a.name.localeCompare(b.name));
     }, [suppliers]);
 
     const reportAvailableMonths = useMemo(() => {
@@ -62,7 +62,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
         if (!supplier) return [];
         
         const months = new Set<string>();
-        Object.values(supplier.deliveries || {}).filter(d => d.invoiceNumber).forEach(d => {
+        Object.values((supplier.deliveries as any) || {}).filter((d: any) => d.invoiceNumber).forEach((d: any) => {
             if (d.date) {
                 months.add(d.date.substring(0, 7)); // YYYY-MM
             }

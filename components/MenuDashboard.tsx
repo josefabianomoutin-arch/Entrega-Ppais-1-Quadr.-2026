@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import type { StandardMenu, DailyMenus, MenuRow, Supplier } from '../types';
+import type { StandardMenu, DailyMenus, MenuRow, Supplier, Delivery } from '../types';
 import { Calendar, Printer, Clock, Utensils, ChevronRight, ChevronLeft, CheckSquare, Square, Tag } from 'lucide-react';
 
 interface MenuDashboardProps {
@@ -69,7 +69,7 @@ const MenuDashboard: React.FC<MenuDashboardProps> = ({ standardMenu, dailyMenus,
     let latestDate = 0;
 
     suppliers.forEach(s => {
-      (s.deliveries || []).forEach(d => {
+      (Object.values(s.deliveries || {}) as Delivery[]).forEach(d => {
         if (d.item === contractedItemName && d.invoiceNumber) {
           const dDate = new Date(d.date).getTime();
           if (dDate > latestDate) {

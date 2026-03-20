@@ -137,7 +137,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
         // 2. Acumular Entradas de Notas Fiscais (Deliveries)
         suppliers.forEach(s => {
             const sNorm = superNormalize(s.name);
-            (s.deliveries || []).forEach(del => {
+            (Object.values(s.deliveries || {}) as Delivery[]).forEach(del => {
                 if (del.item === 'AGENDAMENTO PENDENTE') return;
                 
                 const delINorm = superNormalize(del.item || '');

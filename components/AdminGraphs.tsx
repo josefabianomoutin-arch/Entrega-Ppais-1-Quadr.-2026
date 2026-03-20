@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis 
 } from 'recharts';
-import type { Supplier, WarehouseMovement, CleaningLog, FinancialRecord, VehicleExitOrder, ThirdPartyEntryLog, DirectorPerCapitaLog, PerCapitaConfig, AcquisitionItem } from '../types';
+import type { Supplier, WarehouseMovement, CleaningLog, FinancialRecord, VehicleExitOrder, ThirdPartyEntryLog, DirectorPerCapitaLog, PerCapitaConfig, AcquisitionItem, Delivery } from '../types';
 
 interface AdminGraphsProps {
   suppliers: Supplier[];
@@ -54,7 +54,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
     let notDeliveredCount = 0;
 
     suppliers.forEach(s => {
-      const totalDelivered = (s.deliveries || []).reduce((acc, d) => acc + (d.kg || 0), 0);
+      const totalDelivered = (Object.values(s.deliveries || {}) as Delivery[]).reduce((acc, d) => acc + (Number(d.kg) || 0), 0);
       if (totalDelivered > 0) deliveredCount++;
       else notDeliveredCount++;
     });
@@ -68,7 +68,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
   // 2.1 Fornecedores Sem Entregas (Lista)
   const suppliersWithoutDeliveries = useMemo(() => {
     return suppliers
-      .filter(s => (s.deliveries || []).length === 0)
+      .filter(s => Object.values(s.deliveries || {}).length === 0)
       .map(s => ({
         name: s.name,
         value: (s.contractItems || []).reduce((acc, item) => acc + ((item.totalKg || 0) * (item.valuePerKg || 0)), 0)
@@ -87,7 +87,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
         current.contracted += ci.totalKg || 0;
         itemsMap.set(ci.name, current);
       });
-      (s.deliveries || []).forEach(d => {
+      (Object.values(s.deliveries || {}) as Delivery[]).forEach(d => {
         const current = itemsMap.get(d.item) || { contracted: 0, delivered: 0 };
         const deliveredKg = Number(d.kg) || 0;
         current.delivered += deliveredKg;
@@ -176,7 +176,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
     return suppliers
       .map(s => ({
         name: s.name,
-        delivered: (s.deliveries || []).reduce((acc, d) => acc + (Number(d.kg) || 0), 0),
+        delivered: (Object.values(s.deliveries || {}) as Delivery[]).reduce((acc, d) => acc + (Number(d.kg) || 0), 0),
         contracted: (s.contractItems || []).reduce((acc, ci) => acc + (Number(ci.totalKg) || 0), 0)
       }))
       .filter(s => s.contracted > 0)

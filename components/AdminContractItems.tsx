@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import type { Supplier, WarehouseMovement } from '../types';
+import type { Supplier, WarehouseMovement, Delivery } from '../types';
 import ConfirmModal from './ConfirmModal';
 
 interface AdminContractItemsProps {
@@ -75,7 +75,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
             });
 
             // 2. Agrega Entradas de Notas Fiscais (Deliveries)
-            (s.deliveries || []).forEach(del => {
+            (Object.values(s.deliveries || {}) as Delivery[]).forEach(del => {
                 if (del.item === 'AGENDAMENTO PENDENTE') return;
                 const delINorm = superNormalize(del.item || '');
                 

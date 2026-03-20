@@ -525,7 +525,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     const datesOfWeek = getDatesOfWeek(selectedWeek, 2026);
     const suppliersThisWeek = new Set<string>();
     suppliers.forEach(supplier => {
-        const hasDeliveryThisWeek = Object.values(supplier.deliveries || {}).some(delivery => 
+        const hasDeliveryThisWeek = Object.values((supplier.deliveries as any) || {}).some((delivery: any) => 
             datesOfWeek.includes(delivery.date) && delivery.item !== 'AGENDAMENTO PENDENTE'
         );
         if (hasDeliveryThisWeek) {

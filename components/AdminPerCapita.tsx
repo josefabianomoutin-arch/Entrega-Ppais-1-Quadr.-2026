@@ -1,7 +1,7 @@
 
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Supplier, PerCapitaConfig, WarehouseMovement, AcquisitionItem } from '../types';
+import type { Supplier, Delivery, PerCapitaConfig, WarehouseMovement, AcquisitionItem } from '../types';
 import AdminContractItems from './AdminContractItems';
 import AdminAcquisitionItems from './AdminAcquisitionItems';
 import AdminPerCapitaSuppliers from './AdminPerCapitaSuppliers';
@@ -383,7 +383,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
 
         // 1. Regular Suppliers
         suppliers.forEach(s => {
-            Object.values(s.deliveries || {}).forEach(d => {
+            (Object.values(s.deliveries || {}) as Delivery[]).forEach(d => {
                 const m = getMonthFromDate(d.date);
                 if (!m) return;
                 
@@ -407,7 +407,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
 
         // 2. PPAIS Producers
         ppaisProducers.forEach(p => {
-            Object.values(p.deliveries || {}).forEach(d => {
+            (Object.values(p.deliveries || {}) as Delivery[]).forEach(d => {
                 const m = getMonthFromDate(d.date);
                 if (m) execution[m]['PPAIS'] += d.value || 0;
             });
@@ -415,7 +415,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
 
         // 3. Pereciveis Suppliers
         pereciveisSuppliers.forEach(p => {
-            Object.values(p.deliveries || {}).forEach(d => {
+            (Object.values(p.deliveries || {}) as Delivery[]).forEach(d => {
                 const m = getMonthFromDate(d.date);
                 if (m) execution[m]['PERECÍVEIS'] += d.value || 0;
             });
@@ -468,7 +468,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
                 summary.set(normalizedName, data);
             });
 
-            Object.values(supplier.deliveries || {}).forEach(delivery => {
+            (Object.values(supplier.deliveries || {}) as Delivery[]).forEach(delivery => {
                 const normalizedName = normalizeItemName(delivery.item || '');
                 if (normalizedName && summary.has(normalizedName)) {
                     const data = summary.get(normalizedName)!;
@@ -519,7 +519,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
     const suppliersWithoutEmpenho = useMemo(() => {
         if (!suppliers) return [];
         return suppliers.filter(supplier => {
-            const hasEmpenho = Object.values(supplier.deliveries || {}).some(d => !!d.receiptTermNumber);
+            const hasEmpenho = (Object.values(supplier.deliveries || {}) as Delivery[]).some(d => !!d.receiptTermNumber);
             return !hasEmpenho;
         }).map(supplier => {
             const totalWeight = supplier.contractItems?.reduce((acc, item) => acc + (item.totalKg || 0), 0) || 0;

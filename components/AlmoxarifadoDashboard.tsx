@@ -99,7 +99,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
         const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'CONCLUÍDO' | 'TERCEIRO' | 'CANCELADO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO' }[] = [];
         
         suppliers.forEach(s => {
-            Object.values(s.deliveries || {}).forEach(d => {
+            Object.values((s.deliveries as any) || {}).forEach((d: any) => {
                 if (d.date === selectedAgendaDate) {
                     const isFaturado = d.item !== 'AGENDAMENTO PENDENTE';
                     const status = isFaturado ? 'CONCLUÍDO' : 'AGENDADO';
@@ -157,7 +157,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
         }
 
         suppliers.forEach(s => {
-            Object.values(s.deliveries || {}).forEach(d => {
+            Object.values((s.deliveries as any) || {}).forEach((d: any) => {
                 if (weekDates.includes(d.date)) {
                     const isFaturado = d.item !== 'AGENDAMENTO PENDENTE';
                     list.push({
@@ -309,7 +309,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
     const supplierInvoices = useMemo(() => {
         if (!receiptSupplier) return [];
         const invoices = new Set<string>();
-        Object.values(receiptSupplier.deliveries || {}).forEach(d => {
+        Object.values((receiptSupplier.deliveries as any) || {}).forEach((d: any) => {
             if (d.invoiceNumber) {
                 invoices.add(d.invoiceNumber);
             }
@@ -319,15 +319,15 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
 
     const receiptData = useMemo(() => {
         if (!receiptSupplier || !receiptInvoice) return null;
-        const deliveries = Object.values(receiptSupplier.deliveries || {}).filter(d => 
+        const deliveries = Object.values((receiptSupplier.deliveries as any) || {}).filter((d: any) => 
             d.invoiceNumber === receiptInvoice && d.item !== 'AGENDAMENTO PENDENTE'
         );
         if (deliveries.length === 0) return null;
 
         const items = deliveries.map(d => {
-            const contractItem = receiptSupplier.contractItems.find(ci => ci.name === d.item);
+            const contractItem = receiptSupplier.contractItems.find((ci: any) => ci.name === (d as any).item);
             const unitPrice = contractItem?.valuePerKg || 0;
-            const totalValue = (d.kg || 0) * unitPrice;
+            const totalValue = ((d as any).kg || 0) * unitPrice;
             
             // Determinar unidade de exibição
             let unit = 'Kg';
@@ -341,8 +341,8 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
             }
 
             return {
-                name: d.item || 'N/A',
-                quantity: d.kg || 0,
+                name: (d as any).item || 'N/A',
+                quantity: (d as any).kg || 0,
                 unit,
                 unitPrice,
                 totalValue
