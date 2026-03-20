@@ -33,6 +33,7 @@ let driverAssetsRef: any;
 let dailyAllowancesRef: any;
 let staffRef: any;
 let validationRolesRef: any;
+let systemPasswordsRef: any;
 
 try {
   database = getDatabase(app);
@@ -53,6 +54,7 @@ try {
   dailyAllowancesRef = ref(database, 'dailyAllowances');
   staffRef = ref(database, 'staff');
   validationRolesRef = ref(database, 'validationRoles');
+  systemPasswordsRef = ref(database, 'systemPasswords');
 } catch (error) {
   console.error("Erro ao inicializar Firebase:", error);
 }
@@ -75,6 +77,7 @@ const App: React.FC = () => {
   const [dailyAllowances, setDailyAllowances] = useState<DailyAllowance[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [validationRoles, setValidationRoles] = useState<ValidationRole[]>([]);
+  const [systemPasswords, setSystemPasswords] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!database) return;
@@ -157,6 +160,9 @@ const App: React.FC = () => {
       const data = snapshot.val();
       setValidationRoles(data ? Object.values(data) : []);
     });
+    onValue(systemPasswordsRef, (snapshot) => {
+      setSystemPasswords(snapshot.val() || {});
+    });
   }, []);
 
   const handleLogin = (nameInput: string, passwordInput: string) => {
@@ -180,36 +186,36 @@ const App: React.FC = () => {
     }
 
     if (cleanName === 'ALMOXARIFADO' || cleanName === 'ALMOX') {
-      if (rawPass.toLowerCase() === 'almoxarifado123') {
+      if (rawPass.toLowerCase() === (systemPasswords['ALMOXARIFADO'] || 'almoxarifado123').toLowerCase()) {
         setUser({ name: 'ALMOXARIFADO', cpf: 'almoxarifado123', role: 'almoxarifado' });
         return true;
       }
     }
-    if (cleanName === 'ITESP' && rawPass.toLowerCase() === 'taiuvaitesp2026') {
+    if (cleanName === 'ITESP' && rawPass.toLowerCase() === (systemPasswords['ITESP'] || 'taiuvaitesp2026').toLowerCase()) {
       setUser({ name: 'ITESP', cpf: 'taiuvaitesp2026', role: 'itesp' });
       return true;
     }
-    if (cleanName === 'FINANCEIRO' && rawPass.toLowerCase() === 'financeiro123') {
+    if (cleanName === 'FINANCEIRO' && rawPass.toLowerCase() === (systemPasswords['FINANCEIRO'] || 'financeiro123').toLowerCase()) {
       setUser({ name: 'FINANCEIRO', cpf: 'financeiro123', role: 'financeiro' });
       return true;
     }
-    if (cleanName === 'CARDAPIO' && rawPass.toLowerCase() === 'cardapio123') {
+    if (cleanName === 'CARDAPIO' && rawPass.toLowerCase() === (systemPasswords['CARDAPIO'] || 'cardapio123').toLowerCase()) {
       setUser({ name: 'CARDAPIO', cpf: 'cardapio123', role: 'cardapio' });
       return true;
     }
-    if (cleanName === 'SEGURANÇA EXTERNA' && rawPass === 'externa2026') {
+    if (cleanName === 'SEGURANÇA EXTERNA' && rawPass === (systemPasswords['SEGURANÇA EXTERNA'] || 'externa2026')) {
       setUser({ name: 'SEGURANÇA EXTERNA', cpf: 'externa2026', role: 'subportaria' });
       return true;
     }
-    if (cleanName === 'INFRAESTRUTURA' && rawPass === 'infra2026') {
+    if (cleanName === 'INFRAESTRUTURA' && rawPass === (systemPasswords['INFRAESTRUTURA'] || 'infra2026')) {
       setUser({ name: 'INFRAESTRUTURA', cpf: 'infra2026', role: 'infraestrutura' });
       return true;
     }
-    if (cleanName === 'ORDEM DE SAIDA' && rawPass === 'saida2026') {
+    if (cleanName === 'ORDEM DE SAIDA' && rawPass === (systemPasswords['ORDEM DE SAIDA'] || 'saida2026')) {
       setUser({ name: 'ORDEM DE SAIDA', cpf: 'saida2026', role: 'ordem_saida' });
       return true;
     }
-    if (cleanName === 'JULIO CESAR NOGUEIRA' && numericPass === '431385464') {
+    if (cleanName === 'JULIO CESAR NOGUEIRA' && numericPass === (systemPasswords['JULIO CESAR NOGUEIRA'] || '431385464')) {
       setUser({ name: 'JULIO CESAR NOGUEIRA', cpf: '431385464', role: 'julio' });
       return true;
     }
@@ -232,6 +238,16 @@ const App: React.FC = () => {
     }
     
     return false;
+  };
+
+  const handleUpdateSystemPassword = async (key: string, newPassword: string) => {
+    try {
+      await set(child(systemPasswordsRef, key), newPassword);
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao atualizar senha:', error);
+      return { success: false, message: String(error) };
+    }
   };
 
   const handleLogout = () => setUser(null);
