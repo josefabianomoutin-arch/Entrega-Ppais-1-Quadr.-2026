@@ -67,7 +67,7 @@ const WeeklyScheduleControl: React.FC<WeeklyScheduleControlProps> = ({
 
     const weeklyData = useMemo(() => {
         const supplierData = filteredSuppliers.map(supplier => {
-            const weekDeliveries = (supplier.deliveries || []).filter(d => {
+            const weekDeliveries = Object.values(supplier.deliveries || {}).filter((d: any) => {
                 const dDate = new Date(d.date + 'T00:00:00');
                 return getWeekNumber(dDate) === selectedWeek;
             });

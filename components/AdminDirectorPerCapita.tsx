@@ -49,7 +49,7 @@ const AdminDirectorPerCapita: React.FC<AdminDirectorPerCapitaProps> = ({ supplie
   const availableItems = useMemo(() => {
     const itemMap = new Map<string, { price: number; unit: string }>();
     suppliers.forEach(s => {
-      (s.contractItems || []).forEach(ci => {
+      Object.values(s.contractItems || {}).forEach((ci: any) => {
         if (!itemMap.has(ci.name)) {
           itemMap.set(ci.name, { price: ci.valuePerKg, unit: ci.unit || 'Kg' });
         }

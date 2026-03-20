@@ -113,7 +113,7 @@ const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ suppliers = [], warehou
             
             const monthsCount = activeMonths.length || 12;
 
-            (s.contractItems || []).forEach(ci => {
+            Object.values(s.contractItems || {}).forEach((ci: any) => {
                 const iNorm = superNormalize(ci.name);
                 // Auditoria focada no ano completo
                 months.forEach(mName => {

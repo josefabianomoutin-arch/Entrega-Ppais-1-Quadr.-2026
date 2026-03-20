@@ -665,7 +665,7 @@ const EditWarehouseMovementModal: React.FC<EditWarehouseMovementModalProps> = ({
     const [isSaving, setIsSaving] = useState(false);
 
     const selectedSupplier = useMemo(() => suppliers.find(s => s.cpf === selectedCpf), [suppliers, selectedCpf]);
-    const availableItems = useMemo(() => selectedSupplier ? (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)) : [], [selectedSupplier]);
+    const availableItems = useMemo(() => selectedSupplier ? (Object.values(selectedSupplier.contractItems || {}) as any[]).sort((a,b) => a.name.localeCompare(b.name)) : [], [selectedSupplier]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -798,7 +798,7 @@ const ManualWarehouseMovementModal: React.FC<ManualWarehouseMovementModalProps> 
     const [isSaving, setIsSaving] = useState(false);
 
     const selectedSupplier = useMemo(() => suppliers.find(s => s.cpf === selectedCpf), [suppliers, selectedCpf]);
-    const availableItems = useMemo(() => selectedSupplier ? (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)) : [], [selectedSupplier]);
+    const availableItems = useMemo(() => selectedSupplier ? (Object.values(selectedSupplier.contractItems || {}) as any[]).sort((a,b) => a.name.localeCompare(b.name)) : [], [selectedSupplier]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

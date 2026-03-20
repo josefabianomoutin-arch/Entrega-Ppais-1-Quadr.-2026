@@ -45,7 +45,7 @@ const AdminContractItems: React.FC<AdminContractItemsProps> = ({ suppliers = [],
 
         // 1. Agrega Metas de todos os Fornecedores
         suppliers.forEach(s => {
-            (s.contractItems || []).forEach(ci => {
+            Object.values(s.contractItems || {}).forEach((ci: any) => {
                 const normName = superNormalize(ci.name);
                 const existing = map.get(normName) || {
                     name: ci.name,

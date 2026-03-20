@@ -107,8 +107,8 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
                 : months.slice(0, 4); 
             
             const monthsCount = activeMonths.length || 4;
-
-            s.contractItems.forEach(ci => {
+            
+            Object.values(s.contractItems || {}).forEach((ci: any) => {
                 const iNorm = superNormalize(ci.name);
                 months.forEach(mName => {
                     const hasContractInMonth = activeMonths.includes(mName);

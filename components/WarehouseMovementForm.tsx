@@ -42,7 +42,7 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
     const manualSupplierInvoices = useMemo(() => {
         if (!selectedSupplier) return [];
         const invoices = new Set<string>();
-        (selectedSupplier.deliveries || []).forEach(d => {
+        Object.values(selectedSupplier.deliveries || {}).forEach((d: any) => {
             if (d.invoiceNumber) invoices.add(d.invoiceNumber);
         });
         return Array.from(invoices).sort();
@@ -50,12 +50,12 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
 
     const availableItems = useMemo(() => {
         if (selectedSupplier) {
-            return (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name));
+            return Object.values(selectedSupplier.contractItems || {}).sort((a: any, b: any) => a.name.localeCompare(b.name));
         }
         if (manualType === 'saída') {
             const all: { name: string; supplierName: string; supplierCpf: string }[] = [];
             suppliers.forEach(s => {
-                (s.contractItems || []).forEach(ci => {
+                Object.values(s.contractItems || {}).forEach((ci: any) => {
                     all.push({ name: ci.name, supplierName: s.name, supplierCpf: s.cpf });
                 });
             });
@@ -69,7 +69,7 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
         if (barcode.length >= 8) {
             let foundMatch = false;
             for (const s of suppliers) {
-                const deliveries = (s.deliveries || []).filter(d => d.barcode === barcode);
+                const deliveries = Object.values(s.deliveries || {}).filter((d: any) => d.barcode === barcode);
                 if (deliveries.length > 0) {
                     // Se o fornecedor ainda não foi selecionado, seleciona
                     if (!selectedSupplierCpf) {

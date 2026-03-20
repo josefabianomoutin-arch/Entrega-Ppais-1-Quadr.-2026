@@ -188,9 +188,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         return {
             ...p,
             cpf: p.cpfCnpj, // Ensure cpf is set for Supplier type compatibility
-            deliveries: p.deliveries || [],
+            deliveries: Object.values(p.deliveries || {}),
             allowedWeeks: Array.from(new Set(weeks)),
-            initialValue: (p.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * (curr.valuePerKg || 0)), 0)
+            initialValue: Object.values(p.contractItems || {}).reduce((acc: any, curr: any) => acc + (curr.totalKg * (curr.valuePerKg || 0)), 0)
         } as Supplier;
     };
 

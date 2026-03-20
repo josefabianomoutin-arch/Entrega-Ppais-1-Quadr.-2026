@@ -1339,13 +1339,13 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
     }, [barcode]);
 
     const selectedSupplier = useMemo(() => suppliers.find(s => s.cpf === selectedCpf), [suppliers, selectedCpf]);
-    const availableContractItems = useMemo(() => selectedSupplier ? (selectedSupplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)) : [], [selectedSupplier]);
+    const availableContractItems = useMemo(() => selectedSupplier ? Object.values(selectedSupplier.contractItems || {}).sort((a: any, b: any) => a.name.localeCompare(b.name)) : [], [selectedSupplier]);
 
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedCpf || !nf || !date) return alert('Preencha fornecedor, data e número da nota.');
         const finalItems = items.map(it => {
-            const contract = (selectedSupplier?.contractItems || []).find(ci => ci.name === it.name);
+            const contract = Object.values(selectedSupplier?.contractItems || {}).find((ci: any) => ci.name === it.name);
             const kg = parseFloat(it.kg.replace(',', '.'));
             if (!contract || isNaN(kg) || kg <= 0) return null;
             return { name: it.name, kg, value: kg * contract.valuePerKg, lotNumber: it.lot, expirationDate: it.exp };
@@ -1356,7 +1356,7 @@ const ManualInvoiceModal: React.FC<ManualInvoiceModalProps> = ({ suppliers, onCl
 
     const totalValue = useMemo(() => {
         return items.reduce((sum, it) => {
-            const contract = (selectedSupplier?.contractItems || []).find(ci => ci.name === it.name);
+            const contract = Object.values(selectedSupplier?.contractItems || {}).find((ci: any) => ci.name === it.name);
             const kg = parseFloat(it.kg.replace(',', '.'));
             return (contract && !isNaN(kg)) ? sum + (kg * contract.valuePerKg) : sum;
         }, 0);
@@ -1490,17 +1490,17 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
         }
     }, [barcode, invoiceNumber]);
 
-    const availableContractItems = useMemo(() => (supplier.contractItems || []).sort((a,b) => a.name.localeCompare(b.name)), [supplier.contractItems]);
+    const availableContractItems = useMemo(() => Object.values(supplier.contractItems || {}).sort((a: any, b: any) => a.name.localeCompare(b.name)), [supplier.contractItems]);
     const handleItemChange = (id: string, field: 'name' | 'kg' | 'lot' | 'exp', value: string) => { setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it)); };
     const totalValue = useMemo(() => items.reduce((sum, it) => {
-        const contract = supplier.contractItems.find(ci => ci.name === it.name);
+        const contract = Object.values(supplier.contractItems || {}).find((ci: any) => ci.name === it.name);
         const kg = parseFloat(it.kg.replace(',', '.'));
         return (contract && !isNaN(kg)) ? sum + (kg * contract.valuePerKg) : sum;
     }, 0), [items, supplier.contractItems]);
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const finalItems = items.map(it => {
-            const contract = supplier.contractItems.find(ci => ci.name === it.name);
+            const contract = Object.values(supplier.contractItems || {}).find((ci: any) => ci.name === it.name);
             const kg = parseFloat(it.kg.replace(',', '.'));
             if (!contract || isNaN(kg)) return null;
             return { name: it.name, kg, value: kg * contract.valuePerKg, lotNumber: it.lot, expirationDate: it.exp };
@@ -1557,7 +1557,7 @@ const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, supplier, 
                         </div>
 
                         {filteredItems.length > 0 ? filteredItems.map(item => {
-                            const contract = supplier.contractItems.find(ci => ci.name === item.name);
+                            const contract = Object.values(supplier.contractItems || {}).find((ci: any) => ci.name === item.name);
                             const unit = getDisplayUnit(contract);
                             return (
                                 <div key={item.id} className="bg-gray-50 p-3 rounded-xl border border-gray-100 hover:border-teal-100 transition-colors space-y-2">
@@ -1767,7 +1767,7 @@ const ExitInvoiceModal: React.FC<ExitInvoiceModalProps> = ({ invoice, supplier, 
 
                         <div className="grid grid-cols-1 gap-2">
                             {filteredItems.length > 0 ? filteredItems.map(item => {
-                                const contract = supplier.contractItems.find(ci => ci.name === item.name);
+                                const contract = Object.values(supplier.contractItems || {}).find((ci: any) => ci.name === item.name);
                                 const unit = getDisplayUnit(contract);
                                 const isFilled = parseFloat(item.kg.replace(',', '.')) > 0;
                                 return (

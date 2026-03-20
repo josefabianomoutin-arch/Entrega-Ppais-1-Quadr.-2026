@@ -325,7 +325,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
         if (deliveries.length === 0) return null;
 
         const items = deliveries.map(d => {
-            const contractItem = receiptSupplier.contractItems.find((ci: any) => ci.name === (d as any).item);
+            const contractItem = Object.values(receiptSupplier.contractItems || {}).find((ci: any) => ci.name === (d as any).item);
             const unitPrice = contractItem?.valuePerKg || 0;
             const totalValue = ((d as any).kg || 0) * unitPrice;
             

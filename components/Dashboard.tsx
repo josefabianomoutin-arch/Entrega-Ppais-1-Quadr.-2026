@@ -129,7 +129,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const monthlyQuotas = useMemo(() => {
     if (!selectedDate || !supplier.contractItems) return [];
     const currentMonth = selectedDate.getMonth();
-    return supplier.contractItems.map(item => {
+    return Object.values(supplier.contractItems || {}).map(item => {
         const deliveredThisMonth = Object.values(supplier.deliveries || {})
             .filter(d => d.item === item.name && new Date(d.date + 'T00:00:00').getMonth() === currentMonth)
             .reduce((sum, d) => sum + (d.kg || 0), 0);
@@ -174,19 +174,19 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div className="flex flex-wrap justify-center gap-2">
                 {monthlySchedule ? (
-                    Object.entries(monthlySchedule).filter(([_, weeks]) => (weeks as number[]).length > 0).map(([month, weeks]) => (
+                    Object.entries(monthlySchedule).filter(([_, weeks]) => Object.values(weeks || {}).length > 0).map(([month, weeks]) => (
                         <div key={month} className="flex items-center gap-1 bg-white/20 px-3 py-1.5 rounded-xl border border-white/30">
                             <span className="text-[9px] font-black uppercase">{month.substring(0,3)}:</span>
                             <div className="flex gap-1">
-                                {(weeks as number[]).map(w => (
-                                    <span key={w} className="bg-white text-gray-800 w-5 h-5 flex items-center justify-center rounded-lg text-[10px] font-black shadow-sm">{w}</span>
+                                {Object.values(weeks || {}).map(w => (
+                                    <span key={w as number} className="bg-white text-gray-800 w-5 h-5 flex items-center justify-center rounded-lg text-[10px] font-black shadow-sm">{w as number}</span>
                                 ))}
                             </div>
                         </div>
                     ))
-                ) : supplier.allowedWeeks && supplier.allowedWeeks.length > 0 ? (
-                    supplier.allowedWeeks.sort((a,b) => a-b).map(w => (
-                        <span key={w} className={`${weekBadgeColor} font-black px-4 py-2 rounded-xl text-sm shadow-md`}>Semana {w}</span>
+                ) : supplier.allowedWeeks && Object.values(supplier.allowedWeeks || {}).length > 0 ? (
+                    Object.values(supplier.allowedWeeks || {}).sort((a: any, b: any) => a-b).map(w => (
+                        <span key={w as number} className={`${weekBadgeColor} font-black px-4 py-2 rounded-xl text-sm shadow-md`}>Semana {w as number}</span>
                     ))
                 ) : (
                     <span className="bg-green-400 text-green-950 font-black px-6 py-2 rounded-xl text-sm shadow-md uppercase">Calendário Livre</span>
@@ -208,7 +208,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="lg:col-span-2">
               <Calendar 
                 onDayClick={handleDayClick} 
-                deliveries={supplier.deliveries || []} 
+                deliveries={Object.values(supplier.deliveries || {})} 
                 simulatedToday={SIMULATED_TODAY} 
                 allowedWeeks={supplier.allowedWeeks}
                 monthlySchedule={monthlySchedule}

@@ -235,7 +235,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
             ...p,
             deliveries: [],
             allowedWeeks: [],
-            initialValue: (p.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * (curr.valuePerKg || 0)), 0)
+            initialValue: Object.values(p.contractItems || {}).reduce((acc: any, curr: any) => acc + (curr.totalKg * (curr.valuePerKg || 0)), 0)
         } as Supplier));
     }, [ppaisProducers]);
 
@@ -244,14 +244,14 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
             ...p,
             deliveries: [],
             allowedWeeks: [],
-            initialValue: (p.contractItems || []).reduce((acc, curr) => acc + (curr.totalKg * (curr.valuePerKg || 0)), 0)
+            initialValue: Object.values(p.contractItems || {}).reduce((acc: any, curr: any) => acc + (curr.totalKg * (curr.valuePerKg || 0)), 0)
         } as Supplier));
     }, [pereciveisSuppliers]);
 
     const handleUpdateContractForPpais = async (itemName: string, assignments: any[]) => {
         const updatedProducers = ppaisProducers.map(producer => {
             const assignment = assignments.find(a => a.supplierCpf === producer.cpfCnpj);
-            const newContractItems = (producer.contractItems || []).filter(ci => ci.name !== itemName);
+            const newContractItems = Object.values(producer.contractItems || {}).filter((ci: any) => ci.name !== itemName);
             if (assignment) {
                 newContractItems.push({
                     name: itemName,
@@ -272,7 +272,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
     const handleUpdateContractForPereciveis = async (itemName: string, assignments: any[]) => {
         const updatedSuppliers = pereciveisSuppliers.map(supplier => {
             const assignment = assignments.find(a => a.supplierCpf === supplier.cpfCnpj);
-            const newContractItems = (supplier.contractItems || []).filter(ci => ci.name !== itemName);
+            const newContractItems = Object.values(supplier.contractItems || {}).filter((ci: any) => ci.name !== itemName);
             if (assignment) {
                 newContractItems.push({
                     name: itemName,
@@ -293,7 +293,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
     const allContractItemNames = useMemo(() => {
         const names = new Set<string>();
         suppliers.forEach(s => {
-            (s.contractItems || []).forEach(ci => names.add(ci.name));
+            Object.values(s.contractItems || {}).forEach((ci: any) => names.add(ci.name));
         });
         return Array.from(names).sort();
     }, [suppliers]);
@@ -312,7 +312,7 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
       const allSources = [...suppliers, ...ppaisAsSuppliers, ...pereciveisAsSuppliers];
       
       allSources.forEach(p => {
-        (p.contractItems || []).forEach(item => {
+        Object.values(p.contractItems || {}).forEach((item: any) => {
           const current = data.get(item.name) || { totalQuantity: 0, totalValue: 0, unit: item.unit || 'kg-1' };
           
           current.totalQuantity += item.totalKg;
@@ -522,9 +522,9 @@ const AdminPerCapita: React.FC<AdminPerCapitaProps> = ({ suppliers, warehouseLog
             const hasEmpenho = (Object.values(supplier.deliveries || {}) as Delivery[]).some(d => !!d.receiptTermNumber);
             return !hasEmpenho;
         }).map(supplier => {
-            const totalWeight = supplier.contractItems?.reduce((acc, item) => acc + (item.totalKg || 0), 0) || 0;
-            const totalValue = supplier.contractItems?.reduce((acc, item) => acc + ((item.totalKg || 0) * (item.valuePerKg || 0)), 0) || 0;
-            const items = supplier.contractItems?.map(item => ({
+            const totalWeight = Object.values(supplier.contractItems || {}).reduce((acc: any, item: any) => acc + (item.totalKg || 0), 0) || 0;
+            const totalValue = Object.values(supplier.contractItems || {}).reduce((acc: any, item: any) => acc + ((item.totalKg || 0) * (item.valuePerKg || 0)), 0) || 0;
+            const items = Object.values(supplier.contractItems || {}).map((item: any) => ({
                 name: item.name,
                 contracted: item.totalKg || 0,
                 unit: item.unit || 'KG',

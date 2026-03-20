@@ -81,9 +81,9 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
         const supplier = suppliers.find(s => s.cpf === reportSupplierCpf);
         if (!supplier || !reportSelectedMonth) return;
 
-        const items = (supplier.deliveries || [])
-            .filter(d => d.date.startsWith(reportSelectedMonth) && d.invoiceNumber)
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const items = Object.values((supplier.deliveries as any) || {})
+            .filter((d: any) => d.date.startsWith(reportSelectedMonth) && d.invoiceNumber)
+            .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
         if (items.length === 0) {
             alert('Nenhum item encontrado para este mês/fornecedor.');
@@ -282,7 +282,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
     const handleClearDayForSupplier = (supplierCpf: string, supplierName: string, date: string) => {
         const p = suppliers.find(s => s.cpf === supplierCpf);
         if (!p) return;
-        const deliveriesOnDate = (p.deliveries || []).filter(d => d.date === date);
+        const deliveriesOnDate = Object.values((p.deliveries as any) || {}).filter((d: any) => d.date === date);
         if (deliveriesOnDate.length === 0) return;
 
         setConfirmConfig({
@@ -405,13 +405,14 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                             </h3>
                         )}
                         {sortedSuppliers.length > 0 ? sortedSuppliers.map(supplier => {
+                            const deliveriesArray = Object.values((supplier.deliveries as any) || {});
                             const displayDeliveries = dateFilter 
-                                ? (supplier.deliveries || []).filter(d => d.date === dateFilter)
-                                : (supplier.deliveries || []);
+                                ? deliveriesArray.filter((d: any) => d.date === dateFilter)
+                                : deliveriesArray;
 
-                            const sortedDeliveries = [...displayDeliveries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                            const pendingDeliveries = sortedDeliveries.filter(d => d.item === 'AGENDAMENTO PENDENTE');
-                            const realDeliveries = sortedDeliveries.filter(d => d.item !== 'AGENDAMENTO PENDENTE');
+                            const sortedDeliveries = [...displayDeliveries].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                            const pendingDeliveries = sortedDeliveries.filter((d: any) => d.item === 'AGENDAMENTO PENDENTE');
+                            const realDeliveries = sortedDeliveries.filter((d: any) => d.item !== 'AGENDAMENTO PENDENTE');
 
                             return (
                                 <div key={supplier.cpf} className="p-5 border rounded-2xl bg-gray-50/50 hover:bg-white transition-all border-l-8 border-l-purple-400 shadow-sm">

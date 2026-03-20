@@ -17,7 +17,7 @@ const AgendaChegadas: React.FC<AgendaChegadasProps> = ({ suppliers, thirdPartyEn
         const list: { supplierName: string; supplierCpf: string; time: string; arrivalTime?: string; status: 'AGENDADO' | 'CONCLUÍDO' | 'TERCEIRO' | 'CANCELADO'; id: string; type: 'FORNECEDOR' | 'TERCEIRO' }[] = [];
         
         suppliers.forEach(s => {
-            (s.deliveries || []).forEach(d => {
+            Object.values(s.deliveries || {}).forEach((d: any) => {
                 if (d.date === selectedAgendaDate) {
                     const isFaturado = d.item !== 'AGENDAMENTO PENDENTE';
                     const status = isFaturado ? 'CONCLUÍDO' : 'AGENDADO';

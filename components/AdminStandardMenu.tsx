@@ -263,7 +263,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
       const lots: typeof availableLots = [];
       
       suppliers.forEach(supplier => {
-          (supplier.deliveries || []).forEach(delivery => {
+          Object.values(supplier.deliveries || {}).forEach((delivery: any) => {
               if (delivery.item === itemName && delivery.lots) {
                   delivery.lots.forEach(lot => {
                       if ((lot.remainingQuantity || 0) > 0) {
@@ -325,7 +325,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   const availableContractItems = useMemo(() => {
     const itemSet = new Set<string>();
     (suppliers || []).forEach(s => {
-        (s.contractItems || []).forEach(ci => {
+        Object.values(s.contractItems || {}).forEach((ci: any) => {
             itemSet.add(ci.name);
         });
     });
@@ -335,7 +335,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
   const contractItemUnitMap = useMemo(() => {
     const map = new Map<string, string>();
     (suppliers || []).forEach(s => {
-        (s.contractItems || []).forEach(ci => {
+        Object.values(s.contractItems || {}).forEach((ci: any) => {
             if (!map.has(ci.name)) {
                 map.set(ci.name, ci.unit || 'kg-1');
             }
@@ -693,12 +693,12 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
 
     return contractedItemsInMenu.map(itemName => {
         const foundSuppliers = suppliers
-            .filter(supplier => (supplier.contractItems || []).some(ci => ci.name === itemName))
+            .filter(supplier => Object.values(supplier.contractItems || {}).some((ci: any) => ci.name === itemName))
             .map(supplier => {
-                const contractItem = supplier.contractItems.find(ci => ci.name === itemName);
+                const contractItem = Object.values(supplier.contractItems || {}).find((ci: any) => ci.name === itemName);
                 const totalContracted = contractItem?.totalKg || 0;
                 
-                const totalDelivered = (supplier.deliveries || [])
+                const totalDelivered = Object.values(supplier.deliveries || {})
                     .filter(d => d.item === itemName)
                     .reduce((sum, d) => sum + (d.kg || 0), 0);
                 
@@ -750,7 +750,7 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     });
 
     const result = scheduledSuppliers.map(supplier => {
-        const itemsToSupply = (supplier.contractItems || [])
+        const itemsToSupply = Object.values(supplier.contractItems || {})
             .map(ci => ci.name)
             .filter(name => requiredItems.has(name));
 

@@ -71,7 +71,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
       .filter(s => Object.values(s.deliveries || {}).length === 0)
       .map(s => ({
         name: s.name,
-        value: (s.contractItems || []).reduce((acc, item) => acc + ((item.totalKg || 0) * (item.valuePerKg || 0)), 0)
+        value: Object.values(s.contractItems || {}).reduce((acc: any, item: any) => acc + ((item.totalKg || 0) * (item.valuePerKg || 0)), 0)
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
@@ -82,7 +82,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
     const itemsMap = new Map<string, { contracted: number; delivered: number }>();
     
     suppliers.forEach(s => {
-      (s.contractItems || []).forEach(ci => {
+      Object.values(s.contractItems || {}).forEach((ci: any) => {
         const current = itemsMap.get(ci.name) || { contracted: 0, delivered: 0 };
         current.contracted += ci.totalKg || 0;
         itemsMap.set(ci.name, current);
@@ -109,7 +109,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
   // 4. Per Capita - Custo por Pessoa
   const perCapitaStats = useMemo(() => {
     const totalContractValue = suppliers.reduce((acc, s) => {
-      return acc + (s.contractItems || []).reduce((sum, item) => sum + ((item.totalKg || 0) * (item.valuePerKg || 0)), 0);
+      return acc + Object.values(s.contractItems || {}).reduce((sum: any, item: any) => sum + ((item.totalKg || 0) * (item.valuePerKg || 0)), 0);
     }, 0);
 
     const dailyCost = totalContractValue / 365; 
@@ -177,7 +177,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
       .map(s => ({
         name: s.name,
         delivered: (Object.values(s.deliveries || {}) as Delivery[]).reduce((acc, d) => acc + (Number(d.kg) || 0), 0),
-        contracted: (s.contractItems || []).reduce((acc, ci) => acc + (Number(ci.totalKg) || 0), 0)
+        contracted: Object.values(s.contractItems || {}).reduce((acc: any, ci: any) => acc + (Number(ci.totalKg) || 0), 0)
       }))
       .filter(s => s.contracted > 0)
       .sort((a, b) => b.delivered - a.delivered)

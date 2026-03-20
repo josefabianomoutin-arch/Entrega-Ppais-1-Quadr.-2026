@@ -139,7 +139,7 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                             if (category !== 'PPAIS' && category !== 'PERECÍVEIS') {
                                 extraCols = `<td class="text-right">${item.stockBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>`;
                             } else {
-                                const suppliersForItem = suppliers.filter(s => (s.contractItems || []).some(ci => ci.name === item.name));
+                                const suppliersForItem = suppliers.filter(s => Object.values(s.contractItems || {}).some((ci: any) => ci.name === item.name));
                                 const numSuppliers = suppliersForItem.length || 1;
                                 const weightPerSupplier = item.acquiredQuantity / numSuppliers;
                                 const valuePerSupplier = totalValue / numSuppliers;
@@ -406,7 +406,7 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                                         </div>
                                         {(category === 'PPAIS' || category === 'PERECÍVEIS') && (
                                             <div className="mt-4 grid grid-cols-2 gap-2">
-                                                {suppliers.filter(s => (s.contractItems || []).some(ci => ci.name === item.name)).map(s => (
+                                                {suppliers.filter(s => Object.values(s.contractItems || {}).some((ci: any) => ci.name === item.name)).map(s => (
                                                     <div key={s.cpf} className="flex items-center bg-white/50 px-2.5 py-1.5 rounded-xl border border-zinc-100 shadow-sm hover:border-indigo-200 transition-all">
                                                         <div className="w-2 h-2 rounded-full bg-indigo-500 mr-2 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
                                                         <div className="flex flex-col">
@@ -475,7 +475,7 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                                         </td>
                                     ) : (() => {
                                         const supplierCount = suppliers.filter(s => 
-                                            (s.contractItems || []).some(ci => ci.name === item.name)
+                                            Object.values(s.contractItems || {}).some((ci: any) => ci.name === item.name)
                                         ).length || 1;
                                         const weightPerSupplier = item.acquiredQuantity / supplierCount;
                                         const valuePerSupplier = (item.unitValue || 0) * weightPerSupplier;
@@ -732,8 +732,8 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                 <ManageContractSuppliersModal 
                     itemName={manageItem.name} 
                     currentSuppliers={suppliers.flatMap(s => 
-                        (s.contractItems || [])
-                            .filter(ci => ci.name === manageItem.name)
+                        Object.values(s.contractItems || {})
+                            .filter((ci: any) => ci.name === manageItem.name)
                             .map(ci => ({
                                 supplierName: s.name,
                                 supplierCpf: s.cpf,

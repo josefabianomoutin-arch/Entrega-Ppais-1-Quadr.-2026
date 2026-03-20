@@ -40,16 +40,17 @@ const Calendar: React.FC<CalendarProps> = ({ onDayClick, deliveries, simulatedTo
   const isDateAllowed = (date: Date) => {
     if (monthlySchedule) {
       const monthName = MONTHS_2026[date.getMonth()].name;
-      const allowedWeeksInMonth = monthlySchedule[monthName] || [];
+      const allowedWeeksInMonth = Object.values(monthlySchedule[monthName] || {}) as number[];
       if (allowedWeeksInMonth.length === 0) return true; // Se não definiu nada, libera tudo? Ou bloqueia tudo? 
       // Geralmente se não definiu nada no per capita, libera tudo.
       const weekOfMonth = getWeekOfMonth(date);
       return allowedWeeksInMonth.includes(weekOfMonth);
     }
     
-    if (!allowedWeeks || allowedWeeks.length === 0) return true;
+    const allowedWeeksArray = Object.values(allowedWeeks || {}) as number[];
+    if (allowedWeeksArray.length === 0) return true;
     const weekNumber = getWeekNumber(date);
-    return allowedWeeks.includes(weekNumber);
+    return allowedWeeksArray.includes(weekNumber);
   };
 
   const generateMonthGrid = (month: number, year: number) => {

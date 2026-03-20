@@ -37,8 +37,8 @@ const formatCurrency = (value: number): string => {
 };
 
 const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
-    const deliveries = supplier.deliveries || [];
-    const contractItems = supplier.contractItems || [];
+    const deliveries = Object.values(supplier.deliveries || {});
+    const contractItems = Object.values(supplier.contractItems || {});
 
     const totalDeliveredValue = deliveries.reduce((sum, delivery) => sum + (delivery.value || 0), 0);
     const valueProgress = supplier.initialValue > 0 ? (totalDeliveredValue / supplier.initialValue) * 100 : 0;
@@ -123,7 +123,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
         <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
             <h2 className="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">Contrato 1º Quadr. 2026</h2>
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                {supplier.contractItems.map(item => {
+                {contractItems.map(item => {
                     const itemMonthlyData = monthlyDataByItem.get(item.name) || [];
                     return (
                         <div key={item.name} className="p-3 bg-gray-50 rounded-lg text-sm border">
