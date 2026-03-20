@@ -1480,10 +1480,6 @@ const App: React.FC = () => {
           await set(child(vehicleExitOrdersRef, order.id), order);
           return { success: true, message: 'Atualizado' };
         }}
-        onDeleteVehicleExitOrder={async (id) => {
-          console.log("Deleting vehicle exit order (Subportaria) with ID:", id);
-          return remove(child(vehicleExitOrdersRef, id));
-        }}
         onDeleteThirdPartyEntry={async (id) => remove(child(thirdPartyEntriesRef, id))}
       />
     );

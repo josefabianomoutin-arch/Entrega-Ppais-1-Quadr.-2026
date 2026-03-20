@@ -8,7 +8,7 @@ interface AdminVehicleExitOrderProps {
     orders: VehicleExitOrder[];
     onRegister: (order: Omit<VehicleExitOrder, 'id'>) => Promise<{ success: boolean; message: string; id?: string }>;
     onUpdate: (order: VehicleExitOrder) => Promise<{ success: boolean; message: string }>;
-    onDelete: (id: string) => Promise<void>;
+    onDelete?: (id: string) => Promise<void>;
     vehicleAssets: VehicleAsset[];
     onRegisterVehicleAsset: (asset: Omit<VehicleAsset, 'id'>) => Promise<{ success: boolean; message: string }>;
     onUpdateVehicleAsset: (asset: VehicleAsset) => Promise<{ success: boolean; message: string }>;
@@ -630,7 +630,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                     )}
                                 </button>
                             )}
-                            {!readOnly && (
+                            {onDelete && !readOnly && (
                                 <button 
                                     onClick={() => {
                                         setConfirmConfig({
@@ -944,7 +944,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                                 <div className="text-[9px] text-gray-400 uppercase mt-1">{order.responsibleServer}</div>
                                             </div>
                                             <div className="flex gap-2">
-                                                {!readOnly && (
+                                                {onDelete && !readOnly && (
                                                     <button 
                                                         onClick={() => {
                                                             setConfirmConfig({
@@ -992,7 +992,7 @@ const AdminVehicleExitOrder: React.FC<AdminVehicleExitOrderProps> = ({
                                                 <div className="text-[9px] text-gray-400 uppercase mt-1">Saída: {order.exitTime}</div>
                                             </div>
                                             <div className="flex gap-2">
-                                                {!readOnly && (
+                                                {onDelete && !readOnly && (
                                                     <button 
                                                         onClick={() => {
                                                             setConfirmConfig({
