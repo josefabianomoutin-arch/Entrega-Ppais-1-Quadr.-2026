@@ -198,7 +198,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
         {/* MENSAGEM DINÂMICA DE SAUDAÇÃO E ADIANTADOS LIBERADOS */}
         <div className="flex-1 mx-4 md:mx-10 bg-blue-50 border-2 border-blue-200 rounded-2xl p-2 overflow-hidden whitespace-nowrap relative h-12 flex items-center shadow-inner">
             <div className="animate-marquee inline-block text-blue-900 font-black text-xs md:text-sm uppercase italic tracking-tight">
-                {greeting}, HOJE TEMOS OS ADIANTADOS LIBERADOS: {releasedAdvances.length > 0 ? releasedAdvances.join(' • ') : 'NENHUM NO MOMENTO'}
+                {greeting}, DANIELE GARCIA POSSIDONIO, HOJE TEMOS LIBERADOS OS ADIANTADOS: {releasedAdvances.length > 0 ? releasedAdvances.join(' • ') : 'NENHUM NO MOMENTO'}
             </div>
         </div>
 
