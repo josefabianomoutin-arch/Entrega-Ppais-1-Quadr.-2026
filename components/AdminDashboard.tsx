@@ -81,6 +81,8 @@ interface AdminDashboardProps {
   onDeleteDriverAsset: (id: string) => Promise<void>;
   validationRoles: any[];
   onUpdateSupplierObservations?: (cpf: string, observations: string) => Promise<{ success: boolean; message?: string }>;
+  systemPasswords: Record<string, string>;
+  onUpdateSystemPassword: (key: string, pass: string) => Promise<void>;
 }
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -121,6 +123,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   const [regWeeks, setRegWeeks] = useState<number[]>([]);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [editingPasswordKey, setEditingPasswordKey] = useState<string | null>(null);
+  const [newPasswordValue, setNewPasswordValue] = useState('');
+
+  const systemAccesses = [
+      { key: 'ALMOXARIFADO', name: 'Almoxarifado', default: 'almoxarifado123' },
+      { key: 'ITESP', name: 'ITESP', default: 'taiuvaitesp2026' },
+      { key: 'FINANCEIRO', name: 'Financeiro', default: 'financeiro123' },
+      { key: 'CARDAPIO', name: 'Cardápio', default: 'cardapio123' },
+      { key: 'SEGURANÇA EXTERNA', name: 'Segurança Externa', default: 'externa2026' },
+      { key: 'INFRAESTRUTURA', name: 'Infraestrutura', default: 'infra2026' },
+      { key: 'ORDEM DE SAIDA', name: 'Ordem de Saída', default: 'saida2026' },
+      { key: 'JULIO CESAR NOGUEIRA', name: 'Julio Cesar Nogueira', default: '431385464' },
+  ];
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const backupInputRef = useRef<HTMLInputElement>(null);
   
@@ -398,6 +413,78 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                                 };
                                 reader.readAsText(file);
                             }} accept=".json" className="hidden" />
+                        </div>
+                    </div>
+
+                    <div className="mt-12">
+                        <h3 className="text-xl font-black text-indigo-950 uppercase tracking-tighter mb-6 flex items-center gap-2">
+                            <svg className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                            Gerenciamento de Acessos
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {systemAccesses.map((access) => (
+                                <div key={access.key} className="bg-zinc-50 p-5 rounded-3xl border border-zinc-200 hover:border-indigo-200 transition-all group">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{access.name}</h4>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                {editingPasswordKey === access.key ? (
+                                                    <input 
+                                                        type="text"
+                                                        value={newPasswordValue}
+                                                        onChange={(e) => setNewPasswordValue(e.target.value)}
+                                                        className="bg-white border border-indigo-200 rounded-lg px-2 py-1 text-xs font-bold text-indigo-900 outline-none focus:ring-2 focus:ring-indigo-100 w-32"
+                                                        autoFocus
+                                                    />
+                                                ) : (
+                                                    <p className="text-sm font-black text-zinc-800 font-mono">
+                                                        {props.systemPasswords[access.key] || access.default}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            {editingPasswordKey === access.key ? (
+                                                <>
+                                                    <button 
+                                                        onClick={async () => {
+                                                            if (newPasswordValue.trim()) {
+                                                                await props.onUpdateSystemPassword(access.key, newPasswordValue.trim());
+                                                                setEditingPasswordKey(null);
+                                                            }
+                                                        }}
+                                                        className="p-2 bg-green-100 text-green-600 rounded-xl hover:bg-green-200 transition-colors"
+                                                        title="Salvar"
+                                                    >
+                                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setEditingPasswordKey(null)}
+                                                        className="p-2 bg-zinc-100 text-zinc-400 rounded-xl hover:bg-zinc-200 transition-colors"
+                                                        title="Cancelar"
+                                                    >
+                                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => {
+                                                        setEditingPasswordKey(access.key);
+                                                        setNewPasswordValue(props.systemPasswords[access.key] || access.default);
+                                                    }}
+                                                    className="p-2 bg-white text-zinc-400 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 border border-zinc-200 transition-all opacity-0 group-hover:opacity-100"
+                                                    title="Alterar Senha"
+                                                >
+                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {!editingPasswordKey && !props.systemPasswords[access.key] && (
+                                        <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest bg-zinc-100 px-2 py-0.5 rounded-full">Padrão</span>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>

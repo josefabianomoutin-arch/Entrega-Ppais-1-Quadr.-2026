@@ -1315,6 +1315,10 @@ const App: React.FC = () => {
         registrationStatus={null}
         onClearRegistrationStatus={() => {}}
         validationRoles={validationRoles}
+        systemPasswords={systemPasswords}
+        onUpdateSystemPassword={async (key, pass) => {
+          await set(child(systemPasswordsRef, key), pass);
+        }}
       />
     );
   }
