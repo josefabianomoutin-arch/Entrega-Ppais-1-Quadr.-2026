@@ -71,7 +71,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
       .filter(s => Object.values(s.deliveries || {}).length === 0)
       .map(s => ({
         name: s.name,
-        value: Object.values(s.contractItems || {}).reduce((acc: any, item: any) => acc + ((item.totalKg || 0) * (item.valuePerKg || 0)), 0)
+        value: (Object.values(s.contractItems || {}) as any[]).reduce((acc: any, item: any) => acc + ((item.totalKg || 0) * (item.valuePerKg || 0)), 0)
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
@@ -177,7 +177,7 @@ const AdminGraphs: React.FC<AdminGraphsProps> = ({
       .map(s => ({
         name: s.name,
         delivered: (Object.values(s.deliveries || {}) as Delivery[]).reduce((acc, d) => acc + (Number(d.kg) || 0), 0),
-        contracted: Object.values(s.contractItems || {}).reduce((acc: any, ci: any) => acc + (Number(ci.totalKg) || 0), 0)
+        contracted: (Object.values(s.contractItems || {}) as any[]).reduce((acc: any, ci: any) => acc + (Number(ci.totalKg) || 0), 0)
       }))
       .filter(s => s.contracted > 0)
       .sort((a, b) => b.delivered - a.delivered)

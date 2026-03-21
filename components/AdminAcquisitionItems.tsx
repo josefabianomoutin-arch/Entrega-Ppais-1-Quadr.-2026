@@ -732,9 +732,9 @@ const AdminAcquisitionItems: React.FC<AdminAcquisitionItemsProps> = ({ items, ca
                 <ManageContractSuppliersModal 
                     itemName={manageItem.name} 
                     currentSuppliers={suppliers.flatMap(s => 
-                        Object.values(s.contractItems || {})
+                        (Object.values(s.contractItems || {}) as any[])
                             .filter((ci: any) => ci.name === manageItem.name)
-                            .map(ci => ({
+                            .map((ci: any) => ({
                                 supplierName: s.name,
                                 supplierCpf: s.cpf,
                                 amount: ci.totalKg,

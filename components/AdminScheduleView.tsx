@@ -81,7 +81,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
         const supplier = suppliers.find(s => s.cpf === reportSupplierCpf);
         if (!supplier || !reportSelectedMonth) return;
 
-        const items = Object.values((supplier.deliveries as any) || {})
+        const items = (Object.values((supplier.deliveries as any) || {}) as any[])
             .filter((d: any) => d.date.startsWith(reportSelectedMonth) && d.invoiceNumber)
             .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
@@ -90,8 +90,8 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
             return;
         }
 
-        const totalWeight = items.reduce((sum, item) => sum + (item.kg || 0), 0);
-        const totalValue = items.reduce((sum, item) => sum + (item.value || 0), 0);
+        const totalWeight = items.reduce((sum: number, item: any) => sum + (item.kg || 0), 0);
+        const totalValue = items.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
 
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
@@ -290,7 +290,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
             title: 'Limpar Dia',
             message: `ATENÇÃO: Deseja excluir TODOS os registros (${deliveriesOnDate.length}) do fornecedor ${supplierName} no dia ${formatDate(date)}?`,
             onConfirm: () => {
-                onCancelDeliveries(supplierCpf, deliveriesOnDate.map(d => d.id));
+                onCancelDeliveries(supplierCpf, (deliveriesOnDate as any[]).map(d => d.id));
                 setConfirmConfig(prev => ({ ...prev, isOpen: false }));
             },
             variant: 'danger'
@@ -405,7 +405,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                             </h3>
                         )}
                         {sortedSuppliers.length > 0 ? sortedSuppliers.map(supplier => {
-                            const deliveriesArray = Object.values((supplier.deliveries as any) || {});
+                            const deliveriesArray = (Object.values((supplier.deliveries as any) || {}) as any[]);
                             const displayDeliveries = dateFilter 
                                 ? deliveriesArray.filter((d: any) => d.date === dateFilter)
                                 : deliveriesArray;
@@ -442,7 +442,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                                             </h4>
                                             {pendingDeliveries.length > 0 ? (
                                                 <div className="flex flex-wrap gap-2">
-                                                            {pendingDeliveries.map(delivery => (
+                                                            {pendingDeliveries.map((delivery: any) => (
                                                                 <div key={delivery.id} className="flex flex-col gap-2 p-3 bg-red-50/50 rounded-xl border border-red-100">
                                                                     <div className="flex items-center gap-2">
                                                                         <span className="text-xs font-black text-red-800 font-mono">{formatDate(delivery.date)}</span>
@@ -482,7 +482,7 @@ const AdminScheduleView: React.FC<AdminScheduleViewProps> = ({ suppliers, thirdP
                                                 <div className="flex flex-wrap gap-2">
                                                     {(() => {
                                                         const invoices = new Map<string, { date: string, invoiceNumber: string, ids: string[] }>();
-                                                        realDeliveries.forEach(d => {
+                                                        realDeliveries.forEach((d: any) => {
                                                             const nf = (d.invoiceNumber || '').toString().trim();
                                                             const key = nf || `no-nf-${d.id}`;
                                                             if (!invoices.has(key)) {

@@ -37,24 +37,24 @@ const formatCurrency = (value: number): string => {
 };
 
 const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
-    const deliveries = Object.values(supplier.deliveries || {});
-    const contractItems = Object.values(supplier.contractItems || {});
+    const deliveries = (Object.values(supplier.deliveries || {}) as any[]);
+    const contractItems = (Object.values(supplier.contractItems || {}) as any[]);
 
-    const totalDeliveredValue = deliveries.reduce((sum, delivery) => sum + (delivery.value || 0), 0);
+    const totalDeliveredValue = deliveries.reduce((sum: number, delivery: any) => sum + (delivery.value || 0), 0);
     const valueProgress = supplier.initialValue > 0 ? (totalDeliveredValue / supplier.initialValue) * 100 : 0;
 
     const aggregatedTotals = useMemo(() => {
         const contracted = new Map<string, number>();
         const delivered = new Map<string, number>();
         contractItems.forEach(item => {
-            const { quantity, unit } = getContractItemDisplayInfo(item);
+            const { quantity, unit } = getContractItemDisplayInfo(item as any);
             contracted.set(unit, (contracted.get(unit) || 0) + quantity);
         });
         deliveries.forEach(delivery => {
             if (!delivery.item || (delivery.kg || 0) === 0) return;
             const contractItem = contractItems.find(ci => ci.name === delivery.item);
             if (contractItem) {
-                const { unit } = getContractItemDisplayInfo(contractItem);
+                const { unit } = getContractItemDisplayInfo(contractItem as any);
                 delivered.set(unit, (delivered.get(unit) || 0) + (delivery.kg || 0));
             }
         });
@@ -69,7 +69,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
         const data = new Map<string, any[]>();
         contractItems.forEach(item => {
             const itemMonthlyData = [];
-            const { quantity: itemTotalQuantity, unit: itemUnit } = getContractItemDisplayInfo(item);
+            const { quantity: itemTotalQuantity, unit: itemUnit } = getContractItemDisplayInfo(item as any);
             const itemTotalValue = (item.totalKg || 0) * (item.valuePerKg || 0);
             
             let accumulatedQuantityRemainder = 0;
@@ -92,8 +92,8 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ supplier }) => {
                     const monthNumber = parseInt(parts[1], 10);
                     return (monthNumber - 1) === month.number;
                 });
-                const deliveredValue = deliveredInMonth.reduce((sum, d) => sum + (d.value || 0), 0);
-                const deliveredQuantity = deliveredInMonth.reduce((sum, d) => sum + (d.kg || 0), 0);
+                const deliveredValue = deliveredInMonth.reduce((sum: number, d: any) => sum + (d.value || 0), 0);
+                const deliveredQuantity = deliveredInMonth.reduce((sum: number, d: any) => sum + (d.kg || 0), 0);
                 
                 const remainingValue = monthlyValueQuota - deliveredValue;
                 const remainingQuantity = monthlyQuantityQuota - deliveredQuantity;

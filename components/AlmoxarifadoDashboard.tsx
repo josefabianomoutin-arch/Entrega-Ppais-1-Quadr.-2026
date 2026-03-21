@@ -325,7 +325,7 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
         if (deliveries.length === 0) return null;
 
         const items = deliveries.map(d => {
-            const contractItem = Object.values(receiptSupplier.contractItems || {}).find((ci: any) => ci.name === (d as any).item);
+            const contractItem = (Object.values(receiptSupplier.contractItems || {}) as any[]).find((ci: any) => ci.name === (d as any).item);
             const unitPrice = contractItem?.valuePerKg || 0;
             const totalValue = ((d as any).kg || 0) * unitPrice;
             
@@ -350,10 +350,10 @@ const AlmoxarifadoDashboard: React.FC<AlmoxarifadoDashboardProps> = ({
         });
 
         const totalInvoiceValue = items.reduce((sum, it) => sum + it.totalValue, 0);
-        const invoiceDate = deliveries.find(d => d.invoiceDate)?.invoiceDate || deliveries[0]?.date || ''; 
-        const receiptDate = deliveries[0]?.date || ''; // Data de chegada
-        const barcode = deliveries.find(d => d.barcode)?.barcode || '';
-        const receiptTermNumber = deliveries.find(d => d.receiptTermNumber)?.receiptTermNumber || '';
+        const invoiceDate = (deliveries as any[]).find(d => d.invoiceDate)?.invoiceDate || (deliveries[0] as any)?.date || ''; 
+        const receiptDate = (deliveries[0] as any)?.date || ''; // Data de chegada
+        const barcode = (deliveries as any[]).find(d => d.barcode)?.barcode || '';
+        const receiptTermNumber = (deliveries as any[]).find(d => d.receiptTermNumber)?.receiptTermNumber || '';
 
         return {
             supplierName: receiptSupplier.name,

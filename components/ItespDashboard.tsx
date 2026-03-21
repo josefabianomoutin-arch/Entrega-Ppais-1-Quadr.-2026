@@ -130,7 +130,7 @@ const ItespDashboard: React.FC<ItespDashboardProps> = ({ suppliers = [], warehou
         // 2. Acumula Entradas Reais (via Consulta de Notas Fiscais / Deliveries)
         itespSuppliers.forEach(supplier => {
             const sNorm = superNormalize(supplier.name);
-            Object.values(supplier.deliveries || {}).forEach(delivery => {
+            (Object.values(supplier.deliveries || {}) as any[]).forEach(delivery => {
                 // Consideramos apenas entregas com item definido e que não seja o placeholder de agendamento
                 if (!delivery.item || delivery.item === 'AGENDAMENTO PENDENTE') return;
 

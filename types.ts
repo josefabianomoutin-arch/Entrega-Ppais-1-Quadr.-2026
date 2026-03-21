@@ -148,6 +148,7 @@ export interface FinancialRecord {
   selecao: string;
   natureza: '339030' | '339039';
   modalidade: string;
+  adiantado?: string; // NOVO
   dataSolicitacao: string;
   valorSolicitado: number;
   dataRecebimento: string;

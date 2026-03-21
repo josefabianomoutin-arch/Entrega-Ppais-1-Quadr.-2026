@@ -693,14 +693,14 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
 
     return contractedItemsInMenu.map(itemName => {
         const foundSuppliers = suppliers
-            .filter(supplier => Object.values(supplier.contractItems || {}).some((ci: any) => ci.name === itemName))
+            .filter(supplier => (Object.values(supplier.contractItems || {}) as any[]).some((ci: any) => ci.name === itemName))
             .map(supplier => {
-                const contractItem = Object.values(supplier.contractItems || {}).find((ci: any) => ci.name === itemName);
+                const contractItem = (Object.values(supplier.contractItems || {}) as any[]).find((ci: any) => ci.name === itemName);
                 const totalContracted = contractItem?.totalKg || 0;
                 
-                const totalDelivered = Object.values(supplier.deliveries || {})
-                    .filter(d => d.item === itemName)
-                    .reduce((sum, d) => sum + (d.kg || 0), 0);
+                const totalDelivered = (Object.values(supplier.deliveries || {}) as any[])
+                    .filter((d: any) => d.item === itemName)
+                    .reduce((sum: number, d: any) => sum + (d.kg || 0), 0);
                 
                 const remainingBalance = Math.max(0, totalContracted - totalDelivered);
                 
@@ -750,8 +750,8 @@ const AdminStandardMenu: React.FC<AdminStandardMenuProps> = ({ template, dailyMe
     });
 
     const result = scheduledSuppliers.map(supplier => {
-        const itemsToSupply = Object.values(supplier.contractItems || {})
-            .map(ci => ci.name)
+        const itemsToSupply = (Object.values(supplier.contractItems || {}) as any[])
+            .map((ci: any) => ci.name)
             .filter(name => requiredItems.has(name));
 
         return {

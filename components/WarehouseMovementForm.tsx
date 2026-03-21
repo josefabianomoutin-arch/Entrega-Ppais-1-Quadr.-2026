@@ -50,12 +50,12 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
 
     const availableItems = useMemo(() => {
         if (selectedSupplier) {
-            return Object.values(selectedSupplier.contractItems || {}).sort((a: any, b: any) => a.name.localeCompare(b.name));
+            return (Object.values(selectedSupplier.contractItems || {}) as any[]).sort((a: any, b: any) => a.name.localeCompare(b.name));
         }
         if (manualType === 'saída') {
             const all: { name: string; supplierName: string; supplierCpf: string }[] = [];
             suppliers.forEach(s => {
-                Object.values(s.contractItems || {}).forEach((ci: any) => {
+                (Object.values(s.contractItems || {}) as any[]).forEach((ci: any) => {
                     all.push({ name: ci.name, supplierName: s.name, supplierCpf: s.cpf });
                 });
             });
@@ -69,7 +69,7 @@ const WarehouseMovementForm: React.FC<WarehouseMovementFormProps> = ({ suppliers
         if (barcode.length >= 8) {
             let foundMatch = false;
             for (const s of suppliers) {
-                const deliveries = Object.values(s.deliveries || {}).filter((d: any) => d.barcode === barcode);
+                const deliveries = (Object.values(s.deliveries || {}) as any[]).filter((d: any) => d.barcode === barcode);
                 if (deliveries.length > 0) {
                     // Se o fornecedor ainda não foi selecionado, seleciona
                     if (!selectedSupplierCpf) {

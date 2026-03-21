@@ -142,6 +142,7 @@ const PtresTable: React.FC<{ ptres: string, ptresRecords: FinancialRecord[], for
                                             <th className="p-3 text-center w-12">#</th>
                                             <th className="p-3 text-left">Tipo</th>
                                             <th className="p-3 text-left">Modalidade</th>
+                                            <th className="p-3 text-left">Adiantado</th>
                                             <th className="p-3 text-left">Descrição</th>
                                             <th className="p-3 text-left">Processo / Empenho</th>
                                             <th className="p-3 text-left">Data</th>
@@ -167,6 +168,13 @@ const PtresTable: React.FC<{ ptres: string, ptresRecords: FinancialRecord[], for
                                                     <td className="p-3">
                                                         {r.tipo === 'DESPESA' ? (
                                                             <div className={`text-[10px] font-black uppercase ${isFinalizado ? 'text-green-600' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-indigo-500'}`}>{r.modalidade || 'DISPENSA'}</div>
+                                                        ) : (
+                                                            <div className="text-[10px] font-bold text-gray-400">-</div>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-3">
+                                                        {r.tipo === 'DESPESA' ? (
+                                                            <div className="text-[10px] font-black uppercase text-gray-600">{r.adiantado || '-'}</div>
                                                         ) : (
                                                             <div className="text-[10px] font-bold text-gray-400">-</div>
                                                         )}
@@ -241,6 +249,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
     ptres: '380302',
     natureza: '339030',
     modalidade: '',
+    adiantado: '',
     dataSolicitacao: new Date().toISOString().split('T')[0],
     valorSolicitado: 0,
     valorRecebido: 0,
@@ -312,6 +321,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
                                 <th>Tipo</th>
                                 <th>Natureza</th>
                                 <th>Modalidade</th>
+                                <th>Adiantado</th>
                                 <th>Descrição</th>
                                 <th>Processo / Empenho</th>
                                 <th>Data</th>
@@ -326,6 +336,7 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
                                     <td class="font-bold ${r.tipo === 'RECURSO' ? 'text-indigo-600' : 'text-red-600'}">${r.tipo}</td>
                                     <td>${r.natureza}</td>
                                     <td>${r.modalidade || '-'}</td>
+                                    <td>${r.adiantado || '-'}</td>
                                     <td>${r.descricao || '-'}</td>
                                     <td>
                                         ${r.numeroProcesso ? `Proc: ${r.numeroProcesso}<br>` : ''}
@@ -414,7 +425,8 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
             numeroEmpenho: formData.numeroEmpenho?.trim() || '',
             notaCredito: formData.notaCredito?.trim() || '',
             dataFinalizacaoProcesso: formData.dataFinalizacaoProcesso || '',
-            modalidade: formData.modalidade?.trim() || ''
+            modalidade: formData.modalidade?.trim() || '',
+            adiantado: formData.adiantado?.trim() || ''
         };
 
         if (formData.tipo === 'RECURSO') {
@@ -558,6 +570,10 @@ const AdminFinancialManager: React.FC<AdminFinancialManagerProps> = ({ records, 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Modalidade</label>
                 <input type="text" value={formData.modalidade || ''} onChange={e => setFormData({...formData, modalidade: e.target.value})} className="w-full p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-400 font-bold text-sm" placeholder="Dispensa, Pregão..." />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Adiantado</label>
+                <input type="text" value={formData.adiantado || ''} onChange={e => setFormData({...formData, adiantado: e.target.value})} className="w-full p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-400 font-bold text-sm" placeholder="Nome do adiantado" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-red-600 uppercase ml-1">Valor Gasto (R$)</label>

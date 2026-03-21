@@ -484,10 +484,16 @@ const FinancialCard: React.FC<{ record: FinancialRecord }> = ({ record: r }) => 
                         <p className={`text-[10px] font-bold ${isFinalizado ? 'text-green-600' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-indigo-600'}`}>{r.natureza} ({r.natureza === '339030' ? 'Peças' : 'Serviços'})</p>
                     </div>
                     {r.tipo === 'DESPESA' && (
-                        <div>
-                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Modalidade</p>
-                            <p className={`text-[10px] font-bold uppercase truncate ${isFinalizado ? 'text-green-600' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-gray-600'}`}>{r.modalidade || '-'}</p>
-                        </div>
+                        <>
+                            <div>
+                                <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Modalidade</p>
+                                <p className={`text-[10px] font-bold uppercase truncate ${isFinalizado ? 'text-green-600' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-gray-600'}`}>{r.modalidade || '-'}</p>
+                            </div>
+                            <div>
+                                <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Adiantado</p>
+                                <p className={`text-[10px] font-bold uppercase truncate ${isFinalizado ? 'text-green-600' : isEmAndamentoEmpenhado ? 'text-orange-600' : 'text-gray-600'}`}>{r.adiantado || '-'}</p>
+                            </div>
+                        </>
                     )}
                 </div>
             </div>
